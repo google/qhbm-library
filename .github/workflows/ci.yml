@@ -13,3 +13,4 @@ jobs:
       - uses: psf/black@2f52e4b4929370ec503ee272bcc10d3176db8e89
         with:
           args: ". --diff"
+
