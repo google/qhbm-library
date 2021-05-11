@@ -17,8 +17,8 @@
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-import qhbm_base
-import util
+from qhbm_library import qhbm_base
+from qhbm_library import util
 
 
 # ============================================================================ #

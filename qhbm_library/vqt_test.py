@@ -19,10 +19,10 @@ import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-import ebm
-import qhbm_base
-import util
-import vqt
+from qhbm_library import ebm
+from qhbm_library import qhbm_base
+from qhbm_library import util
+from qhbm_library import vqt
 
 
 class VQTTest(tf.test.TestCase):

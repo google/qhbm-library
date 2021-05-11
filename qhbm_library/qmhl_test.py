@@ -19,11 +19,11 @@ import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-from qhbm_tfq import ansatze
-from qhbm_tfq import density_operator
-from qhbm_tfq import ebm
-from qhbm_tfq import qhbm
-from qhbm_tfq import qmhl
+from qhbm_library import ansatze
+from qhbm_library import density_operator
+from qhbm_library import ebm
+from qhbm_library import qhbm
+from qhbm_library import qmhl
 
 
 class QMHLLossTest(tf.test.TestCase):

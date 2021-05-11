@@ -17,8 +17,8 @@ import itertools
 
 import tensorflow as tf
 
-import ebm
-import util
+from qhbm_library import ebm
+from qhbm_library import util
 
 
 class ProbTest(tf.test.TestCase):

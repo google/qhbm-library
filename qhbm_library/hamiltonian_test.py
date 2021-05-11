@@ -18,7 +18,7 @@ import cirq
 
 import googletest
 
-import hamiltonian
+from qhbm_library import hamiltonian
 
 
 class QubitGridTest(googletest.TestCase):

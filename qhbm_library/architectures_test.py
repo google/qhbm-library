@@ -21,7 +21,7 @@ import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-import architectures
+from qhbm_library import architectures
 
 
 class RPQCTest(tf.test.TestCase, parameterized.TestCase):
