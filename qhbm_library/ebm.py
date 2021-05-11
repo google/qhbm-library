@@ -25,9 +25,9 @@ import tensorflow_probability as tfp
 
 @tf.function
 def probability_to_logit(probability):
-  print("retracing: probability_to_logit")
-  p = tf.cast(probability, tf.dtypes.float32)
-  return tf.math.log(p) - tf.math.log(1 - p)
+    print("retracing: probability_to_logit")
+    p = tf.cast(probability, tf.dtypes.float32)
+    return tf.math.log(p) - tf.math.log(1 - p)
 
 
 @tf.function
