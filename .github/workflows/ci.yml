@@ -1,0 +1,15 @@
+name: Continuous Integration
+
+on: [ pull_request ]
+
+jobs:
+  format:
+    name: Format check
+    runs-on: ubuntu-16.04
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - uses: psf/black@2f52e4b4929370ec503ee272bcc10d3176db8e89
+        with:
+          args: "qhbm_library --diff --color"

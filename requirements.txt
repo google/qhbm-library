@@ -1,0 +1,2 @@
+black==21.5b1
+tensorflow-quantum==2.4.1
