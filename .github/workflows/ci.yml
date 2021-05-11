@@ -6,51 +6,10 @@ jobs:
   format:
     name: Format check
     runs-on: ubuntu-16.04
-    timeout-minutes: 5
+    timeout-minutes: 2
     steps:
       - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - uses: psf/black@2f52e4b4929370ec503ee272bcc10d3176db8e89
         with:
-          fetch-depth: 0
-      - uses: actions/setup-python@v1
-        with:
-          python-version: '3.8'
-          architecture: 'x64'
-      - name: Install black
-        run: pip install black==20.8b1
-      - name: Format
-        run: check/format
-  lint:
-    name: Lint check
-    runs-on: ubuntu-16.04
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v1
-      - uses: actions/setup-python@v1
-        with:
-          python-version: '3.8'
-          architecture: 'x64'
-      - name: Install Lint tools
-        run: pip install --upgrade pip setuptools; pip install -r requirements.txt;
-      - name: Lint All
-        run: ./scripts/lint_all.sh
-
-  format:
-    name: Formatting check
-    runs-on: ubuntu-16.04
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v1
-      - uses: actions/setup-python@v1
-        with:
-          python-version: '3.8'
-          architecture: 'x64'
-      - name: Install Format tools
-        run: pip install --upgrade pip setuptools; pip install -r requirements.txt;
-      - name: Format Check
-        run: ./scripts/format_check.sh  example-job:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@3d86a7cc43670094ac248017207be0295edbc31d
-        with:
-          access_token: ${{ github.token }}
+          args: "qhbm_library --diff --color"
