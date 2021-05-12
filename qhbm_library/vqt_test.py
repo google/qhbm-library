@@ -60,9 +60,7 @@ class VQTTest(tf.test.TestCase):
             tf_ham = tfq.convert_to_tensor([[cirq_ham]])
             for beta in tf.constant([0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]):
                 loss_estimate = vqt.vqt_loss(test_qhbm, num_samples, beta, tf_ham)
-                loss_exact = vqt.exact_vqt_loss(
-                    test_qhbm, num_samples, beta, tf_ham
-                )
+                loss_exact = vqt.exact_vqt_loss(test_qhbm, num_samples, beta, tf_ham)
                 self.assertAllClose(loss_estimate, loss_exact, rtol=1e-2)
 
 

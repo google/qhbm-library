@@ -92,7 +92,9 @@ class RPQCTest(tf.test.TestCase, parameterized.TestCase):
                 expected_circuit += cirq.Circuit(
                     cirq.CZ(q0, q1) ** expected_symbols[-1]
                 )
-        test_circuit, test_symbols = architectures.get_cz_exp_layer(qubits, layer_num, name)
+        test_circuit, test_symbols = architectures.get_cz_exp_layer(
+            qubits, layer_num, name
+        )
         self.assertEqual(expected_circuit, test_circuit)
         self.assertEqual(expected_symbols, test_symbols)
         # Confirm all symbols are unique
@@ -105,13 +107,17 @@ class RPQCTest(tf.test.TestCase, parameterized.TestCase):
         name = "test_hardware_efficient_model"
         expected_symbols = []
         expected_circuit = cirq.Circuit()
-        this_circuit, this_symbols = architectures.get_xz_rotation_layer(qubits, 0, name)
+        this_circuit, this_symbols = architectures.get_xz_rotation_layer(
+            qubits, 0, name
+        )
         expected_symbols += this_symbols
         expected_circuit += this_circuit
         this_circuit, this_symbols = architectures.get_cz_exp_layer(qubits, 0, name)
         expected_symbols += this_symbols
         expected_circuit += this_circuit
-        this_circuit, this_symbols = architectures.get_xz_rotation_layer(qubits, 1, name)
+        this_circuit, this_symbols = architectures.get_xz_rotation_layer(
+            qubits, 1, name
+        )
         expected_symbols += this_symbols
         expected_circuit += this_circuit
         this_circuit, this_symbols = architectures.get_cz_exp_layer(qubits, 1, name)
@@ -131,10 +137,14 @@ class RPQCTest(tf.test.TestCase, parameterized.TestCase):
         name = "test_harware_efficient_model_1q"
         expected_symbols = []
         expected_circuit = cirq.Circuit()
-        this_circuit, this_symbols = architectures.get_xz_rotation_layer(qubits, 0, name)
+        this_circuit, this_symbols = architectures.get_xz_rotation_layer(
+            qubits, 0, name
+        )
         expected_symbols += this_symbols
         expected_circuit += this_circuit
-        this_circuit, this_symbols = architectures.get_xz_rotation_layer(qubits, 1, name)
+        this_circuit, this_symbols = architectures.get_xz_rotation_layer(
+            qubits, 1, name
+        )
         expected_symbols += this_symbols
         expected_circuit += this_circuit
         test_circuit, test_symbols = architectures.get_hardware_efficient_model_unitary(
@@ -239,7 +249,9 @@ class HEA2dTest(tf.test.TestCase):
         )
         symbols_expect.append(s)
 
-        test_circuit, test_symbols = architectures.get_2d_cz_exp_layer(2, 3, layer_num, name)
+        test_circuit, test_symbols = architectures.get_2d_cz_exp_layer(
+            2, 3, layer_num, name
+        )
         self.assertEqual(circuit_expect, test_circuit)
         self.assertEqual(symbols_expect, test_symbols)
 
@@ -258,7 +270,9 @@ class HEA2dTest(tf.test.TestCase):
             cirq.CZPowGate(exponent=s)(cirq.GridQubit(0, 0), cirq.GridQubit(0, 1))
         )
         symbols_expect = [s]
-        test_circuit, test_symbols = architectures.get_2d_cz_exp_layer(1, 2, layer_num, name)
+        test_circuit, test_symbols = architectures.get_2d_cz_exp_layer(
+            1, 2, layer_num, name
+        )
         self.assertEqual(circuit_expect, test_circuit)
         self.assertEqual(symbols_expect, test_symbols)
 
@@ -269,8 +283,12 @@ class HEA2dTest(tf.test.TestCase):
         circuit_expect = cirq.Circuit()
         symbols_expect = []
         for layer in range(2):
-            xz_circuit, xz_symbols = architectures.get_2d_xz_rotation_layer(2, 3, layer, name)
-            cz_circuit, cz_symbols = architectures.get_2d_cz_exp_layer(2, 3, layer, name)
+            xz_circuit, xz_symbols = architectures.get_2d_xz_rotation_layer(
+                2, 3, layer, name
+            )
+            cz_circuit, cz_symbols = architectures.get_2d_cz_exp_layer(
+                2, 3, layer, name
+            )
             circuit_expect += xz_circuit
             symbols_expect += xz_symbols
             circuit_expect += cz_circuit

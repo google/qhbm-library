@@ -385,7 +385,11 @@ def vqt_qhbm_loss(qhbm_vqt, num_vqt_samples, sub_term_energy_func):
 def vqt_qhbm_loss_thetas_grad(qhbm_vqt, num_vqt_samples, sub_term_energy_func):
     print("retracing: vqt_qhbm_loss_thetas_grad")
     # Build components of the gradient
-    (vqt_circuits, vqt_bitstrings, vqt_circuits_counts) = qhbm_vqt.sample_state_circuits(
+    (
+        vqt_circuits,
+        vqt_bitstrings,
+        vqt_circuits_counts,
+    ) = qhbm_vqt.sample_state_circuits(
         num_vqt_samples,
     )
     vqt_expanded_circuits_counts = tf.cast(

@@ -50,9 +50,7 @@ class QMHLExactLossTest(tf.test.TestCase):
                 model_qhbm, model_samples, target_circuits, target_counts
             )
             print("Current num qubits: {}".format(num_qubits))
-            self.assertAllClose(
-                loss, target_qhbm.entropy_function(), atol=1e-3
-            )
+            self.assertAllClose(loss, target_qhbm.entropy_function(), atol=1e-3)
             self.assertAllClose(thetas_grad, tf.zeros(shape_thetas), atol=1e-3)
 
 
