@@ -205,6 +205,7 @@ class QHBM(tf.Module):
         self.u_dagger = upgrade_circuit(u ** -1, self.phis_symbols)
 
         self.raw_qubits = sorted(u.all_qubits())
+        self.qubits = tf.constant([[q.row, q.col] for q in self.raw_qubits])
         raw_bit_circuit, raw_bit_symbols = build_bit_circuit(self.raw_qubits, name)
         self.bit_symbols = upgrade_symbols(
             raw_bit_symbols, tf.ones([len(self.raw_qubits)])

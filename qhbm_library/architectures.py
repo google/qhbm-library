@@ -20,7 +20,7 @@ import cirq
 import sympy
 import tensorflow_quantum as tfq
 
-import ebm
+from qhbm_library import ebm
 
 
 # ============================================================================ #
@@ -29,7 +29,7 @@ import ebm
 
 
 def get_xz_rotation(q, a, b):
-    """General single qubit rotation."""
+    """Two-axis single qubit rotation."""
     return cirq.Circuit(cirq.X(q) ** a, cirq.Z(q) ** b)
 
 
@@ -44,17 +44,17 @@ def get_cz_exp(q0, q1, a):
 
 
 def get_zz_exp(q0, q1, a):
-    """Exponent of entangling CZ gate."""
+    """Exponent of entangling ZZ gate."""
     return cirq.Circuit(cirq.ZZPowGate(exponent=a)(q0, q1))
 
 
 def get_cnot_exp(q0, q1, a):
-    """Exponent of entangling CZ gate."""
+    """Exponent of entangling CNot gate."""
     return cirq.Circuit(cirq.CNotPowGate(exponent=a)(q0, q1))
 
 
 def get_xz_rotation_layer(qubits, layer_num, name):
-    """Apply single qubit rotations to all the given qubits."""
+    """Apply two-axis single qubit rotations to all the given qubits."""
     layer_symbols = []
     circuit = cirq.Circuit()
     for n, q in enumerate(qubits):
@@ -67,7 +67,7 @@ def get_xz_rotation_layer(qubits, layer_num, name):
 
 
 def get_cz_exp_layer(qubits, layer_num, name):
-    """Apply CZ gates to all pairs of nearest-neighbor qubits."""
+    """Apply parameterized CZ gates to all pairs of nearest-neighbor qubits."""
     layer_symbols = []
     circuit = cirq.Circuit()
     for n, (q0, q1) in enumerate(zip(qubits[::2], qubits[1::2])):
