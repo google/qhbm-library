@@ -181,33 +181,6 @@ def exact_qmhl_loss_phis_grad(
 
 
 @tf.function
-def qmhl_loss(qhbm_model, thetas, target_density):
-    """Calculate the QMHL loss of the model against the target.
-
-    Args:
-      qhbm_model: `QHBM` which is the parameterized model density operator.
-      thetas: a `tf.Tensor` for the `qhbm.thetas`.
-      target_density: `DensityOperator` which is the distribution whose logarithm
-        we are trying to learn.
-
-    Returns:
-      loss: Quantum cross entropy between the target and model.
-    """
-    print("retracing: qmhl_loss")
-    expected = qhbm.pulled_back_energy_expectation(
-        qhbm_model.energy_function,
-        thetas,
-        qhbm_model.u_dagger,
-        qhbm_model.phis_symbols,
-        qhbm_model.phis,
-        target_density.circuits,
-        target_density.counts,
-    )
-    log_partition = qhbm_model.log_partition_function(thetas)
-    return expected + log_partition
-
-
-@tf.function
 def qmhl_loss_thetas_grad(qhbm_model, num_model_samples, target_density):
     """Calculate thetas gradient of the QMHL loss of the model against the target.
 
