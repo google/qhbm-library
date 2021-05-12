@@ -72,12 +72,10 @@ class VQTLossTest(tf.test.TestCase):
         """Confirm correct gradients and loss at the optimal settings."""
         for num_qubits in [1, 2]:
             qubits = cirq.GridQubit.rect(1, num_qubits)
-            target_qhbm = qhbm_base.get_random_qhbm(
-                qubits, ebm.build_boltzmann, 1, "VQTLossTest{}".format(num_qubits)
+            target_qhbm = test_util.get_random_qhbm(
+                qubits, 1, "VQTLossTest{}".format(num_qubits)
             )
             model_qhbm = target_qhbm.copy()
-            self.assertAllClose(model_qhbm.thetas, target_qhbm.thetas, atol=1e-6)
-            self.assertAllClose(model_qhbm.phis, target_qhbm.phis, atol=1e-6)
             shape_thetas = target_qhbm.thetas.shape
             shape_phis = target_qhbm.phis.shape
 
@@ -107,8 +105,8 @@ class VQTLossTest(tf.test.TestCase):
         qubits = cirq.GridQubit.rect(1, 3)
         qubits_1 = qubits[:1]
         qubits_2 = qubits[1:]
-        qhbm_1 = qhbm_base.get_random_qhbm(qubits_1, ebm.build_boltzmann, 1, "qhbm_1")
-        qhbm_2 = qhbm_base.get_random_qhbm(qubits_2, ebm.build_boltzmann, 1, "qhbm_2")
+        qhbm_1 = test_util.get_random_qhbm(qubits_1, 1, "qhbm_1")
+        qhbm_2 = test_util.get_random_qhbm(qubits_2, 1, "qhbm_2")
         target_samples = 30000
         raw_dm_1 = tf.linalg.LinearOperatorFullMatrix(
             qhbm_base.approximate_density_matrix(qhbm_1, target_samples)
@@ -128,7 +126,7 @@ class VQTLossTest(tf.test.TestCase):
         )
 
         # Set up training loop.
-        model_qhbm = qhbm_base.get_random_qhbm(
+        model_qhbm = test_util.get_random_qhbm(
             qubits, ebm.build_boltzmann, 1, "model_qhbm"
         )
         schedule = tf.keras.optimizers.schedules.ExponentialDecay(
@@ -177,10 +175,10 @@ class VQTLossTest(tf.test.TestCase):
         qubits = cirq.GridQubit.rect(1, 3)
         qubits_2_0 = qubits[:2]
         qubits_2_1 = qubits[1:]
-        qhbm_2_0 = qhbm_base.get_random_qhbm(
+        qhbm_2_0 = test_util.get_random_qhbm(
             qubits_2_0, ebm.build_boltzmann, 1, "qhbm_2_0"
         )
-        qhbm_2_1 = qhbm_base.get_random_qhbm(
+        qhbm_2_1 = test_util.get_random_qhbm(
             qubits_2_1, ebm.build_boltzmann, 1, "qhbm_2_1"
         )
         target_samples = 30000
@@ -207,7 +205,7 @@ class VQTLossTest(tf.test.TestCase):
         self.assertAllClose(tf.linalg.trace(target_dm), 1.0, atol=1e-5)
 
         # Set up training loop.
-        model_qhbm = qhbm_base.get_random_qhbm(
+        model_qhbm = test_util.get_random_qhbm(
             qubits, ebm.build_boltzmann, 2, "model_qhbm"
         )
         schedule = tf.keras.optimizers.schedules.ExponentialDecay(
