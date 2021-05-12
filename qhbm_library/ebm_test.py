@@ -17,8 +17,8 @@ import itertools
 
 import tensorflow as tf
 
-import ebm
-import util
+from qhbm_library import ebm
+from qhbm_library import qhbm_base
 
 
 class ProbTest(tf.test.TestCase):
@@ -111,7 +111,7 @@ class BernoulliTest(tf.test.TestCase):
         test_logits = tf.constant([0.0])
         num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
         bitstrings = sampler_bernoulli(test_logits, num_bitstrings)
-        _, _, counts = util.unique_with_counts(bitstrings)
+        _, _, counts = qhbm_base.unique_with_counts(bitstrings)
         # check that we got both bitstrings
         self.assertTrue(
             tf.reduce_any(tf.equal(tf.constant([0], dtype=tf.int8), bitstrings))
@@ -138,7 +138,7 @@ class BernoulliTest(tf.test.TestCase):
         test_logits = tf.constant([0.0, 0.0])
         num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
         bitstrings = sampler_bernoulli(test_logits, num_bitstrings)
-        _, _, counts = util.unique_with_counts(bitstrings)
+        _, _, counts = qhbm_base.unique_with_counts(bitstrings)
         # check that we got all bitstrings.
         @tf.function
         def check_bitstring_exists(bitstring, bitstring_list):
@@ -252,7 +252,7 @@ class BoltzmannTest(tf.test.TestCase):
         test_thetas = tf.constant([0.0])
         num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
         bitstrings = sampler_boltzmann(test_thetas, num_bitstrings)
-        _, _, counts = util.unique_with_counts(bitstrings)
+        _, _, counts = qhbm_base.unique_with_counts(bitstrings)
         # check that we got both bitstrings
         self.assertTrue(
             tf.reduce_any(tf.equal(tf.constant([0], dtype=tf.int8), bitstrings))
@@ -280,7 +280,7 @@ class BoltzmannTest(tf.test.TestCase):
         test_thetas = tf.constant([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
         bitstrings = sampler_boltzmann(test_thetas, num_bitstrings)
-        _, _, counts = util.unique_with_counts(bitstrings)
+        _, _, counts = qhbm_base.unique_with_counts(bitstrings)
         # check that we got all bitstrings.
         @tf.function
         def check_bitstring_exists(bitstring, bitstring_list):

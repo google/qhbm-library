@@ -15,13 +15,12 @@
 """Tests for hamiltonian.py"""
 
 import cirq
+import tensorflow as tf
 
-import googletest
-
-import hamiltonian
+from qhbm_library import hamiltonian
 
 
-class QubitGridTest(googletest.TestCase):
+class QubitGridTest(tf.test.TestCase):
     """Test the qubit_grid function."""
 
     def test_qubit_grid(self):
@@ -34,7 +33,7 @@ class QubitGridTest(googletest.TestCase):
                 self.assertEqual(cirq.GridQubit(test_r, test_c), q)
 
 
-class HeisenbergTest(googletest.TestCase):
+class HeisenbergTest(tf.test.TestCase):
     """Test components related to the 2D Heisenberg Hamiltonian."""
 
     def test_heisenberg_bond(self):
@@ -93,7 +92,7 @@ class HeisenbergTest(googletest.TestCase):
                     self.assertEqual(actual_shard, test_shard)
 
 
-class TFIMTest(googletest.TestCase):
+class TFIMTest(tf.test.TestCase):
     """Test components related to the 2D Transverse Field Ising Model."""
 
     def test_tfim_x_shard(self):

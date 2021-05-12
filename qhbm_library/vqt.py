@@ -17,8 +17,8 @@
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-import qhbm_base
-import util
+from qhbm_library import qhbm_base
+from qhbm_library import util
 
 
 # ============================================================================ #
@@ -370,13 +370,7 @@ def build_sub_term_energy_func(qhbm_vqt, qhbm_hamiltonian_list):
 @tf.function
 def vqt_qhbm_loss(qhbm_vqt, num_vqt_samples, sub_term_energy_func):
     print("retracing: vqt_qhbm_loss")
-    vqt_circuits, _, vqt_circuits_counts = qhbm.sample_state_circuits(
-        qhbm_vqt.sampler_function,
-        qhbm_vqt.thetas,
-        qhbm_vqt.bit_and_u,
-        qhbm_vqt.bit_symbols,
-        qhbm_vqt.phis_symbols,
-        qhbm_vqt.phis,
+    vqt_circuits, _, vqt_circuits_counts = qhbm_vqt.sample_state_circuits(
         num_vqt_samples,
     )
     sub_energy_list = sub_term_energy_func(vqt_circuits, vqt_circuits_counts)
@@ -384,29 +378,25 @@ def vqt_qhbm_loss(qhbm_vqt, num_vqt_samples, sub_term_energy_func):
         tf.reduce_sum(tf.cast(vqt_circuits_counts, tf.float32) * sub_energy_list),
         num_vqt_samples,
     )
-    return e_avg - qhbm_vqt.entropy_function(qhbm_vqt.thetas)
+    return e_avg - qhbm_vqt.entropy_function()
 
 
 @tf.function
 def vqt_qhbm_loss_thetas_grad(qhbm_vqt, num_vqt_samples, sub_term_energy_func):
     print("retracing: vqt_qhbm_loss_thetas_grad")
     # Build components of the gradient
-    (vqt_circuits, vqt_bitstrings, vqt_circuits_counts) = qhbm.sample_state_circuits(
-        qhbm_vqt.sampler_function,
-        qhbm_vqt.thetas,
-        qhbm_vqt.bit_and_u,
-        qhbm_vqt.bit_symbols,
-        qhbm_vqt.phis_symbols,
-        qhbm_vqt.phis,
+    (
+        vqt_circuits,
+        vqt_bitstrings,
+        vqt_circuits_counts,
+    ) = qhbm_vqt.sample_state_circuits(
         num_vqt_samples,
     )
     vqt_expanded_circuits_counts = tf.cast(
         tf.expand_dims(vqt_circuits_counts, 1), tf.dtypes.float32
     )
     vqt_energies, vqt_energy_grads = tf.map_fn(
-        lambda x: qhbm.energy_and_energy_grad(
-            qhbm_vqt.energy_function, qhbm_vqt.thetas, x
-        ),
+        lambda x: qhbm_vqt.energy_and_energy_grad(x),
         vqt_bitstrings,
         fn_output_signature=(tf.float32, tf.float32),
     )
@@ -439,12 +429,7 @@ def vqt_qhbm_loss_thetas_grad(qhbm_vqt, num_vqt_samples, sub_term_energy_func):
 @tf.function
 def phis_grad_sub_func(
     i,
-    qhbm_sampler,
-    qhbm_thetas,
-    qhbm_bit_and_u,
-    qhbm_bit_symbols,
-    qhbm_phis_symbols,
-    qhbm_phis,
+    qhbm,
     num_vqt_samples,
     D,
     eps,
@@ -454,13 +439,9 @@ def phis_grad_sub_func(
     perturbation = p_axis * eps
 
     # Forward
+    original_phis = qhbm.phis.read_value()
+    qhbm.phis.assign_add(perturbation)
     (vqt_circuits_forward, _, vqt_circuits_counts_forward) = qhbm.sample_state_circuits(
-        qhbm_sampler,
-        qhbm_thetas,
-        qhbm_bit_and_u,
-        qhbm_bit_symbols,
-        qhbm_phis_symbols,
-        qhbm_phis + perturbation,
         num_vqt_samples,
     )
     sub_energy_list = sub_term_energy_func(
@@ -474,17 +455,12 @@ def phis_grad_sub_func(
     )
 
     # Backward
+    qhbm.phis.assign_add(-2.0 * perturbation)
     (
         vqt_circuits_backward,
         _,
         vqt_circuits_counts_backward,
     ) = qhbm.sample_state_circuits(
-        qhbm_sampler,
-        qhbm_thetas,
-        qhbm_bit_and_u,
-        qhbm_bit_symbols,
-        qhbm_phis_symbols,
-        qhbm_phis - perturbation,
         num_vqt_samples,
     )
     sub_energy_list = sub_term_energy_func(
@@ -496,6 +472,7 @@ def phis_grad_sub_func(
         ),
         num_vqt_samples,
     )
+    qhbm.phis.assign(original_phis)
 
     return tf.divide(forward - backward, (2.0 * eps))
 
@@ -507,12 +484,7 @@ def vqt_qhbm_loss_phis_grad(qhbm_vqt, num_vqt_samples, sub_term_energy_func, eps
     return tf.map_fn(
         lambda x: phis_grad_sub_func(
             x,
-            qhbm_vqt.sampler_function,
-            qhbm_vqt.thetas,
-            qhbm_vqt.bit_and_u,
-            qhbm_vqt.bit_symbols,
-            qhbm_vqt.phis_symbols,
-            qhbm_vqt.phis,
+            qhbm_vqt,
             num_vqt_samples,
             D,
             eps,

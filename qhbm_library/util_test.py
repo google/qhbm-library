@@ -20,8 +20,8 @@ import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-import test_util
-import util
+from qhbm_library import test_util
+from qhbm_library import util
 
 
 # ============================================================================ #
@@ -324,9 +324,7 @@ class GetThermalStateTest(tf.test.TestCase):
             for beta in beta_list:
                 beta_t = tf.constant(beta, dtype=tf.float64)
                 pauli_sum = test_util.get_random_pauli_sum(qubits)
-                pauli_matrix = tf.cast(
-                    util.pauli_sum_to_matrix(qubits, pauli_sum), tf.complex128
-                )
+                pauli_matrix = tf.constant(pauli_sum.matrix(), dtype=tf.complex128)
                 direct_exp = tf.linalg.expm(-beta * pauli_matrix)
                 direct_thermal = direct_exp / tf.linalg.trace(direct_exp)
                 stable_thermal = util.get_thermal_state(beta_t, pauli_matrix)

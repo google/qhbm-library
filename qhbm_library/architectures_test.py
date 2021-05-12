@@ -21,18 +21,18 @@ import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-import architectures
+from qhbm_library import architectures
 
 
 class RPQCTest(tf.test.TestCase, parameterized.TestCase):
-    """Test RPQC functions in the ansatze module."""
+    """Test RPQC functions in the architectures module."""
 
     def test_get_xz_rotation(self):
         """Confirm an XZ rotation is returned."""
         q = cirq.GridQubit(7, 9)
         a, b = sympy.symbols("a b")
         expected_circuit = cirq.Circuit(cirq.X(q) ** a, cirq.Z(q) ** b)
-        test_circuit = ansatze.get_xz_rotation(q, a, b)
+        test_circuit = architectures.get_xz_rotation(q, a, b)
         self.assertEqual(expected_circuit, test_circuit)
 
     def test_get_cz_exp(self):
@@ -41,7 +41,7 @@ class RPQCTest(tf.test.TestCase, parameterized.TestCase):
         q1 = cirq.GridQubit(2, 5)
         a = sympy.Symbol("a")
         expected_circuit = cirq.Circuit(cirq.CZ(q0, q1) ** a)
-        test_circuit = ansatze.get_cz_exp(q0, q1, a)
+        test_circuit = architectures.get_cz_exp(q0, q1, a)
         self.assertEqual(expected_circuit, test_circuit)
 
     def test_get_xz_rotation_layer(self):
@@ -60,7 +60,7 @@ class RPQCTest(tf.test.TestCase, parameterized.TestCase):
                 sympy.Symbol("sz_{0}_{1}_{2}".format(name, layer_num, n))
             )
             expected_circuit += cirq.Circuit(cirq.Z(q) ** expected_symbols[-1])
-        test_circuit, test_symbols = ansatze.get_xz_rotation_layer(
+        test_circuit, test_symbols = architectures.get_xz_rotation_layer(
             qubits, layer_num, name
         )
         self.assertEqual(expected_circuit, test_circuit)
@@ -92,7 +92,9 @@ class RPQCTest(tf.test.TestCase, parameterized.TestCase):
                 expected_circuit += cirq.Circuit(
                     cirq.CZ(q0, q1) ** expected_symbols[-1]
                 )
-        test_circuit, test_symbols = ansatze.get_cz_exp_layer(qubits, layer_num, name)
+        test_circuit, test_symbols = architectures.get_cz_exp_layer(
+            qubits, layer_num, name
+        )
         self.assertEqual(expected_circuit, test_circuit)
         self.assertEqual(expected_symbols, test_symbols)
         # Confirm all symbols are unique
@@ -105,19 +107,23 @@ class RPQCTest(tf.test.TestCase, parameterized.TestCase):
         name = "test_hardware_efficient_model"
         expected_symbols = []
         expected_circuit = cirq.Circuit()
-        this_circuit, this_symbols = ansatze.get_xz_rotation_layer(qubits, 0, name)
+        this_circuit, this_symbols = architectures.get_xz_rotation_layer(
+            qubits, 0, name
+        )
         expected_symbols += this_symbols
         expected_circuit += this_circuit
-        this_circuit, this_symbols = ansatze.get_cz_exp_layer(qubits, 0, name)
+        this_circuit, this_symbols = architectures.get_cz_exp_layer(qubits, 0, name)
         expected_symbols += this_symbols
         expected_circuit += this_circuit
-        this_circuit, this_symbols = ansatze.get_xz_rotation_layer(qubits, 1, name)
+        this_circuit, this_symbols = architectures.get_xz_rotation_layer(
+            qubits, 1, name
+        )
         expected_symbols += this_symbols
         expected_circuit += this_circuit
-        this_circuit, this_symbols = ansatze.get_cz_exp_layer(qubits, 1, name)
+        this_circuit, this_symbols = architectures.get_cz_exp_layer(qubits, 1, name)
         expected_symbols += this_symbols
         expected_circuit += this_circuit
-        test_circuit, test_symbols = ansatze.get_hardware_efficient_model_unitary(
+        test_circuit, test_symbols = architectures.get_hardware_efficient_model_unitary(
             qubits, 2, name
         )
         self.assertEqual(expected_circuit, test_circuit)
@@ -131,13 +137,17 @@ class RPQCTest(tf.test.TestCase, parameterized.TestCase):
         name = "test_harware_efficient_model_1q"
         expected_symbols = []
         expected_circuit = cirq.Circuit()
-        this_circuit, this_symbols = ansatze.get_xz_rotation_layer(qubits, 0, name)
+        this_circuit, this_symbols = architectures.get_xz_rotation_layer(
+            qubits, 0, name
+        )
         expected_symbols += this_symbols
         expected_circuit += this_circuit
-        this_circuit, this_symbols = ansatze.get_xz_rotation_layer(qubits, 1, name)
+        this_circuit, this_symbols = architectures.get_xz_rotation_layer(
+            qubits, 1, name
+        )
         expected_symbols += this_symbols
         expected_circuit += this_circuit
-        test_circuit, test_symbols = ansatze.get_hardware_efficient_model_unitary(
+        test_circuit, test_symbols = architectures.get_hardware_efficient_model_unitary(
             qubits, 2, name
         )
         self.assertEqual(expected_circuit, test_circuit)
@@ -147,7 +157,7 @@ class RPQCTest(tf.test.TestCase, parameterized.TestCase):
 
 
 class HEA2dTest(tf.test.TestCase):
-    """Test 2D HEA functions in the ansatze module."""
+    """Test 2D HEA functions in the architectures module."""
 
     def test_get_2d_xz_rotation_layer(self):
         """Confirms the xz rotations are correct on a 2x3 grid."""
@@ -167,7 +177,7 @@ class HEA2dTest(tf.test.TestCase):
                 z_gate = cirq.Z(q) ** s
                 symbols_expect.append(s)
                 circuit_expect += cirq.Circuit(x_gate, z_gate)
-        test_circuit, test_symbols = ansatze.get_2d_xz_rotation_layer(
+        test_circuit, test_symbols = architectures.get_2d_xz_rotation_layer(
             rows, cols, layer_num, name
         )
         self.assertEqual(circuit_expect, test_circuit)
@@ -187,7 +197,7 @@ class HEA2dTest(tf.test.TestCase):
         z_gate = cirq.Z(q) ** s
         symbols_expect.append(s)
         circuit_expect += cirq.Circuit(x_gate, z_gate)
-        test_circuit, test_symbols = ansatze.get_2d_xz_rotation_layer(
+        test_circuit, test_symbols = architectures.get_2d_xz_rotation_layer(
             1, 1, layer_num, name
         )
         self.assertEqual(circuit_expect, test_circuit)
@@ -239,13 +249,15 @@ class HEA2dTest(tf.test.TestCase):
         )
         symbols_expect.append(s)
 
-        test_circuit, test_symbols = ansatze.get_2d_cz_exp_layer(2, 3, layer_num, name)
+        test_circuit, test_symbols = architectures.get_2d_cz_exp_layer(
+            2, 3, layer_num, name
+        )
         self.assertEqual(circuit_expect, test_circuit)
         self.assertEqual(symbols_expect, test_symbols)
 
     def test_get_2d_cz_exp_layer_empty(self):
         """On single qubit, no gates should be returned."""
-        test_circuit, test_symbols = ansatze.get_2d_cz_exp_layer(1, 1, 1, "")
+        test_circuit, test_symbols = architectures.get_2d_cz_exp_layer(1, 1, 1, "")
         self.assertEqual(cirq.Circuit(), test_circuit)
         self.assertEqual([], test_symbols)
 
@@ -258,7 +270,9 @@ class HEA2dTest(tf.test.TestCase):
             cirq.CZPowGate(exponent=s)(cirq.GridQubit(0, 0), cirq.GridQubit(0, 1))
         )
         symbols_expect = [s]
-        test_circuit, test_symbols = ansatze.get_2d_cz_exp_layer(1, 2, layer_num, name)
+        test_circuit, test_symbols = architectures.get_2d_cz_exp_layer(
+            1, 2, layer_num, name
+        )
         self.assertEqual(circuit_expect, test_circuit)
         self.assertEqual(symbols_expect, test_symbols)
 
@@ -269,19 +283,23 @@ class HEA2dTest(tf.test.TestCase):
         circuit_expect = cirq.Circuit()
         symbols_expect = []
         for layer in range(2):
-            xz_circuit, xz_symbols = ansatze.get_2d_xz_rotation_layer(2, 3, layer, name)
-            cz_circuit, cz_symbols = ansatze.get_2d_cz_exp_layer(2, 3, layer, name)
+            xz_circuit, xz_symbols = architectures.get_2d_xz_rotation_layer(
+                2, 3, layer, name
+            )
+            cz_circuit, cz_symbols = architectures.get_2d_cz_exp_layer(
+                2, 3, layer, name
+            )
             circuit_expect += xz_circuit
             symbols_expect += xz_symbols
             circuit_expect += cz_circuit
             symbols_expect += cz_symbols
-        test_circuit, test_symbols = ansatze.get_2d_hea(2, 3, 2, name)
+        test_circuit, test_symbols = architectures.get_2d_hea(2, 3, 2, name)
         self.assertEqual(circuit_expect, test_circuit)
         self.assertEqual(symbols_expect, test_symbols)
 
 
 class TrotterTest(tf.test.TestCase, parameterized.TestCase):
-    """Test trotter functions in the ansatze module."""
+    """Test trotter functions in the architectures module."""
 
     def test_get_trotter_model_unitary(self):
         """Confirm correct trotter unitary and parameters are returned."""
@@ -310,7 +328,7 @@ class TrotterTest(tf.test.TestCase, parameterized.TestCase):
             expected_circuit += tfq.util.exponential(
                 [x_circuit], coefficients=[betas[j]]
             )
-        test_circuit, test_symbols = ansatze.get_trotter_model_unitary(
+        test_circuit, test_symbols = architectures.get_trotter_model_unitary(
             p, [hz, hx], test_name
         )
         self.assertEqual(expected_circuit, test_circuit)
@@ -318,7 +336,7 @@ class TrotterTest(tf.test.TestCase, parameterized.TestCase):
 
 
 class ConvolutionalTest(tf.test.TestCase, parameterized.TestCase):
-    """Test convolutional functions in the ansatze module."""
+    """Test convolutional functions in the architectures module."""
 
     def test_one_qubit_unitary(self):
         pass
@@ -331,8 +349,3 @@ class ConvolutionalTest(tf.test.TestCase, parameterized.TestCase):
 
     def test_get_convolutional_model_unitary(self):
         pass
-
-
-if __name__ == "__main__":
-    print("Running ansatze_test.py ...")
-    tf.test.main()
