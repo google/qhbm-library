@@ -100,7 +100,7 @@ def exact_qmhl_loss_thetas_grad(
     )
     # safe when all circuits have the same number of qubits
     all_samples_pb = ragged_samples_pb.values.to_tensor()
-    unique_samples_pb, _, counts_pb = util.unique_with_counts(all_samples_pb)
+    unique_samples_pb, _, counts_pb = qhbm_base.unique_with_counts(all_samples_pb)
     expanded_counts_pb = tf.cast(
         tf.tile(tf.expand_dims(counts_pb, 1), [1, tf.shape(qhbm_model.thetas)[0]]),
         tf.dtypes.float32,
@@ -226,7 +226,7 @@ def qmhl_loss_thetas_grad(qhbm_model, num_model_samples, target_density):
     )
     # safe when all circuits have the same number of qubits
     all_samples_pb = ragged_samples_pb.values.to_tensor()
-    unique_samples_pb, _, counts_pb = util.unique_with_counts(all_samples_pb)
+    unique_samples_pb, _, counts_pb = qhbm_base.unique_with_counts(all_samples_pb)
     expanded_counts_pb = tf.cast(
         tf.tile(tf.expand_dims(counts_pb, 1), [1, tf.shape(qhbm_model.thetas)[0]]),
         tf.dtypes.float32,

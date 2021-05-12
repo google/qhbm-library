@@ -40,12 +40,12 @@ class QMHLExactLossTest(tf.test.TestCase):
             shape_phis = target_qhbm.phis.shape
 
             # Get the QMHL loss gradients
-            model_samples = 2e5
-            target_samples = 2e5
+            model_samples = 1e6
+            target_samples = 1e6
             target_circuits, _, target_counts = target_qhbm.sample_state_circuits(
                 target_samples
             )
-            loss = qmhl.exact_qmhl_loss(model_qhbm, target_density)
+            loss = qmhl.exact_qmhl_loss(model_qhbm, target_circuits, target_counts)
             thetas_grad = qmhl.exact_qmhl_loss_thetas_grad(
                 model_qhbm, model_samples, target_circuits, target_counts
             )
