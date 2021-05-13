@@ -22,7 +22,7 @@ import tensorflow_quantum as tfq
 from qhbm_library import ebm
 from qhbm_library import qhbm_base
 from qhbm_library import qmhl
-from qhbm_library import test_util
+from tests import test_util
 
 
 class QMHLExactLossTest(tf.test.TestCase):

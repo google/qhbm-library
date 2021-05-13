@@ -20,8 +20,8 @@ import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-from qhbm_library import test_util
 from qhbm_library import util
+from tests import test_util
 
 
 # ============================================================================ #
