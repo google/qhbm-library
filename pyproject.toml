@@ -19,6 +19,7 @@ tensorflow-probability = "0.11.0"
 pytest = "^6.2.4"
 coverage = {extras = ["toml"], version = "^5.5"}
 pytest-cov = "^2.11.1"
+nox = "^2020.12.31"
 
 [tool.coverage.paths]
 source = ["qhbm_libary"]
