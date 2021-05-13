@@ -11,6 +11,7 @@ authors = ["The QHBM Library Authors"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
+tensorflow-quantum = "0.4.0"
 
 [tool.poetry.dev-dependencies]
 
