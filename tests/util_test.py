@@ -33,6 +33,7 @@ class PureStateTensorToDensityMatrixTest(tf.test.TestCase):
 
     def test_simple_states(self):
         """Test one-qubit density matrix, dm = 0.75|0><0| + 0.25|1><1|."""
+        junk = "test"
         test_tensor = tf.constant(
             [[1, 0], [1, 0], [1, 0], [0, 1]], dtype=tf.dtypes.complex64
         )
