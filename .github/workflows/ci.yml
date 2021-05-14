@@ -15,7 +15,7 @@ jobs:
           args: ". --diff"
   test:
     name: Lint check
-    runs-on: ubunut-16.04
+    runs-on: ubuntu-16.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v2
@@ -25,7 +25,6 @@ jobs:
           architecture: 'x64'
       - name: Install dependencies
         run: |
-          curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python
-          source ~/.poetry/env
-          poetry install
-          poetry pytest --cov
+          python -m pip install --upgrade pip
+          pip install flake8==3.9.2
+          flake8 .
