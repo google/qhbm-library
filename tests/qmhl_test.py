@@ -17,7 +17,7 @@
 import cirq
 import tensorflow as tf
 
-from qhbm_library import qmhl
+from qhbmlib import qmhl
 from tests import test_util
 
 

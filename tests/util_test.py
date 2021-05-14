@@ -19,7 +19,7 @@ import cirq
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-from qhbm_library import util
+from qhbmlib import util
 from tests import test_util
 
 

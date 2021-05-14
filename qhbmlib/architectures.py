@@ -20,7 +20,7 @@ import cirq
 import sympy
 import tensorflow_quantum as tfq
 
-from qhbm_library import ebm
+from qhbmlib import ebm
 
 
 # ============================================================================ #
