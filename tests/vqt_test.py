@@ -52,11 +52,11 @@ class VQTTest(tf.test.TestCase):
             self.name,
         )
         num_samples = tf.constant(int(5e6))
-        num_random_hamiltonians = 4
-        for _ in range(num_random_hamiltonians):
-            cirq_ham = test_util.get_random_pauli_sum(self.raw_qubits)
-            tf_ham = tfq.convert_to_tensor([[cirq_ham]])
-            for beta in tf.constant([0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]):
+        num_random_hamiltonians = 2
+        for beta in tf.constant([0.1, 0.4, 1.6, 6.4]):
+            for _ in range(num_random_hamiltonians):
+                cirq_ham = test_util.get_random_pauli_sum(self.raw_qubits)
+                tf_ham = tfq.convert_to_tensor([[cirq_ham]])
                 loss_estimate = vqt.vqt_loss(test_qhbm, num_samples, beta, tf_ham)
                 loss_exact = vqt.exact_vqt_loss(test_qhbm, num_samples, beta, tf_ham)
                 self.assertAllClose(loss_estimate, loss_exact, rtol=1e-2)

@@ -13,5 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+
 poetry run black qhbm_library/ tests/
 poetry run flake8
+retval=$?
+if [ "$retval" == 0 ]
+then
+  echo "Success: no lint found."
+else
+  echo "Please remove lint and try again."
+  exit 1
+fi
+poetry run pytest --cov .
