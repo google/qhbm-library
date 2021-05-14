@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "qhbm-library"
+name = "qhbmlib"
 version = "0.1.0"
 description = "Quantum Hamiltonian-Based Models built on TensorFlow Quantum"
 license = "Apache-2.0"
@@ -23,11 +23,11 @@ flake8 = "3.9.2"
 pytest = "6.2.4"
 
 [tool.coverage.paths]
-source = ["qhbm_libary"]
+source = ["qhbmlib"]
 
 [tool.coverage.run]
 branch = true
-source = ["qhbm_library"]
+source = ["qhbmlib"]
 
 [tool.coverage.report]
 show_missing = true

@@ -14,7 +14,7 @@
 # limitations under the License.
 # ==============================================================================
 
-poetry run black qhbm_library/ tests/
+poetry run black qhbmlib/ tests/
 poetry run flake8
 retval=$?
 if [ "$retval" == 0 ]

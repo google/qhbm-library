@@ -17,7 +17,7 @@
 import cirq
 import tensorflow as tf
 
-from qhbm_library import hamiltonian
+from qhbmlib import hamiltonian
 
 
 class QubitGridTest(tf.test.TestCase):

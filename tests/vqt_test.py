@@ -19,8 +19,8 @@ import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-from qhbm_library import qhbm_base
-from qhbm_library import vqt
+from qhbmlib import qhbm_base
+from qhbmlib import vqt
 from tests import test_util
 
 

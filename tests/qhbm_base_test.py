@@ -20,7 +20,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 import tensorflow_quantum as tfq
 
-from qhbm_library import qhbm_base
+from qhbmlib import qhbm_base
 from tests import test_util
 
 

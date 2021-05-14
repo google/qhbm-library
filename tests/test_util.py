@@ -23,9 +23,9 @@ import scipy
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from qhbm_library import architectures
-from qhbm_library import ebm
-from qhbm_library import qhbm_base
+from qhbmlib import architectures
+from qhbmlib import ebm
+from qhbmlib import qhbm_base
 
 
 def get_random_qhbm(
