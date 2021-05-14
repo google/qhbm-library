@@ -19,11 +19,9 @@ import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-from qhbm_library import ebm
 from qhbm_library import qhbm_base
-from qhbm_library import test_util
-from qhbm_library import util
 from qhbm_library import vqt
+from tests import test_util
 
 
 class VQTTest(tf.test.TestCase):
@@ -94,7 +92,7 @@ class VQTTest(tf.test.TestCase):
 #             )
 #             print("Current num qubits: {}".format(num_qubits))
 #             self.assertAllClose(
-#                 loss, -target_qhbm.log_partition_function(target_qhbm.thetas), atol=1e-2
+#               loss, -target_qhbm.log_partition_function(target_qhbm.thetas), atol=1e-2
 #             )
 #             self.assertAllClose(thetas_grad, tf.zeros(shape_thetas), atol=1e-2)
 #             self.assertAllClose(phis_grad, tf.zeros(shape_phis), atol=1e-1)
@@ -150,7 +148,7 @@ class VQTTest(tf.test.TestCase):
 #                 ]
 #             )
 
-#         final_loss = vqt.vqt_qhbm_loss(model_qhbm, model_samples, sub_term_energy_func)
+#         final_loss = vqt.vqt_qhbm_loss(model_qhbm,model_samples,sub_term_energy_func)
 #         final_dm = model_qhbm.density_matrix()
 #         final_fidelity = util.fidelity(final_dm, target_dm)
 #         # TODO(zaqqwerty): tighten these once better sample gradients are ready

@@ -282,7 +282,7 @@ class HEA2dTest(tf.test.TestCase):
         name = "test_hea"
         circuit_expect = cirq.Circuit()
         symbols_expect = []
-        for layer in range(2):
+        for layer in range(num_layers):
             xz_circuit, xz_symbols = architectures.get_2d_xz_rotation_layer(
                 2, 3, layer, name
             )

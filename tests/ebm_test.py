@@ -139,7 +139,7 @@ class BernoulliTest(tf.test.TestCase):
         num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
         bitstrings = sampler_bernoulli(test_logits, num_bitstrings)
         _, _, counts = qhbm_base.unique_with_counts(bitstrings)
-        # check that we got all bitstrings.
+
         @tf.function
         def check_bitstring_exists(bitstring, bitstring_list):
             print("retracing: check_bitstring_exists")
@@ -281,7 +281,7 @@ class BoltzmannTest(tf.test.TestCase):
         num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
         bitstrings = sampler_boltzmann(test_thetas, num_bitstrings)
         _, _, counts = qhbm_base.unique_with_counts(bitstrings)
-        # check that we got all bitstrings.
+
         @tf.function
         def check_bitstring_exists(bitstring, bitstring_list):
             print("retracing: check_bitstring_exists")

@@ -150,4 +150,4 @@ class TFIMTest(tf.test.TestCase):
 
 if __name__ == "__main__":
     print("Running hamiltonian_test.py ...")
-    googletest.main()
+    tf.test.main()

@@ -18,7 +18,6 @@ import tensorflow as tf
 import tensorflow_quantum as tfq
 
 from qhbm_library import qhbm_base
-from qhbm_library import util
 
 
 # ============================================================================ #
@@ -180,140 +179,141 @@ def exact_qmhl_loss_phis_grad(
 # ============================================================================ #
 
 
-@tf.function
-def qmhl_loss_thetas_grad(qhbm_model, num_model_samples, target_density):
-    """Calculate thetas gradient of the QMHL loss of the model against the target.
+# TODO(#18)
+# @tf.function
+# def qmhl_loss_thetas_grad(qhbm_model, num_model_samples, target_density):
+#     """Calculate thetas gradient of the QMHL loss of the model against the target.
 
-    Args:
-      qhbm_model: `QHBM` which is the parameterized model density operator.
-      num_model_samples: number of bitstrings sampled from the classical
-        distribution of `qhbm_model` to average over when estimating the model
-        density operator.
-      target_density: `DensityOperator` which is the distribution whose logarithm
-        we are trying to learn.
+#     Args:
+#       qhbm_model: `QHBM` which is the parameterized model density operator.
+#       num_model_samples: number of bitstrings sampled from the classical
+#         distribution of `qhbm_model` to average over when estimating the model
+#         density operator.
+#       target_density: `DensityOperator` which is the distribution whose logarithm
+#         we are trying to learn.
 
-    Returns:
-      Stochastic estimate of the gradient of the QMHL loss with respect to the
-        classical model parameters.
-    """
-    print("retracing: qmhl_loss_thetas_grad")
+#     Returns:
+#       Stochastic estimate of the gradient of the QMHL loss with respect to the
+#         classical model parameters.
+#     """
+#     print("retracing: qmhl_loss_thetas_grad")
 
-    # Get energy gradients for the classical bitstrings
-    unique_samples_c, counts_c = qhbm.sample_bitstrings(
-        qhbm_model.sampler_function, qhbm_model.thetas, num_model_samples
-    )
-    expanded_counts_c = tf.cast(
-        tf.tile(tf.expand_dims(counts_c, 1), [1, tf.shape(qhbm_model.thetas)[0]]),
-        tf.dtypes.float32,
-    )
+#     # Get energy gradients for the classical bitstrings
+#     unique_samples_c, counts_c = qhbm.sample_bitstrings(
+#         qhbm_model.sampler_function, qhbm_model.thetas, num_model_samples
+#     )
+#     expanded_counts_c = tf.cast(
+#         tf.tile(tf.expand_dims(counts_c, 1), [1, tf.shape(qhbm_model.thetas)[0]]),
+#         tf.dtypes.float32,
+#     )
 
-    def loop(x):
-        return qhbm.energy_and_energy_grad(
-            qhbm_model.energy_function, qhbm_model.thetas, x
-        )
+#     def loop(x):
+#         return qhbm.energy_and_energy_grad(
+#             qhbm_model.energy_function, qhbm_model.thetas, x
+#         )
 
-    _, e_grad_list_c = tf.map_fn(
-        loop, unique_samples_c, fn_output_signature=(tf.float32, tf.float32)
-    )
+#     _, e_grad_list_c = tf.map_fn(
+#         loop, unique_samples_c, fn_output_signature=(tf.float32, tf.float32)
+#     )
 
-    # Get energy gradients for the pulled-back data bitstrings
-    ragged_samples_pb = qhbm.sample_pulled_back_bitstrings(
-        qhbm_model.u_dagger,
-        qhbm_model.phis_symbols,
-        qhbm_model.phis,
-        target_density.circuits,
-        target_density.counts,
-    )
-    # safe when all circuits have the same number of qubits
-    all_samples_pb = ragged_samples_pb.values.to_tensor()
-    unique_samples_pb, _, counts_pb = qhbm_base.unique_with_counts(all_samples_pb)
-    expanded_counts_pb = tf.cast(
-        tf.tile(tf.expand_dims(counts_pb, 1), [1, tf.shape(qhbm_model.thetas)[0]]),
-        tf.dtypes.float32,
-    )
-    _, e_grad_list_pb = tf.map_fn(
-        loop, unique_samples_pb, fn_output_signature=(tf.float32, tf.float32)
-    )
+#     # Get energy gradients for the pulled-back data bitstrings
+#     ragged_samples_pb = qhbm.sample_pulled_back_bitstrings(
+#         qhbm_model.u_dagger,
+#         qhbm_model.phis_symbols,
+#         qhbm_model.phis,
+#         target_density.circuits,
+#         target_density.counts,
+#     )
+#     # safe when all circuits have the same number of qubits
+#     all_samples_pb = ragged_samples_pb.values.to_tensor()
+#     unique_samples_pb, _, counts_pb = qhbm_base.unique_with_counts(all_samples_pb)
+#     expanded_counts_pb = tf.cast(
+#         tf.tile(tf.expand_dims(counts_pb, 1), [1, tf.shape(qhbm_model.thetas)[0]]),
+#         tf.dtypes.float32,
+#     )
+#     _, e_grad_list_pb = tf.map_fn(
+#         loop, unique_samples_pb, fn_output_signature=(tf.float32, tf.float32)
+#     )
 
-    # Build theta gradients after reweighting
-    e_grad_c_avg = tf.divide(
-        tf.reduce_sum(expanded_counts_c * e_grad_list_c, 0),
-        tf.cast(tf.reduce_sum(counts_c), tf.float32),
-    )
-    e_grad_pb_avg = tf.divide(
-        tf.reduce_sum(expanded_counts_pb * e_grad_list_pb, 0),
-        tf.cast(tf.reduce_sum(counts_pb), tf.float32),
-    )
-    return tf.math.subtract(e_grad_pb_avg, e_grad_c_avg)
-
-
-@tf.function
-def phis_grad_sub_func(
-    i,
-    qhbm_energy_function,
-    qhbm_thetas,
-    qhbm_u_dagger,
-    qhbm_phis_symbols,
-    qhbm_phis,
-    circuit_samples,
-    circuit_counts,
-    num_phis,
-    eps,
-):
-    """phis_grad_sub_func."""
-    print("retracing: phis_grad_sub_func")
-    p_axis = tf.one_hot(i, num_phis, dtype=tf.float32)
-    perturbation = p_axis * eps
-    forward = qhbm.pulled_back_energy_expectation(
-        qhbm_energy_function,
-        qhbm_thetas,
-        qhbm_u_dagger,
-        qhbm_phis_symbols,
-        qhbm_phis + perturbation,
-        circuit_samples,
-        circuit_counts,
-    )
-    backward = qhbm.pulled_back_energy_expectation(
-        qhbm_energy_function,
-        qhbm_thetas,
-        qhbm_u_dagger,
-        qhbm_phis_symbols,
-        qhbm_phis - perturbation,
-        circuit_samples,
-        circuit_counts,
-    )
-    return tf.divide(forward - backward, (2.0 * eps))
+#     # Build theta gradients after reweighting
+#     e_grad_c_avg = tf.divide(
+#         tf.reduce_sum(expanded_counts_c * e_grad_list_c, 0),
+#         tf.cast(tf.reduce_sum(counts_c), tf.float32),
+#     )
+#     e_grad_pb_avg = tf.divide(
+#         tf.reduce_sum(expanded_counts_pb * e_grad_list_pb, 0),
+#         tf.cast(tf.reduce_sum(counts_pb), tf.float32),
+#     )
+#     return tf.math.subtract(e_grad_pb_avg, e_grad_c_avg)
 
 
-@tf.function
-def qmhl_loss_phis_grad(qhbm_model, target_density, eps=0.1):
-    """Calculate phis gradient of the QMHL loss of the model against the target.
+# @tf.function
+# def phis_grad_sub_func(
+#     i,
+#     qhbm_energy_function,
+#     qhbm_thetas,
+#     qhbm_u_dagger,
+#     qhbm_phis_symbols,
+#     qhbm_phis,
+#     circuit_samples,
+#     circuit_counts,
+#     num_phis,
+#     eps,
+# ):
+#     """phis_grad_sub_func."""
+#     print("retracing: phis_grad_sub_func")
+#     p_axis = tf.one_hot(i, num_phis, dtype=tf.float32)
+#     perturbation = p_axis * eps
+#     forward = qhbm.pulled_back_energy_expectation(
+#         qhbm_energy_function,
+#         qhbm_thetas,
+#         qhbm_u_dagger,
+#         qhbm_phis_symbols,
+#         qhbm_phis + perturbation,
+#         circuit_samples,
+#         circuit_counts,
+#     )
+#     backward = qhbm.pulled_back_energy_expectation(
+#         qhbm_energy_function,
+#         qhbm_thetas,
+#         qhbm_u_dagger,
+#         qhbm_phis_symbols,
+#         qhbm_phis - perturbation,
+#         circuit_samples,
+#         circuit_counts,
+#     )
+#     return tf.divide(forward - backward, (2.0 * eps))
 
-    Args:
-      qhbm_model: `QHBM` which is the parameterized model density operator.
-      target_density: `DensityOperator` which is the distribution whose logarithm
-        we are trying to learn.
-      eps: the size of the finite difference step.
 
-    Returns:
-      Stochastic estimate of the gradient of the QMHL loss with respect to the
-        unitary model parameters.
-    """
-    print("retracing: qmhl_loss_phis_grad")
-    num_phis = tf.shape(qhbm_model.phis)[0]
+# @tf.function
+# def qmhl_loss_phis_grad(qhbm_model, target_density, eps=0.1):
+#     """Calculate phis gradient of the QMHL loss of the model against the target.
 
-    def loop(x):
-        phis_grad_sub_func(
-            x,
-            qhbm_model.energy_function,
-            qhbm_model.thetas,
-            qhbm_model.u_dagger,
-            qhbm_model.phis_symbols,
-            qhbm_model.phis,
-            target_density.circuits,
-            target_density.counts,
-            num_phis,
-            eps,
-        )
+#     Args:
+#       qhbm_model: `QHBM` which is the parameterized model density operator.
+#       target_density: `DensityOperator` which is the distribution whose logarithm
+#         we are trying to learn.
+#       eps: the size of the finite difference step.
 
-    return tf.map_fn(loop, tf.range(num_phis), fn_output_signature=tf.float32)
+#     Returns:
+#       Stochastic estimate of the gradient of the QMHL loss with respect to the
+#         unitary model parameters.
+#     """
+#     print("retracing: qmhl_loss_phis_grad")
+#     num_phis = tf.shape(qhbm_model.phis)[0]
+
+#     def loop(x):
+#         phis_grad_sub_func(
+#             x,
+#             qhbm_model.energy_function,
+#             qhbm_model.thetas,
+#             qhbm_model.u_dagger,
+#             qhbm_model.phis_symbols,
+#             qhbm_model.phis,
+#             target_density.circuits,
+#             target_density.counts,
+#             num_phis,
+#             eps,
+#         )
+
+#     return tf.map_fn(loop, tf.range(num_phis), fn_output_signature=tf.float32)

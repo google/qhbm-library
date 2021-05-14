@@ -184,8 +184,6 @@ def build_boltzmann(num_nodes, identifier):
         @tf.function
         def sampler_boltzmann(thetas, num_samples):
             print("retracing: sampler_boltzmann_{}".format(identifier))
-            Z = partition_boltzmann(thetas)
-            exponentials = all_exponentials(thetas)
             raw_samples = tfp.distributions.Categorical(
                 logits=tf.multiply(
                     tf.constant(-1, dtype=tf.float32), all_energies(thetas)
@@ -366,7 +364,6 @@ def get_swish_network(num_bits, num_layers):
     n_init_params = num_bits * h_w + h_w
     n_hidden_params = h_w ** 2 + h_w
     n_hidden_params_total = n_hidden_params * num_layers
-    n_final_params = h_w + 1
 
     this_initial_layer = get_initial_layer(num_bits)
 
@@ -563,7 +560,7 @@ class MCMCBitstringKernel(tfp.mcmc.TransitionKernel):
     @tf.function
     def one_step(self, current_state, previous_kernel_results):
         print("retracing: one_step")
-        [proposed_state, proposed_results,] = self.inner_kernel.one_step(
+        [proposed_state, proposed_results] = self.inner_kernel.one_step(
             current_state, previous_kernel_results.accepted_results
         )
         log_accept_ratio = (

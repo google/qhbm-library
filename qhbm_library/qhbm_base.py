@@ -518,294 +518,295 @@ class ExactQHBM(QHBM):
         )
 
 
-class QHBMQ(tf.Module):
-    def __init__(
-        self,
-        p,
-        initial_etas,
-        initial_classical_thetas,
-        eta_theta_symbols,
-        energy,
-        sampler,
-        log_partition,
-        entropy,
-        initial_phis,
-        phis_symbols,
-        u,
-        name,
-    ):
-        """Initialize a QHBM with all the required parameters."""
-        if not isinstance(name, str):
-            raise TypeError("name must be a string")
-        super().__init__(name)
+# TODO(#16)
+# class QHBMQ(tf.Module):
+#     def __init__(
+#         self,
+#         p,
+#         initial_etas,
+#         initial_classical_thetas,
+#         eta_theta_symbols,
+#         energy,
+#         sampler,
+#         log_partition,
+#         entropy,
+#         initial_phis,
+#         phis_symbols,
+#         u,
+#         name,
+#     ):
+#         """Initialize a QHBM with all the required parameters."""
+#         if not isinstance(name, str):
+#             raise TypeError("name must be a string")
+#         super().__init__(name)
 
-        self.p = tf.constant(p, dtype=tf.int32)
+#         self.p = tf.constant(p, dtype=tf.int32)
 
-        if isinstance(initial_etas, tf.Variable):
-            self.etas = tf.Variable(
-                tf.cast(initial_etas.read_value(), tf.float32), dtype=tf.float32
-            )
-        elif isinstance(initial_etas, (list, np.ndarray, tf.Tensor)):
-            self.etas = tf.Variable(tf.cast(initial_etas, tf.float32), dtype=tf.float32)
-        else:
-            raise TypeError(
-                "initial_etas needs to be a numeric type, got {}".format(
-                    type(initial_etas)
-                )
-            )
-        if self.etas.shape[0] != self.p:
-            raise ValueError("must have as many eta values as trotter steps.")
+#         if isinstance(initial_etas, tf.Variable):
+#             self.etas = tf.Variable(
+#                 tf.cast(initial_etas.read_value(), tf.float32), dtype=tf.float32
+#             )
+#         elif isinstance(initial_etas, (list, np.ndarray, tf.Tensor)):
+#           self.etas = tf.Variable(tf.cast(initial_etas, tf.float32), dtype=tf.float32)
+#         else:
+#             raise TypeError(
+#                 "initial_etas needs to be a numeric type, got {}".format(
+#                     type(initial_etas)
+#                 )
+#             )
+#         if self.etas.shape[0] != self.p:
+#             raise ValueError("must have as many eta values as trotter steps.")
 
-        if isinstance(initial_classical_thetas, tf.Variable):
-            self.classical_thetas = tf.Variable(
-                tf.cast(initial_classical_thetas.read_value(), tf.float32),
-                dtype=tf.float32,
-            )
-        elif isinstance(initial_classical_thetas, (list, np.ndarray, tf.Tensor)):
-            self.classical_thetas = tf.Variable(
-                tf.cast(initial_classical_thetas, tf.float32), dtype=tf.float32
-            )
-        else:
-            raise TypeError(
-                "initial_classical_thetas needs to be a numeric type, got {}".format(
-                    type(initial_classical_thetas)
-                )
-            )
+#         if isinstance(initial_classical_thetas, tf.Variable):
+#             self.classical_thetas = tf.Variable(
+#                 tf.cast(initial_classical_thetas.read_value(), tf.float32),
+#                 dtype=tf.float32,
+#             )
+#         elif isinstance(initial_classical_thetas, (list, np.ndarray, tf.Tensor)):
+#             self.classical_thetas = tf.Variable(
+#                 tf.cast(initial_classical_thetas, tf.float32), dtype=tf.float32
+#             )
+#         else:
+#             raise TypeError(
+#                 "initial_classical_thetas needs to be a numeric type, got {}".format(
+#                     type(initial_classical_thetas)
+#                 )
+#             )
 
-        if not isinstance(eta_theta_symbols, (list, tuple)) or not all(
-            [isinstance(s, sympy.Symbol) for row_s in eta_theta_symbols for s in row_s]
-        ):
-            raise TypeError(
-                "eta_theta_symbols must be a 2-D list or tuple of sympy.Symbols."
-            )
-        self.raw_eta_theta_symbols = copy.deepcopy(eta_theta_symbols)
-        self.eta_theta_symbols = tf.constant(
-            [str(s) for row_s in eta_theta_symbols for s in row_s], dtype=tf.string
-        )
-        if (
-            self.classical_thetas.shape[0] * self.etas.shape[0]
-            != self.eta_theta_symbols.shape[0]
-        ):
-            raise ValueError(
-                "Due to TFQ limitations, "
-                "there must be as many eta-theta symbols as etas times thetas."
-            )
+#         if not isinstance(eta_theta_symbols, (list, tuple)) or not all(
+#            [isinstance(s, sympy.Symbol) for row_s in eta_theta_symbols for s in row_s]
+#         ):
+#             raise TypeError(
+#                 "eta_theta_symbols must be a 2-D list or tuple of sympy.Symbols."
+#             )
+#         self.raw_eta_theta_symbols = copy.deepcopy(eta_theta_symbols)
+#         self.eta_theta_symbols = tf.constant(
+#             [str(s) for row_s in eta_theta_symbols for s in row_s], dtype=tf.string
+#         )
+#         if (
+#             self.classical_thetas.shape[0] * self.etas.shape[0]
+#             != self.eta_theta_symbols.shape[0]
+#         ):
+#             raise ValueError(
+#                 "Due to TFQ limitations, "
+#                 "there must be as many eta-theta symbols as etas times thetas."
+#             )
 
-        if not isinstance(energy, collections.Callable):
-            raise TypeError("energy must be a function, got {}".format(type(energy)))
-        self.energy_function = energy
-        if not isinstance(sampler, collections.Callable):
-            raise TypeError("sampler must be a function, got {}".format(type(sampler)))
-        self.sampler_function = sampler
-        if not isinstance(log_partition, collections.Callable):
-            raise TypeError(
-                "log_partition must be a function, got {}".format(type(log_partition))
-            )
-        self.log_partition_function = log_partition
-        if not isinstance(entropy, collections.Callable):
-            raise TypeError("entropy must be a function, got {}".format(type(entropy)))
-        self.entropy_function = entropy
-        if isinstance(initial_phis, tf.Variable):
-            self.phis = tf.Variable(initial_phis.read_value(), dtype=tf.float32)
-        elif isinstance(initial_phis, (list, np.ndarray, tf.Tensor)):
-            self.phis = tf.Variable(initial_phis, dtype=tf.float32)
-        else:
-            raise TypeError(
-                "initial_phis needs to be a numeric type, got {}".format(
-                    type(initial_phis)
-                )
-            )
-        if not isinstance(phis_symbols, (list, tuple)) or not all(
-            [isinstance(s, sympy.Symbol) for s in phis_symbols]
-        ):
-            raise TypeError("phis_symbols must be a list or tuple of sympy.Symbols.")
-        self.raw_phis_symbols = copy.deepcopy(phis_symbols)
-        self.phis_symbols = tf.constant([str(s) for s in phis_symbols], dtype=tf.string)
-        if self.phis.shape != self.phis_symbols.shape:
-            raise ValueError("There must be one symbol per quantum circuit parameter")
-        if not isinstance(u, cirq.Circuit):
-            raise TypeError("u must be a cirq.Circuit, got {}".format(type(u)))
-        self.raw_u = copy.deepcopy(u)
-        if set(tfq.util.get_circuit_symbols(u)) != set(
-            [str(s) for s in self.raw_phis_symbols]
-            + [str(s) for row_s in self.raw_eta_theta_symbols for s in row_s]
-        ):
-            raise ValueError(
-                "u must contain all and only the symbols "
-                "in phis_symbols and eta_theta_symbols."
-            )
-        self.u = tfq.convert_to_tensor([u])
-        self.u_dagger = tfq.convert_to_tensor([u ** -1])
+#         if not isinstance(energy, collections.Callable):
+#             raise TypeError("energy must be a function, got {}".format(type(energy)))
+#         self.energy_function = energy
+#         if not isinstance(sampler, collections.Callable):
+#            raise TypeError("sampler must be a function, got {}".format(type(sampler)))
+#         self.sampler_function = sampler
+#         if not isinstance(log_partition, collections.Callable):
+#             raise TypeError(
+#                 "log_partition must be a function, got {}".format(type(log_partition))
+#             )
+#         self.log_partition_function = log_partition
+#         if not isinstance(entropy, collections.Callable):
+#            raise TypeError("entropy must be a function, got {}".format(type(entropy)))
+#         self.entropy_function = entropy
+#         if isinstance(initial_phis, tf.Variable):
+#             self.phis = tf.Variable(initial_phis.read_value(), dtype=tf.float32)
+#         elif isinstance(initial_phis, (list, np.ndarray, tf.Tensor)):
+#             self.phis = tf.Variable(initial_phis, dtype=tf.float32)
+#         else:
+#             raise TypeError(
+#                 "initial_phis needs to be a numeric type, got {}".format(
+#                     type(initial_phis)
+#                 )
+#             )
+#         if not isinstance(phis_symbols, (list, tuple)) or not all(
+#             [isinstance(s, sympy.Symbol) for s in phis_symbols]
+#         ):
+#             raise TypeError("phis_symbols must be a list or tuple of sympy.Symbols.")
+#         self.raw_phis_symbols = copy.deepcopy(phis_symbols)
+#       self.phis_symbols = tf.constant([str(s) for s in phis_symbols], dtype=tf.string)
+#         if self.phis.shape != self.phis_symbols.shape:
+#             raise ValueError("There must be one symbol per quantum circuit parameter")
+#         if not isinstance(u, cirq.Circuit):
+#             raise TypeError("u must be a cirq.Circuit, got {}".format(type(u)))
+#         self.raw_u = copy.deepcopy(u)
+#         if set(tfq.util.get_circuit_symbols(u)) != set(
+#             [str(s) for s in self.raw_phis_symbols]
+#             + [str(s) for row_s in self.raw_eta_theta_symbols for s in row_s]
+#         ):
+#             raise ValueError(
+#                 "u must contain all and only the symbols "
+#                 "in phis_symbols and eta_theta_symbols."
+#             )
+#         self.u = tfq.convert_to_tensor([u])
+#         self.u_dagger = tfq.convert_to_tensor([u ** -1])
 
-        self.raw_qubits = sorted(u.all_qubits())
-        raw_bit_circuit, raw_bit_symbols = util.build_bit_circuit(self.raw_qubits, name)
-        self.qubits = tf.constant([[q.row, q.col] for q in self.raw_qubits])
-        self.num_qubits = tf.constant(len(self.raw_qubits))
-        self.bit_symbols = tf.constant(
-            [str(s) for s in raw_bit_symbols], dtype=tf.string
-        )
-        self.bit_injector = tfq.convert_to_tensor([raw_bit_circuit])
+#         self.raw_qubits = sorted(u.all_qubits())
+#       raw_bit_circuit, raw_bit_symbols = util.build_bit_circuit(self.raw_qubits, name)
+#         self.qubits = tf.constant([[q.row, q.col] for q in self.raw_qubits])
+#         self.num_qubits = tf.constant(len(self.raw_qubits))
+#         self.bit_symbols = tf.constant(
+#             [str(s) for s in raw_bit_symbols], dtype=tf.string
+#         )
+#         self.bit_injector = tfq.convert_to_tensor([raw_bit_circuit])
 
-    def copy(self):
-        return QHBM(
-            self.p,
-            self.etas,
-            self.classical_thetas,
-            self.eta_theta_symbols,
-            self.energy_function,
-            self.sampler_function,
-            self.log_partition_function,
-            self.entropy_function,
-            self.phis,
-            self.raw_phis_symbols,
-            self.raw_u,
-            self.name,
-        )
-
-
-@tf.function
-def get_eta_theta_vals(etas, classical_thetas):
-    """Get the quantum circuit params induced by the classical model."""
-    print("retracing: get_eta_theta_vals")
-    p = tf.shape(etas)[0]
-    num_classical_thetas = tf.shape(classical_thetas)[0]
-    classical_thetas_tiled = tf.tile(tf.expand_dims(classical_thetas, 0), [p, 1])
-    etas_tiled = tf.tile(tf.expand_dims(etas, 1), [1, num_classical_thetas])
-    return tf.reshape(etas_tiled * classical_thetas_tiled, [p * num_classical_thetas])
+#     def copy(self):
+#         return QHBM(
+#             self.p,
+#             self.etas,
+#             self.classical_thetas,
+#             self.eta_theta_symbols,
+#             self.energy_function,
+#             self.sampler_function,
+#             self.log_partition_function,
+#             self.entropy_function,
+#             self.phis,
+#             self.raw_phis_symbols,
+#             self.raw_u,
+#             self.name,
+#         )
 
 
-@tf.function
-def sample_bitstrings(this_qhbm, num_samples):
-    """Returns unique bitstrings and counts from this QHBM's classical dist.
-
-    Args:
-      this_qhbm: QHBM representation of a density matrix.
-      num_samples: number of bitstrings to sample from the classical probability
-          distribution parameterizing this QHBM.
-
-    Returns:
-      unique_samples:
-      counts:
-    """
-    print("retracing: sample_bitstrings")
-    samples = this_qhbm.sampler_function(this_qhbm.classical_thetas, num_samples)
-    unique_samples, _, counts = util.unique_with_counts(samples)
-    return unique_samples, counts
+# @tf.function
+# def get_eta_theta_vals(etas, classical_thetas):
+#     """Get the quantum circuit params induced by the classical model."""
+#     print("retracing: get_eta_theta_vals")
+#     p = tf.shape(etas)[0]
+#     num_classical_thetas = tf.shape(classical_thetas)[0]
+#     classical_thetas_tiled = tf.tile(tf.expand_dims(classical_thetas, 0), [p, 1])
+#     etas_tiled = tf.tile(tf.expand_dims(etas, 1), [1, num_classical_thetas])
+#     return tf.reshape(etas_tiled * classical_thetas_tiled, [p * num_classical_thetas])
 
 
-@tf.function
-def sample_state_circuits(this_qhbm, num_samples):
-    """Returns tensor of circuits generating pure state samples from this QHBM.
+# @tf.function
+# def sample_bitstrings(this_qhbm, num_samples):
+#     """Returns unique bitstrings and counts from this QHBM's classical dist.
 
-    Args:
-      this_qhbm: QHBM representation of a density matrix.
-      num_samples: number of pure state samples to draw from this QHBM.
+#     Args:
+#       this_qhbm: QHBM representation of a density matrix.
+#       num_samples: number of bitstrings to sample from the classical probability
+#           distribution parameterizing this QHBM.
 
-    Returns:
-      circuit_samples: 1-D `tf.Tensor` containing the string representations of
-          the circuits to generate pures state samples from this QHBM.
-      bitstring_samples:
-      counts: 1-D `tf.Tensor` of type `tf.int32` such that `counts[i]` says how
-          many times circuit `circuit_samples[i]` occurs in the sum used to
-          approximate this QHBM.
-    """
-    print("retracing: sample_state_circuits")
-    # Fill in quantum circuit values
-    eta_theta_vals = get_eta_theta_vals(this_qhbm.etas, this_qhbm.classical_thetas)
-    total_vals = tf.concat([eta_theta_vals, this_qhbm.phis], 0)
-    total_symbols = tf.concat([this_qhbm.eta_theta_symbols, this_qhbm.phis_symbols], 0)
-    u_model_concrete = tfq.resolve_parameters(
-        this_qhbm.u, total_symbols, tf.expand_dims(total_vals, 0)
-    )
-
-    # Inject the unique bitstrings
-    bitstring_samples, counts = sample_bitstrings(this_qhbm, num_samples)
-    tiled_bit_injector = tf.tile(this_qhbm.bit_injector, [tf.shape(counts)[0]])
-    bit_injector_samples = tfq.resolve_parameters(
-        tiled_bit_injector, this_qhbm.bit_symbols, bitstring_samples
-    )
-    circuit_samples = tfq.append_circuit(
-        bit_injector_samples, tf.tile(u_model_concrete, [tf.shape(counts)[0]])
-    )
-    return circuit_samples, bitstring_samples, counts
+#     Returns:
+#       unique_samples:
+#       counts:
+#     """
+#     print("retracing: sample_bitstrings")
+#     samples = this_qhbm.sampler_function(this_qhbm.classical_thetas, num_samples)
+#     unique_samples, _, counts = util.unique_with_counts(samples)
+#     return unique_samples, counts
 
 
-@tf.function
-def sample_pulled_back_bitstrings(this_qhbm, circuit_samples, counts):
-    """Returns samples from the pulled back data distribution.
+# @tf.function
+# def sample_state_circuits(this_qhbm, num_samples):
+#     """Returns tensor of circuits generating pure state samples from this QHBM.
 
-    The inputs represent the data density matrix. The inverse of this QHBM's
-    unitary is appended to create the set of circuits representing the
-    pulled back data density matrix. Then, the requested number of bitstrings
-    are sampled from each circuit.
+#     Args:
+#       this_qhbm: QHBM representation of a density matrix.
+#       num_samples: number of pure state samples to draw from this QHBM.
 
-    Args:
-      this_qhbm: QHBM representation of a density matrix.
-    """
-    print("retracing: sample_pulled_back_bitstrings")
-    # Fill in quantum circuit values
-    eta_theta_vals = get_eta_theta_vals(this_qhbm.etas, this_qhbm.classical_thetas)
-    total_vals = tf.concat([eta_theta_vals, this_qhbm.phis], 0)
-    total_symbols = tf.concat([this_qhbm.eta_theta_symbols, this_qhbm.phis_symbols], 0)
-    u_dagger_concrete = tfq.resolve_parameters(
-        this_qhbm.u_dagger, total_symbols, tf.expand_dims(total_vals, 0)
-    )
-    pulled_back_circuits = tfq.append_circuit(
-        circuit_samples, tf.tile(u_dagger_concrete, [tf.shape(circuit_samples)[0]])
-    )
-    raw_samples = tfq.layers.Sample()(
-        pulled_back_circuits, repetitions=tf.expand_dims(tf.math.reduce_max(counts), 0)
-    )
-    num_samples_mask = tf.cast((tf.ragged.range(counts) + 1).to_tensor(), tf.bool)
-    ragged_samples = tf.ragged.boolean_mask(raw_samples, num_samples_mask)
-    return ragged_samples
+#     Returns:
+#       circuit_samples: 1-D `tf.Tensor` containing the string representations of
+#           the circuits to generate pures state samples from this QHBM.
+#       bitstring_samples:
+#       counts: 1-D `tf.Tensor` of type `tf.int32` such that `counts[i]` says how
+#           many times circuit `circuit_samples[i]` occurs in the sum used to
+#           approximate this QHBM.
+#     """
+#     print("retracing: sample_state_circuits")
+#     # Fill in quantum circuit values
+#     eta_theta_vals = get_eta_theta_vals(this_qhbm.etas, this_qhbm.classical_thetas)
+#     total_vals = tf.concat([eta_theta_vals, this_qhbm.phis], 0)
+#    total_symbols = tf.concat([this_qhbm.eta_theta_symbols, this_qhbm.phis_symbols], 0)
+#     u_model_concrete = tfq.resolve_parameters(
+#         this_qhbm.u, total_symbols, tf.expand_dims(total_vals, 0)
+#     )
 
-
-@tf.function
-def approximate_density_matrix(this_qhbm, num_samples):
-    """Returns an estimate of the density matrix represented by this QHBM.
-
-    Args:
-      num_samples: number of pure state samples to use when computing the
-          density matrix represented by this QHBM.
-
-    Returns:
-      density_matrix: 2-D tensor containing a numeric approximation to the
-          density matrix represented by this QHBM.
-    """
-    print("retracing: approximate_density_matrix")
-    state_circuits, _, counts = sample_state_circuits(this_qhbm, num_samples)
-    return util.circuits_and_counts_to_density_matrix(state_circuits, counts)
+#     # Inject the unique bitstrings
+#     bitstring_samples, counts = sample_bitstrings(this_qhbm, num_samples)
+#     tiled_bit_injector = tf.tile(this_qhbm.bit_injector, [tf.shape(counts)[0]])
+#     bit_injector_samples = tfq.resolve_parameters(
+#         tiled_bit_injector, this_qhbm.bit_symbols, bitstring_samples
+#     )
+#     circuit_samples = tfq.append_circuit(
+#         bit_injector_samples, tf.tile(u_model_concrete, [tf.shape(counts)[0]])
+#     )
+#     return circuit_samples, bitstring_samples, counts
 
 
-@tf.function
-def energy_and_energy_grad(this_qhbm, bitstring):
-    print("retracing: energy_and_energy_grad")
-    # Need fresh tensor for gradient
-    new_dup_thetas = tf.identity(this_qhbm.classical_thetas)
-    with tf.GradientTape() as tape:
-        tape.watch(new_dup_thetas)
-        this_energy = this_qhbm.energy_function(new_dup_thetas, bitstring)
-    this_grad = tape.gradient(this_energy, new_dup_thetas)
-    return this_energy, this_grad
+# @tf.function
+# def sample_pulled_back_bitstrings(this_qhbm, circuit_samples, counts):
+#     """Returns samples from the pulled back data distribution.
+
+#     The inputs represent the data density matrix. The inverse of this QHBM's
+#     unitary is appended to create the set of circuits representing the
+#     pulled back data density matrix. Then, the requested number of bitstrings
+#     are sampled from each circuit.
+
+#     Args:
+#       this_qhbm: QHBM representation of a density matrix.
+#     """
+#     print("retracing: sample_pulled_back_bitstrings")
+#     # Fill in quantum circuit values
+#     eta_theta_vals = get_eta_theta_vals(this_qhbm.etas, this_qhbm.classical_thetas)
+#     total_vals = tf.concat([eta_theta_vals, this_qhbm.phis], 0)
+#    total_symbols = tf.concat([this_qhbm.eta_theta_symbols, this_qhbm.phis_symbols], 0)
+#     u_dagger_concrete = tfq.resolve_parameters(
+#         this_qhbm.u_dagger, total_symbols, tf.expand_dims(total_vals, 0)
+#     )
+#     pulled_back_circuits = tfq.append_circuit(
+#         circuit_samples, tf.tile(u_dagger_concrete, [tf.shape(circuit_samples)[0]])
+#     )
+#     raw_samples = tfq.layers.Sample()(
+#        pulled_back_circuits, repetitions=tf.expand_dims(tf.math.reduce_max(counts), 0)
+#     )
+#     num_samples_mask = tf.cast((tf.ragged.range(counts) + 1).to_tensor(), tf.bool)
+#     ragged_samples = tf.ragged.boolean_mask(raw_samples, num_samples_mask)
+#     return ragged_samples
 
 
-@tf.function
-def pulled_back_energy_expectation(this_qhbm, circuit_samples, circuit_counts):
-    """Calculates the average energy of bitstrings from the pulled back dist."""
-    print("retracing: pulled_back_energy_expectation")
-    ragged_samples_pb = sample_pulled_back_bitstrings(
-        this_qhbm, circuit_samples, circuit_counts
-    )
-    # safe when all circuits have the same number of qubits
-    all_samples_pb = ragged_samples_pb.values.to_tensor()
-    unique_samples_pb, _, counts_pb = util.unique_with_counts(all_samples_pb)
-    counts_pb = tf.cast(counts_pb, tf.float32)
-    e_list, _ = tf.map_fn(
-        lambda x: energy_and_energy_grad(this_qhbm, x),
-        unique_samples_pb,
-        fn_output_signature=(tf.float32, tf.float32),
-    )
-    e_list_full = tf.multiply(counts_pb, e_list)
-    average_energy = tf.divide(tf.reduce_sum(e_list_full), tf.reduce_sum(counts_pb))
-    return average_energy
+# @tf.function
+# def approximate_density_matrix(this_qhbm, num_samples):
+#     """Returns an estimate of the density matrix represented by this QHBM.
+
+#     Args:
+#       num_samples: number of pure state samples to use when computing the
+#           density matrix represented by this QHBM.
+
+#     Returns:
+#       density_matrix: 2-D tensor containing a numeric approximation to the
+#           density matrix represented by this QHBM.
+#     """
+#     print("retracing: approximate_density_matrix")
+#     state_circuits, _, counts = sample_state_circuits(this_qhbm, num_samples)
+#     return util.circuits_and_counts_to_density_matrix(state_circuits, counts)
+
+
+# @tf.function
+# def energy_and_energy_grad(this_qhbm, bitstring):
+#     print("retracing: energy_and_energy_grad")
+#     # Need fresh tensor for gradient
+#     new_dup_thetas = tf.identity(this_qhbm.classical_thetas)
+#     with tf.GradientTape() as tape:
+#         tape.watch(new_dup_thetas)
+#         this_energy = this_qhbm.energy_function(new_dup_thetas, bitstring)
+#     this_grad = tape.gradient(this_energy, new_dup_thetas)
+#     return this_energy, this_grad
+
+
+# @tf.function
+# def pulled_back_energy_expectation(this_qhbm, circuit_samples, circuit_counts):
+#     """Calculates the average energy of bitstrings from the pulled back dist."""
+#     print("retracing: pulled_back_energy_expectation")
+#     ragged_samples_pb = sample_pulled_back_bitstrings(
+#         this_qhbm, circuit_samples, circuit_counts
+#     )
+#     # safe when all circuits have the same number of qubits
+#     all_samples_pb = ragged_samples_pb.values.to_tensor()
+#     unique_samples_pb, _, counts_pb = util.unique_with_counts(all_samples_pb)
+#     counts_pb = tf.cast(counts_pb, tf.float32)
+#     e_list, _ = tf.map_fn(
+#         lambda x: energy_and_energy_grad(this_qhbm, x),
+#         unique_samples_pb,
+#         fn_output_signature=(tf.float32, tf.float32),
+#     )
+#     e_list_full = tf.multiply(counts_pb, e_list)
+#     average_energy = tf.divide(tf.reduce_sum(e_list_full), tf.reduce_sum(counts_pb))
+#     return average_energy
