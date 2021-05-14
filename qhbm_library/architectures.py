@@ -489,38 +489,39 @@ def two_qubit_pool(source_qubit, sink_qubit, symbols):
     return pool_circuit
 
 
-def quantum_convolutional_layer(qubits, layer_num, name):
-    """Assumes the qubits are arranged on a grid."""
-    qubit_grid = qubits_to_grid(qubits)
-    layer_symbols = []
-    circuit = cirq.Circuit()
-    tied_2q_symbols = [
-        sympy.Symbol("s_conv_I{0}_L{1}_N{2}".format(name, layer_num, s_num))
-        for s_num in range(15)
-    ]
-    # Apply horizontal bonds
-    for r in qubit_grid:
-        r_clipped = r[1:]
-        for alt_r in [r, r_clipped]:
-            for q0, q1 in zip(alt_r[::2], alt_r[1::2]):
-                circuit += two_qubit_unitary(q0, q1, tied_2q_symbols)
-    # Apply vertical bonds
-    grid_clipped = qubit_grid[1:]
-    for r0, r1 in zip(qubit_grid[::2], qubit_grid[1::2]):
-        for q0, q1 in zip(r0, r1):
-            circuit += two_qubit_unitary(q0, q1, tied_2q_symbols)
-    for r0, r1 in zip(grid_clipped[::2], grid_clipped[1::2]):
-        for q0, q1 in zip(r0, r1):
-            circuit += two_qubit_unitary(q0, q1, tied_2q_symbols)
-    return circuit, tied_2q_symbols
+# TODO(#19)
+# def quantum_convolutional_layer(qubits, layer_num, name):
+#     """Assumes the qubits are arranged on a grid."""
+#     qubit_grid = qubits_to_grid(qubits)
+#     layer_symbols = []
+#     circuit = cirq.Circuit()
+#     tied_2q_symbols = [
+#         sympy.Symbol("s_conv_I{0}_L{1}_N{2}".format(name, layer_num, s_num))
+#         for s_num in range(15)
+#     ]
+#     # Apply horizontal bonds
+#     for r in qubit_grid:
+#         r_clipped = r[1:]
+#         for alt_r in [r, r_clipped]:
+#             for q0, q1 in zip(alt_r[::2], alt_r[1::2]):
+#                 circuit += two_qubit_unitary(q0, q1, tied_2q_symbols)
+#     # Apply vertical bonds
+#     grid_clipped = qubit_grid[1:]
+#     for r0, r1 in zip(qubit_grid[::2], qubit_grid[1::2]):
+#         for q0, q1 in zip(r0, r1):
+#             circuit += two_qubit_unitary(q0, q1, tied_2q_symbols)
+#     for r0, r1 in zip(grid_clipped[::2], grid_clipped[1::2]):
+#         for q0, q1 in zip(r0, r1):
+#             circuit += two_qubit_unitary(q0, q1, tied_2q_symbols)
+#     return circuit, tied_2q_symbols
 
 
-def quantum_pool_layer(qubits, layer_num, name, direction_flag):
-    """Assumes the qubits are arranged on a grid."""
-    qubit_grid = qubits_to_grid(qubits)
-    layer_symbols = []
-    circuit = cirq.Circuit()
-    tied_pool_symbols = [
-        sympy.Symbol("s_pool_I{0}_L{1}_N{2}".format(name, layer_num, s_num))
-        for s_num in range(6)
-    ]
+# def quantum_pool_layer(qubits, layer_num, name, direction_flag):
+#     """Assumes the qubits are arranged on a grid."""
+#     qubit_grid = qubits_to_grid(qubits)
+#     layer_symbols = []
+#     circuit = cirq.Circuit()
+#     tied_pool_symbols = [
+#         sympy.Symbol("s_pool_I{0}_L{1}_N{2}".format(name, layer_num, s_num))
+#         for s_num in range(6)
+#     ]

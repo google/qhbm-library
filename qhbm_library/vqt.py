@@ -18,7 +18,6 @@ import tensorflow as tf
 import tensorflow_quantum as tfq
 
 from qhbm_library import qhbm_base
-from qhbm_library import util
 
 
 # ============================================================================ #
@@ -284,212 +283,212 @@ def exact_vqt_loss_phis_grad(
 # Version of VQT that takes a list of QHBMs as the target Hamiltonian.
 # ============================================================================ #
 
-
-@tf.function
-def get_avg_sub_energy(
-    full_y_samples_j, qhbm_energy_function, qhbm_thetas_j, bit_sub_indices_j
-):
-    print("retracing: get_avg_sub_energy")
-    sub_samples = tf.gather(full_y_samples_j, bit_sub_indices_j, axis=1)
-    unique_sub_samples, _, counts = qhbm_base.unique_with_counts(sub_samples)
-    counts = tf.cast(counts, tf.float32)
-    unique_sub_energies, _ = tf.map_fn(
-        lambda x: qhbm.energy_and_energy_grad(qhbm_energy_function, qhbm_thetas_j, x),
-        unique_sub_samples,
-        fn_output_signature=(tf.float32, tf.float32),
-    )
-    sub_energies = tf.multiply(counts, unique_sub_energies)
-    return tf.divide(tf.reduce_sum(sub_energies), tf.reduce_sum(counts))
-
-
-def build_sub_term_energy_func(qhbm_vqt, qhbm_hamiltonian_list):
-    bit_sub_indices_list = [
-        util.get_bit_sub_indices(qhbm_vqt.qubits, this_qhbm.qubits)
-        for this_qhbm in qhbm_hamiltonian_list
-    ]
-    qhbm_thetas = [this_qhbm.thetas for this_qhbm in qhbm_hamiltonian_list]
-    qhbm_u_dagger = [this_qhbm.u_dagger for this_qhbm in qhbm_hamiltonian_list]
-    qhbm_phis_symbols = [this_qhbm.phis_symbols for this_qhbm in qhbm_hamiltonian_list]
-    qhbm_phis = [this_qhbm.phis for this_qhbm in qhbm_hamiltonian_list]
-    qhbm_energy_list = [
-        this_qhbm.energy_function for this_qhbm in qhbm_hamiltonian_list
-    ]
-
-    def inner_build_sub_term_energy_func(
-        energy_list, thetas, sub_indices, daggers, phis_s, phis
-    ):
-        list_of_get_avg_energy_lists = []
-
-        def inner_jth_sampled_circuits_energy_list(
-            j, i_energy_list, i_thetas, i_sub_indices, i_daggers, i_phis_s, i_phis
-        ):
-            @tf.function
-            def jth_sampled_circuits_energy_list(circuits, counts):
-                print("retracing: jth_sampled_circuits_energy_list_{}".format(j))
-                return tf.map_fn(
-                    lambda x: get_avg_sub_energy(
-                        x.to_tensor(), energy_list[j], thetas[j], sub_indices[j]
-                    ),
-                    qhbm.sample_pulled_back_bitstrings(
-                        daggers[j], phis_s[j], phis[j], circuits, counts
-                    ),
-                    fn_output_signature=tf.float32,
-                )
-
-            return jth_sampled_circuits_energy_list
-
-        for j, _ in enumerate(energy_list):
-            list_of_get_avg_energy_lists.append(
-                inner_jth_sampled_circuits_energy_list(
-                    j, energy_list, thetas, sub_indices, daggers, phis_s, phis
-                )
-            )
-
-        @tf.function
-        def sub_term_energy_func(
-            vqt_circuits, vqt_circuits_counts, le=list_of_get_avg_energy_lists
-        ):
-            print("retracing: sub_term_energy_func")
-            avg_energy_lists = tf.stack(
-                [f(vqt_circuits, vqt_circuits_counts) for f in le]
-            )
-            return tf.reduce_sum(avg_energy_lists, 0)
-
-        return sub_term_energy_func
-
-    return inner_build_sub_term_energy_func(
-        qhbm_energy_list,
-        qhbm_thetas,
-        bit_sub_indices_list,
-        qhbm_u_dagger,
-        qhbm_phis_symbols,
-        qhbm_phis,
-    )
+# TODO(#14)
+# @tf.function
+# def get_avg_sub_energy(
+#     full_y_samples_j, qhbm_energy_function, qhbm_thetas_j, bit_sub_indices_j
+# ):
+#     print("retracing: get_avg_sub_energy")
+#     sub_samples = tf.gather(full_y_samples_j, bit_sub_indices_j, axis=1)
+#     unique_sub_samples, _, counts = qhbm_base.unique_with_counts(sub_samples)
+#     counts = tf.cast(counts, tf.float32)
+#     unique_sub_energies, _ = tf.map_fn(
+#         lambda x: qhbm.energy_and_energy_grad(qhbm_energy_function, qhbm_thetas_j, x),
+#         unique_sub_samples,
+#         fn_output_signature=(tf.float32, tf.float32),
+#     )
+#     sub_energies = tf.multiply(counts, unique_sub_energies)
+#     return tf.divide(tf.reduce_sum(sub_energies), tf.reduce_sum(counts))
 
 
-@tf.function
-def vqt_qhbm_loss(qhbm_vqt, num_vqt_samples, sub_term_energy_func):
-    print("retracing: vqt_qhbm_loss")
-    vqt_circuits, _, vqt_circuits_counts = qhbm_vqt.sample_state_circuits(
-        num_vqt_samples,
-    )
-    sub_energy_list = sub_term_energy_func(vqt_circuits, vqt_circuits_counts)
-    e_avg = tf.divide(
-        tf.reduce_sum(tf.cast(vqt_circuits_counts, tf.float32) * sub_energy_list),
-        num_vqt_samples,
-    )
-    return e_avg - qhbm_vqt.entropy_function()
+# def build_sub_term_energy_func(qhbm_vqt, qhbm_hamiltonian_list):
+#     bit_sub_indices_list = [
+#         util.get_bit_sub_indices(qhbm_vqt.qubits, this_qhbm.qubits)
+#         for this_qhbm in qhbm_hamiltonian_list
+#     ]
+#     qhbm_thetas = [this_qhbm.thetas for this_qhbm in qhbm_hamiltonian_list]
+#     qhbm_u_dagger = [this_qhbm.u_dagger for this_qhbm in qhbm_hamiltonian_list]
+#     qhbm_phis_symbols=[this_qhbm.phis_symbols for this_qhbm in qhbm_hamiltonian_list]
+#     qhbm_phis = [this_qhbm.phis for this_qhbm in qhbm_hamiltonian_list]
+#     qhbm_energy_list = [
+#         this_qhbm.energy_function for this_qhbm in qhbm_hamiltonian_list
+#     ]
+
+#     def inner_build_sub_term_energy_func(
+#         energy_list, thetas, sub_indices, daggers, phis_s, phis
+#     ):
+#         list_of_get_avg_energy_lists = []
+
+#         def inner_jth_sampled_circuits_energy_list(
+#             j, i_energy_list, i_thetas, i_sub_indices, i_daggers, i_phis_s, i_phis
+#         ):
+#             @tf.function
+#             def jth_sampled_circuits_energy_list(circuits, counts):
+#                 print("retracing: jth_sampled_circuits_energy_list_{}".format(j))
+#                 return tf.map_fn(
+#                     lambda x: get_avg_sub_energy(
+#                         x.to_tensor(), energy_list[j], thetas[j], sub_indices[j]
+#                     ),
+#                     qhbm.sample_pulled_back_bitstrings(
+#                         daggers[j], phis_s[j], phis[j], circuits, counts
+#                     ),
+#                     fn_output_signature=tf.float32,
+#                 )
+
+#             return jth_sampled_circuits_energy_list
+
+#         for j, _ in enumerate(energy_list):
+#             list_of_get_avg_energy_lists.append(
+#                 inner_jth_sampled_circuits_energy_list(
+#                     j, energy_list, thetas, sub_indices, daggers, phis_s, phis
+#                 )
+#             )
+
+#         @tf.function
+#         def sub_term_energy_func(
+#             vqt_circuits, vqt_circuits_counts, le=list_of_get_avg_energy_lists
+#         ):
+#             print("retracing: sub_term_energy_func")
+#             avg_energy_lists = tf.stack(
+#                 [f(vqt_circuits, vqt_circuits_counts) for f in le]
+#             )
+#             return tf.reduce_sum(avg_energy_lists, 0)
+
+#         return sub_term_energy_func
+
+#     return inner_build_sub_term_energy_func(
+#         qhbm_energy_list,
+#         qhbm_thetas,
+#         bit_sub_indices_list,
+#         qhbm_u_dagger,
+#         qhbm_phis_symbols,
+#         qhbm_phis,
+#     )
 
 
-@tf.function
-def vqt_qhbm_loss_thetas_grad(qhbm_vqt, num_vqt_samples, sub_term_energy_func):
-    print("retracing: vqt_qhbm_loss_thetas_grad")
-    # Build components of the gradient
-    (
-        vqt_circuits,
-        vqt_bitstrings,
-        vqt_circuits_counts,
-    ) = qhbm_vqt.sample_state_circuits(
-        num_vqt_samples,
-    )
-    vqt_expanded_circuits_counts = tf.cast(
-        tf.expand_dims(vqt_circuits_counts, 1), tf.dtypes.float32
-    )
-    vqt_energies, vqt_energy_grads = tf.map_fn(
-        lambda x: qhbm_vqt.energy_and_energy_grad(x),
-        vqt_bitstrings,
-        fn_output_signature=(tf.float32, tf.float32),
-    )
-
-    # Compute the per vqt bitstring diff list
-    sub_energy_list = sub_term_energy_func(vqt_circuits, vqt_circuits_counts)
-    diff_list = sub_energy_list - vqt_energies
-    expanded_diff_list = tf.expand_dims(diff_list, 1)
-
-    # Compute the positive term in the gradient
-    diff_list_avg = tf.divide(
-        tf.reduce_sum(tf.cast(vqt_circuits_counts, tf.float32) * diff_list),
-        num_vqt_samples,
-    )
-    vqt_energy_grads_avg = tf.divide(
-        tf.reduce_sum(vqt_expanded_circuits_counts * vqt_energy_grads, 0),
-        num_vqt_samples,
-    )
-    positive = vqt_energy_grads_avg * diff_list_avg
-
-    # Compute the negative term in the gradient
-    prod_list = vqt_energy_grads * expanded_diff_list
-    negative = tf.divide(
-        tf.reduce_sum(vqt_expanded_circuits_counts * prod_list, 0), num_vqt_samples
-    )
-
-    return positive - negative
+# @tf.function
+# def vqt_qhbm_loss(qhbm_vqt, num_vqt_samples, sub_term_energy_func):
+#     print("retracing: vqt_qhbm_loss")
+#     vqt_circuits, _, vqt_circuits_counts = qhbm_vqt.sample_state_circuits(
+#         num_vqt_samples,
+#     )
+#     sub_energy_list = sub_term_energy_func(vqt_circuits, vqt_circuits_counts)
+#     e_avg = tf.divide(
+#         tf.reduce_sum(tf.cast(vqt_circuits_counts, tf.float32) * sub_energy_list),
+#         num_vqt_samples,
+#     )
+#     return e_avg - qhbm_vqt.entropy_function()
 
 
-@tf.function
-def phis_grad_sub_func(
-    i,
-    qhbm,
-    num_vqt_samples,
-    D,
-    eps,
-    sub_term_energy_func,
-):
-    p_axis = tf.one_hot(i, D, dtype=tf.float32)
-    perturbation = p_axis * eps
+# @tf.function
+# def vqt_qhbm_loss_thetas_grad(qhbm_vqt, num_vqt_samples, sub_term_energy_func):
+#     print("retracing: vqt_qhbm_loss_thetas_grad")
+#     # Build components of the gradient
+#     (
+#         vqt_circuits,
+#         vqt_bitstrings,
+#         vqt_circuits_counts,
+#     ) = qhbm_vqt.sample_state_circuits(
+#         num_vqt_samples,
+#     )
+#     vqt_expanded_circuits_counts = tf.cast(
+#         tf.expand_dims(vqt_circuits_counts, 1), tf.dtypes.float32
+#     )
+#     vqt_energies, vqt_energy_grads = tf.map_fn(
+#         lambda x: qhbm_vqt.energy_and_energy_grad(x),
+#         vqt_bitstrings,
+#         fn_output_signature=(tf.float32, tf.float32),
+#     )
 
-    # Forward
-    original_phis = qhbm.phis.read_value()
-    qhbm.phis.assign_add(perturbation)
-    (vqt_circuits_forward, _, vqt_circuits_counts_forward) = qhbm.sample_state_circuits(
-        num_vqt_samples,
-    )
-    sub_energy_list = sub_term_energy_func(
-        vqt_circuits_forward, vqt_circuits_counts_forward
-    )
-    forward = tf.divide(
-        tf.reduce_sum(
-            tf.cast(vqt_circuits_counts_forward, tf.float32) * sub_energy_list
-        ),
-        num_vqt_samples,
-    )
+#     # Compute the per vqt bitstring diff list
+#     sub_energy_list = sub_term_energy_func(vqt_circuits, vqt_circuits_counts)
+#     diff_list = sub_energy_list - vqt_energies
+#     expanded_diff_list = tf.expand_dims(diff_list, 1)
 
-    # Backward
-    qhbm.phis.assign_add(-2.0 * perturbation)
-    (
-        vqt_circuits_backward,
-        _,
-        vqt_circuits_counts_backward,
-    ) = qhbm.sample_state_circuits(
-        num_vqt_samples,
-    )
-    sub_energy_list = sub_term_energy_func(
-        vqt_circuits_backward, vqt_circuits_counts_backward
-    )
-    backward = tf.divide(
-        tf.reduce_sum(
-            tf.cast(vqt_circuits_counts_backward, tf.float32) * sub_energy_list
-        ),
-        num_vqt_samples,
-    )
-    qhbm.phis.assign(original_phis)
+#     # Compute the positive term in the gradient
+#     diff_list_avg = tf.divide(
+#         tf.reduce_sum(tf.cast(vqt_circuits_counts, tf.float32) * diff_list),
+#         num_vqt_samples,
+#     )
+#     vqt_energy_grads_avg = tf.divide(
+#         tf.reduce_sum(vqt_expanded_circuits_counts * vqt_energy_grads, 0),
+#         num_vqt_samples,
+#     )
+#     positive = vqt_energy_grads_avg * diff_list_avg
 
-    return tf.divide(forward - backward, (2.0 * eps))
+#     # Compute the negative term in the gradient
+#     prod_list = vqt_energy_grads * expanded_diff_list
+#     negative = tf.divide(
+#         tf.reduce_sum(vqt_expanded_circuits_counts * prod_list, 0), num_vqt_samples
+#     )
+
+#     return positive - negative
 
 
-@tf.function
-def vqt_qhbm_loss_phis_grad(qhbm_vqt, num_vqt_samples, sub_term_energy_func, eps=0.1):
-    print("retracing: vqt_qhbm_loss_phis_grad")
-    D = tf.shape(qhbm_vqt.phis)[0]
-    return tf.map_fn(
-        lambda x: phis_grad_sub_func(
-            x,
-            qhbm_vqt,
-            num_vqt_samples,
-            D,
-            eps,
-            sub_term_energy_func,
-        ),
-        tf.range(D),
-        fn_output_signature=tf.float32,
-    )
+# @tf.function
+# def phis_grad_sub_func(
+#     i,
+#     qhbm,
+#     num_vqt_samples,
+#     D,
+#     eps,
+#     sub_term_energy_func,
+# ):
+#     p_axis = tf.one_hot(i, D, dtype=tf.float32)
+#     perturbation = p_axis * eps
+
+#     # Forward
+#     original_phis = qhbm.phis.read_value()
+#     qhbm.phis.assign_add(perturbation)
+#     (vqt_circuits_forward,_,vqt_circuits_counts_forward) = qhbm.sample_state_circuits(
+#         num_vqt_samples,
+#     )
+#     sub_energy_list = sub_term_energy_func(
+#         vqt_circuits_forward, vqt_circuits_counts_forward
+#     )
+#     forward = tf.divide(
+#         tf.reduce_sum(
+#             tf.cast(vqt_circuits_counts_forward, tf.float32) * sub_energy_list
+#         ),
+#         num_vqt_samples,
+#     )
+
+#     # Backward
+#     qhbm.phis.assign_add(-2.0 * perturbation)
+#     (
+#         vqt_circuits_backward,
+#         _,
+#         vqt_circuits_counts_backward,
+#     ) = qhbm.sample_state_circuits(
+#         num_vqt_samples,
+#     )
+#     sub_energy_list = sub_term_energy_func(
+#         vqt_circuits_backward, vqt_circuits_counts_backward
+#     )
+#     backward = tf.divide(
+#         tf.reduce_sum(
+#             tf.cast(vqt_circuits_counts_backward, tf.float32) * sub_energy_list
+#         ),
+#         num_vqt_samples,
+#     )
+#     qhbm.phis.assign(original_phis)
+
+#     return tf.divide(forward - backward, (2.0 * eps))
+
+
+# @tf.function
+# def vqt_qhbm_loss_phis_grad(qhbm_vqt, num_vqt_samples, sub_term_energy_func, eps=0.1):
+#     print("retracing: vqt_qhbm_loss_phis_grad")
+#     D = tf.shape(qhbm_vqt.phis)[0]
+#     return tf.map_fn(
+#         lambda x: phis_grad_sub_func(
+#             x,
+#             qhbm_vqt,
+#             num_vqt_samples,
+#             D,
+#             eps,
+#             sub_term_energy_func,
+#         ),
+#         tf.range(D),
+#         fn_output_signature=tf.float32,
+#     )

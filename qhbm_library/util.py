@@ -14,9 +14,7 @@
 # ==============================================================================
 """Utility functions."""
 
-import cirq
 import numpy as np
-import sympy
 
 import tensorflow as tf
 import tensorflow_quantum as tfq

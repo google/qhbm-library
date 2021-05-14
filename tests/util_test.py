@@ -16,7 +16,6 @@
 import math
 
 import cirq
-import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
 

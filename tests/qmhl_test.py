@@ -15,12 +15,8 @@
 """Tests for the QMHL loss and gradients."""
 
 import cirq
-import sympy
 import tensorflow as tf
-import tensorflow_quantum as tfq
 
-from qhbm_library import ebm
-from qhbm_library import qhbm_base
 from qhbm_library import qmhl
 from tests import test_util
 
@@ -37,7 +33,6 @@ class QMHLExactLossTest(tf.test.TestCase):
             )
             model_qhbm = target_qhbm.copy()
             shape_thetas = target_qhbm.thetas.shape
-            shape_phis = target_qhbm.phis.shape
 
             # Get the QMHL loss gradients
             model_samples = 1e6
