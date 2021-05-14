@@ -46,4 +46,4 @@ jobs:
           python -m pip install --upgrade pip
           pip install --user poetry
           poetry install
-          poetry pytest .
+          poetry run pytest .
