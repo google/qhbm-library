@@ -8,6 +8,17 @@ homepage = "https://github.com/google/qhbm-library"
 repository = "https://github.com/google/qhbm-library"
 keywords = ["quantum-computing"]
 authors = ["The QHBM Library Authors <no-reply@google.com>"]
+classifiers = [
+        'Development Status :: 3 - Alpha',
+        'Intended Audience :: Science/Research',
+        'License :: OSI Approved :: Apache Software License'
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.8',
+        'Topic :: Scientific/Engineering',
+        'Topic :: Scientific/Engineering :: Artificial Intelligence',
+        'Topic :: Scientific/Engineering :: Mathematics',
+        'Topic :: Scientific/Engineering :: Physics',
+]
 
 [tool.poetry.dependencies]
 python = "~3.8"
