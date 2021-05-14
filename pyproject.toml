@@ -7,7 +7,7 @@ readme = "README.md"
 homepage = "https://github.com/google/qhbm-library"
 repository = "https://github.com/google/qhbm-library"
 keywords = ["quantum-computing"]
-authors = ["The QHBM Library Authors"]
+authors = ["The QHBM Library Authors <no-reply@google.com>"]
 
 [tool.poetry.dependencies]
 python = "~3.8"
