@@ -19,6 +19,9 @@ classifiers = [
         'Topic :: Scientific/Engineering :: Mathematics',
         'Topic :: Scientific/Engineering :: Physics',
 ]
+packages = [
+    { include = "qhbmlib" },
+]
 
 [tool.poetry.dependencies]
 python = "~3.8"
