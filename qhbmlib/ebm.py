@@ -504,7 +504,6 @@ BitstringKernelResults = collections.namedtuple(
     ["target_log_prob", "log_acceptance_correction", "energy_function_params"],
 )
 
-
 class BitstringKernel(tfp.mcmc.TransitionKernel):
     def __init__(self, proposal_function, energy_function):
         super().__init__()
@@ -514,13 +513,13 @@ class BitstringKernel(tfp.mcmc.TransitionKernel):
     @tf.function
     def one_step(self, current_state, previous_kernel_results):
         print("retracing: one_step")
-        next_state = self.proposal_function(current_state)
+        next_state, log_acceptance_correction = self.proposal_function(current_state)
         kernel_results = BitstringKernelResults(
             target_log_prob=-1.0
             * self.energy_function(
                 previous_kernel_results.energy_function_params, next_state
             ),
-            log_acceptance_correction=tf.constant(0.0),
+            log_acceptance_correction=log_acceptance_correction,
             energy_function_params=previous_kernel_results.energy_function_params,
         )
         return next_state, kernel_results
@@ -617,11 +616,61 @@ def get_bernoulli_proposal_function(flip_prob, num_qubits):
     @tf.function
     def bernoulli_proposal_function(current_state):
         print("retracing: bernoulli_proposal_function")
-        mask = dist.sample(1)[0]
-        return tf.math.logical_xor(current_state, mask)
+        mask = dist.sample()
+        return tf.math.logical_xor(mask, current_state), tf.constant(0.0)
 
     return bernoulli_proposal_function
 
+def get_gwg_proposal_function(energy_function, energy_function_params, gradient=True, temp=2.0, num_samples=1):
+
+    @tf.function
+    def exact_difference_function(current_state):
+        diff = tf.zeros_like(current_state, dtype=tf.float32)
+        current_energy = energy_function(energy_function_params, current_state)
+        for i in range(tf.shape(current_state)[0]):
+            index = tf.sparse.to_dense(tf.sparse.SparseTensor(indices=[[i]], values=[True], dense_shape=tf.cast(tf.shape(current_state), tf.int64)))
+            pert_state = tf.where(index, tf.math.logical_xor(True, current_state), current_state)
+            diff = tf.where(index, current_energy - energy_function(energy_function_params, pert_state), diff)
+        return diff
+
+    @tf.function
+    def gradient_difference_function(current_state):
+        current_state = tf.cast(current_state, tf.float32)
+        with tf.GradientTape() as tape:
+            tape.watch(current_state)
+            current_energy = energy_function(energy_function_params, current_state)
+        grad = tape.gradient(current_energy, current_state)
+        return (2 * current_state - 1) * grad
+
+    if gradient:
+        difference_function = gradient_difference_function
+    else:
+        difference_function = exact_difference_function
+
+
+    @tf.function
+    def gwg_proposal_function(current_state):
+        forward_diff = difference_function(current_state)
+        forward_dist = tfp.distributions.OneHotCategorical(
+                logits=forward_diff / temp,
+                dtype=tf.int8,
+        )
+        all_changes = forward_dist.sample(num_samples)
+        change = tf.reduce_sum(all_changes, 0) > 0
+        next_state = tf.math.logical_xor(change, current_state)
+
+        forward_log_prob = tf.reduce_sum(forward_dist.log_prob(all_changes), 0)
+        backward_diff = difference_function(next_state)
+        backward_dist = tfp.distributions.OneHotCategorical(
+                logits=backward_diff / temp,
+                dtype=tf.int8,
+        )
+        backward_log_prob = tf.reduce_sum(backward_dist.log_prob(all_changes), 0)
+        log_acceptance_correction = forward_log_prob - backward_log_prob
+
+        return next_state, log_acceptance_correction
+
+    return gwg_proposal_function
 
 def get_chain(
     proposal_function,
