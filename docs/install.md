@@ -11,26 +11,59 @@ There are three ways to start developing with the QHBM Library:
 
 ## Build from source
 
-The following steps were tested on Ubuntu.
+The following steps are adapted from the guide [Hypermodern Python](https://cjolowicz.github.io/posts/hypermodern-python-01-setup/).
 
-### 1. Set up a Python 3 development environment
+### 1. Clone the source code
 
-To manage python versions, you will use [pyenv](https://realpython.com/intro-to-pyenv/#installing-pyenv).  To start, install the [recommended dependencies](https://github.com/pyenv/pyenv/wiki#suggested-build-environment):
+From your working directory, clone the code from GitHub:
 ```
-sudo apt-get update; sudo apt-get install make build-essential libssl-dev zlib1g-dev \
+git clone https://github.com/google/qhbm-library.git
+cd qhbm-library
+```
+
+### 2. Install Python development tools
+
+To manage python versions, you will use [pyenv](https://realpython.com/intro-to-pyenv/#installing-pyenv). To start, install the [recommended dependencies](https://github.com/pyenv/pyenv/wiki#suggested-build-environment):
+```
+sudo apt update
+sudo apt install make build-essential libssl-dev zlib1g-dev \
 libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm \
 libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
+sudo apt upgrade
 ```
 Install `pyenv` with the official installer:
 ```
 curl https://pyenv.run | bash
 ```
-Follow the directions in the output to finish adding `pyenv` to your system.  Once you finish appropriately updating your `~/.profile` file, `~/.bashrc` file, etc., restart your terminal:
+Follow the directions in the output to finish adding `pyenv` to your system. Once you finish appropriately updating your `~/.profile` file, `~/.bashrc` file, etc., restart your terminal:
 ```
-exec "$SHELL"
+exec $SHELL
+```
+Now you can install a specific version of python and make it the default for your current working directory:
+```
+pyenv install 3.8.11
+pyenv local 3.8.11
+```
+You should verify that the python version is the one you just localized:
+```
+python --version
 ```
 
+### 3. Set up a virtual environment
 
-
-
-### 2. Create a virtual environment
+To manage virtual environments, you will use [poetry](https://python-poetry.org/). Install from source:
+```
+curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/install-poetry.py | python -
+```
+After installation, follow the on screen instructions to ensure the `poetry` command can be found by your shell. Restart the shell and confirm successful installation:
+```
+poetry --version
+```
+Poetry automatically manages your environment using the specifications in the `pyproject.toml` file. To initiate your virtual environment and install all dependencies, run:
+```
+poetry install
+```
+Note that `poetry` uses the Python version you specified in the previous section. To confirm that the QHBM Library has been successfully installed from source, you can run the unit tests:
+```
+poetry run pytest
+```
