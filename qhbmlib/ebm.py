@@ -678,7 +678,7 @@ class EBM(abc.ABC):
     @abc.abstractmethod
     def bitwidth(self):
         """Returns the bitwidth of samples from this EBM."""
-        
+
     @abc.abstractmethod
     def energy(self, bitstrings):
         """Returns the energies associated to a list of bitstrings.
@@ -728,14 +728,14 @@ class EBM(abc.ABC):
         This method should be called by all derived class `update_thetas`. It is used
         to perform any other tasks for this class which should happen exactly
         once per parameter update, e.g. caching for performance reasons.
-        
+
         Args:
             update: Tensor of dtype `tf.float32`, with the same shape as the
                 `initial_parameters` used to construct this EBM.
         """
         self._thetas.assign_add(update)
 
-        
+
 class ExactEBM(EBM):
     """EBMs for which extra information theoretic quantities are available."""
 
