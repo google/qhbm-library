@@ -14,7 +14,12 @@
 # limitations under the License.
 # ==============================================================================
 
-poetry run yapf --in-place --recursive qhbmlib/
-poetry run yapf --in-place --recursive tests/
-./scripts/check_lint.sh
-poetry run pytest --cov .
+poetry run pylint --rcfile .pylintrc qhbmlib/ tests/
+retval=$?
+if [ "$retval" == 0 ]
+then
+  echo "Success: no lint found."
+else
+  echo "Please run `poetry run yapf --in-place --recursive qhbmlib/` and try again."
+  exit 1
+fi

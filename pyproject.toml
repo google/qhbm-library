@@ -51,3 +51,7 @@ show_missing = true
 [build-system]
 requires = ["poetry-core~=1.1.6"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.yapf]
+based_on_style = "yapf"
+indent_width = "2"
