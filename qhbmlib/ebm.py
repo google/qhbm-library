@@ -735,42 +735,28 @@ class EBM(abc.ABC):
         """
         self._thetas.assign_add(update)
 
-
+        
 class ExactEBM(EBM):
     """EBMs for which extra information theoretic quantities are available."""
 
     def __init__(self, initial_parameters):
         super().__init__(initial_parameters)
-        self._all_strings = tf.constant(
-            list(itertools.product([0, 1], repeat=self.bitwidth)), dtype=tf.float32
-        )
-        self.all_energies = tf.Variable(self.energy(self._all_strings))
-        self._energies_need_update = tf.Variable(False)
 
-    def _update_all_energies(self):
-        self.all_energies.assign(self.energy(self._all_strings))
-        self._energies_need_update.assign(tf.constant(False))
-
-    @tf.function
+    @abc.abstractmethod
     def log_partition_function(self):
         """Returns the logarithm of the partition function of this EBM.
 
         Returns:
             Scalar tensor of dtype `tf.float32`.
         """
-        tf.cond(self._energies_need_update, self._update_all_energies, lambda: None)
-        return tf.reduce_logsumexp(-1.0 * self.all_energies)
 
-    @tf.function
+    @abc.abstractmethod
     def entropy_function(self):
         """Returns the entropy of this EBM.
 
         Returns:
             Scalar tensor of dtype `tf.float32`.
         """
-        tf.cond(self._energies_need_update, self._update_all_energies, lambda: None)
-        return tfp.distributions.Categorical(logits=-1.0 * self.all_energies).entropy()
 
     def update_thetas(self, update):
         super().update_thetas(update)
-        self._energies_need_update.assign(tf.constant(True))
