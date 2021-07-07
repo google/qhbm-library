@@ -26,7 +26,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "~3.6.2 || ~3.7 || ~3.8"
+python = "~3.6 || ~3.7 || ~3.8"
 tensorflow-quantum = "0.5.1"
 tensorflow = "2.4.1"
 tensorflow-probability = "0.12.0"
@@ -34,8 +34,8 @@ tensorflow-probability = "0.12.0"
 [tool.poetry.dev-dependencies]
 coverage = {extras = ["toml"], version = "5.5"}
 pytest-cov = "2.11.1"
-black = "21.5b1"
-flake8 = "3.9.2"
+yapf = "0.31.0"
+pylint = "2.9.3"
 pytest = "6.2.4"
 
 [tool.coverage.paths]
