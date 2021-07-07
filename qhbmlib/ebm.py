@@ -678,6 +678,7 @@ class EBM(abc.ABC):
     @abc.abstractmethod
     def bitwidth(self):
         """Returns the bitwidth of samples from this EBM."""
+        
 
     @abc.abstractmethod
     def energy(self, bitstrings):
