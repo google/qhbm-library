@@ -14,6 +14,14 @@
 # limitations under the License.
 # ==============================================================================
 
-poetry run yapf --in-place --recursive qhbmlib/
-poetry run yapf --in-place --recursive tests/
+poetry run black qhbmlib/ tests/
+poetry run flake8
+retval=$?
+if [ "$retval" == 0 ]
+then
+  echo "Success: no lint found."
+else
+  echo "Please remove lint and try again."
+  exit 1
+fi
 poetry run pytest --cov .
