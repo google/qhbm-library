@@ -21,7 +21,7 @@ import tensorflow_quantum as tfq
 
 from qhbmlib import qhbm_base
 from qhbmlib import vqt
-from qhbmlib.tests import test_util
+from tests import test_util
 
 
 class VQTTest(tf.test.TestCase):

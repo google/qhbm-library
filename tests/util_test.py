@@ -20,7 +20,7 @@ import tensorflow as tf
 import tensorflow_quantum as tfq
 
 from qhbmlib import util
-from qhbmlib.tests import test_util
+from tests import test_util
 
 # ============================================================================ #
 # Density matrix utilities.
