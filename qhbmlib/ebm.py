@@ -654,3 +654,74 @@ def get_chain(
         )
 
     return run_chain
+
+
+# ============================================================================ #
+# General discrete EBM class.
+# ============================================================================ #
+
+
+class EBM(tf.Module):
+    """Class for working with discrete energy based models."""
+
+    def __init__(self, initial_parameters: tf.tensor, name: str) -> None:
+        """Initialize a discrete EBM.
+
+        Args:
+            initial_parameters: Initial values for the parameters controlling
+                this EBM. The shape is determined by the inheriting subclass.
+            name: The name of this class instance.
+        """
+        super().__init__(name)
+        self._thetas = tf.Variable(initial_parameters, name="thetas", dtype=tf.float32)
+
+    @abc.abstractmethod
+    def energy(self, bitstrings):
+        """Returns the energies associated to a list of bitstrings.
+
+        Note: energy must be differentiable.
+
+        Args:
+            bitstrings: 2D tensor of dtype `tf.float32` whose entries are bits.
+
+        Returns:
+            energy_list: 1D tensor of dtype `tf.float32` which are the energies
+                this EBM assigns to each entry of `bitstrings`.
+        """
+
+    @abc.abstractmethod
+    def energy_derivative(self, bitstrings):
+        """Returns the derivative of `energy` with respect to the parameters of the EBM.
+
+        Args:
+            bitstrings: 2D tensor of dtype `tf.float32` whose entries are bits.
+
+        Returns:
+            derivative: Tensor of dtype `tf.float32`, with the same shape as the
+                initial parameters used to construct this EBM.        
+        """
+
+    @abc.abstractmethod
+    def sample(self, n_samples):
+        """Returns bitstring samples from this EBM.
+
+        Args:
+            n_samples: Number of samples to draw from the distribution.
+
+        Returns:
+            unique_samples: 2D tensor of dtype `tf.float32` whose entries are
+                bits. For each `i`, `unique_samples[i]` is some bitstring which
+                was sampled from this EBM, and each `unique_samples[i]` is unique.
+            counts: 1D tensor of dtype `tf.int32` such that `counts[i]` is the
+                number of times `unique_samples[i]` was sampled. `sum(counts)` is
+                equal to `n_samples`.
+        """
+
+    def add_update(self, update):
+        """Updates the parameters defining this EBM.
+
+        Args:
+            update: Tensor of dtype `tf.float32`, with the same shape as the
+                initial parameters used to construct this EBM.
+        """
+        self._thetas.assign_add(update)
