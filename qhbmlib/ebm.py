@@ -14,6 +14,7 @@
 # ==============================================================================
 """Module for defining and sampling from EBMs."""
 
+import abc
 import collections
 import itertools
 
@@ -657,24 +658,27 @@ def get_chain(
 
 
 # ============================================================================ #
-# General discrete EBM class.
+# General discrete EBM classes.
 # ============================================================================ #
 
 
-class EBM(tf.Module):
+class EBM(abc.ABC):
     """Class for working with discrete energy based models."""
 
-    def __init__(self, initial_parameters: tf.tensor, name: str) -> None:
+    def __init__(self, initial_parameters):
         """Initialize a discrete EBM.
 
         Args:
             initial_parameters: Initial values for the parameters controlling
                 this EBM. The shape is determined by the inheriting subclass.
-            name: The name of this class instance.
         """
-        super().__init__(name)
-        self._thetas = tf.Variable(initial_parameters, name="thetas", dtype=tf.float32)
+        self._thetas = tf.Variable(initial_parameters, dtype=tf.float32)
 
+    @property
+    @abc.abstractmethod
+    def bitwidth(self):
+        """Returns the bitwidth of samples from this EBM."""
+        
     @abc.abstractmethod
     def energy(self, bitstrings):
         """Returns the energies associated to a list of bitstrings.
@@ -690,15 +694,16 @@ class EBM(tf.Module):
         """
 
     @abc.abstractmethod
-    def energy_derivative(self, bitstrings):
+    def energy_derivatives(self, bitstrings):
         """Returns the derivative of `energy` with respect to the parameters of the EBM.
 
         Args:
             bitstrings: 2D tensor of dtype `tf.float32` whose entries are bits.
 
         Returns:
-            derivative: Tensor of dtype `tf.float32`, with the same shape as the
-                initial parameters used to construct this EBM.        
+            derivatives: Tensor of dtype `tf.float32`, whose first dimension is the same
+                as the first dimension of `bitstrings`; each entry has the same shape as
+                the `initial_parameters` used to construct this EBM.
         """
 
     @abc.abstractmethod
@@ -717,11 +722,55 @@ class EBM(tf.Module):
                 equal to `n_samples`.
         """
 
-    def add_update(self, update):
+    def update_thetas(self, update):
         """Updates the parameters defining this EBM.
 
+        This method should be called by all derived class `update_thetas`. It is used
+        to perform any other tasks for this class which should happen exactly
+        once per parameter update, e.g. caching for performance reasons.
+        
         Args:
             update: Tensor of dtype `tf.float32`, with the same shape as the
-                initial parameters used to construct this EBM.
+                `initial_parameters` used to construct this EBM.
         """
         self._thetas.assign_add(update)
+
+
+class ExactEBM(EBM):
+    """EBMs for which extra information theoretic quantities are available."""
+
+    def __init__(self, initial_parameters):
+        super().__init__(initial_parameters)
+        self._all_strings = tf.constant(
+            list(itertools.product([0, 1], repeat=self.bitwidth)), dtype=tf.float32
+        )
+        self.all_energies = tf.Variable(self.energy(self._all_strings))
+        self._energies_need_update = tf.Variable(False)
+
+    def _update_all_energies(self):
+        self.all_energies.assign(self.energy(self._all_strings))
+        self._energies_need_update.assign(tf.constant(False))
+
+    @tf.function
+    def log_partition_function(self):
+        """Returns the logarithm of the partition function of this EBM.
+
+        Returns:
+            Scalar tensor of dtype `tf.float32`.
+        """
+        tf.cond(self._energies_need_update, self._update_all_energies, lambda: None)
+        return tf.reduce_logsumexp(-1.0 * self.all_energies)
+
+    @tf.function
+    def entropy_function(self):
+        """Returns the entropy of this EBM.
+
+        Returns:
+            Scalar tensor of dtype `tf.float32`.
+        """
+        tf.cond(self._energies_need_update, self._update_all_energies, lambda: None)
+        return tfp.distributions.Categorical(logits=-1.0 * self.all_energies).entropy()
+
+    def update_thetas(self, update):
+        super().update_thetas(update)
+        self._energies_need_update.assign(tf.constant(True))
