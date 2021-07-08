@@ -14,6 +14,7 @@
 # ==============================================================================
 """Module for defining and sampling from EBMs."""
 
+import abc
 import collections
 import itertools
 from absl import logging
@@ -707,3 +708,88 @@ class MCMCSampler:
       self.buffer.dequeue_many(projected_buffer_size - self.buffer_size)
     self.buffer.enqueue_many(sampled_states)
     return sampled_states[:num_samples]
+
+
+# ============================================================================ #
+# General discrete EBM classes.
+# ============================================================================ #
+
+
+class EBM(abc.ABC):
+  """Class for working with discrete energy based models."""
+
+  @property
+  @abc.abstractmethod
+  def bitwidth(self):
+    """Returns the number of bits in samples from this EBM."""
+
+  @property
+  @abc.abstractmethod
+  def thetas(self):
+    """List of trainable variables in this EBM."""
+
+  @abc.abstractmethod
+  def energy(self, bitstring):
+    """Returns the energy associated to a bitstring.
+
+    Args:
+      bitstring: `tf.tensor` of dtype `tf.int8` whose entries are bits.
+    
+    Returns:
+      `tf.tensor` dtype `tf.float32` which is the energy of `bitstring`.
+    """
+
+  @abc.abstractmethod
+  def update_thetas(self, update):
+    """Updates the parameters defining this EBM.
+    
+    This method should be called by all derived class `update_thetas`. It is used
+    to perform any other tasks for this class which should happen exactly
+    once per parameter update, e.g. caching for performance reasons.
+
+    Args:
+      update: Object of the same shape and type as `self.thetas`. This value is
+        added to `self.thetas`.
+    """
+
+class EBMSampler(abc.ABC):
+  """Class for defining sampling routines for EBMs."""
+
+  def __init__(self, ebm: EBM):
+    """Sample from an EBM."""
+    
+  
+  @abc.abstractmethod
+  def sample(self, n_samples):
+    """Returns bitstring samples from this EBM.
+
+    Args:
+      n_samples: Number of samples to draw from the distribution.
+    
+    Returns:
+      unique_samples: 2D tensor of dtype `tf.int8` whose entries are
+        bits. For each `i`, `unique_samples[i]` is some bitstring which
+        was sampled from this EBM, and each `unique_samples[i]` is unique.
+      counts: 1D tensor of dtype `tf.int32` such that `counts[i]` is the
+        number of times `unique_samples[i]` was sampled. `sum(counts)` is
+        equal to `n_samples`.
+    """
+
+class SimEBM(EBM):
+  """Extends EBM to include new but potentially costly calculations."""
+
+  @abc.abstractmethod
+  def log_partition_function(self):
+    """Returns the logarithm of the partition function of this EBM.
+    
+    Returns:
+      Scalar tensor of dtype `tf.float32`.
+    """
+
+  @abc.abstractmethod
+  def entropy_function(self):
+    """Returns the entropy of this EBM.
+    
+    Returns:
+      Scalar tensor of dtype `tf.float32`.
+    """
