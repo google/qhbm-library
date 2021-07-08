@@ -752,12 +752,13 @@ class EBM(abc.ABC):
         added to `self.thetas`.
     """
 
+
 class EBMSampler(abc.ABC):
   """Class for defining sampling routines for EBMs."""
 
   def __init__(self, ebm: EBM):
-    """Sample from an EBM."""
-    
+    """Initializes self with the EBM defining the distribution to sample."""
+    self.ebm = ebm
   
   @abc.abstractmethod
   def sample(self, n_samples):
@@ -774,6 +775,7 @@ class EBMSampler(abc.ABC):
         number of times `unique_samples[i]` was sampled. `sum(counts)` is
         equal to `n_samples`.
     """
+
 
 class SimEBM(EBM):
   """Extends EBM to include new but potentially costly calculations."""
