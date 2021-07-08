@@ -132,6 +132,7 @@ class InputChecksTest(tf.test.TestCase):
 class OrthogonalEnsembleTest(tf.test.TestCase):
   """Tests the OrthogonalEnsemble class."""
 
+  num_bits = 5
   raw_phis_symbols = [sympy.Symbol("s0"), sympy.Symbol("s1")]
   phis_symbols = tf.constant([str(s) for s in raw_phis_symbols])
   initial_phis = tf.random.uniform([len(phis_symbols)], minval=-1.0)
@@ -144,6 +145,7 @@ class OrthogonalEnsembleTest(tf.test.TestCase):
   raw_bit_circuit, raw_bit_symbols = orthogonal_ensemble.build_bit_circuit(
       raw_qubits, name)
   bit_symbols = tf.constant([str(s) for s in raw_bit_symbols])
+  bit_circuit = tfq.convert_to_tensor([raw_bit_circuit])
 
   def test_init(self):
     """Confirms OrthogonalEnsemble is initialized correctly."""
@@ -166,9 +168,7 @@ class OrthogonalEnsembleTest(tf.test.TestCase):
     )
     self.assertAllEqual(self.raw_qubits, test_oe.raw_qubits)
     self.assertAllEqual(self.bit_symbols, test_oe.bit_symbols)
-    self.assertEqual(
-        self.raw_bit_circuit, tfq.from_tensor(test_oe.bit_circuit)
-    )
+    self.assertEqual(tfq.from_tensor(self.bit_circuit), tfq.from_tensor(test_oe.bit_circuit))
 
 
 if __name__ == "__main__":
