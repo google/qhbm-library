@@ -168,7 +168,8 @@ class OrthogonalEnsembleTest(tf.test.TestCase):
     )
     self.assertAllEqual(self.raw_qubits, test_oe.raw_qubits)
     self.assertAllEqual(self.bit_symbols, test_oe.bit_symbols)
-    self.assertEqual(tfq.from_tensor(self.bit_circuit), tfq.from_tensor(test_oe.bit_circuit))
+    self.assertEqual(
+        tfq.from_tensor(self.bit_circuit), tfq.from_tensor(test_oe.bit_circuit))
 
 
 if __name__ == "__main__":
