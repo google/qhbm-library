@@ -118,6 +118,7 @@ class OrthogonalEnsemble:
 
   def __init__(self, circuit, symbols, symbols_initial_values, name):
     """Initialize an OrthogonalEnsemble."""
+    self.name = name
     self.phis = upgrade_initial_values(symbols_initial_values)
     self.phis_symbols = upgrade_symbols(symbols, self.phis)
     self.u = upgrade_circuit(circuit, self.phis_symbols)
