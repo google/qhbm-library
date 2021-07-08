@@ -14,6 +14,14 @@
 # ==============================================================================
 """Module for defining and sampling from orthogonal ensembles."""
 
+import numbers
+from typing import Any, Callable, Iterable, List, Union
+
+import cirq
+import sympy
+import tensorflow as tf
+import tensorflow_quantum as tfq
+
 
 def build_bit_circuit(qubits, ident):
   """Returns exponentiated X gate on each qubit and the exponent symbols."""
