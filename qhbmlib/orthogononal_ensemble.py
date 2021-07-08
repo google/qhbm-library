@@ -115,7 +115,7 @@ def upgrade_circuit(circuit: cirq.Circuit, symbols: tf.Tensor) -> tf.Tensor:
 
 class OrthogonalEnsemble:
   """Operations on ensembles of orthogonal states indexed by bitstrings."""
- 
+
   def __init__(self, circuit, symbols, symbols_initial_values, name):
     """Initialize an OrthogonalEnsemble."""
     self.phis = upgrade_initial_values(symbols_initial_values)
@@ -202,7 +202,7 @@ class OrthogonalEnsemble:
             that `ragged_samples[i]` contains `counts[i]` bitstrings.
       """
     raise NotImplementedError
-    
+
   def pulled_back_measure(self, circuits, counts, observables):
     """Returns the expectation values for a given pulled-back dataset."""
     raise NotImplementedError

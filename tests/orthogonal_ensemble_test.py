@@ -60,9 +60,13 @@ class InputChecksTest(tf.test.TestCase):
     true_tensor = tf.constant(true_list, dtype=tf.float32)
     true_variable = tf.Variable(true_tensor)
     self.assertAllClose(
-        orthogonal_ensemble.upgrade_initial_values(true_list), true_variable, atol=ATOL)
+        orthogonal_ensemble.upgrade_initial_values(true_list),
+        true_variable,
+        atol=ATOL)
     self.assertAllClose(
-        orthogonal_ensemble.upgrade_initial_values(true_tensor), true_variable, atol=ATOL)
+        orthogonal_ensemble.upgrade_initial_values(true_tensor),
+        true_variable,
+        atol=ATOL)
     self.assertAllClose(
         orthogonal_ensemble.upgrade_initial_values(true_variable),
         true_variable,
@@ -79,14 +83,16 @@ class InputChecksTest(tf.test.TestCase):
     values = tf.constant([0 for _ in true_symbol_names])
     true_symbols = [sympy.Symbol(s) for s in true_symbol_names]
     true_symbols_t = tf.constant(true_symbol_names, dtype=tf.string)
-    self.assertAllEqual(true_symbols_t,
-                        orthogonal_ensemble.upgrade_symbols(true_symbols, values))
+    self.assertAllEqual(
+        true_symbols_t,
+        orthogonal_ensemble.upgrade_symbols(true_symbols, values))
     # Test bad inputs.
     with self.assertRaisesRegex(TypeError, "must be `sympy.Symbol`"):
-      _ = orthogonal_ensemble.upgrade_symbols(true_symbols[:-1] + ["bad"], values)
+      _ = orthogonal_ensemble.upgrade_symbols(true_symbols[:-1] + ["bad"],
+                                              values)
     with self.assertRaisesRegex(ValueError, "must be unique"):
-      _ = orthogonal_ensemble.upgrade_symbols(true_symbols[:-1] + true_symbols[:1],
-                                    values)
+      _ = orthogonal_ensemble.upgrade_symbols(
+          true_symbols[:-1] + true_symbols[:1], values)
     with self.assertRaisesRegex(ValueError, "symbol for every value"):
       _ = orthogonal_ensemble.upgrade_symbols(true_symbols, values[:-1])
     with self.assertRaisesRegex(TypeError, "must be an iterable"):
@@ -116,10 +122,11 @@ class InputChecksTest(tf.test.TestCase):
     with self.assertRaisesRegex(TypeError, "dtype `tf.string`"):
       _ = orthogonal_ensemble.upgrade_circuit(true_circuit, tf.constant([5.5]))
     with self.assertRaisesRegex(ValueError, "must contain"):
-      _ = orthogonal_ensemble.upgrade_circuit(true_circuit, tf.constant(["a", "junk"]))
+      _ = orthogonal_ensemble.upgrade_circuit(true_circuit,
+                                              tf.constant(["a", "junk"]))
     with self.assertRaisesRegex(ValueError, "Empty circuit"):
       _ = orthogonal_ensemble.upgrade_circuit(cirq.Circuit(),
-                                    tf.constant([], dtype=tf.string))
+                                              tf.constant([], dtype=tf.string))
 
 
 class OrthogonalEnsembleTest(tf.test.TestCase):
