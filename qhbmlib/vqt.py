@@ -19,7 +19,6 @@ import tensorflow_quantum as tfq
 
 from qhbmlib import qhbm_base
 
-
 # ============================================================================ #
 # Sample-based VQT.
 # ============================================================================ #
@@ -32,7 +31,7 @@ def vqt_loss(
     beta: tf.Tensor,
     hamiltonian: tf.Tensor,
 ):
-    """Estimates the VQT loss function between a QHBM and a Hamiltonian.
+  """Estimates the VQT loss function between a QHBM and a Hamiltonian.
 
     The two step process follows the VQT loss estimator described in the paper.
     First, samples are drawn from the classical probability distribution of the
@@ -45,35 +44,33 @@ def vqt_loss(
       num_samples: The number of samples to draw from the classical probability
         distribution of the QHBM.
       beta: Inverse temperature of the target thermal state.
-      hamiltonian: Hamiltonian of the target thermal state.
-        It is a 2-D tensor of strings, the result of calling
-        `tfq.convert_to_tensor` on a list of lists of cirq.PauliSum which has only
-        one term, `[[op]]`.
+      hamiltonian: Hamiltonian of the target thermal state. It is a 2-D tensor
+        of strings, the result of calling `tfq.convert_to_tensor` on a list of
+        lists of cirq.PauliSum which has only one term, `[[op]]`.
 
     Returns:
       Estimate of the VQT loss between the input QHBM and target thermal state.
     """
-    samples, counts = qhbm.sample_bitstrings(num_samples)
-    prob_terms = tf.cast(counts, tf.float32) / tf.cast(num_samples, tf.float32)
-    log_prob_terms = tf.math.log(prob_terms)
-    minus_entropy_approx = tf.reduce_sum(prob_terms * log_prob_terms)
-    num_circuits = tf.shape(counts)[0]
-    state_circuits = qhbm.state_circuits(samples)
-    tiled_hamiltonian = tf.tile(hamiltonian, [num_circuits, 1])
-    expectations = tf.reshape(
-        tfq.layers.SampledExpectation()(
-            state_circuits,
-            symbol_names=tf.constant([], dtype=tf.string),
-            symbol_values=tf.tile(
-                tf.constant([[]], dtype=tf.float32), [num_circuits, 1]
-            ),
-            operators=tiled_hamiltonian,
-            repetitions=tf.expand_dims(counts, 1),
-        ),
-        [num_circuits],
-    )
-    energy_approx = tf.reduce_sum(expectations * prob_terms)
-    return minus_entropy_approx + beta * energy_approx
+  samples, counts = qhbm.sample_bitstrings(num_samples)
+  prob_terms = tf.cast(counts, tf.float32) / tf.cast(num_samples, tf.float32)
+  log_prob_terms = tf.math.log(prob_terms)
+  minus_entropy_approx = tf.reduce_sum(prob_terms * log_prob_terms)
+  num_circuits = tf.shape(counts)[0]
+  state_circuits = qhbm.state_circuits(samples)
+  tiled_hamiltonian = tf.tile(hamiltonian, [num_circuits, 1])
+  expectations = tf.reshape(
+      tfq.layers.SampledExpectation()(
+          state_circuits,
+          symbol_names=tf.constant([], dtype=tf.string),
+          symbol_values=tf.tile(
+              tf.constant([[]], dtype=tf.float32), [num_circuits, 1]),
+          operators=tiled_hamiltonian,
+          repetitions=tf.expand_dims(counts, 1),
+      ),
+      [num_circuits],
+  )
+  energy_approx = tf.reduce_sum(expectations * prob_terms)
+  return minus_entropy_approx + beta * energy_approx
 
 
 @tf.function
@@ -83,46 +80,43 @@ def vqt_loss_thetas_grad(
     beta: tf.Tensor,
     hamiltonian: tf.Tensor,
 ):
-    """Sample-based estimate of classical param gradient of VQT loss."""
-    print("retracing: vqt_loss_thetas_grad")
-    # Sample circuits to average the gradient over.
-    circuits, bitstrings, counts = qhbm.sample_state_circuits(num_samples)
-    num_samples = tf.cast(num_samples, tf.float32)
-    num_circuits = tf.shape(circuits)[0]
-    counts = tf.cast(counts, tf.float32)
+  """Sample-based estimate of classical param gradient of VQT loss."""
+  print("retracing: vqt_loss_thetas_grad")
+  # Sample circuits to average the gradient over.
+  circuits, bitstrings, counts = qhbm.sample_state_circuits(num_samples)
+  num_samples = tf.cast(num_samples, tf.float32)
+  num_circuits = tf.shape(circuits)[0]
+  counts = tf.cast(counts, tf.float32)
 
-    # Compute the per bitstring difference between beta H and energy
-    tiled_hamiltonian = tf.tile(hamiltonian, [num_circuits, 1])
-    expectations = tf.reshape(
-        tfq.layers.SampledExpectation()(
-            circuits,
-            symbol_names=tf.constant([], dtype=tf.string),
-            symbol_values=tf.tile(
-                tf.constant([[]], dtype=tf.float32), [num_circuits, 1]
-            ),
-            operators=tiled_hamiltonian,
-            repetitions=tf.expand_dims(counts, 1),
-        ),
-        [num_circuits],
-    )
-    beta_h = beta * expectations
-    energies, energy_grads = tf.map_fn(
-        qhbm.energy_and_energy_grad,
-        bitstrings,
-        fn_output_signature=(tf.float32, tf.float32),
-    )
-    diff_list = beta_h - energies
+  # Compute the per bitstring difference between beta H and energy
+  tiled_hamiltonian = tf.tile(hamiltonian, [num_circuits, 1])
+  expectations = tf.reshape(
+      tfq.layers.SampledExpectation()(
+          circuits,
+          symbol_names=tf.constant([], dtype=tf.string),
+          symbol_values=tf.tile(
+              tf.constant([[]], dtype=tf.float32), [num_circuits, 1]),
+          operators=tiled_hamiltonian,
+          repetitions=tf.expand_dims(counts, 1),
+      ),
+      [num_circuits],
+  )
+  beta_h = beta * expectations
+  energies, energy_grads = tf.map_fn(
+      qhbm.energy_and_energy_grad,
+      bitstrings,
+      fn_output_signature=(tf.float32, tf.float32),
+  )
+  diff_list = beta_h - energies
 
-    part_a = tf.divide(tf.reduce_sum(counts * diff_list), num_samples)
-    part_b = tf.divide(
-        tf.reduce_sum(tf.expand_dims(counts, 1) * energy_grads, 0), num_samples
-    )
-    prod_list = tf.expand_dims(diff_list, 1) * energy_grads
-    part_c = tf.divide(
-        tf.reduce_sum(tf.expand_dims(counts, 1) * prod_list, 0), num_samples
-    )
+  part_a = tf.divide(tf.reduce_sum(counts * diff_list), num_samples)
+  part_b = tf.divide(
+      tf.reduce_sum(tf.expand_dims(counts, 1) * energy_grads, 0), num_samples)
+  prod_list = tf.expand_dims(diff_list, 1) * energy_grads
+  part_c = tf.divide(
+      tf.reduce_sum(tf.expand_dims(counts, 1) * prod_list, 0), num_samples)
 
-    return part_a * part_b - part_c
+  return part_a * part_b - part_c
 
 
 @tf.function
@@ -132,30 +126,29 @@ def vqt_loss_phis_grad(
     beta: tf.Tensor,
     hamiltonian: tf.Tensor,
 ):
-    """Sample-based estimate of quantum circuit param gradient of VQT loss."""
-    print("retracing: vqt_loss_phis_grad")
-    circuits, _, counts = qhbm.sample_unresolved_state_circuits(num_samples)
-    num_circuits = tf.shape(counts)[0]
-    new_dup_phis = tf.identity(qhbm.phis)
-    with tf.GradientTape() as tape:
-        tape.watch(new_dup_phis)
-        sub_energy_list = tf.reshape(
-            tfq.layers.Expectation()(
-                circuits,
-                symbol_names=qhbm.phis_symbols,
-                symbol_values=tf.tile(
-                    tf.expand_dims(new_dup_phis, 0), [num_circuits, 1]
-                ),
-                operators=tf.tile(hamiltonian, [num_circuits, 1]),
-            ),
-            [num_circuits],
-        )
-        e_avg = tf.divide(
-            tf.reduce_sum(tf.cast(counts, tf.float32) * sub_energy_list),
-            tf.cast(num_samples, tf.float32),
-        )
-    this_grad = tape.gradient(e_avg, new_dup_phis)
-    return beta * this_grad
+  """Sample-based estimate of quantum circuit param gradient of VQT loss."""
+  print("retracing: vqt_loss_phis_grad")
+  circuits, _, counts = qhbm.sample_unresolved_state_circuits(num_samples)
+  num_circuits = tf.shape(counts)[0]
+  new_dup_phis = tf.identity(qhbm.phis)
+  with tf.GradientTape() as tape:
+    tape.watch(new_dup_phis)
+    sub_energy_list = tf.reshape(
+        tfq.layers.Expectation()(
+            circuits,
+            symbol_names=qhbm.phis_symbols,
+            symbol_values=tf.tile(
+                tf.expand_dims(new_dup_phis, 0), [num_circuits, 1]),
+            operators=tf.tile(hamiltonian, [num_circuits, 1]),
+        ),
+        [num_circuits],
+    )
+    e_avg = tf.divide(
+        tf.reduce_sum(tf.cast(counts, tf.float32) * sub_energy_list),
+        tf.cast(num_samples, tf.float32),
+    )
+  this_grad = tape.gradient(e_avg, new_dup_phis)
+  return beta * this_grad
 
 
 # ============================================================================ #
@@ -164,33 +157,32 @@ def vqt_loss_phis_grad(
 
 
 def _tiled_expectation(circuits: tf.Tensor, hamiltonian: tf.Tensor):
-    """Calculates the expectation value for every circuit.
+  """Calculates the expectation value for every circuit.
 
     Args:
-      circuits: 1-D tensor of strings which are TFQ serialized circuits with
-        no free parameters.
+      circuits: 1-D tensor of strings which are TFQ serialized circuits with no
+        free parameters.
       hamiltonian: 2-D tensor of strings, the result of calling
-        `tfq.convert_to_tensor` on a list of lists of cirq.PauliSum which has only
-        one term, `[[op]]`.  Will be tiled along the 0th dimension, to be measured
-        against each entry of `circuits`.
+        `tfq.convert_to_tensor` on a list of lists of cirq.PauliSum which has
+        only one term, `[[op]]`.  Will be tiled along the 0th dimension, to be
+        measured against each entry of `circuits`.
 
     Returns:
       1-D tensor of floats which are the expectation values of the single op in
         `hamiltonian` measured against each circuit in `circuits`.
     """
-    num_circuits = tf.shape(circuits)[0]
-    measurements = tf.tile(hamiltonian, [num_circuits, 1])
-    return tf.reshape(
-        tfq.layers.Expectation()(
-            circuits,
-            symbol_names=tf.constant([], dtype=tf.string),
-            symbol_values=tf.tile(
-                tf.constant([[]], dtype=tf.float32), [tf.shape(circuits)[0], 1]
-            ),
-            operators=measurements,
-        ),
-        [num_circuits],
-    )
+  num_circuits = tf.shape(circuits)[0]
+  measurements = tf.tile(hamiltonian, [num_circuits, 1])
+  return tf.reshape(
+      tfq.layers.Expectation()(
+          circuits,
+          symbol_names=tf.constant([], dtype=tf.string),
+          symbol_values=tf.tile(
+              tf.constant([[]], dtype=tf.float32), [tf.shape(circuits)[0], 1]),
+          operators=measurements,
+      ),
+      [num_circuits],
+  )
 
 
 @tf.function
@@ -200,15 +192,14 @@ def exact_vqt_loss(
     beta: tf.Tensor,
     hamiltonian: tf.Tensor,
 ):
-    """Calculates the VQT loss function between an ExactQHBM and a hamiltonian."""
-    print("retracing: exact_vqt_loss")
-    circuits, _, counts = qhbm.sample_state_circuits(num_samples)
-    sub_energy_list = _tiled_expectation(circuits, hamiltonian)
-    weighted_energy_list = tf.cast(counts, tf.float32) * sub_energy_list
-    e_avg = tf.divide(
-        tf.reduce_sum(weighted_energy_list), tf.cast(num_samples, tf.float32)
-    )
-    return beta * e_avg - qhbm.entropy_function()
+  """Calculates the VQT loss function between an ExactQHBM and a hamiltonian."""
+  print("retracing: exact_vqt_loss")
+  circuits, _, counts = qhbm.sample_state_circuits(num_samples)
+  sub_energy_list = _tiled_expectation(circuits, hamiltonian)
+  weighted_energy_list = tf.cast(counts, tf.float32) * sub_energy_list
+  e_avg = tf.divide(
+      tf.reduce_sum(weighted_energy_list), tf.cast(num_samples, tf.float32))
+  return beta * e_avg - qhbm.entropy_function()
 
 
 @tf.function
@@ -218,32 +209,30 @@ def exact_vqt_loss_thetas_grad(
     beta: tf.Tensor,
     hamiltonian: tf.Tensor,
 ):
-    """Gradient of exact VQT loss function with respect to classical params."""
-    print("retracing: exact_vqt_loss_thetas_grad")
-    # Sample circuits to average the gradient over.
-    circuits, bitstrings, counts = qhbm.sample_state_circuits(num_samples)
-    num_samples = tf.cast(num_samples, tf.float32)
-    counts = tf.cast(counts, tf.float32)
+  """Gradient of exact VQT loss function with respect to classical params."""
+  print("retracing: exact_vqt_loss_thetas_grad")
+  # Sample circuits to average the gradient over.
+  circuits, bitstrings, counts = qhbm.sample_state_circuits(num_samples)
+  num_samples = tf.cast(num_samples, tf.float32)
+  counts = tf.cast(counts, tf.float32)
 
-    # Compute the per bitstring difference between beta H and energy
-    beta_h = beta * _tiled_expectation(circuits, hamiltonian)
-    energies, energy_grads = tf.map_fn(
-        qhbm.energy_and_energy_grad,
-        bitstrings,
-        fn_output_signature=(tf.float32, tf.float32),
-    )
-    diff_list = beta_h - energies
+  # Compute the per bitstring difference between beta H and energy
+  beta_h = beta * _tiled_expectation(circuits, hamiltonian)
+  energies, energy_grads = tf.map_fn(
+      qhbm.energy_and_energy_grad,
+      bitstrings,
+      fn_output_signature=(tf.float32, tf.float32),
+  )
+  diff_list = beta_h - energies
 
-    part_a = tf.divide(tf.reduce_sum(counts * diff_list), num_samples)
-    part_b = tf.divide(
-        tf.reduce_sum(tf.expand_dims(counts, 1) * energy_grads, 0), num_samples
-    )
-    prod_list = tf.expand_dims(diff_list, 1) * energy_grads
-    part_c = tf.divide(
-        tf.reduce_sum(tf.expand_dims(counts, 1) * prod_list, 0), num_samples
-    )
+  part_a = tf.divide(tf.reduce_sum(counts * diff_list), num_samples)
+  part_b = tf.divide(
+      tf.reduce_sum(tf.expand_dims(counts, 1) * energy_grads, 0), num_samples)
+  prod_list = tf.expand_dims(diff_list, 1) * energy_grads
+  part_c = tf.divide(
+      tf.reduce_sum(tf.expand_dims(counts, 1) * prod_list, 0), num_samples)
 
-    return part_a * part_b - part_c
+  return part_a * part_b - part_c
 
 
 @tf.function
@@ -253,30 +242,29 @@ def exact_vqt_loss_phis_grad(
     beta: tf.Tensor,
     hamiltonian: tf.Tensor,
 ):
-    """Gradient of exact VQT loss function with respect to circuit params."""
-    print("retracing: exact_vqt_loss_phis_grad")
-    circuits, _, counts = qhbm.sample_unresolved_state_circuits(num_samples)
-    num_circuits = tf.shape(counts)[0]
-    new_dup_phis = tf.identity(qhbm.phis)
-    with tf.GradientTape() as tape:
-        tape.watch(new_dup_phis)
-        sub_energy_list = tf.reshape(
-            tfq.layers.Expectation()(
-                circuits,
-                symbol_names=qhbm.phis_symbols,
-                symbol_values=tf.tile(
-                    tf.expand_dims(new_dup_phis, 0), [num_circuits, 1]
-                ),
-                operators=tf.tile(hamiltonian, [num_circuits, 1]),
-            ),
-            [num_circuits],
-        )
-        e_avg = tf.divide(
-            tf.reduce_sum(tf.cast(counts, tf.float32) * sub_energy_list),
-            tf.cast(num_samples, tf.float32),
-        )
-    this_grad = tape.gradient(e_avg, new_dup_phis)
-    return beta * this_grad
+  """Gradient of exact VQT loss function with respect to circuit params."""
+  print("retracing: exact_vqt_loss_phis_grad")
+  circuits, _, counts = qhbm.sample_unresolved_state_circuits(num_samples)
+  num_circuits = tf.shape(counts)[0]
+  new_dup_phis = tf.identity(qhbm.phis)
+  with tf.GradientTape() as tape:
+    tape.watch(new_dup_phis)
+    sub_energy_list = tf.reshape(
+        tfq.layers.Expectation()(
+            circuits,
+            symbol_names=qhbm.phis_symbols,
+            symbol_values=tf.tile(
+                tf.expand_dims(new_dup_phis, 0), [num_circuits, 1]),
+            operators=tf.tile(hamiltonian, [num_circuits, 1]),
+        ),
+        [num_circuits],
+    )
+    e_avg = tf.divide(
+        tf.reduce_sum(tf.cast(counts, tf.float32) * sub_energy_list),
+        tf.cast(num_samples, tf.float32),
+    )
+  this_grad = tape.gradient(e_avg, new_dup_phis)
+  return beta * this_grad
 
 
 # ============================================================================ #
@@ -299,7 +287,6 @@ def exact_vqt_loss_phis_grad(
 #     )
 #     sub_energies = tf.multiply(counts, unique_sub_energies)
 #     return tf.divide(tf.reduce_sum(sub_energies), tf.reduce_sum(counts))
-
 
 # def build_sub_term_energy_func(qhbm_vqt, qhbm_hamiltonian_list):
 #     bit_sub_indices_list = [
@@ -365,7 +352,6 @@ def exact_vqt_loss_phis_grad(
 #         qhbm_phis,
 #     )
 
-
 # @tf.function
 # def vqt_qhbm_loss(qhbm_vqt, num_vqt_samples, sub_term_energy_func):
 #     print("retracing: vqt_qhbm_loss")
@@ -378,7 +364,6 @@ def exact_vqt_loss_phis_grad(
 #         num_vqt_samples,
 #     )
 #     return e_avg - qhbm_vqt.entropy_function()
-
 
 # @tf.function
 # def vqt_qhbm_loss_thetas_grad(qhbm_vqt, num_vqt_samples, sub_term_energy_func):
@@ -423,7 +408,6 @@ def exact_vqt_loss_phis_grad(
 #     )
 
 #     return positive - negative
-
 
 # @tf.function
 # def phis_grad_sub_func(
@@ -474,7 +458,6 @@ def exact_vqt_loss_phis_grad(
 #     qhbm.phis.assign(original_phis)
 
 #     return tf.divide(forward - backward, (2.0 * eps))
-
 
 # @tf.function
 # def vqt_qhbm_loss_phis_grad(qhbm_vqt, num_vqt_samples, sub_term_energy_func, eps=0.1):

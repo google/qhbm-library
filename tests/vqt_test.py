@@ -25,41 +25,41 @@ from tests import test_util
 
 
 class VQTTest(tf.test.TestCase):
-    """Tests for the sample-based VQT."""
+  """Tests for the sample-based VQT."""
 
-    num_bits = 5
-    initial_thetas = tf.random.uniform([num_bits], minval=-1.0)
-    raw_phis_symbols = [sympy.Symbol("s0"), sympy.Symbol("s1")]
-    phis_symbols = tf.constant([str(s) for s in raw_phis_symbols])
-    initial_phis = tf.random.uniform([len(phis_symbols)], minval=-1.0)
-    raw_qubits = cirq.GridQubit.rect(1, num_bits)
-    u = cirq.Circuit()
-    for s in raw_phis_symbols:
-        for q in raw_qubits:
-            u += cirq.X(q) ** s
-    name = "TestQHBM"
+  num_bits = 5
+  initial_thetas = tf.random.uniform([num_bits], minval=-1.0)
+  raw_phis_symbols = [sympy.Symbol("s0"), sympy.Symbol("s1")]
+  phis_symbols = tf.constant([str(s) for s in raw_phis_symbols])
+  initial_phis = tf.random.uniform([len(phis_symbols)], minval=-1.0)
+  raw_qubits = cirq.GridQubit.rect(1, num_bits)
+  u = cirq.Circuit()
+  for s in raw_phis_symbols:
+    for q in raw_qubits:
+      u += cirq.X(q)**s
+  name = "TestQHBM"
 
-    def test_loss_consistency(self):
-        """Confirms that the sample-based and exact losses are close."""
-        energy, sampler = test_util.get_ebm_functions(self.num_bits)
-        test_qhbm = qhbm_base.ExactQHBM(
-            self.initial_thetas,
-            energy,
-            sampler,
-            self.initial_phis,
-            self.raw_phis_symbols,
-            self.u,
-            self.name,
-        )
-        num_samples = tf.constant(int(5e6))
-        num_random_hamiltonians = 2
-        for beta in tf.constant([0.1, 0.4, 1.6, 6.4]):
-            for _ in range(num_random_hamiltonians):
-                cirq_ham = test_util.get_random_pauli_sum(self.raw_qubits)
-                tf_ham = tfq.convert_to_tensor([[cirq_ham]])
-                loss_estimate = vqt.vqt_loss(test_qhbm, num_samples, beta, tf_ham)
-                loss_exact = vqt.exact_vqt_loss(test_qhbm, num_samples, beta, tf_ham)
-                self.assertAllClose(loss_estimate, loss_exact, rtol=1e-2)
+  def test_loss_consistency(self):
+    """Confirms that the sample-based and exact losses are close."""
+    energy, sampler = test_util.get_ebm_functions(self.num_bits)
+    test_qhbm = qhbm_base.ExactQHBM(
+        self.initial_thetas,
+        energy,
+        sampler,
+        self.initial_phis,
+        self.raw_phis_symbols,
+        self.u,
+        self.name,
+    )
+    num_samples = tf.constant(int(5e6))
+    num_random_hamiltonians = 2
+    for beta in tf.constant([0.1, 0.4, 1.6, 6.4]):
+      for _ in range(num_random_hamiltonians):
+        cirq_ham = test_util.get_random_pauli_sum(self.raw_qubits)
+        tf_ham = tfq.convert_to_tensor([[cirq_ham]])
+        loss_estimate = vqt.vqt_loss(test_qhbm, num_samples, beta, tf_ham)
+        loss_exact = vqt.exact_vqt_loss(test_qhbm, num_samples, beta, tf_ham)
+        self.assertAllClose(loss_estimate, loss_exact, rtol=1e-2)
 
 
 # TODO(#14): wait for rewrite
@@ -220,7 +220,6 @@ class VQTTest(tf.test.TestCase):
 #         # TODO(zaqqwerty): tighten these once better sample gradients are ready
 #         self.assertAllClose(final_fidelity, 1.0, atol=1e-1)
 
-
 if __name__ == "__main__":
-    print("Running vqt_test.py ...")
-    tf.test.main()
+  print("Running vqt_test.py ...")
+  tf.test.main()

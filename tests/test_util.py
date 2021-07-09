@@ -37,33 +37,33 @@ def get_random_qhbm(
     minval_phis=-6.2,
     maxval_phis=6.2,
 ):
-    """Create a random QHBM for use in testing."""
-    num_qubits = len(qubits)
-    (energy, sampler, _, _, num_thetas) = ebm.build_boltzmann(num_qubits, identifier)
-    thetas_initial_values = tf.random.uniform(
-        [num_thetas], minval=minval_thetas, maxval=maxval_thetas
-    )
+  """Create a random QHBM for use in testing."""
+  num_qubits = len(qubits)
+  (energy, sampler, _, _,
+   num_thetas) = ebm.build_boltzmann(num_qubits, identifier)
+  thetas_initial_values = tf.random.uniform([num_thetas],
+                                            minval=minval_thetas,
+                                            maxval=maxval_thetas)
 
-    unitary, phis_symbols = architectures.get_hardware_efficient_model_unitary(
-        qubits, num_layers, identifier
-    )
-    phis_initial_values = tf.random.uniform(
-        [len(phis_symbols)], minval=minval_phis, maxval=maxval_phis
-    )
+  unitary, phis_symbols = architectures.get_hardware_efficient_model_unitary(
+      qubits, num_layers, identifier)
+  phis_initial_values = tf.random.uniform([len(phis_symbols)],
+                                          minval=minval_phis,
+                                          maxval=maxval_phis)
 
-    return qhbm_base.ExactQHBM(
-        thetas_initial_values,
-        energy,
-        sampler,
-        phis_initial_values,
-        phis_symbols,
-        unitary,
-        identifier,
-    )
+  return qhbm_base.ExactQHBM(
+      thetas_initial_values,
+      energy,
+      sampler,
+      phis_initial_values,
+      phis_symbols,
+      unitary,
+      identifier,
+  )
 
 
 def get_ebm_functions(num_bits):
-    """EBM functions to use in a test QHBM.
+  """EBM functions to use in a test QHBM.
 
     The test EBM will be a simple case where the parameters are bias energies
     for uncoupled bits.
@@ -75,42 +75,44 @@ def get_ebm_functions(num_bits):
       tuple of functions required as input args for analytic QHBMs.
     """
 
-    def energy(thetas, bitstring):
-        """Computes the energy of a bitstring."""
-        spins = tf.subtract(
-            tf.ones(num_bits, dtype=tf.int8),
-            tf.constant(2, dtype=tf.int8) * tf.cast(bitstring, tf.int8),
-        )
-        return tf.reduce_sum(tf.cast(spins, tf.float32) * thetas)
+  def energy(thetas, bitstring):
+    """Computes the energy of a bitstring."""
+    spins = tf.subtract(
+        tf.ones(num_bits, dtype=tf.int8),
+        tf.constant(2, dtype=tf.int8) * tf.cast(bitstring, tf.int8),
+    )
+    return tf.reduce_sum(tf.cast(spins, tf.float32) * thetas)
 
-    def sampler(thetas, num_samples):
-        r"""Fairly samples from the EBM defined by `energy`.
+  def sampler(thetas, num_samples):
+    r"""Fairly samples from the EBM defined by `energy`.
 
-        For Bernoulli distribution, we let $p$ be the probability of being `1` bit.
+        For Bernoulli distribution, we let $p$ be the probability of being `1`
+        bit.
         In this case, $p = \frac{e^{theta}}{{e^{theta}+e^{-theta}}}$.
         Therefore, each independent logit is:
           $logit = \log\frac{p}{1-p} = \log\frac{e^{theta}}{e^{-theta}}
                  = \log{e^{2*theta}} = 2*theta$
 
         Args:
-          thetas: a `tf.Tensor` of dtype `tf.float32` representing classical model
-            parameters for classical energies. `tf.shape(thetas)[0] == num_bits`.
+          thetas: a `tf.Tensor` of dtype `tf.float32` representing classical
+            model parameters for classical energies. `tf.shape(thetas)[0] ==
+            num_bits`.
           num_samples: a `tf.Tensor` of dtype `tf.int32` representing the number
             of samples from given Bernoulli distribition.
 
         Returns:
-          a `tf.Tensor` in the shape of [num_samples, num_bits] of `tf.int8` with
+          a `tf.Tensor` in the shape of [num_samples, num_bits] of `tf.int8`
+          with
           bitstrings sampled from the classical distribution.
         """
-        return tfp.distributions.Bernoulli(logits=2 * thetas, dtype=tf.int8).sample(
-            num_samples
-        )
+    return tfp.distributions.Bernoulli(
+        logits=2 * thetas, dtype=tf.int8).sample(num_samples)
 
-    return energy, sampler
+  return energy, sampler
 
 
 def get_random_pauli_sum(qubits):
-    """Test fixture.
+  """Test fixture.
 
     Args:
       qubits: A list of `cirq.GridQubit`s on which to build the pauli sum.
@@ -119,35 +121,35 @@ def get_random_pauli_sum(qubits):
       pauli_sum: A `cirq.PauliSum` which is a linear combination of random pauli
       strings on `qubits`.
     """
-    paulis = [cirq.X, cirq.Y, cirq.Z]
+  paulis = [cirq.X, cirq.Y, cirq.Z]
 
-    coeff_max = 1.5
-    coeff_min = -1.0 * coeff_max
+  coeff_max = 1.5
+  coeff_min = -1.0 * coeff_max
 
-    num_qubits = len(qubits)
-    num_pauli_terms = num_qubits - 1
-    num_pauli_factors = num_qubits - 1
+  num_qubits = len(qubits)
+  num_pauli_terms = num_qubits - 1
+  num_pauli_factors = num_qubits - 1
 
-    pauli_sum = cirq.PauliSum()
-    for _ in range(num_pauli_terms):
-        pauli_term = random.uniform(coeff_min, coeff_max) * cirq.I(qubits[0])
-        sub_qubits = random.sample(qubits, num_pauli_factors)
-        for q in sub_qubits:
-            pauli_factor = random.choice(paulis)(q)
-            pauli_term *= pauli_factor
-        pauli_sum += pauli_term
-    return pauli_sum
+  pauli_sum = cirq.PauliSum()
+  for _ in range(num_pauli_terms):
+    pauli_term = random.uniform(coeff_min, coeff_max) * cirq.I(qubits[0])
+    sub_qubits = random.sample(qubits, num_pauli_factors)
+    for q in sub_qubits:
+      pauli_factor = random.choice(paulis)(q)
+      pauli_term *= pauli_factor
+    pauli_sum += pauli_term
+  return pauli_sum
 
 
 def generate_pure_random_density_operator(num_qubits):
-    dim = 2 ** num_qubits
-    unitary = scipy.stats.unitary_group.rvs(dim)
-    u_vec = unitary[:, 0:1]
-    return tf.matmul(u_vec, u_vec, adjoint_b=True)
+  dim = 2**num_qubits
+  unitary = scipy.stats.unitary_group.rvs(dim)
+  u_vec = unitary[:, 0:1]
+  return tf.matmul(u_vec, u_vec, adjoint_b=True)
 
 
 def generate_mixed_random_density_operator(num_qubits, num_mixtures=5):
-    """Generates a random mixed density matrix.
+  """Generates a random mixed density matrix.
 
     Generates `num_mixtures` random quantum states, takes their outer products,
     and generates a random convex combination of them.
@@ -163,51 +165,51 @@ def generate_mixed_random_density_operator(num_qubits, num_mixtures=5):
       final_state: The mixed density matrix.
       prob: The probability of each random state in the mixture.
     """
-    prob = tf.random.uniform(shape=[num_mixtures])
-    prob = prob / tf.reduce_sum(prob)
-    final_state = tf.zeros((2 ** num_qubits, 2 ** num_qubits), dtype=tf.complex128)
-    dim = 2 ** num_qubits
-    unitary = scipy.stats.unitary_group.rvs(dim)
-    for i in range(num_mixtures):
-        u_vec = unitary[:, i : i + 1]
-        final_state += tf.multiply(
-            tf.cast(prob[i], dtype=tf.complex128),
-            tf.matmul(u_vec, u_vec, adjoint_b=True),
-        )
-    return final_state, prob
+  prob = tf.random.uniform(shape=[num_mixtures])
+  prob = prob / tf.reduce_sum(prob)
+  final_state = tf.zeros((2**num_qubits, 2**num_qubits), dtype=tf.complex128)
+  dim = 2**num_qubits
+  unitary = scipy.stats.unitary_group.rvs(dim)
+  for i in range(num_mixtures):
+    u_vec = unitary[:, i:i + 1]
+    final_state += tf.multiply(
+        tf.cast(prob[i], dtype=tf.complex128),
+        tf.matmul(u_vec, u_vec, adjoint_b=True),
+    )
+  return final_state, prob
 
 
 def generate_mixed_random_density_operator_pair(num_qubits, perm_basis=False):
-    num_mixtures = 5
-    dim = 2 ** num_qubits
-    # Use common basis
-    unitary = scipy.stats.unitary_group.rvs(dim)
+  num_mixtures = 5
+  dim = 2**num_qubits
+  # Use common basis
+  unitary = scipy.stats.unitary_group.rvs(dim)
 
-    prob = tf.random.uniform(shape=[num_mixtures])
-    prob = prob / tf.reduce_sum(prob)
-    final_state1 = tf.zeros((dim, dim), dtype=tf.complex128)
+  prob = tf.random.uniform(shape=[num_mixtures])
+  prob = prob / tf.reduce_sum(prob)
+  final_state1 = tf.zeros((dim, dim), dtype=tf.complex128)
+  basis_indices = np.random.permutation(dim)[:num_mixtures]
+  for i, idx in enumerate(basis_indices):
+    u_vec = unitary[:, idx:idx + 1]
+    final_state1 += tf.multiply(
+        tf.cast(prob[i], dtype=tf.complex128),
+        tf.matmul(u_vec, u_vec, adjoint_b=True),
+    )
+
+  prob = tf.random.uniform(shape=[num_mixtures])
+  prob = prob / tf.reduce_sum(prob)
+  final_state2 = tf.zeros((dim, dim), dtype=tf.complex128)
+  if perm_basis:
     basis_indices = np.random.permutation(dim)[:num_mixtures]
-    for i, idx in enumerate(basis_indices):
-        u_vec = unitary[:, idx : idx + 1]
-        final_state1 += tf.multiply(
-            tf.cast(prob[i], dtype=tf.complex128),
-            tf.matmul(u_vec, u_vec, adjoint_b=True),
-        )
-
-    prob = tf.random.uniform(shape=[num_mixtures])
-    prob = prob / tf.reduce_sum(prob)
-    final_state2 = tf.zeros((dim, dim), dtype=tf.complex128)
-    if perm_basis:
-        basis_indices = np.random.permutation(dim)[:num_mixtures]
-    for i, idx in enumerate(basis_indices):
-        u_vec = unitary[:, idx : idx + 1]
-        final_state2 += tf.multiply(
-            tf.cast(prob[i], dtype=tf.complex128),
-            tf.matmul(u_vec, u_vec, adjoint_b=True),
-        )
-    return final_state1, final_state2
+  for i, idx in enumerate(basis_indices):
+    u_vec = unitary[:, idx:idx + 1]
+    final_state2 += tf.multiply(
+        tf.cast(prob[i], dtype=tf.complex128),
+        tf.matmul(u_vec, u_vec, adjoint_b=True),
+    )
+  return final_state1, final_state2
 
 
 def stable_classical_entropy(probs):
-    """Entropy function for a list of probabilities, allowing zeros."""
-    return -tf.reduce_sum(tf.math.multiply_no_nan(tf.math.log(probs), probs))
+  """Entropy function for a list of probabilities, allowing zeros."""
+  return -tf.reduce_sum(tf.math.multiply_no_nan(tf.math.log(probs), probs))
