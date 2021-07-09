@@ -21,7 +21,7 @@ import tensorflow_probability as tfp
 import tensorflow_quantum as tfq
 
 from qhbmlib import qhbm_base
-from qhbmlib.tests import test_util
+from tests import test_util
 
 # Global tolerance, set for float32.
 ATOL = 1e-5

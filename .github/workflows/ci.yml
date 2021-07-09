@@ -3,8 +3,8 @@ name: Continuous Integration
 on: [ pull_request ]
 
 jobs:
-  lint-and-format-and-test:
-    name: Lint, Format, and Test
+  test:
+    name: Checks
     runs-on: ubuntu-16.04
     timeout-minutes: 5
     steps:
@@ -18,7 +18,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install --user poetry
           poetry install
-      - name: Format check
+      - name: Check format
         run: |
           ./scripts/check_format.sh
       - name: Run tests
