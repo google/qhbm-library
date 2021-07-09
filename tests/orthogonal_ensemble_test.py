@@ -14,6 +14,8 @@
 # ==============================================================================
 """Tests for the orthogonal_ensemble module."""
 
+from absl import logging
+
 import cirq
 import sympy
 import tensorflow as tf
@@ -21,7 +23,6 @@ import tensorflow_probability as tfp
 import tensorflow_quantum as tfq
 
 from qhbmlib import orthogonal_ensemble
-from tests import test_util
 
 # Global tolerance, set for float32.
 ATOL = 1e-5
@@ -173,5 +174,5 @@ class OrthogonalEnsembleTest(tf.test.TestCase):
 
 
 if __name__ == "__main__":
-  print("Running orthogonal_ensemble_test.py ...")
+  logging.info("Running orthogonal_ensemble_test.py ...")
   tf.test.main()
