@@ -16,8 +16,8 @@
 
 import cirq
 from qhbmlib import qmhl
-from tests import test_util
 import tensorflow as tf
+from tests import test_util
 
 
 class QMHLExactLossTest(tf.test.TestCase):
