@@ -20,6 +20,6 @@ if [ "$retval" == 0 ]
 then
   echo "Success: no lint found."
 else
-  echo "Please run `poetry run yapf --in-place --recursive qhbmlib/` and try again."
+  echo "Failure: please remove lint and try again."
   exit 1
 fi
