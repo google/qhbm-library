@@ -56,7 +56,7 @@ def vqt_loss(
   log_prob_terms = tf.math.log(prob_terms)
   minus_entropy_approx = tf.reduce_sum(prob_terms * log_prob_terms)
   num_circuits = tf.shape(counts)[0]
-  state_circuits = qhbm.orth_ens.ensemble(samples)
+  state_circuits = qhbm.state_circuits(samples)
   tiled_hamiltonian = tf.tile(hamiltonian, [num_circuits, 1])
   expectations = tf.reshape(
       tfq.layers.SampledExpectation()(
