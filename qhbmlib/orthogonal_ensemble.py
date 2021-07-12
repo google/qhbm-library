@@ -135,7 +135,7 @@ class OrthogonalEnsemble:
     return OrthogonalEnsemble(
         tfq.from_tensor(self.u)[0],
         [sympy.Symbol(s.decode("utf-8")) for s in self.phis_symbols.numpy()],
-        self.phis,        
+        self.phis,
         self.name,
     )
 

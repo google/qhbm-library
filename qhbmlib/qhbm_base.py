@@ -113,7 +113,7 @@ class QHBM(tf.Module):
     self.energy_function = check_base_function(energy)
     self.sampler_function = check_base_function(sampler)
     self.orth_ens = orthogonal_ensemble.OrthogonalEnsemble(
-      u, phis_symbols, initial_phis, name)
+        u, phis_symbols, initial_phis, name)
     self.phis = self.orth_ens.phis
     self.phis_symbols = self.orth_ens.phis_symbols
     self.u = self.orth_ens.u
@@ -122,7 +122,8 @@ class QHBM(tf.Module):
     self.raw_qubits = self.orth_ens.raw_qubits
     self.qubits = self.orth_ens.qubits
     self.bit_symbols = self.orth_ens.bit_symbols
-    self.bit_and_u = tfq.append_circuit(self.orth_ens.bit_circuit, self.orth_ens.u)
+    self.bit_and_u = tfq.append_circuit(self.orth_ens.bit_circuit,
+                                        self.orth_ens.u)
 
     # Simulator backends
     self.tfq_sample_layer = tfq.layers.Sample()
