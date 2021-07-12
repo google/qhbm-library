@@ -20,34 +20,12 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 import tensorflow_quantum as tfq
 
+from qhbmlib import orthogonal_ensemble
 from qhbmlib import qhbm_base
 from tests import test_util
 
 # Global tolerance, set for float32.
 ATOL = 1e-5
-
-
-class BuildBitCircuitTest(tf.test.TestCase):
-  """Test build_bit_circuit from the qhbm library."""
-
-  def test_build_bit_circuit(self):
-    """Confirm correct bit injector circuit creation."""
-    my_qubits = [
-        cirq.GridQubit(0, 2),
-        cirq.GridQubit(1, 4),
-        cirq.GridQubit(2, 2)
-    ]
-    identifier = "build_bit_test"
-    test_circuit, test_symbols = qhbm_base.build_bit_circuit(
-        my_qubits, identifier)
-    expected_symbols = list(
-        sympy.symbols(
-            "_bit_build_bit_test_0 _bit_build_bit_test_1 _bit_build_bit_test_2")
-    )
-    expected_circuit = cirq.Circuit(
-        [cirq.X(q)**s for q, s in zip(my_qubits, expected_symbols)])
-    self.assertAllEqual(test_symbols, expected_symbols)
-    self.assertEqual(test_circuit, expected_circuit)
 
 
 class UniqueWithCountsTest(tf.test.TestCase):
@@ -111,26 +89,6 @@ class UniqueWithCountsTest(tf.test.TestCase):
 class InputChecksTest(tf.test.TestCase):
   """Tests all the input checking functions used for QHBMs."""
 
-  def test_upgrade_initial_values(self):
-    """Confirms lists of values are properly upgraded to variables."""
-    # Test allowed inputs.
-    true_list = [-5.1, 2.8, -3.4, 4.8]
-    true_tensor = tf.constant(true_list, dtype=tf.float32)
-    true_variable = tf.Variable(true_tensor)
-    self.assertAllClose(
-        qhbm_base.upgrade_initial_values(true_list), true_variable, atol=ATOL)
-    self.assertAllClose(
-        qhbm_base.upgrade_initial_values(true_tensor), true_variable, atol=ATOL)
-    self.assertAllClose(
-        qhbm_base.upgrade_initial_values(true_variable),
-        true_variable,
-        atol=ATOL)
-    # Check for bad inputs.
-    with self.assertRaisesRegex(TypeError, "numeric type"):
-      _ = qhbm_base.upgrade_initial_values("junk")
-    with self.assertRaisesRegex(ValueError, "must be 1D"):
-      _ = qhbm_base.upgrade_initial_values([[5.2]])
-
   def test_check_function(self):
     """Confirms only allowed functions pass the checks."""
 
@@ -143,54 +101,6 @@ class InputChecksTest(tf.test.TestCase):
     self.assertEqual(base_func, qhbm_base.check_base_function(base_func))
     with self.assertRaisesRegex(TypeError, "two argument"):
       _ = qhbm_base.check_base_function(analytic_func)
-
-  def test_upgrade_symbols(self):
-    """Confirms symbols are upgraded appropriately."""
-    true_symbol_names = ["test1", "a", "my_symbol", "MySymbol2"]
-    values = tf.constant([0 for _ in true_symbol_names])
-    true_symbols = [sympy.Symbol(s) for s in true_symbol_names]
-    true_symbols_t = tf.constant(true_symbol_names, dtype=tf.string)
-    self.assertAllEqual(true_symbols_t,
-                        qhbm_base.upgrade_symbols(true_symbols, values))
-    # Test bad inputs.
-    with self.assertRaisesRegex(TypeError, "must be `sympy.Symbol`"):
-      _ = qhbm_base.upgrade_symbols(true_symbols[:-1] + ["bad"], values)
-    with self.assertRaisesRegex(ValueError, "must be unique"):
-      _ = qhbm_base.upgrade_symbols(true_symbols[:-1] + true_symbols[:1],
-                                    values)
-    with self.assertRaisesRegex(ValueError, "symbol for every value"):
-      _ = qhbm_base.upgrade_symbols(true_symbols, values[:-1])
-    with self.assertRaisesRegex(TypeError, "must be an iterable"):
-      _ = qhbm_base.upgrade_symbols(5, values)
-
-  def test_upgrade_circuit(self):
-    """Confirms circuits are upgraded appropriately."""
-    qubits = cirq.GridQubit.rect(1, 5)
-    true_symbol_names = ["a", "b"]
-    true_symbols = [sympy.Symbol(s) for s in true_symbol_names]
-    true_symbols_t = tf.constant(true_symbol_names, dtype=tf.string)
-    true_circuit = cirq.Circuit()
-    for q in qubits:
-      for s in true_symbols:
-        true_circuit += cirq.X(q)**s
-    true_circuit_t = tfq.convert_to_tensor([true_circuit])
-    self.assertEqual(
-        tfq.from_tensor(true_circuit_t),
-        tfq.from_tensor(
-            qhbm_base.upgrade_circuit(true_circuit, true_symbols_t)),
-    )
-    # Test bad inputs.
-    with self.assertRaisesRegex(TypeError, "must be a `cirq.Circuit`"):
-      _ = qhbm_base.upgrade_circuit("junk", true_symbols_t)
-    with self.assertRaisesRegex(TypeError, "must be a `tf.Tensor`"):
-      _ = qhbm_base.upgrade_circuit(true_circuit, true_symbol_names)
-    with self.assertRaisesRegex(TypeError, "dtype `tf.string`"):
-      _ = qhbm_base.upgrade_circuit(true_circuit, tf.constant([5.5]))
-    with self.assertRaisesRegex(ValueError, "must contain"):
-      _ = qhbm_base.upgrade_circuit(true_circuit, tf.constant(["a", "junk"]))
-    with self.assertRaisesRegex(ValueError, "Empty circuit"):
-      _ = qhbm_base.upgrade_circuit(cirq.Circuit(),
-                                    tf.constant([], dtype=tf.string))
 
 
 class QHBMTest(tf.test.TestCase):
@@ -207,7 +117,7 @@ class QHBMTest(tf.test.TestCase):
     for q in raw_qubits:
       u += cirq.X(q)**s
   name = "TestQHBM"
-  raw_bit_circuit, raw_bit_symbols = qhbm_base.build_bit_circuit(
+  raw_bit_circuit, raw_bit_symbols = orthogonal_ensemble.build_bit_circuit(
       raw_qubits, name)
   bit_symbols = tf.constant([str(s) for s in raw_bit_symbols])
   bit_and_u = tfq.layers.AddCircuit()(raw_bit_circuit, append=u)

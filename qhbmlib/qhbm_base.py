@@ -113,7 +113,7 @@ class QHBM(tf.Module):
     self.energy_function = check_base_function(energy)
     self.sampler_function = check_base_function(sampler)
     self.orth_ens = orthogonal_ensemble.OrthogonalEnsemble(
-      u, phis_symbols, initial_phis)
+      u, phis_symbols, initial_phis, name)
     self.phis = self.orth_ens.phis
     self.phis_symbols = self.orth_ens.phis_symbols
     self.u = self.orth_ens.u
