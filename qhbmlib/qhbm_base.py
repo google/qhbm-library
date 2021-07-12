@@ -181,13 +181,7 @@ class QHBM(tf.Module):
 
   @tf.function
   def state_circuits(self, samples):
-    print(f"retracing: state_circuits from {self.name}")
-    u_model_concrete = tfq.resolve_parameters(self.bit_and_u, self.phis_symbols,
-                                              tf.expand_dims(self.phis, 0))
-    tiled_u_model_concrete = tf.tile(u_model_concrete, [tf.shape(samples)[0]])
-    circuit_samples = tfq.resolve_parameters(tiled_u_model_concrete,
-                                             self.bit_symbols, samples)
-    return circuit_samples
+    return self.orth_ens.ensemble(samples)
 
   @tf.function
   def sample_unresolved_state_circuits(self, num_samples):

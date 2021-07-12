@@ -172,6 +172,30 @@ class OrthogonalEnsembleTest(tf.test.TestCase):
     self.assertEqual(
         tfq.from_tensor(self.bit_circuit), tfq.from_tensor(test_oe.bit_circuit))
 
+  def test_copy(self):
+    test_oe = orthogonal_ensemble.OrthogonalEnsemble(
+        self.u,
+        self.raw_phis_symbols,
+        self.initial_phis,
+        self.name,
+    )
+    test_oe_copy = test_oe.copy()
+    self.assertEqual(test_oe_copy.name, test_oe.name)
+    self.assertAllClose(test_oe_copy.phis, test_oe.phis)
+    self.assertAllEqual(test_oe_copy.phis_symbols, test_oe.phis_symbols)
+    self.assertAllEqual(
+        tfq.from_tensor(test_oe_copy.u),
+        tfq.from_tensor(test_oe.u),
+    )
+    self.assertAllEqual(
+        tfq.from_tensor(test_oe_copy.u_dagger),
+        tfq.from_tensor(test_oe.u_dagger),
+    )
+    self.assertAllEqual(test_oe_copy.raw_qubits, test_oe.raw_qubits)
+    self.assertAllEqual(test_oe_copy.bit_symbols, test_oe.bit_symbols)
+    self.assertEqual(
+        tfq.from_tensor(test_oe_copy.bit_circuit), tfq.from_tensor(test_oe.bit_circuit))
+
 
 if __name__ == "__main__":
   logging.info("Running orthogonal_ensemble_test.py ...")

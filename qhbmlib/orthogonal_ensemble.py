@@ -131,6 +131,14 @@ class OrthogonalEnsemble:
                                        tf.ones([len(self.raw_qubits)]))
     self.bit_circuit = upgrade_circuit(raw_bit_circuit, self.bit_symbols)
 
+  def copy(self):
+    return OrthogonalEnsemble(
+        tfq.from_tensor(self.u)[0],
+        [sympy.Symbol(s.decode("utf-8")) for s in self.phis_symbols.numpy()],
+        self.phis,        
+        self.name,
+    )
+
   def ensemble(self, bitstrings):
     """Returns the current concrete circuits for this orthogonal ensemble.
 
