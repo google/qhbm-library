@@ -139,6 +139,18 @@ class OrthogonalEnsemble:
         self.name,
     )
 
+  @property
+  def resolved_u(self):
+    """Returns the diagonalizing unitary with current phis resolved."""
+    return tfq.resolve_parameters(self.u, self.phis_symbols,
+                                  tf.expand_dims(self.phis, 0))
+
+  @property
+  def resolved_u_dagger(self):
+    """Returns the diagonalizing adjoint unitary with current phis resolved."""
+    return tfq.resolve_parameters(self.u_dagger, self.phis_symbols,
+                                  tf.expand_dims(self.phis, 0))
+
   def ensemble(self, bitstrings):
     """Returns the current concrete circuits for this orthogonal ensemble.
 
@@ -153,9 +165,7 @@ class OrthogonalEnsemble:
     tiled_bit_injectors = tf.tile(self.bit_circuit, [num_labels])
     bit_circuits = tfq.resolve_parameters(tiled_bit_injectors, self.bit_symbols,
                                           tf.cast(bitstrings, tf.float32))
-    u_concrete = tfq.resolve_parameters(self.u, self.phis_symbols,
-                                        tf.expand_dims(self.phis, 0))
-    tiled_u_concrete = tf.tile(u_concrete, [num_labels])
+    tiled_u_concrete = tf.tile(self.resolved_u, [num_labels])
     return tfq.append_circuit(bit_circuits, tiled_u_concrete)
 
   def sample(self, bitstrings, counts):
