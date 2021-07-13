@@ -715,7 +715,7 @@ class MCMCSampler:
 # ============================================================================ #
 
 
-class EBM(abc.ABC):
+class EnergyFunction(abc.ABC):
   """Class for working with discrete energy based models."""
 
   @property
@@ -739,26 +739,9 @@ class EBM(abc.ABC):
       `tf.tensor` dtype `tf.float32` which is the energy of `bitstring`.
     """
 
-  @abc.abstractmethod
-  def update_thetas(self, update):
-    """Updates the parameters defining this EBM.
-    
-    This method should be called by all derived class `update_thetas`. It is used
-    to perform any other tasks for this class which should happen exactly
-    once per parameter update, e.g. caching for performance reasons.
 
-    Args:
-      update: Object of the same shape and type as `self.thetas`. This value is
-        added to `self.thetas`.
-    """
-
-
-class EBMSampler(abc.ABC):
+class EBM(EnergyFunction):
   """Class for defining sampling routines for EBMs."""
-
-  def __init__(self, ebm: EBM):
-    """Initializes self with the EBM defining the distribution to sample."""
-    self.ebm = ebm
   
   @abc.abstractmethod
   def sample(self, n_samples):
@@ -776,9 +759,8 @@ class EBMSampler(abc.ABC):
         equal to `n_samples`.
     """
 
-
-class SimEBM(EBM):
-  """Extends EBM to include new but potentially costly calculations."""
+class AnalyticEBM(EBM):
+  """Extends EBM to include calculations requiring the normalizing constant."""
 
   @abc.abstractmethod
   def log_partition_function(self):
@@ -795,3 +777,39 @@ class SimEBM(EBM):
     Returns:
       Scalar tensor of dtype `tf.float32`.
     """
+
+    
+class GeneralAnalyticEBM(EBM):
+  
+  def __init__(self, energy: EnergyFunction):
+    self.energy_function = energy
+    self.all_bitstrings = tf.constant(
+          list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
+
+  @property
+  def bitwidth(self):
+    return self.energy.bitwidth
+
+  @property
+  def thetas(self):
+    return self.energy.thetas
+
+  def energy(self, bitstring):
+    return self.energy.energy
+
+  def sample(self):
+    all_energies = self.energy(self.all_bitstrings)
+    dist = tfp.distributions.Categorical(
+      logits=-1 * all_energies, dtype=tf.int8)
+    return tf.gather(self.all_bitstrings, dist.sample(num_samples))
+
+  def log_partition_function(self):
+    all_energies = self.energy(self.all_bitstrings)
+    return tf.reduce_logsumexp(-1 * all_energies)
+
+  def entropy_function(self):
+    all_energies = self.energy(self.all_bitstrings)
+    dist = tfp.distributions.Categorical(logits=-1 * all_energies)
+    return dist.entropy()
+
+
