@@ -160,7 +160,8 @@ class QNNTest(tf.test.TestCase):
     self.assertAllEqual(self.raw_qubits, test_qnn.raw_qubits)
     self.assertAllEqual(self.bit_symbols, test_qnn.bit_symbols)
     self.assertEqual(
-        tfq.from_tensor(self.bit_circuit), tfq.from_tensor(test_qnn.bit_circuit))
+        tfq.from_tensor(self.bit_circuit),
+        tfq.from_tensor(test_qnn.bit_circuit))
 
     self.assertEqual(
         tfq.from_tensor(test_qnn.resolved_u),
