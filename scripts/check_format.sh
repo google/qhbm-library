@@ -14,7 +14,21 @@
 # limitations under the License.
 # ==============================================================================
 
-poetry run yapf --in-place --recursive qhbmlib/
-poetry run yapf --in-place --recursive tests/
-./scripts/check_lint.sh
-poetry run pytest --cov .
+poetry run yapf --diff --recursive qhbmlib/
+retval=$?
+if [ "$retval" == 0 ]
+then
+  echo "Success: library files are formatted correctly."
+else
+  echo "Failure: please run `poetry run yapf --in-place --recursive qhbmlib/` and try again."
+  exit 1
+fi
+poetry run yapf --diff --recursive tests/
+retval=$?
+if [ "$retval" == 0 ]
+then
+  echo "Success: test files are formatted correctly."
+else
+  echo "Failure: please run `poetry run yapf --in-place --recursive tests/` and try again."
+  exit 1
+fi
