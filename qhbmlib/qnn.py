@@ -114,10 +114,10 @@ def upgrade_circuit(circuit: cirq.Circuit, symbols: tf.Tensor) -> tf.Tensor:
 
 
 class QNN:
-  """Operations on ensembles of orthogonal states indexed by bitstrings."""
+  """Operations on parameterized unitaries with bitstring inputs."""
 
   def __init__(self, circuit, symbols, symbols_initial_values, name):
-    """Initialize an QNN."""
+    """Initialize a QNN."""
     self.name = name
     self.phis = upgrade_initial_values(symbols_initial_values)
     self.phis_symbols = upgrade_symbols(symbols, self.phis)
@@ -151,15 +151,15 @@ class QNN:
     return tfq.resolve_parameters(self.u_dagger, self.phis_symbols,
                                   tf.expand_dims(self.phis, 0))
 
-  def ensemble(self, bitstrings):
-    """Returns the current concrete circuits for this orthogonal ensemble.
+  def circuits(self, bitstrings):
+    """Returns the current concrete circuits for this QNN given bitstrings.
 
       Args:
         bitstrings: 2D tensor of dtype `tf.int8` whose entries are bits. These
-          specify the labels of the states to use in the ensemble.
+          specify the state inputs to use in the returned set of circuits.
 
       Returns:
-        1D tensor of strings which represent the current ensemble circuits.
+        1D tensor of strings which represent the current QNN circuits.
       """
     num_labels = tf.shape(bitstrings)[0]
     tiled_bit_injectors = tf.tile(self.bit_circuit, [num_labels])
@@ -169,11 +169,11 @@ class QNN:
     return tfq.append_circuit(bit_circuits, tiled_u_concrete)
 
   def sample(self, bitstrings, counts):
-    """Returns bitstring samples from the ensemble.
+    """Returns bitstring samples from the QNN.
 
       Args:
         bitstrings: 2D tensor of dtype `tf.int8` whose entries are bits. These
-          specify the labels of the states to use in the ensemble.
+          specify the state inputs to the unitary of this QNN.
         counts: 1D tensor of dtype `tf.int32` such that `counts[i]` is the
           number of samples to draw from `self.u|bitstrings[i]>`.
 
@@ -185,7 +185,7 @@ class QNN:
     raise NotImplementedError
 
   def measure(self, bitstrings, observables):
-    """Returns the expectation values of the observables against the ensemble.
+    """Returns the expectation values of the observables against the QNN.
 
       Args:
         bitstrings: 2D tensor of dtype `tf.int8` whose entries are bits.

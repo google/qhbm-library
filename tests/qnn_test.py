@@ -140,91 +140,91 @@ class QNNTest(tf.test.TestCase):
 
   def test_init(self):
     """Confirms QNN is initialized correctly."""
-    test_oe = qnn.QNN(
+    test_qnn = qnn.QNN(
         self.u,
         self.raw_phis_symbols,
         self.initial_phis,
         self.name,
     )
-    self.assertEqual(self.name, test_oe.name)
-    self.assertAllClose(self.initial_phis, test_oe.phis)
-    self.assertAllEqual(self.phis_symbols, test_oe.phis_symbols)
+    self.assertEqual(self.name, test_qnn.name)
+    self.assertAllClose(self.initial_phis, test_qnn.phis)
+    self.assertAllEqual(self.phis_symbols, test_qnn.phis_symbols)
     self.assertAllEqual(
         tfq.from_tensor(self.u_tfq),
-        tfq.from_tensor(test_oe.u),
+        tfq.from_tensor(test_qnn.u),
     )
     self.assertAllEqual(
         tfq.from_tensor(self.u_dagger_tfq),
-        tfq.from_tensor(test_oe.u_dagger),
+        tfq.from_tensor(test_qnn.u_dagger),
     )
-    self.assertAllEqual(self.raw_qubits, test_oe.raw_qubits)
-    self.assertAllEqual(self.bit_symbols, test_oe.bit_symbols)
+    self.assertAllEqual(self.raw_qubits, test_qnn.raw_qubits)
+    self.assertAllEqual(self.bit_symbols, test_qnn.bit_symbols)
     self.assertEqual(
-        tfq.from_tensor(self.bit_circuit), tfq.from_tensor(test_oe.bit_circuit))
+        tfq.from_tensor(self.bit_circuit), tfq.from_tensor(test_qnn.bit_circuit))
 
     self.assertEqual(
-        tfq.from_tensor(test_oe.resolved_u),
+        tfq.from_tensor(test_qnn.resolved_u),
         tfq.from_tensor(
             tfq.resolve_parameters(self.u_tfq, self.phis_symbols,
                                    tf.expand_dims(self.initial_phis, 0))))
     self.assertEqual(
-        tfq.from_tensor(test_oe.resolved_u_dagger),
+        tfq.from_tensor(test_qnn.resolved_u_dagger),
         tfq.from_tensor(
             tfq.resolve_parameters(self.u_dagger_tfq, self.phis_symbols,
                                    tf.expand_dims(self.initial_phis, 0))))
 
   def test_copy(self):
     """Confirms copied QNN has correct attributes."""
-    test_oe = qnn.QNN(
+    test_qnn = qnn.QNN(
         self.u,
         self.raw_phis_symbols,
         self.initial_phis,
         self.name,
     )
-    test_oe_copy = test_oe.copy()
-    self.assertEqual(test_oe_copy.name, test_oe.name)
-    self.assertAllClose(test_oe_copy.phis, test_oe.phis)
-    self.assertAllEqual(test_oe_copy.phis_symbols, test_oe.phis_symbols)
+    test_qnn_copy = test_qnn.copy()
+    self.assertEqual(test_qnn_copy.name, test_qnn.name)
+    self.assertAllClose(test_qnn_copy.phis, test_qnn.phis)
+    self.assertAllEqual(test_qnn_copy.phis_symbols, test_qnn.phis_symbols)
     self.assertAllEqual(
-        tfq.from_tensor(test_oe_copy.u),
-        tfq.from_tensor(test_oe.u),
+        tfq.from_tensor(test_qnn_copy.u),
+        tfq.from_tensor(test_qnn.u),
     )
     self.assertAllEqual(
-        tfq.from_tensor(test_oe_copy.u_dagger),
-        tfq.from_tensor(test_oe.u_dagger),
+        tfq.from_tensor(test_qnn_copy.u_dagger),
+        tfq.from_tensor(test_qnn.u_dagger),
     )
-    self.assertAllEqual(test_oe_copy.raw_qubits, test_oe.raw_qubits)
-    self.assertAllEqual(test_oe_copy.bit_symbols, test_oe.bit_symbols)
+    self.assertAllEqual(test_qnn_copy.raw_qubits, test_qnn.raw_qubits)
+    self.assertAllEqual(test_qnn_copy.bit_symbols, test_qnn.bit_symbols)
     self.assertEqual(
-        tfq.from_tensor(test_oe_copy.bit_circuit),
-        tfq.from_tensor(test_oe.bit_circuit))
+        tfq.from_tensor(test_qnn_copy.bit_circuit),
+        tfq.from_tensor(test_qnn.bit_circuit))
     self.assertEqual(
-        tfq.from_tensor(test_oe_copy.resolved_u),
-        tfq.from_tensor(test_oe.resolved_u))
+        tfq.from_tensor(test_qnn_copy.resolved_u),
+        tfq.from_tensor(test_qnn.resolved_u))
     self.assertEqual(
-        tfq.from_tensor(test_oe_copy.resolved_u_dagger),
-        tfq.from_tensor(test_oe.resolved_u_dagger))
+        tfq.from_tensor(test_qnn_copy.resolved_u_dagger),
+        tfq.from_tensor(test_qnn.resolved_u_dagger))
 
-  def test_ensemble(self):
+  def test_circuits(self):
     """Confirms bitstring injectors are prepended to u."""
     bitstrings = 2 * list(itertools.product([0, 1], repeat=self.num_bits))
-    test_oe = qnn.QNN(
+    test_qnn = qnn.QNN(
         self.u,
         self.raw_phis_symbols,
         self.initial_phis,
         self.name,
     )
-    test_ensemble = test_oe.ensemble(tf.constant(bitstrings, dtype=tf.int8))
-    test_ensemble_deser = tfq.from_tensor(test_ensemble)
+    test_circuits = test_qnn.circuits(tf.constant(bitstrings, dtype=tf.int8))
+    test_circuits_deser = tfq.from_tensor(test_circuits)
 
-    resolved_u = tfq.from_tensor(test_oe.resolved_u)[0]
+    resolved_u = tfq.from_tensor(test_qnn.resolved_u)[0]
     bit_injectors = []
     for b in bitstrings:
       bit_injectors.append(
           cirq.Circuit(cirq.X(q)**b_i for q, b_i in zip(self.raw_qubits, b)))
     combined = [b + resolved_u for b in bit_injectors]
 
-    for expected, test in zip(combined, test_ensemble_deser):
+    for expected, test in zip(combined, test_circuits_deser):
       self.assertTrue(cirq.approx_eq(expected, test))
 
 

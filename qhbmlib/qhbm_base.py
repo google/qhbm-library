@@ -112,17 +112,17 @@ class QHBM(tf.Module):
     self.thetas = qnn.upgrade_initial_values(initial_thetas)
     self.energy_function = check_base_function(energy)
     self.sampler_function = check_base_function(sampler)
-    self.orth_ens = qnn.QNN(u, phis_symbols, initial_phis, name)
-    self.phis = self.orth_ens.phis
-    self.phis_symbols = self.orth_ens.phis_symbols
-    self.u = self.orth_ens.u
-    self.u_dagger = self.orth_ens.u_dagger
+    self.diagonalizing_op = qnn.QNN(u, phis_symbols, initial_phis, name)
+    self.phis = self.diagonalizing_op.phis
+    self.phis_symbols = self.diagonalizing_op.phis_symbols
+    self.u = self.diagonalizing_op.u
+    self.u_dagger = self.diagonalizing_op.u_dagger
 
-    self.raw_qubits = self.orth_ens.raw_qubits
-    self.qubits = self.orth_ens.qubits
-    self.bit_symbols = self.orth_ens.bit_symbols
-    self.bit_and_u = tfq.append_circuit(self.orth_ens.bit_circuit,
-                                        self.orth_ens.u)
+    self.raw_qubits = self.diagonalizing_op.raw_qubits
+    self.qubits = self.diagonalizing_op.qubits
+    self.bit_symbols = self.diagonalizing_op.bit_symbols
+    self.bit_and_u = tfq.append_circuit(self.diagonalizing_op.bit_circuit,
+                                        self.diagonalizing_op.u)
 
     # Simulator backends
     self.tfq_sample_layer = tfq.layers.Sample()
@@ -181,7 +181,7 @@ class QHBM(tf.Module):
 
   @tf.function
   def state_circuits(self, samples):
-    return self.orth_ens.ensemble(samples)
+    return self.diagonalizing_op.circuits(samples)
 
   @tf.function
   def sample_unresolved_state_circuits(self, num_samples):
