@@ -117,8 +117,7 @@ class QHBMTest(tf.test.TestCase):
     for q in raw_qubits:
       u += cirq.X(q)**s
   name = "TestQHBM"
-  raw_bit_circuit, raw_bit_symbols = qnn.build_bit_circuit(
-      raw_qubits, name)
+  raw_bit_circuit, raw_bit_symbols = qnn.build_bit_circuit(raw_qubits, name)
   bit_symbols = tf.constant([str(s) for s in raw_bit_symbols])
   bit_and_u = tfq.layers.AddCircuit()(raw_bit_circuit, append=u)
 

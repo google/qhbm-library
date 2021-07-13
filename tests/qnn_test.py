@@ -40,8 +40,7 @@ class BuildBitCircuitTest(tf.test.TestCase):
         cirq.GridQubit(2, 2)
     ]
     identifier = "build_bit_test"
-    test_circuit, test_symbols = qnn.build_bit_circuit(
-        my_qubits, identifier)
+    test_circuit, test_symbols = qnn.build_bit_circuit(my_qubits, identifier)
     expected_symbols = list(
         sympy.symbols(
             "_bit_build_bit_test_0 _bit_build_bit_test_1 _bit_build_bit_test_2")
@@ -62,17 +61,11 @@ class InputChecksTest(tf.test.TestCase):
     true_tensor = tf.constant(true_list, dtype=tf.float32)
     true_variable = tf.Variable(true_tensor)
     self.assertAllClose(
-        qnn.upgrade_initial_values(true_list),
-        true_variable,
-        atol=ATOL)
+        qnn.upgrade_initial_values(true_list), true_variable, atol=ATOL)
     self.assertAllClose(
-        qnn.upgrade_initial_values(true_tensor),
-        true_variable,
-        atol=ATOL)
+        qnn.upgrade_initial_values(true_tensor), true_variable, atol=ATOL)
     self.assertAllClose(
-        qnn.upgrade_initial_values(true_variable),
-        true_variable,
-        atol=ATOL)
+        qnn.upgrade_initial_values(true_variable), true_variable, atol=ATOL)
     # Check for bad inputs.
     with self.assertRaisesRegex(TypeError, "numeric type"):
       _ = qnn.upgrade_initial_values("junk")
@@ -85,16 +78,13 @@ class InputChecksTest(tf.test.TestCase):
     values = tf.constant([0 for _ in true_symbol_names])
     true_symbols = [sympy.Symbol(s) for s in true_symbol_names]
     true_symbols_t = tf.constant(true_symbol_names, dtype=tf.string)
-    self.assertAllEqual(
-        true_symbols_t,
-        qnn.upgrade_symbols(true_symbols, values))
+    self.assertAllEqual(true_symbols_t,
+                        qnn.upgrade_symbols(true_symbols, values))
     # Test bad inputs.
     with self.assertRaisesRegex(TypeError, "must be `sympy.Symbol`"):
-      _ = qnn.upgrade_symbols(true_symbols[:-1] + ["bad"],
-                                              values)
+      _ = qnn.upgrade_symbols(true_symbols[:-1] + ["bad"], values)
     with self.assertRaisesRegex(ValueError, "must be unique"):
-      _ = qnn.upgrade_symbols(
-          true_symbols[:-1] + true_symbols[:1], values)
+      _ = qnn.upgrade_symbols(true_symbols[:-1] + true_symbols[:1], values)
     with self.assertRaisesRegex(ValueError, "symbol for every value"):
       _ = qnn.upgrade_symbols(true_symbols, values[:-1])
     with self.assertRaisesRegex(TypeError, "must be an iterable"):
@@ -113,8 +103,7 @@ class InputChecksTest(tf.test.TestCase):
     true_circuit_t = tfq.convert_to_tensor([true_circuit])
     self.assertEqual(
         tfq.from_tensor(true_circuit_t),
-        tfq.from_tensor(
-            qnn.upgrade_circuit(true_circuit, true_symbols_t)),
+        tfq.from_tensor(qnn.upgrade_circuit(true_circuit, true_symbols_t)),
     )
     # Test bad inputs.
     with self.assertRaisesRegex(TypeError, "must be a `cirq.Circuit`"):
@@ -124,11 +113,9 @@ class InputChecksTest(tf.test.TestCase):
     with self.assertRaisesRegex(TypeError, "dtype `tf.string`"):
       _ = qnn.upgrade_circuit(true_circuit, tf.constant([5.5]))
     with self.assertRaisesRegex(ValueError, "must contain"):
-      _ = qnn.upgrade_circuit(true_circuit,
-                                              tf.constant(["a", "junk"]))
+      _ = qnn.upgrade_circuit(true_circuit, tf.constant(["a", "junk"]))
     with self.assertRaisesRegex(ValueError, "Empty circuit"):
-      _ = qnn.upgrade_circuit(cirq.Circuit(),
-                                              tf.constant([], dtype=tf.string))
+      _ = qnn.upgrade_circuit(cirq.Circuit(), tf.constant([], dtype=tf.string))
 
 
 class QNNTest(tf.test.TestCase):
@@ -147,8 +134,7 @@ class QNNTest(tf.test.TestCase):
   u_tfq = tfq.convert_to_tensor([u])
   u_dagger_tfq = tfq.convert_to_tensor([u_dagger])
   name = "TestOE"
-  raw_bit_circuit, raw_bit_symbols = qnn.build_bit_circuit(
-      raw_qubits, name)
+  raw_bit_circuit, raw_bit_symbols = qnn.build_bit_circuit(raw_qubits, name)
   bit_symbols = tf.constant([str(s) for s in raw_bit_symbols])
   bit_circuit = tfq.convert_to_tensor([raw_bit_circuit])
 
