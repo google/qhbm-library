@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Module for defining and sampling from orthogonal ensembles."""
+"""Module for defining and sampling from orthogonal sets of QNNs."""
 
 import numbers
 from typing import Any, Callable, Iterable, List, Union
@@ -113,11 +113,11 @@ def upgrade_circuit(circuit: cirq.Circuit, symbols: tf.Tensor) -> tf.Tensor:
   return tfq.convert_to_tensor([circuit])
 
 
-class OrthogonalEnsemble:
+class QNN:
   """Operations on ensembles of orthogonal states indexed by bitstrings."""
 
   def __init__(self, circuit, symbols, symbols_initial_values, name):
-    """Initialize an OrthogonalEnsemble."""
+    """Initialize an QNN."""
     self.name = name
     self.phis = upgrade_initial_values(symbols_initial_values)
     self.phis_symbols = upgrade_symbols(symbols, self.phis)
@@ -132,7 +132,7 @@ class OrthogonalEnsemble:
     self.bit_circuit = upgrade_circuit(raw_bit_circuit, self.bit_symbols)
 
   def copy(self):
-    return OrthogonalEnsemble(
+    return QNN(
         tfq.from_tensor(self.u)[0],
         [sympy.Symbol(s.decode("utf-8")) for s in self.phis_symbols.numpy()],
         self.phis,

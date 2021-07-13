@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for the orthogonal_ensemble module."""
+"""Tests for the qnn module."""
 
 import itertools
 from absl import logging
@@ -23,7 +23,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 import tensorflow_quantum as tfq
 
-from qhbmlib import orthogonal_ensemble
+from qhbmlib import qnn
 
 # Global tolerance, set for float32.
 ATOL = 1e-5
@@ -40,7 +40,7 @@ class BuildBitCircuitTest(tf.test.TestCase):
         cirq.GridQubit(2, 2)
     ]
     identifier = "build_bit_test"
-    test_circuit, test_symbols = orthogonal_ensemble.build_bit_circuit(
+    test_circuit, test_symbols = qnn.build_bit_circuit(
         my_qubits, identifier)
     expected_symbols = list(
         sympy.symbols(
@@ -62,22 +62,22 @@ class InputChecksTest(tf.test.TestCase):
     true_tensor = tf.constant(true_list, dtype=tf.float32)
     true_variable = tf.Variable(true_tensor)
     self.assertAllClose(
-        orthogonal_ensemble.upgrade_initial_values(true_list),
+        qnn.upgrade_initial_values(true_list),
         true_variable,
         atol=ATOL)
     self.assertAllClose(
-        orthogonal_ensemble.upgrade_initial_values(true_tensor),
+        qnn.upgrade_initial_values(true_tensor),
         true_variable,
         atol=ATOL)
     self.assertAllClose(
-        orthogonal_ensemble.upgrade_initial_values(true_variable),
+        qnn.upgrade_initial_values(true_variable),
         true_variable,
         atol=ATOL)
     # Check for bad inputs.
     with self.assertRaisesRegex(TypeError, "numeric type"):
-      _ = orthogonal_ensemble.upgrade_initial_values("junk")
+      _ = qnn.upgrade_initial_values("junk")
     with self.assertRaisesRegex(ValueError, "must be 1D"):
-      _ = orthogonal_ensemble.upgrade_initial_values([[5.2]])
+      _ = qnn.upgrade_initial_values([[5.2]])
 
   def test_upgrade_symbols(self):
     """Confirms symbols are upgraded appropriately."""
@@ -87,18 +87,18 @@ class InputChecksTest(tf.test.TestCase):
     true_symbols_t = tf.constant(true_symbol_names, dtype=tf.string)
     self.assertAllEqual(
         true_symbols_t,
-        orthogonal_ensemble.upgrade_symbols(true_symbols, values))
+        qnn.upgrade_symbols(true_symbols, values))
     # Test bad inputs.
     with self.assertRaisesRegex(TypeError, "must be `sympy.Symbol`"):
-      _ = orthogonal_ensemble.upgrade_symbols(true_symbols[:-1] + ["bad"],
+      _ = qnn.upgrade_symbols(true_symbols[:-1] + ["bad"],
                                               values)
     with self.assertRaisesRegex(ValueError, "must be unique"):
-      _ = orthogonal_ensemble.upgrade_symbols(
+      _ = qnn.upgrade_symbols(
           true_symbols[:-1] + true_symbols[:1], values)
     with self.assertRaisesRegex(ValueError, "symbol for every value"):
-      _ = orthogonal_ensemble.upgrade_symbols(true_symbols, values[:-1])
+      _ = qnn.upgrade_symbols(true_symbols, values[:-1])
     with self.assertRaisesRegex(TypeError, "must be an iterable"):
-      _ = orthogonal_ensemble.upgrade_symbols(5, values)
+      _ = qnn.upgrade_symbols(5, values)
 
   def test_upgrade_circuit(self):
     """Confirms circuits are upgraded appropriately."""
@@ -114,25 +114,25 @@ class InputChecksTest(tf.test.TestCase):
     self.assertEqual(
         tfq.from_tensor(true_circuit_t),
         tfq.from_tensor(
-            orthogonal_ensemble.upgrade_circuit(true_circuit, true_symbols_t)),
+            qnn.upgrade_circuit(true_circuit, true_symbols_t)),
     )
     # Test bad inputs.
     with self.assertRaisesRegex(TypeError, "must be a `cirq.Circuit`"):
-      _ = orthogonal_ensemble.upgrade_circuit("junk", true_symbols_t)
+      _ = qnn.upgrade_circuit("junk", true_symbols_t)
     with self.assertRaisesRegex(TypeError, "must be a `tf.Tensor`"):
-      _ = orthogonal_ensemble.upgrade_circuit(true_circuit, true_symbol_names)
+      _ = qnn.upgrade_circuit(true_circuit, true_symbol_names)
     with self.assertRaisesRegex(TypeError, "dtype `tf.string`"):
-      _ = orthogonal_ensemble.upgrade_circuit(true_circuit, tf.constant([5.5]))
+      _ = qnn.upgrade_circuit(true_circuit, tf.constant([5.5]))
     with self.assertRaisesRegex(ValueError, "must contain"):
-      _ = orthogonal_ensemble.upgrade_circuit(true_circuit,
+      _ = qnn.upgrade_circuit(true_circuit,
                                               tf.constant(["a", "junk"]))
     with self.assertRaisesRegex(ValueError, "Empty circuit"):
-      _ = orthogonal_ensemble.upgrade_circuit(cirq.Circuit(),
+      _ = qnn.upgrade_circuit(cirq.Circuit(),
                                               tf.constant([], dtype=tf.string))
 
 
-class OrthogonalEnsembleTest(tf.test.TestCase):
-  """Tests the OrthogonalEnsemble class."""
+class QNNTest(tf.test.TestCase):
+  """Tests the QNN class."""
 
   num_bits = 5
   raw_phis_symbols = [sympy.Symbol("s0"), sympy.Symbol("s1")]
@@ -147,14 +147,14 @@ class OrthogonalEnsembleTest(tf.test.TestCase):
   u_tfq = tfq.convert_to_tensor([u])
   u_dagger_tfq = tfq.convert_to_tensor([u_dagger])
   name = "TestOE"
-  raw_bit_circuit, raw_bit_symbols = orthogonal_ensemble.build_bit_circuit(
+  raw_bit_circuit, raw_bit_symbols = qnn.build_bit_circuit(
       raw_qubits, name)
   bit_symbols = tf.constant([str(s) for s in raw_bit_symbols])
   bit_circuit = tfq.convert_to_tensor([raw_bit_circuit])
 
   def test_init(self):
-    """Confirms OrthogonalEnsemble is initialized correctly."""
-    test_oe = orthogonal_ensemble.OrthogonalEnsemble(
+    """Confirms QNN is initialized correctly."""
+    test_oe = qnn.QNN(
         self.u,
         self.raw_phis_symbols,
         self.initial_phis,
@@ -188,8 +188,8 @@ class OrthogonalEnsembleTest(tf.test.TestCase):
                                    tf.expand_dims(self.initial_phis, 0))))
 
   def test_copy(self):
-    """Confirms copied OrthogonalEnsemble has correct attributes."""
-    test_oe = orthogonal_ensemble.OrthogonalEnsemble(
+    """Confirms copied QNN has correct attributes."""
+    test_oe = qnn.QNN(
         self.u,
         self.raw_phis_symbols,
         self.initial_phis,
@@ -222,7 +222,7 @@ class OrthogonalEnsembleTest(tf.test.TestCase):
   def test_ensemble(self):
     """Confirms bitstring injectors are prepended to u."""
     bitstrings = 2 * list(itertools.product([0, 1], repeat=self.num_bits))
-    test_oe = orthogonal_ensemble.OrthogonalEnsemble(
+    test_oe = qnn.QNN(
         self.u,
         self.raw_phis_symbols,
         self.initial_phis,
@@ -243,5 +243,5 @@ class OrthogonalEnsembleTest(tf.test.TestCase):
 
 
 if __name__ == "__main__":
-  logging.info("Running orthogonal_ensemble_test.py ...")
+  logging.info("Running qnn_test.py ...")
   tf.test.main()

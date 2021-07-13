@@ -25,7 +25,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 import tensorflow_quantum as tfq
 
-from qhbmlib import orthogonal_ensemble
+from qhbmlib import qnn
 
 
 @tf.function
@@ -109,10 +109,10 @@ class QHBM(tf.Module):
     if not isinstance(name, str):
       raise TypeError("name must be a string")
     super().__init__(name)
-    self.thetas = orthogonal_ensemble.upgrade_initial_values(initial_thetas)
+    self.thetas = qnn.upgrade_initial_values(initial_thetas)
     self.energy_function = check_base_function(energy)
     self.sampler_function = check_base_function(sampler)
-    self.orth_ens = orthogonal_ensemble.OrthogonalEnsemble(
+    self.orth_ens = qnn.QNN(
         u, phis_symbols, initial_phis, name)
     self.phis = self.orth_ens.phis
     self.phis_symbols = self.orth_ens.phis_symbols

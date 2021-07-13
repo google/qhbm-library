@@ -20,8 +20,8 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 import tensorflow_quantum as tfq
 
-from qhbmlib import orthogonal_ensemble
 from qhbmlib import qhbm_base
+from qhbmlib import qnn
 from tests import test_util
 
 # Global tolerance, set for float32.
@@ -117,7 +117,7 @@ class QHBMTest(tf.test.TestCase):
     for q in raw_qubits:
       u += cirq.X(q)**s
   name = "TestQHBM"
-  raw_bit_circuit, raw_bit_symbols = orthogonal_ensemble.build_bit_circuit(
+  raw_bit_circuit, raw_bit_symbols = qnn.build_bit_circuit(
       raw_qubits, name)
   bit_symbols = tf.constant([str(s) for s in raw_bit_symbols])
   bit_and_u = tfq.layers.AddCircuit()(raw_bit_circuit, append=u)
