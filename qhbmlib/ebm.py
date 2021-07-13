@@ -739,6 +739,7 @@ class EnergyFunction(abc.ABC):
       `tf.tensor` dtype `tf.float32` which is the energy of `bitstring`.
     """
 
+
 class FFN(EnergyFunction):
 
   def __init__(self, num_bits, units, activations):
@@ -752,7 +753,7 @@ class FFN(EnergyFunction):
   @property
   def bitwidth(self):
     return self._num_bits
-    
+
   @property
   def thetas(self):
     return self.model.trainable_variables
