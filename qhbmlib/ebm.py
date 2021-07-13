@@ -779,7 +779,7 @@ class AnalyticEBM(EBM):
     """
 
     
-class GeneralAnalyticEBM(EBM):
+class GeneralAnalyticEBM(AnalyticEBM):
   
   def __init__(self, energy: EnergyFunction):
     self.energy_function = energy
@@ -813,3 +813,30 @@ class GeneralAnalyticEBM(EBM):
     return dist.entropy()
 
 
+class Bernoulli(AnalyticEBM):
+  def __init__(self, num_bits, initializer, analytic=False):
+    self._num_bits = num_bits
+    self._thetas = tf.Variable(initializer([num_bits]))
+
+  @property
+  def bitwidth(self):
+    return self._num_bits
+
+  @property
+  def thetas(self):
+    return self._thetas
+
+  def energy(self, bitstrings):
+    dist = tfp.distributions.Bernoulli(logits=2 * self.thetas, dtype=tf.int8)
+    return -1 * tf.reduce_sum(dist.log_prob(bitstrings), -1)
+
+  def sample(self, num_samples):
+    dist = tfp.distributions.Bernoulli(logits=2 * self.thetas, dtype=tf.int8)
+    return dist.sample(num_samples)
+
+  def log_partition_function(self):
+    return tf.constant(0.0)
+
+  def entropy(self):
+    dist = tfp.distributions.Bernoulli(logits=2 * self.thetas, dtype=tf.int8)
+    return tf.reduce_sum(dist.entropy())
