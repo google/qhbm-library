@@ -739,6 +739,27 @@ class EnergyFunction(abc.ABC):
       `tf.tensor` dtype `tf.float32` which is the energy of `bitstring`.
     """
 
+class FFN(EnergyFunction):
+
+  def __init__(self, num_bits, units, activations):
+    self._num_bits = num_bits
+    layers = [tf.keras.layers.InputLayer([num_bits])] + [
+        tf.keras.layers.Dense(u, activation=a)
+        for u, a in zip(units, activations)
+    ] + [tf.keras.layers.Dense(1)]
+    self.model = tf.keras.Sequential(layers)
+
+  @property
+  def bitwidth(self):
+    return self._num_bits
+    
+  @property
+  def thetas(self):
+    return self.model.trainable_variables
+
+  def energy(self, bitstrings):
+    return tf.squeeze(self.model(bitstrings), -1)
+
 
 class EBM(EnergyFunction):
   """Class for defining sampling routines for EBMs."""
