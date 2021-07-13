@@ -20,7 +20,7 @@ if [ "$retval" == 0 ]
 then
   echo "Success: library files are formatted correctly."
 else
-  echo "Please run `poetry run yapf --in-place --recursive qhbmlib/` and try again."
+  echo "Failure: please run `poetry run yapf --in-place --recursive qhbmlib/` and try again."
   exit 1
 fi
 poetry run yapf --diff --recursive tests/
@@ -29,6 +29,6 @@ if [ "$retval" == 0 ]
 then
   echo "Success: test files are formatted correctly."
 else
-  echo "Please run `poetry run yapf --in-place --recursive tests/` and try again."
+  echo "Failure: please run `poetry run yapf --in-place --recursive tests/` and try again."
   exit 1
 fi
