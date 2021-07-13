@@ -742,7 +742,7 @@ class EnergyFunction(abc.ABC):
 
 class EBM(EnergyFunction):
   """Class for defining sampling routines for EBMs."""
-  
+
   @abc.abstractmethod
   def sample(self, n_samples):
     """Returns bitstring samples from this EBM.
@@ -758,6 +758,7 @@ class EBM(EnergyFunction):
         number of times `unique_samples[i]` was sampled. `sum(counts)` is
         equal to `n_samples`.
     """
+
 
 class AnalyticEBM(EBM):
   """Extends EBM to include calculations requiring the normalizing constant."""
@@ -778,13 +779,13 @@ class AnalyticEBM(EBM):
       Scalar tensor of dtype `tf.float32`.
     """
 
-    
+
 class GeneralAnalyticEBM(AnalyticEBM):
-  
+
   def __init__(self, energy: EnergyFunction):
     self.energy_function = energy
     self.all_bitstrings = tf.constant(
-          list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
+        list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
 
   @property
   def bitwidth(self):
@@ -800,7 +801,7 @@ class GeneralAnalyticEBM(AnalyticEBM):
   def sample(self):
     all_energies = self.energy(self.all_bitstrings)
     dist = tfp.distributions.Categorical(
-      logits=-1 * all_energies, dtype=tf.int8)
+        logits=-1 * all_energies, dtype=tf.int8)
     return tf.gather(self.all_bitstrings, dist.sample(num_samples))
 
   def log_partition_function(self):
@@ -814,6 +815,7 @@ class GeneralAnalyticEBM(AnalyticEBM):
 
 
 class Bernoulli(AnalyticEBM):
+
   def __init__(self, num_bits, initializer, analytic=False):
     self._num_bits = num_bits
     self._thetas = tf.Variable(initializer([num_bits]))
