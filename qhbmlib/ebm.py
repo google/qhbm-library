@@ -711,12 +711,12 @@ class MCMCSampler:
 
 
 # ============================================================================ #
-# General discrete EBM classes.
+# EBM base classes.
 # ============================================================================ #
 
 
 class EnergyFunction(abc.ABC):
-  """Class for working with discrete energy based models."""
+  """Class for working with parameterized functions defined over bitstrings."""
 
   @property
   @abc.abstractmethod
@@ -738,6 +738,80 @@ class EnergyFunction(abc.ABC):
     Returns:
       `tf.tensor` dtype `tf.float32` which is the energy of `bitstring`.
     """
+
+  def operators(self, qubits):
+    raise NotImplementedError
+
+
+class Sampler(abc.ABC):
+
+  @abc.abstractmethod
+  def sample(self, n_samples):
+    """Returns bitstring samples from this EBM.
+
+    Args:
+      n_samples: Number of samples to draw from the distribution.
+    
+    Returns:
+      unique_samples: 2D tensor of dtype `tf.int8` whose entries are
+        bits. For each `i`, `unique_samples[i]` is some bitstring which
+        was sampled from this EBM, and each `unique_samples[i]` is unique.
+      counts: 1D tensor of dtype `tf.int32` such that `counts[i]` is the
+        number of times `unique_samples[i]` was sampled. `sum(counts)` is
+        equal to `n_samples`.
+    """
+
+
+class EBM:
+  """Class combining energy functions and samplers."""
+
+  def __init__(self, energy_function: EnergyFunction, sampler: Sampler):
+    self.energy_function = energy_function
+    self.sampler = sampler
+
+  def bitwidth(self):
+    self.energy_function.bitwidth
+
+  def thetas(self):
+    self.energy_function.thetas
+
+  def energy(self, bitstrings):
+    self.energy_function.energy(bitstrings)
+
+  def sample(self, n_samples):
+    self.sampler.sample(n_samples)
+
+  def operators(self, qubits):
+    self.energy_function.operators(qubits)
+
+
+class AnalyticEBM(EBM):
+
+  def __init__(self, energy_function: EnergyFunction, sampler: Sampler):
+    super().__init__(energy_function, sampler)
+    self.all_bitstrings = tf.constant(
+        list(itertools.product([0, 1], repeat=energy_function.bitwidth)),
+        dtype=tf.int8)
+
+  def sample(self):
+    all_energies = self.energy(self.all_bitstrings)
+    dist = tfp.distributions.Categorical(
+        logits=-1 * all_energies, dtype=tf.int8)
+    return tf.gather(self.all_bitstrings, dist.sample(num_samples))
+
+  def log_partition_function(self):
+    all_energies = self.energy(self.all_bitstrings)
+    return tf.reduce_logsumexp(-1 * all_energies)
+
+  def entropy_function(self):
+    all_energies = self.energy(self.all_bitstrings)
+    dist = tfp.distributions.Categorical(logits=-1 * all_energies)
+    return dist.entropy()
+
+
+# ============================================================================ #
+# Energy functions.
+# ============================================================================ #
 
 
 class FFN(EnergyFunction):
@@ -762,78 +836,43 @@ class FFN(EnergyFunction):
     return tf.squeeze(self.model(bitstrings), -1)
 
 
-class EBM(EnergyFunction):
-  """Class for defining sampling routines for EBMs."""
+class HOBE(EnergyFunction):
 
-  @abc.abstractmethod
-  def sample(self, n_samples):
-    """Returns bitstring samples from this EBM.
-
-    Args:
-      n_samples: Number of samples to draw from the distribution.
-    
-    Returns:
-      unique_samples: 2D tensor of dtype `tf.int8` whose entries are
-        bits. For each `i`, `unique_samples[i]` is some bitstring which
-        was sampled from this EBM, and each `unique_samples[i]` is unique.
-      counts: 1D tensor of dtype `tf.int32` such that `counts[i]` is the
-        number of times `unique_samples[i]` was sampled. `sum(counts)` is
-        equal to `n_samples`.
-    """
-
-
-class AnalyticEBM(EBM):
-  """Extends EBM to include calculations requiring the normalizing constant."""
-
-  @abc.abstractmethod
-  def log_partition_function(self):
-    """Returns the logarithm of the partition function of this EBM.
-    
-    Returns:
-      Scalar tensor of dtype `tf.float32`.
-    """
-
-  @abc.abstractmethod
-  def entropy_function(self):
-    """Returns the entropy of this EBM.
-    
-    Returns:
-      Scalar tensor of dtype `tf.float32`.
-    """
-
-
-class GeneralAnalyticEBM(AnalyticEBM):
-
-  def __init__(self, energy: EnergyFunction):
-    self.energy_function = energy
-    self.all_bitstrings = tf.constant(
-        list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
+  def __init__(self, num_bits, order, initializer):
+    self._num_bits = num_bits
+    self.order = order
+    self.indices = []
+    for i in range(1, order + 1):
+      combos = itertools.combinations(range(order), i)
+      self.indices.extend([tf.constant(c) for c in combos])
+    self._thetas = tf.Variable(initializer([len(self.indices)]))
 
   @property
   def bitwidth(self):
-    return self.energy.bitwidth
+    return self._thetas
 
   @property
   def thetas(self):
-    return self.energy.thetas
+    return self._thetas
 
-  def energy(self, bitstring):
-    return self.energy.energy
+  @tf.function
+  def energy(self, bitstrings):
+    spins = 1 - 2 * bitstrings
+    parities_t = tf.zeros(
+        [len(self.indices), tf.shape(bitstrings)[0]], dtype=tf.float32)
+    for i in range(len(self.indices)):
+      parity = tf.reduce_prod(tf.gather(spins, self.indices[i], axis=-1), -1)
+      parities_t = tf.tensor_scatter_nd_update(parities_t, [[i]], [parity])
+    return tf.reduce_sum(tf.transpose(parities_t) * self.thetas, -1)
 
-  def sample(self):
-    all_energies = self.energy(self.all_bitstrings)
-    dist = tfp.distributions.Categorical(
-        logits=-1 * all_energies, dtype=tf.int8)
-    return tf.gather(self.all_bitstrings, dist.sample(num_samples))
-
-  def log_partition_function(self):
-    all_energies = self.energy(self.all_bitstrings)
-    return tf.reduce_logsumexp(-1 * all_energies)
-
-  def entropy_function(self):
-    all_energies = self.energy(self.all_bitstrings)
-    dist = tfp.distributions.Categorical(logits=-1 * all_energies)
-    return dist.entropy()
+  def operators(self, qubits):
+    operators = []
+    for i in range(len(self.indices)):
+      operators.append(
+          cirq.PauliString(
+              cirq.Z(qubits[self.indices[i][j]])
+              for j in range(len(self.indices[i]))))
+    return operators
 
 
 class Bernoulli(AnalyticEBM):
