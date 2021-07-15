@@ -16,5 +16,5 @@
 
 poetry run yapf --in-place --recursive qhbmlib/
 poetry run yapf --in-place --recursive tests/
-./scripts/check_lint.sh
+# ./scripts/check_lint.sh <-- add back in during #44
 poetry run pytest --cov .
