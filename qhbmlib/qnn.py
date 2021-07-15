@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Module for defining and sampling from orthogonal ensembles."""
+"""Module for defining and sampling from orthogonal sets of QNNs."""
 
 import numbers
 from typing import Any, Callable, Iterable, List, Union
@@ -113,11 +113,11 @@ def upgrade_circuit(circuit: cirq.Circuit, symbols: tf.Tensor) -> tf.Tensor:
   return tfq.convert_to_tensor([circuit])
 
 
-class OrthogonalEnsemble:
-  """Operations on ensembles of orthogonal states indexed by bitstrings."""
+class QNN:
+  """Operations on parameterized unitaries with bitstring inputs."""
 
   def __init__(self, circuit, symbols, symbols_initial_values, name):
-    """Initialize an OrthogonalEnsemble."""
+    """Initialize a QNN."""
     self.name = name
     self.phis = upgrade_initial_values(symbols_initial_values)
     self.phis_symbols = upgrade_symbols(symbols, self.phis)
@@ -131,31 +131,49 @@ class OrthogonalEnsemble:
                                        tf.ones([len(self.raw_qubits)]))
     self.bit_circuit = upgrade_circuit(raw_bit_circuit, self.bit_symbols)
 
-  def ensemble(self, bitstrings):
-    """Returns the current concrete circuits for this orthogonal ensemble.
+  def copy(self):
+    return QNN(
+        tfq.from_tensor(self.u)[0],
+        [sympy.Symbol(s.decode("utf-8")) for s in self.phis_symbols.numpy()],
+        self.phis,
+        self.name,
+    )
+
+  @property
+  def resolved_u(self):
+    """Returns the diagonalizing unitary with current phis resolved."""
+    return tfq.resolve_parameters(self.u, self.phis_symbols,
+                                  tf.expand_dims(self.phis, 0))
+
+  @property
+  def resolved_u_dagger(self):
+    """Returns the diagonalizing adjoint unitary with current phis resolved."""
+    return tfq.resolve_parameters(self.u_dagger, self.phis_symbols,
+                                  tf.expand_dims(self.phis, 0))
+
+  def circuits(self, bitstrings):
+    """Returns the current concrete circuits for this QNN given bitstrings.
 
       Args:
         bitstrings: 2D tensor of dtype `tf.int8` whose entries are bits. These
-          specify the labels of the states to use in the ensemble.
+          specify the state inputs to use in the returned set of circuits.
 
       Returns:
-        1D tensor of strings which represent the current ensemble circuits.
+        1D tensor of strings which represent the current QNN circuits.
       """
     num_labels = tf.shape(bitstrings)[0]
     tiled_bit_injectors = tf.tile(self.bit_circuit, [num_labels])
     bit_circuits = tfq.resolve_parameters(tiled_bit_injectors, self.bit_symbols,
                                           tf.cast(bitstrings, tf.float32))
-    u_concrete = tfq.resolve_parameters(self.u, self.phis_symbols,
-                                        tf.expand_dims(self.phis, 0))
-    tiled_u_concrete = tf.tile(u_concrete, [num_labels])
+    tiled_u_concrete = tf.tile(self.resolved_u, [num_labels])
     return tfq.append_circuit(bit_circuits, tiled_u_concrete)
 
   def sample(self, bitstrings, counts):
-    """Returns bitstring samples from the ensemble.
+    """Returns bitstring samples from the QNN.
 
       Args:
         bitstrings: 2D tensor of dtype `tf.int8` whose entries are bits. These
-          specify the labels of the states to use in the ensemble.
+          specify the state inputs to the unitary of this QNN.
         counts: 1D tensor of dtype `tf.int32` such that `counts[i]` is the
           number of samples to draw from `self.u|bitstrings[i]>`.
 
@@ -167,7 +185,7 @@ class OrthogonalEnsemble:
     raise NotImplementedError
 
   def measure(self, bitstrings, observables):
-    """Returns the expectation values of the observables against the ensemble.
+    """Returns the expectation values of the observables against the QNN.
 
       Args:
         bitstrings: 2D tensor of dtype `tf.int8` whose entries are bits.

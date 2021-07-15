@@ -25,16 +25,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 import tensorflow_quantum as tfq
 
-
-def build_bit_circuit(qubits, ident):
-  """Returns exponentiated X gate on each qubit and the exponent symbols."""
-  circuit = cirq.Circuit()
-  symbols = []
-  for n, q in enumerate(qubits):
-    new_bit = sympy.Symbol("_bit_{0}_{1}".format(ident, n))
-    circuit += cirq.X(q)**new_bit
-    symbols.append(new_bit)
-  return circuit, symbols
+from qhbmlib import qnn
 
 
 @tf.function
@@ -89,29 +80,6 @@ def unique_with_counts(input_bitstrings, out_idx=tf.int32):
   return y, idx, count
 
 
-def upgrade_initial_values(
-    initial_values: Union[List[numbers.Real], tf.Tensor, tf.Variable]
-) -> tf.Variable:
-  """Upgrades the given values to a tf.Variable.
-
-    Args:
-      initial_values: Numeric values to upgrade.
-
-    Returns:
-      The input values upgraded to a fresh `tf.Variable` of dtype `tf.float32`.
-    """
-  if isinstance(initial_values, tf.Variable):
-    initial_values = initial_values.read_value()
-  if isinstance(initial_values, (List, tf.Tensor)):
-    initial_values = tf.Variable(
-        tf.cast(initial_values, tf.float32), dtype=tf.float32)
-    if len(tf.shape(initial_values)) != 1:
-      raise ValueError("Values for QHBMs must be 1D.")
-    return initial_values
-  raise TypeError(
-      f"Input needs to be a numeric type, got {type(initial_values)}")
-
-
 def check_base_function(
     fn: Callable[[tf.Tensor, tf.Tensor], Any]
 ) -> Callable[[tf.Tensor, tf.Tensor], Any]:
@@ -132,62 +100,6 @@ def check_base_function(
   return fn
 
 
-def upgrade_symbols(
-    symbols: Union[Iterable[sympy.Symbol], tf.Tensor],
-    values: Union[tf.Tensor, tf.Variable],
-) -> tf.Tensor:
-  """Upgrades symbols and checks for correct shape.
-
-    For a QHBM, there must be a value associated with each symbol.  So this
-    function checks that the shape of `values` is the same as that of `symbols`.
-
-    Args:
-      symbols: Iterable of `sympy.Symbol`s to upgrade.
-      values: Values corresponding to the symbols.
-
-    Returns:
-      `tf.Tensor` containing the string representations of the input `symbols`.
-    """
-  if isinstance(symbols, Iterable):
-    if not all([isinstance(s, sympy.Symbol) for s in symbols]):
-      raise TypeError("Each entry of `symbols` must be `sympy.Symbol`.")
-    symbols_partial_upgrade = [str(s) for s in symbols]
-    if len(set(symbols_partial_upgrade)) != len(symbols):
-      raise ValueError("All entries of `symbols` must be unique.")
-    symbols_upgrade = tf.constant(symbols_partial_upgrade, dtype=tf.string)
-    if tf.shape(symbols_upgrade) != tf.shape(values):
-      raise ValueError("There must be a symbol for every value.")
-    return symbols_upgrade
-  raise TypeError("`symbols` must be an iterable of `sympy.Symbol`s.")
-
-
-def upgrade_circuit(circuit: cirq.Circuit, symbols: tf.Tensor) -> tf.Tensor:
-  """Upgrades a circuit and confirms all symbols are present.
-
-    Args:
-      circuit: Circuit to convert to tensor.
-      symbols: Tensor of strings which are the symbols in `circuit`.
-
-    Returns:
-      Single entry 1D tensor of strings representing the input `circuit`.
-    """
-  if not isinstance(circuit, cirq.Circuit):
-    raise TypeError(f"`circuit` must be a `cirq.Circuit`, got {type(circuit)}")
-  if not isinstance(symbols, tf.Tensor):
-    raise TypeError("`symbols` must be a `tf.Tensor`")
-  if symbols.dtype != tf.string:
-    raise TypeError("`symbols` must have dtype `tf.string`")
-  if set(tfq.util.get_circuit_symbols(circuit)) != {
-      s.decode("utf-8") for s in symbols.numpy()
-  }:
-    raise ValueError(
-        "`circuit` must contain all and only the parameters in `symbols`.")
-  if not circuit:
-    raise ValueError("Empty circuit not allowed. "
-                     "Instead, use identities on all unused qubits.")
-  return tfq.convert_to_tensor([circuit])
-
-
 class QHBM(tf.Module):
   """Class for working with QHBM models in TFQ."""
 
@@ -197,20 +109,20 @@ class QHBM(tf.Module):
     if not isinstance(name, str):
       raise TypeError("name must be a string")
     super().__init__(name)
-    self.thetas = upgrade_initial_values(initial_thetas)
+    self.thetas = qnn.upgrade_initial_values(initial_thetas)
     self.energy_function = check_base_function(energy)
     self.sampler_function = check_base_function(sampler)
-    self.phis = upgrade_initial_values(initial_phis)
-    self.phis_symbols = upgrade_symbols(phis_symbols, self.phis)
-    self.u = upgrade_circuit(u, self.phis_symbols)
-    self.u_dagger = upgrade_circuit(u**-1, self.phis_symbols)
+    self.diagonalizing_op = qnn.QNN(u, phis_symbols, initial_phis, name)
+    self.phis = self.diagonalizing_op.phis
+    self.phis_symbols = self.diagonalizing_op.phis_symbols
+    self.u = self.diagonalizing_op.u
+    self.u_dagger = self.diagonalizing_op.u_dagger
 
-    self.raw_qubits = sorted(u.all_qubits())
-    self.qubits = tf.constant([[q.row, q.col] for q in self.raw_qubits])
-    raw_bit_circuit, raw_bit_symbols = build_bit_circuit(self.raw_qubits, name)
-    self.bit_symbols = upgrade_symbols(raw_bit_symbols,
-                                       tf.ones([len(self.raw_qubits)]))
-    self.bit_and_u = tfq.layers.AddCircuit()(raw_bit_circuit, append=u)
+    self.raw_qubits = self.diagonalizing_op.raw_qubits
+    self.qubits = self.diagonalizing_op.qubits
+    self.bit_symbols = self.diagonalizing_op.bit_symbols
+    self.bit_and_u = tfq.append_circuit(self.diagonalizing_op.bit_circuit,
+                                        self.diagonalizing_op.u)
 
     # Simulator backends
     self.tfq_sample_layer = tfq.layers.Sample()
@@ -269,13 +181,7 @@ class QHBM(tf.Module):
 
   @tf.function
   def state_circuits(self, samples):
-    print(f"retracing: state_circuits from {self.name}")
-    u_model_concrete = tfq.resolve_parameters(self.bit_and_u, self.phis_symbols,
-                                              tf.expand_dims(self.phis, 0))
-    tiled_u_model_concrete = tf.tile(u_model_concrete, [tf.shape(samples)[0]])
-    circuit_samples = tfq.resolve_parameters(tiled_u_model_concrete,
-                                             self.bit_symbols, samples)
-    return circuit_samples
+    return self.diagonalizing_op.circuits(samples)
 
   @tf.function
   def sample_unresolved_state_circuits(self, num_samples):
