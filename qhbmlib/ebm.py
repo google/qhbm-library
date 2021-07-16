@@ -17,6 +17,7 @@
 import abc
 import collections
 import itertools
+from absl import logging
 
 import cirq
 import tensorflow as tf
@@ -449,22 +450,26 @@ def probability_to_logit(probability):
   p = tf.cast(probability, tf.dtypes.float32)
   return tf.math.log(p) - tf.math.log(1 - p)
 
+
 @tf.function
 def logit_to_probability(logit_in):
   logging.info("retracing: logit_to_probability")
   logit = tf.cast(logit_in, tf.dtypes.float32)
   return tf.math.divide(tf.math.exp(logit), 1 + tf.math.exp(logit))
 
+
 def build_bernoulli(num_nodes, identifier):
 
   @tf.function
   def energy_bernoulli(logits, bitstring):
     """Calculate the energy of a bitstring against a product of Bernoullis.
+
     Args:
       logits: 1-D tf.Tensor of dtype float32 containing the logits for each
         Bernoulli factor.
       bitstring: 1-D tf.Tensor of dtype int8 of the form [x_0, ..., x_n-1]. Must
         be the same shape as thetas.
+
     Returns:
       energy: 0-D tf.Tensor of dtype float32 containing the
         energy of the bitstring calculated as
@@ -478,11 +483,13 @@ def build_bernoulli(num_nodes, identifier):
   @tf.function
   def sampler_bernoulli(thetas, num_samples):
     """Sample bitstrings from a product of Bernoullis.
+
     Args:
       thetas: 1 dimensional `tensor` of dtype `float32` containing the logits
         for each Bernoulli factor.
       bitstring: 1 dimensional `tensor` of dtype `int8` of the form [x_0, ...,
         x_n-1] so that x is a bitstring.
+
     Returns:
       bitstrings: `tensor` of dtype `int8` and shape [num_samples, bits]
         where bitstrings are sampled according to
@@ -501,9 +508,11 @@ def build_bernoulli(num_nodes, identifier):
   @tf.function
   def entropy_bernoulli(thetas):
     """Calculate the entropy of a product of Bernoullis.
+
     Args:
         thetas: 1 dimensional `tensor` of dtype `float32` containing the logits
           for each Bernoulli factor.
+
     Returns:
       entropy: 0 dimensional `tensor` of dtype `float32` containing the
         entropy (in nats) of the distribution.
@@ -515,6 +524,7 @@ def build_bernoulli(num_nodes, identifier):
 
   return (energy_bernoulli, sampler_bernoulli, log_partition_bernoulli,
           entropy_bernoulli, num_nodes)
+
 
 def build_boltzmann(num_nodes, identifier):
 
@@ -600,14 +610,17 @@ def build_boltzmann(num_nodes, identifier):
 
   return get_all_boltzmann_sub(num_nodes, identifier)
 
+
 # ============================================================================ #
 # K-local EBM tools.
 # ============================================================================ #
+
 
 @tf.function
 def bits_to_spins(x, n_bits):
   logging.info("retracing: bits_to_spins")
   return 1 - 2 * x
+
 
 def get_parity_index_list(n_bits, k):
   if k < 1:
@@ -616,6 +629,7 @@ def get_parity_index_list(n_bits, k):
     raise ValueError("The locality cannot be greater than the number of bits.")
   index_list = list(range(n_bits))
   return tf.constant(list(itertools.combinations(index_list, k)))
+
 
 def get_single_locality_parities(n_bits, k):
   indices = get_parity_index_list(n_bits, k)
@@ -627,6 +641,7 @@ def get_single_locality_parities(n_bits, k):
 
   return single_locality_parities
 
+
 def get_single_locality_operators(qubits, k):
   index_list = get_parity_index_list(len(qubits), k)
   op_list = []
@@ -637,12 +652,14 @@ def get_single_locality_operators(qubits, k):
     op_list.append(this_op)
   return op_list
 
+
 def get_all_operators(qubits, max_k):
   """Operators corresponding to `get_klocal_energy_function`"""
   op_list = []
   for k in range(1, max_k + 1):
     op_list += get_single_locality_operators(qubits, k)
   return op_list
+
 
 def get_all_parities(n_bits, max_k):
   func_list = []
@@ -656,11 +673,13 @@ def get_all_parities(n_bits, max_k):
 
   return all_parities
 
+
 def get_klocal_energy_function_num_values(n_bits, max_k):
   n_vals = 0
   for i in range(1, max_k + 1):
     n_vals += scipy.special.comb(n_bits, i, exact=True)
   return n_vals
+
 
 def get_klocal_energy_function(n_bits, max_k):
   all_parities = get_all_parities(n_bits, max_k)
@@ -675,12 +694,15 @@ def get_klocal_energy_function(n_bits, max_k):
 
   return klocal_energy_function
 
+
 # ============================================================================ #
 # Swish neural network tools.
 # ============================================================================ #
 
+
 def get_swish_net_hidden_width(num_bits):
   return num_bits + 1 + 2
+
 
 def get_initial_layer(num_bits):
   """Linear initial layer."""
@@ -696,6 +718,7 @@ def get_initial_layer(num_bits):
 
   return initial_layer
 
+
 def get_hidden_layer(num_bits, i):
   """Swish hidden unit."""
   w = get_swish_net_hidden_width(num_bits)
@@ -708,6 +731,7 @@ def get_hidden_layer(num_bits, i):
     return tf.nn.swish(tf.linalg.matvec(mat, x) + bias)
 
   return hidden_layer
+
 
 def get_final_layer(num_bits):
   """Linear final layer."""
@@ -723,6 +747,7 @@ def get_final_layer(num_bits):
 
   return final_layer
 
+
 def get_swish_num_values(num_bits, num_layers):
   h_w = get_swish_net_hidden_width(num_bits)
   n_init_params = num_bits * h_w + h_w
@@ -731,8 +756,10 @@ def get_swish_num_values(num_bits, num_layers):
   n_final_params = h_w + 1
   return n_init_params + n_hidden_params_total + n_final_params
 
+
 def get_swish_network(num_bits, num_layers):
   """Any function mapping [0,1]^n to R^m can be approximated by
+
   a Swish network with hidden layer width n+m+2.
   """
   h_w = get_swish_net_hidden_width(num_bits)
@@ -773,12 +800,15 @@ def get_swish_network(num_bits, num_layers):
 
   return swish_network
 
+
 # ============================================================================ #
 # Tools for analytic sampling from small energy functions.
 # ============================================================================ #
 
+
 def get_ebm_functions(num_bits, energy_function, ident):
   """Gets functions for exact calculations on energy based models over bits.
+
   Energy based models (EBMs) are defined by a parameterized energy function,
   E_theta(b), which maps bitstrings to real numbers.  This energy function
   corresponds to a probability distribution
@@ -789,6 +819,7 @@ def get_ebm_functions(num_bits, energy_function, ident):
       `tf.Tensor` of ints.  The floats are parameters of an energy calculation,
       and the ints are the bitstring whose energy is calculated.
     ident: Python `str` used to identify functions during tracing.
+
   Returns:
     sampler_function: function for getting samples from the EBM.
     log_partition_function: function to calculate the natural logarithm of the
@@ -809,11 +840,13 @@ def get_ebm_functions(num_bits, energy_function, ident):
   @tf.function
   def sampler_function(thetas, num_samples):
     """Samples from the EBM.
+
     Args:
       thetas: `tf.Tensor` of DType `tf.float32` which are the parameters of the
         EBM calculation.
       num_samples: Scalar `tf.Tensor` of DType `tf.int32` which is the number of
         samples to draw from the EBM.
+
     Returns:
       `tf.Tensor` of DType `tf.int8` of shape [num_samples, num_bits] which is
         a list of samples from the EBM.
@@ -827,9 +860,11 @@ def get_ebm_functions(num_bits, energy_function, ident):
   @tf.function
   def log_partition_function(thetas):
     """Calculates the logarithm of the partition function of the EBM.
+
     Args:
       thetas: `tf.Tensor` of DType `tf.float32` which are the parameters of the
         EBM calculation.
+
     Returns:
       Scalar `tf.Tensor` of DType `tf.float32` which is the logarithm of the
         partition function of the EBM.
@@ -841,9 +876,11 @@ def get_ebm_functions(num_bits, energy_function, ident):
   @tf.function
   def entropy_function(thetas):
     """Calculates the entropy of the EBM.
+
     Args:
       thetas: `tf.Tensor` of DType `tf.float32` which are the parameters of the
         EBM calculation.
+
     Returns:
       Scalar `tf.Tensor` of DType `tf.float32` which is the entropy of the EBM.
     """
@@ -853,12 +890,15 @@ def get_ebm_functions(num_bits, energy_function, ident):
 
   return sampler_function, log_partition_function, entropy_function
 
+
 # ============================================================================ #
 # Tools for MCMC sampling from arbitrary energy functions.
 # ============================================================================ #
 
+
 def get_batched_energy_function(energy_function):
   """Converts a given energy function that takes only a single bitstring as an
+
   argument to one which can accept batches of bitstrings.
   """
 
@@ -874,12 +914,15 @@ def get_batched_energy_function(energy_function):
 
   return batched_energy_function
 
+
 BernoulliProposalResults = collections.namedtuple(
     "BernoulliProposalResults",
     ["target_log_prob", "log_acceptance_correction"])
 
+
 class BernoulliProposal(tfp.mcmc.TransitionKernel):
   """Proposes the next bitstring by flipping the current bitstring according to
+
   a Bernoulli distribution.
   """
 
@@ -922,9 +965,11 @@ class BernoulliProposal(tfp.mcmc.TransitionKernel):
         log_acceptance_correction=tf.zeros_like(target_log_prob))
     return kernel_results
 
+
 GibbsWithGradientsProposalResults = collections.namedtuple(
     "GibbsWithGradientsProposalResults",
     ["target_log_prob", "log_acceptance_correction"])
+
 
 class GibbsWithGradientsProposal(tfp.mcmc.TransitionKernel):
   """Proposes the next bitstring using Gibbs with Gradients."""
@@ -1011,8 +1056,10 @@ class GibbsWithGradientsProposal(tfp.mcmc.TransitionKernel):
         log_acceptance_correction=tf.zeros_like(target_log_prob))
     return kernel_results
 
+
 class MetropolisHastingsMCMC(tfp.mcmc.MetropolisHastings):
   """Wrapper around tpc.mcmc.MetropolisHastings that sets the energy function
+
   parameters of the inner kernel's energy function.
   """
 
@@ -1022,6 +1069,7 @@ class MetropolisHastingsMCMC(tfp.mcmc.MetropolisHastings):
   def set_energy_function_params(self, energy_function_params):
     logging.info("retracing: set_energy_function_params")
     self.inner_kernel.set_energy_function_params(energy_function_params)
+
 
 class MCMCSampler:
   """Samples from an MCMC kernel."""
