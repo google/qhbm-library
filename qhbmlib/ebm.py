@@ -444,6 +444,7 @@ class Bernoulli(EBM):
 # =======================================================================
 # OLD
 
+
 @tf.function
 def probability_to_logit(probability):
   logging.info("retracing: probability_to_logit")
