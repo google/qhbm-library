@@ -130,6 +130,7 @@ class QNNTest(tf.test.TestCase):
   for s in raw_phis_symbols:
     for q in raw_qubits:
       u += cirq.X(q)**s
+      u += cirq.Z(q)**s
   u_dagger = u**-1
   u_tfq = tfq.convert_to_tensor([u])
   u_dagger_tfq = tfq.convert_to_tensor([u_dagger])
@@ -227,6 +228,55 @@ class QNNTest(tf.test.TestCase):
 
     for expected, test in zip(combined, test_circuits_deser):
       self.assertTrue(cirq.approx_eq(expected, test))
+
+  def test_circuits(self):
+    """Confirms bitstring injectors are prepended to u."""
+    bitstrings = 2 * list(itertools.product([0, 1], repeat=self.num_bits))
+    test_qnn = qnn.QNN(
+        self.u,
+        self.raw_phis_symbols,
+        self.initial_phis,
+        self.name,
+    )
+    test_circuits = test_qnn.circuits(tf.constant(bitstrings, dtype=tf.int8))
+    test_circuits_deser = tfq.from_tensor(test_circuits)
+
+    resolved_u = tfq.from_tensor(test_qnn.resolved_u)[0]
+    bit_injectors = []
+    for b in bitstrings:
+      bit_injectors.append(
+          cirq.Circuit(cirq.X(q)**b_i for q, b_i in zip(self.raw_qubits, b)))
+    combined = [b + resolved_u for b in bit_injectors]
+
+    for expected, test in zip(combined, test_circuits_deser):
+      self.assertTrue(cirq.approx_eq(expected, test))
+
+  def test_sample(self):
+    """Confirms approximately correct sampling from QNNs."""
+    assert False
+
+  def test_pulled_back_circuits(self):
+    """Confirms the pulled back circuits correct for a variety of inputs."""
+    num_data_states = 100
+    data_states, _ = tfq.util.random_circuit_resolver_batch(self.raw_qubits, num_data_states)
+    data_states_t = tfq.convert_to_tensor(data_states)
+    test_qnn = qnn.QNN(
+        self.u,
+        self.raw_phis_symbols,
+        self.initial_phis,
+        self.name,
+    )
+    test_circuits = test_qnn.pulled_back_circuits(data_states_t)
+    test_circuits_deser = tfq.from_tensor(test_circuits)
+
+    resolved_u_dagger = tfq.from_tensor(test_qnn.resolved_u_dagger)[0]
+    combined = [d + resolved_u_dagger for d in data_states]
+    for expected, test in zip(combined, test_circuits_deser):
+      self.assertTrue(cirq.approx_eq(expected, test))
+
+  def test_pulled_back_sample(self):
+    """Confirms samples from pulled back data are approximately correct."""
+    assert False
 
 
 if __name__ == "__main__":
