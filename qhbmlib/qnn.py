@@ -116,8 +116,20 @@ def upgrade_circuit(circuit: cirq.Circuit, symbols: tf.Tensor) -> tf.Tensor:
 class QNN:
   """Operations on parameterized unitaries with bitstring inputs."""
 
-  def __init__(self, circuit, symbols, symbols_initial_values, name):
-    """Initialize a QNN."""
+  def __init__(self, circuit: cirq.Circuit, symbols: Union[Iterable[sympy.Symbol], tf.Tensor], symbols_initial_values: Union[List[numbers.Real], tf.Tensor, tf.Variable], name: str, backend='noiseless'):
+    """Initialize a QNN.
+
+    Args:
+      circuit: Representation of a parameterized unitary.
+      symbols: All parameters of `circuit`.
+      symbols_initial_values: Real number for each entry of `symbols`, which are
+        the initial values of the parameters in `circuit`.
+      name: Identifier for this QNN.
+      backend: Optional Python `object` that specifies what backend TFQ will use
+        for operations involving this QNN. Options are {'noisy', 'noiseless'},
+        or however users may also specify a preconfigured cirq execution
+        object to use instead, which must inherit `cirq.Sampler`.
+    """
     self.name = name
     self.phis = upgrade_initial_values(symbols_initial_values)
     self.phis_symbols = upgrade_symbols(symbols, self.phis)
@@ -130,6 +142,7 @@ class QNN:
     self.bit_symbols = upgrade_symbols(raw_bit_symbols,
                                        tf.ones([len(self.raw_qubits)]))
     self.bit_circuit = upgrade_circuit(raw_bit_circuit, self.bit_symbols)
+    self._tfq_sample = tfq.layers.Sample(backend=backend)
 
   def copy(self):
     return QNN(
@@ -182,7 +195,18 @@ class QNN:
           that `ragged_samples[i]` contains `counts[i]` bitstrings drawn from
           `self.u|bitstrings[i]>`.
     """
-    raise NotImplementedError
+    current_circuits = self.circuits(bitstrings)
+    raw_samples = self._tfq_sample(
+        current_circuits,
+        symbol_names=tf.constant([], dtype=tf.string),
+        symbol_values=tf.tile(
+            tf.constant([[]], dtype=tf.float32), [tf.shape(circuits)[0], 1]),
+        repetitions=tf.expand_dims(tf.math.reduce_max(counts), 0),
+    )
+    num_samples_mask = tf.cast((tf.ragged.range(counts) + 1).to_tensor(),
+                               tf.bool)
+    ragged_samples = tf.ragged.boolean_mask(raw_samples, num_samples_mask)
+    return ragged_samples
 
   def measure(self, bitstrings, observables):
     """Returns the expectation values of the observables against the QNN.
@@ -199,28 +223,53 @@ class QNN:
       """
     raise NotImplementedError
 
-  def pulled_back_sample(self, circuits, counts):
-    """Returns samples from the pulled back data distribution.
-
-      The inputs represent the data density matrix. The inverse of `self.u`
-      is appended to create the set of circuits representing the
-      pulled back data density matrix. Then, the requested number of bitstrings
-      are sampled from each circuit.
+  def pulled_back_circuits(self, circuit_samples):
+    """Returns the pulled back circuits for this QNN given input quantum data.
 
       Args:
         circuit_samples: 1-D `tf.Tensor` of type `tf.string` which contains
           circuits serialized by `tfq.convert_to_tensor`. These represent pure
-          state samples from the data density matrix. Each entry should be
-          unique.
+          state samples from the data density matrix.
+
+      Returns:
+        1D tensor of strings which represent the pulled back circuits.
+      """
+    num_samples = tf.shape(circuit_samples)[0]
+    tiled_u_dagger_concrete = tf.tile(self.resolved_u_dagger, [num_samples])
+    return tfq.append_circuit(circuit_samples, tiled_u_dagger_concrete)
+
+  def pulled_back_sample(self, circuit_samples, counts):
+    """Returns samples from the pulled back data distribution.
+
+      The inputs represent the data density matrix. The inverse of `self.u`
+      is appended to create the set of circuits representing the pulled back
+      data density matrix. Then, the requested number of bitstrings are sampled
+      from each circuit.
+
+      Args:
+        circuit_samples: 1-D `tf.Tensor` of type `tf.string` which contains
+          circuits serialized by `tfq.convert_to_tensor`. These represent pure
+          state samples from the data density matrix.
         counts: 1-D `tf.Tensor` of type `tf.int32`, must be the same size as
           `circuit_samples`. Contains the number of samples to draw from each
-          inputcircuit.
+          input circuit.
 
       Returns:
         ragged_samples: `tf.RaggedTensor` of DType `tf.int8` structured such
             that `ragged_samples[i]` contains `counts[i]` bitstrings.
       """
-    raise NotImplementedError
+    current_circuits = self.pulled_back_circuits(circuit_samples)
+    raw_samples = self._tfq_sample(
+        current_circuits,
+        symbol_names=tf.constant([], dtype=tf.string),
+        symbol_values=tf.tile(
+            tf.constant([[]], dtype=tf.float32), [tf.shape(circuits)[0], 1]),
+        repetitions=tf.expand_dims(tf.math.reduce_max(counts), 0),
+    )
+    num_samples_mask = tf.cast((tf.ragged.range(counts) + 1).to_tensor(),
+                               tf.bool)
+    ragged_samples = tf.ragged.boolean_mask(raw_samples, num_samples_mask)
+    return ragged_samples
 
   def pulled_back_measure(self, circuits, counts, observables):
     """Returns the expectation values for a given pulled-back dataset."""
