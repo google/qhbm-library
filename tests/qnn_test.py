@@ -258,7 +258,8 @@ class QNNTest(tf.test.TestCase):
   def test_pulled_back_circuits(self):
     """Confirms the pulled back circuits correct for a variety of inputs."""
     num_data_states = 100
-    data_states, _ = tfq.util.random_circuit_resolver_batch(self.raw_qubits, num_data_states)
+    data_states, _ = tfq.util.random_circuit_resolver_batch(
+        self.raw_qubits, num_data_states)
     data_states_t = tfq.convert_to_tensor(data_states)
     test_qnn = qnn.QNN(
         self.u,

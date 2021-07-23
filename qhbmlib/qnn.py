@@ -116,7 +116,13 @@ def upgrade_circuit(circuit: cirq.Circuit, symbols: tf.Tensor) -> tf.Tensor:
 class QNN:
   """Operations on parameterized unitaries with bitstring inputs."""
 
-  def __init__(self, circuit: cirq.Circuit, symbols: Union[Iterable[sympy.Symbol], tf.Tensor], symbols_initial_values: Union[List[numbers.Real], tf.Tensor, tf.Variable], name: str, backend='noiseless'):
+  def __init__(self,
+               circuit: cirq.Circuit,
+               symbols: Union[Iterable[sympy.Symbol], tf.Tensor],
+               symbols_initial_values: Union[List[numbers.Real], tf.Tensor,
+                                             tf.Variable],
+               name: str,
+               backend='noiseless'):
     """Initialize a QNN.
 
     Args:
