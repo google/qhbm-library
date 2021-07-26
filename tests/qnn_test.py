@@ -296,6 +296,11 @@ class QNNTest(tf.test.TestCase):
         test_util.check_bitstring_exists(
             tf.constant([1] * self.num_bits, dtype=tf.int8), test_samples))
 
+  def test_measure(self):
+    """Confirms correct measurement."""
+    #TODO(zaqqwerty)
+    pass
+
   def test_pulled_back_circuits(self):
     """Confirms the pulled back circuits correct for a variety of inputs."""
     num_data_states = 100
@@ -355,6 +360,11 @@ class QNNTest(tf.test.TestCase):
         test_util.check_bitstring_exists(
             tf.constant([1, 1] + [0] * (self.num_bits - 2), dtype=tf.int8),
             test_samples[1].to_tensor()))
+
+  def test_pulled_back_measure(self):
+    """Confirms correct pulled back measurement."""
+    #TODO(zaqqwerty)
+    pass
 
 
 if __name__ == "__main__":

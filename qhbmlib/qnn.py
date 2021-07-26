@@ -184,16 +184,17 @@ class QNN:
     each expectation in `observables`.  Additionally, `counts[i]` sets the
     weight of `circuits[i]` in the expectation.
     """
-    prob_terms = tf.cast(counts, tf.float32) / tf.cast(tf.reduce_sum(counts), tf.float32)
+    prob_terms = tf.cast(counts, tf.float32) / tf.cast(
+        tf.reduce_sum(counts), tf.float32)
     num_circuits = tf.shape(counts)[0]
     tiled_observables = tf.tile(observables, [num_circuits, 1])
     bare_expectations = self._expectation_layer(
-      circuits,
-      symbol_names=tf.constant([], dtype=tf.string),
-      symbol_values=tf.tile(
-        tf.constant([[]], dtype=tf.float32), [num_circuits, 1]),
-      operators=tiled_observables,
-      repetitions=tf.expand_dims(counts, 1),
+        circuits,
+        symbol_names=tf.constant([], dtype=tf.string),
+        symbol_values=tf.tile(
+            tf.constant([[]], dtype=tf.float32), [num_circuits, 1]),
+        operators=tiled_observables,
+        repetitions=tf.expand_dims(counts, 1),
     )
     return tf.expand_dims(prob_terms, 1) * bare_expectations
 
@@ -202,15 +203,16 @@ class QNN:
 
     `counts[i]` sets the weight of `circuits[i]` in the expectation.
     """
-    prob_terms = tf.cast(counts, tf.float32) / tf.cast(tf.reduce_sum(counts), tf.float32)
+    prob_terms = tf.cast(counts, tf.float32) / tf.cast(
+        tf.reduce_sum(counts), tf.float32)
     num_circuits = tf.shape(counts)[0]
     tiled_observables = tf.tile(observables, [num_circuits, 1])
     bare_expectations = self._expectation_layer(
-      circuits,
-      symbol_names=tf.constant([], dtype=tf.string),
-      symbol_values=tf.tile(
-        tf.constant([[]], dtype=tf.float32), [num_circuits, 1]),
-      operators=tiled_observables,
+        circuits,
+        symbol_names=tf.constant([], dtype=tf.string),
+        symbol_values=tf.tile(
+            tf.constant([[]], dtype=tf.float32), [num_circuits, 1]),
+        operators=tiled_observables,
     )
     return tf.expand_dims(prob_terms, 1) * bare_expectations
 
@@ -276,7 +278,11 @@ class QNN:
         2-D tensor of floats which are the expectation values.
       """
     current_circuits = self.circuits(bitstrings)
-    return tf.cond(self.analytic, lambda: self._exact_expectation_function(circuits, counts, observables), lambda: self._sample_expectation_function(circuits, counts, observables))
+    return tf.cond(
+        self.analytic,
+        lambda: self._exact_expectation_function(circuits, counts, observables),
+        lambda: self._sample_expectation_function(circuits, counts, observables
+                                                 ))
 
   def pulled_back_circuits(self, circuit_samples):
     """Returns the pulled back circuits for this QNN given input quantum data.
@@ -335,4 +341,7 @@ class QNN:
         2-D tensor of floats which are the expectation values.
     """
     current_circuits = self.pulled_back_circuits(circuit_samples)
-    return tf.cond(self.analytic, lambda: self._exact_expectation_function(current_circuits, counts, observables), lambda: self._sample_expectation_function(current_circuits, counts, observables))
+    return tf.cond(
+        self.analytic, lambda: self._exact_expectation_function(
+            current_circuits, counts, observables), lambda: self.
+        _sample_expectation_function(current_circuits, counts, observables))
