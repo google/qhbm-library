@@ -206,7 +206,7 @@ class QNN:
         current_circuits,
         symbol_names=tf.constant([], dtype=tf.string),
         symbol_values=tf.tile(
-            tf.constant([[]], dtype=tf.float32), [tf.shape(circuits)[0], 1]),
+            tf.constant([[]], dtype=tf.float32), [tf.shape(counts)[0], 1]),
         repetitions=tf.expand_dims(tf.math.reduce_max(counts), 0),
     )
     num_samples_mask = tf.cast((tf.ragged.range(counts) + 1).to_tensor(),
@@ -269,7 +269,7 @@ class QNN:
         current_circuits,
         symbol_names=tf.constant([], dtype=tf.string),
         symbol_values=tf.tile(
-            tf.constant([[]], dtype=tf.float32), [tf.shape(circuits)[0], 1]),
+            tf.constant([[]], dtype=tf.float32), [tf.shape(counts)[0], 1]),
         repetitions=tf.expand_dims(tf.math.reduce_max(counts), 0),
     )
     num_samples_mask = tf.cast((tf.ragged.range(counts) + 1).to_tensor(),
