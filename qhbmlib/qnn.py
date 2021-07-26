@@ -148,7 +148,7 @@ class QNN:
     self.bit_symbols = upgrade_symbols(raw_bit_symbols,
                                        tf.ones([len(self.raw_qubits)]))
     self.bit_circuit = upgrade_circuit(raw_bit_circuit, self.bit_symbols)
-    self._tfq_sample = tfq.layers.Sample(backend=backend)
+    self._sample_layer = tfq.layers.Sample(backend=backend)
 
   def copy(self):
     return QNN(
@@ -157,6 +157,25 @@ class QNN:
         self.phis,
         self.name,
     )
+
+  def _sample_function(self, circuits, counts):
+    """General function for sampling from a set of circuits."""
+    raw_samples = self._sample_layer(
+        circuits,
+        symbol_names=tf.constant([], dtype=tf.string),
+        symbol_values=tf.tile(
+            tf.constant([[]], dtype=tf.float32), [tf.shape(counts)[0], 1]),
+        repetitions=tf.expand_dims(tf.math.reduce_max(counts), 0),
+    )
+    num_samples_mask = tf.cast((tf.ragged.range(counts) + 1).to_tensor(),
+                               tf.bool)
+    return tf.ragged.boolean_mask(raw_samples, num_samples_mask)
+
+  def _sampled_expectation_function(self, circuits, counts):
+    pass
+
+  def _exact_expectation_function(self, circuits, counts):
+    pass
 
   @property
   def resolved_u(self):
@@ -202,17 +221,7 @@ class QNN:
           `self.u|bitstrings[i]>`.
     """
     current_circuits = self.circuits(bitstrings)
-    raw_samples = self._tfq_sample(
-        current_circuits,
-        symbol_names=tf.constant([], dtype=tf.string),
-        symbol_values=tf.tile(
-            tf.constant([[]], dtype=tf.float32), [tf.shape(counts)[0], 1]),
-        repetitions=tf.expand_dims(tf.math.reduce_max(counts), 0),
-    )
-    num_samples_mask = tf.cast((tf.ragged.range(counts) + 1).to_tensor(),
-                               tf.bool)
-    ragged_samples = tf.ragged.boolean_mask(raw_samples, num_samples_mask)
-    return ragged_samples
+    return self._sample_function(current_circuits, counts)
 
   def measure(self, bitstrings, observables):
     """Returns the expectation values of the observables against the QNN.
@@ -265,17 +274,7 @@ class QNN:
             that `ragged_samples[i]` contains `counts[i]` bitstrings.
       """
     current_circuits = self.pulled_back_circuits(circuit_samples)
-    raw_samples = self._tfq_sample(
-        current_circuits,
-        symbol_names=tf.constant([], dtype=tf.string),
-        symbol_values=tf.tile(
-            tf.constant([[]], dtype=tf.float32), [tf.shape(counts)[0], 1]),
-        repetitions=tf.expand_dims(tf.math.reduce_max(counts), 0),
-    )
-    num_samples_mask = tf.cast((tf.ragged.range(counts) + 1).to_tensor(),
-                               tf.bool)
-    ragged_samples = tf.ragged.boolean_mask(raw_samples, num_samples_mask)
-    return ragged_samples
+    return self._sample_function(current_circuits, counts)
 
   def pulled_back_measure(self, circuits, counts, observables):
     """Returns the expectation values for a given pulled-back dataset."""
