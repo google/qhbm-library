@@ -218,4 +218,4 @@ def stable_classical_entropy(probs):
 def check_bitstring_exists(bitstring, bitstring_list):
   """True if `bitstring` is an entry of `bitstring_list`."""
   return tf.math.reduce_any(
-    tf.reduce_all(tf.math.equal(bitstring, bitstring_list), 1))
+      tf.reduce_all(tf.math.equal(bitstring, bitstring_list), 1))
