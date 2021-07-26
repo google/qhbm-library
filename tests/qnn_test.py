@@ -127,6 +127,7 @@ class QNNTest(tf.test.TestCase):
   phis_symbols = tf.constant([str(s) for s in raw_phis_symbols])
   initial_phis = tf.random.uniform([len(phis_symbols)], minval=-1.0)
   raw_qubits = cirq.GridQubit.rect(1, num_bits)
+  backend = None
   u = cirq.Circuit()
   for s in raw_phis_symbols:
     for q in raw_qubits:
@@ -147,10 +148,13 @@ class QNNTest(tf.test.TestCase):
         self.raw_phis_symbols,
         self.initial_phis,
         self.name,
+        self.backend,
     )
     self.assertEqual(self.name, test_qnn.name)
     self.assertAllClose(self.initial_phis, test_qnn.phis)
     self.assertAllEqual(self.phis_symbols, test_qnn.phis_symbols)
+    self.assertAllEqual(self.backend, test_qnn.backend)
+    self.assertAllEqual(True, test_qnn.analytic)
     self.assertAllEqual(
         tfq.from_tensor(self.u_tfq),
         tfq.from_tensor(test_qnn.u),
@@ -183,11 +187,14 @@ class QNNTest(tf.test.TestCase):
         self.raw_phis_symbols,
         self.initial_phis,
         self.name,
+        self.backend,
     )
     test_qnn_copy = test_qnn.copy()
     self.assertEqual(test_qnn_copy.name, test_qnn.name)
     self.assertAllClose(test_qnn_copy.phis, test_qnn.phis)
     self.assertAllEqual(test_qnn_copy.phis_symbols, test_qnn.phis_symbols)
+    self.assertAllEqual(test_qnn_copy.backend, test_qnn.backend)
+    self.assertAllEqual(test_qnn_copy.analytic, test_qnn.analytic)
     self.assertAllEqual(
         tfq.from_tensor(test_qnn_copy.u),
         tfq.from_tensor(test_qnn.u),
@@ -207,28 +214,6 @@ class QNNTest(tf.test.TestCase):
     self.assertEqual(
         tfq.from_tensor(test_qnn_copy.resolved_u_dagger),
         tfq.from_tensor(test_qnn.resolved_u_dagger))
-
-  def test_circuits(self):
-    """Confirms bitstring injectors are prepended to u."""
-    bitstrings = 2 * list(itertools.product([0, 1], repeat=self.num_bits))
-    test_qnn = qnn.QNN(
-        self.u,
-        self.raw_phis_symbols,
-        self.initial_phis,
-        self.name,
-    )
-    test_circuits = test_qnn.circuits(tf.constant(bitstrings, dtype=tf.int8))
-    test_circuits_deser = tfq.from_tensor(test_circuits)
-
-    resolved_u = tfq.from_tensor(test_qnn.resolved_u)[0]
-    bit_injectors = []
-    for b in bitstrings:
-      bit_injectors.append(
-          cirq.Circuit(cirq.X(q)**b_i for q, b_i in zip(self.raw_qubits, b)))
-    combined = [b + resolved_u for b in bit_injectors]
-
-    for expected, test in zip(combined, test_circuits_deser):
-      self.assertTrue(cirq.approx_eq(expected, test))
 
   def test_circuits(self):
     """Confirms bitstring injectors are prepended to u."""

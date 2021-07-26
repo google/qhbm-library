@@ -113,7 +113,7 @@ def upgrade_circuit(circuit: cirq.Circuit, symbols: tf.Tensor) -> tf.Tensor:
   return tfq.convert_to_tensor([circuit])
 
 
-class QNN:
+class QNN(tf.Module):
   """Operations on parameterized unitaries with bitstring inputs."""
 
   def __init__(self,
@@ -136,9 +136,10 @@ class QNN:
         or however users may also specify a preconfigured cirq execution
         object to use instead, which must inherit `cirq.Sampler`.
     """
-    self.name = name
+    super().__init__(name)
     self.phis = upgrade_initial_values(symbols_initial_values)
     self.phis_symbols = upgrade_symbols(symbols, self.phis)
+    self.backend = backend
     self.u = upgrade_circuit(circuit, self.phis_symbols)
     self.u_dagger = upgrade_circuit(circuit**-1, self.phis_symbols)
 
@@ -162,6 +163,7 @@ class QNN:
         [sympy.Symbol(s.decode("utf-8")) for s in self.phis_symbols.numpy()],
         self.phis,
         self.name,
+        self.backend,
     )
 
   def _sample_function(self, circuits, counts):
