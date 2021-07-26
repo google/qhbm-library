@@ -232,21 +232,7 @@ class QHBM(tf.Module):
               that `ragged_samples[i]` contains `counts[i]` bitstrings.
         """
     print(f"retracing: sample_pulled_back_bitstrings for {self.name}")
-    pulled_back_circuits = tfq.layers.AddCircuit()(
-        circuit_samples,
-        append=tf.tile(self.u_dagger, [tf.shape(circuit_samples)[0]]),
-    )
-    raw_samples = self.tfq_sample_layer(
-        pulled_back_circuits,
-        symbol_names=self.phis_symbols,
-        symbol_values=tf.tile(
-            tf.expand_dims(self.phis, 0), [tf.shape(counts)[0], 1]),
-        repetitions=tf.expand_dims(tf.math.reduce_max(counts), 0),
-    )
-    num_samples_mask = tf.cast((tf.ragged.range(counts) + 1).to_tensor(),
-                               tf.bool)
-    ragged_samples = tf.ragged.boolean_mask(raw_samples, num_samples_mask)
-    return ragged_samples
+    self.diagonalizing_op.pulled_back_sample(circuit_samples, counts)
 
   @tf.function
   def energy_and_energy_grad(self, bitstring):
