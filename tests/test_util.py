@@ -213,3 +213,9 @@ def generate_mixed_random_density_operator_pair(num_qubits, perm_basis=False):
 def stable_classical_entropy(probs):
   """Entropy function for a list of probabilities, allowing zeros."""
   return -tf.reduce_sum(tf.math.multiply_no_nan(tf.math.log(probs), probs))
+
+
+def check_bitstring_exists(bitstring, bitstring_list):
+  """True if `bitstring` is an entry of `bitstring_list`."""
+  return tf.math.reduce_any(
+    tf.reduce_all(tf.math.equal(bitstring, bitstring_list), 1))

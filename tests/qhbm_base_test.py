@@ -203,25 +203,20 @@ def get_basic_qhbm():
 class QHBMBasicFunctionTest(tf.test.TestCase):
   """Test methods of the QHBM class with a simple QHBM."""
 
-  def check_bitstring_exists(self, bitstring, bitstring_list):
-    """True if `bitstring` is an entry of `bitstring_list`."""
-    return tf.math.reduce_any(
-        tf.reduce_all(tf.math.equal(bitstring, bitstring_list), 1))
-
   def test_sample_bitstrings(self):
     """Confirm only the middle bit alternates."""
     num_samples = int(1e6)
     test_qhbm = get_basic_qhbm()
     test_bitstrings, test_counts = test_qhbm.sample_bitstrings(num_samples)
     self.assertTrue(
-        self.check_bitstring_exists(
+        test_util.check_bitstring_exists(
             tf.constant([0, 0, 1], dtype=tf.int8), test_bitstrings))
     self.assertTrue(
-        self.check_bitstring_exists(
+        test_util.check_bitstring_exists(
             tf.constant([0, 1, 1], dtype=tf.int8), test_bitstrings))
     # Sanity check that absent bitstring is really missing.
     self.assertFalse(
-        self.check_bitstring_exists(
+        test_util.check_bitstring_exists(
             tf.constant([0, 0, 0], dtype=tf.int8), test_bitstrings))
     # Only the two expected bitstrings should exist.
     self.assertAllEqual(tf.shape(test_bitstrings), [2, 3])
