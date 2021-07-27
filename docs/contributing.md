@@ -113,7 +113,12 @@ There may be conflicts upon merging `main` into your branch. If this occurs, ope
 
 ### 7. Pull request
 
-Pull requests (PRs) are how code gets reviewed and approved. Navigate to the [pull request](https://github.com/google/qhbm-library/pulls) page of the library. If you have recently pushed to a branch of your fork, there should be a yellow banner, with a button labelled "Compare & pull request". Click this button to open the PR creation interface.
+Pull requests (PRs) are how code gets reviewed and approved. To start a PR, first update GitHub with your branch changes:
+```
+git checkout BRANCH_NAME
+git push
+```
+Then, navigate to the [pull request](https://github.com/google/qhbm-library/pulls) page of the library. Since you recently pushed changes, there should be a yellow banner on the webpage, with a button labelled "Compare & pull request". Click this button to open the PR creation interface.
 
 Edit the title of the PR to describe what the PR accomplishes. In the larger "comment" field below, go into more depth on what the PR changes or adds. Be sure to tag the issue associated with this PR, using the #<issue number> syntax.
 
