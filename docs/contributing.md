@@ -79,7 +79,7 @@ git push
 ```
 
 
-### 5. Prepare code for submission
+### 5. Prepare code for review
 
 When you feel your code is ready to submit, first run the preparation script:
 ```
@@ -92,6 +92,7 @@ First, it will format your code with `yapf`. This modifies files, so you will ne
 Then, it will run `pylint` to find possible code defects and further style issues. More information on our linter can be found [here](https://google.github.io/styleguide/pyguide.html#21-lint). Any issues will need to be corrected before submitting, since our Continuous Integration system runs the same set of checks.
 #### Test
 Finally, the script runs all the library tests and determines coverage percentages. All tests need to pass before submission.
+
 
 ### 6. Merge any upstream changes
 
