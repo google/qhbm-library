@@ -89,7 +89,7 @@ This will do three things.
 #### Format
 First, it will format your code with `yapf`. This modifies files, so you will need to commit these changes before proceding.
 #### Lint
-Then, it will run `pylint` to find possible code defects and further style issues. We follow the standard open source guidelines for Google Python code.  Any issues will need to be corrected before submitting, since our Continuous Integration system runs the same set of checks.
+Then, it will run `pylint` to find possible code defects and further style issues. More information on our linter can be found [here](https://google.github.io/styleguide/pyguide.html#21-lint). Any issues will need to be corrected before submitting, since our Continuous Integration system runs the same set of checks.
 #### Test
 Finally, the script runs all the library tests and determines coverage percentages. All tests need to pass before submission.
 
@@ -113,25 +113,35 @@ There may be conflicts upon merging `main` into your branch. If this occurs, ope
 
 ### 7. Pull request
 
-Pull requests (PRs) are how code gets reviewed and approved. Navigate to the [pull request](https://github.com/google/qhbm-library/pulls) page of the library. If you have recently pushed to a branch of your fork, there should be a yellow banner, with a button labelled ????. Click this button to open the PR interface.
+Pull requests (PRs) are how code gets reviewed and approved. Navigate to the [pull request](https://github.com/google/qhbm-library/pulls) page of the library. If you have recently pushed to a branch of your fork, there should be a yellow banner, with a button labelled "Compare & pull request". Click this button to open the PR creation interface.
 
-Request a review from one of the project maintainers:
+Edit the title of the PR to describe what the PR accomplishes. In the larger "comment" field below, go into more depth on what the PR changes or adds. Be sure to tag the issue associated with this PR, using the #<issue number> syntax.
+
+Request a review from one of the project maintainers. Click the gear on the right next to the "Reviewers" tab. Scroll down the list and select any of the following current project maintainers:
 - zaqqwerty
 
-What we are looking for during our review:
+Then you can click "Create pull request".
 
-#### Documentation
-Good 
+Beyond the checks, here is what we are looking for during our review:
 
-#### Test coverage
-Any new functionality should be unit tested. Testing serves many functions:
-- additional source of information beyond the documentation on how to use your feature
-- code can be updated in the future with confidence, since good tests will break if code is broken
+#### Code correctness
+Does your code resolve the assigned issue? If not, is it clear how the code forms a part of such a solution? Performance is another aspect we consider when evaluating correctness.
 
-#### Lint
+#### Code structure
+Is your code easy to read? To support this, we try to follow the standard [Google open source guidelines](https://google.github.io/styleguide/pyguide.html) for Python code. Even within the bounds of the style guide, there can still be more or less clear ways of coding.
 
+#### Comments and Documentation
+Good documentation helps future programmers understand how to use your feature. See [this tutorial](https://realpython.com/documenting-python-code/) for an overview, and see the [style guide](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings) for the specific structure we want in our docstrings.
+
+#### Test new features
+
+Any new functionality should be unit tested. The main idea is to demonstrate that your new code does what it claims to do.
+
+Beyond demonstrating correctness:
+- Tests are additional sources of information beyond the documentation about how to use your feature.
+- Tests act as guardrails for future code updates. Tested code can be updated with confidence, since good tests will break if the tested code gets broken.
 
 #### General
 Other things to keep in mind:
-- Maximum PR size of around 300 additional lines is a good general limit. Pull requests (PRs) much larger than this should be broken up into smaller PRs. This makes review easier, and modularity is a sign of a good solution (the ability for it to be understood, thus submitted, in small chunks).
-- Respond to all reviewer comments. If you did exactly what was suggested, you can simply say "Done". Otherwise, provide a brief description of how you addressed their concern. Feel free to respond with clarifying questions or open a discussion.
+- Maximum PR size of around 300 additional lines is a good general limit. Pull requests (PRs) much larger than this should likely be broken up into smaller PRs. This makes review easier, and modularity is a sign of a good solution (the ability for it to be understood, thus submitted, in small chunks).
+- Respond to all reviewer comments. If you did exactly what was suggested, you can simply say "Done". Otherwise, provide a brief description of how you addressed their concern. Feel free to respond with clarifying questions or to open a discussion instead. The purpose of these responses is to ensure you and the reviewer are in agreement about the code before it gets accepted.
