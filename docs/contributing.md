@@ -87,17 +87,23 @@ Then, it will run `pylint` to find possible code defects and further style issue
 #### Test
 Finally, the script runs all the library tests and determines coverage percentages. All tests need to pass before submission.
 
-Next, get any upstream changes:
+### 5. Merge any upstream changes
+
+Multiple developers may be updating the same code in parallel. Thus, you will need to fetch any upstream changes:
 ```
 git checkout main
 git fetch upstream
 git merge upstream/main
 git push
+```
+If 
+
 git checkout BRANCH_NAME
 git merge main
 git push
 ```
 There may be conflicts upon merging `main` into your branch. If this occurs, open the conflicted files and choose the correct code to keep. Then, run `git commit` to finish the merge.
+
 
 ### 5. Pull request
 
