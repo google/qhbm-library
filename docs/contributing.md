@@ -28,13 +28,16 @@ information on using pull requests.
 This project follows
 [Google's Open Source Community Guidelines](https://opensource.google/conduct/).
 
+
 ## Developer Workflow
 
 We follow a standard open source pull request workflow.
 
+
 ### 1. Get the source code
 
 Before starting, be sure to follow the instructions to [install from source](https://github.com/google/qhbm-library/blob/main/docs/install.md#install-from-source).
+
 
 ### 2. Update your fork
 
@@ -48,6 +51,7 @@ git fetch upstream
 git merge upstream/main
 git push
 ```
+
 
 ### 3. Create a development branch
 
@@ -64,7 +68,8 @@ Let GitHub know about your new branch:
 git push --set-upstream origin BRANCH_NAME
 ```
 
-### 3. Develop the feature
+
+### 4. Develop the feature
 
 Implement your solution to the issue! Make frequent commits and pushes to ensure your work is saved:
 ```
@@ -73,7 +78,8 @@ git commit -m '<short, informative commit message>'
 git push
 ```
 
-### 4. Prepare code for submission
+
+### 5. Prepare code for submission
 
 When you feel your code is ready to submit, first run the preparation script:
 ```
@@ -83,31 +89,31 @@ This will do three things.
 #### Format
 First, it will format your code with `yapf`. This modifies files, so you will need to commit these changes before proceding.
 #### Lint
-Then, it will run `pylint` to find possible code defects and further style issues. Any issues will need to be corrected before submitting, since our Continuous Integration system runs the same set of checks.
+Then, it will run `pylint` to find possible code defects and further style issues. We follow the standard open source guidelines for Google Python code.  Any issues will need to be corrected before submitting, since our Continuous Integration system runs the same set of checks.
 #### Test
 Finally, the script runs all the library tests and determines coverage percentages. All tests need to pass before submission.
 
-### 5. Merge any upstream changes
+### 6. Merge any upstream changes
 
 Multiple developers may be updating the same code in parallel. Thus, you will need to fetch any upstream changes:
 ```
 git checkout main
 git fetch upstream
 git merge upstream/main
-git push
 ```
-If 
+If you get the message "Already up to date.", you can continue to the next section.
 
+Otherwise, you will need to merge changes into your development branch:
+```
 git checkout BRANCH_NAME
 git merge main
-git push
 ```
 There may be conflicts upon merging `main` into your branch. If this occurs, open the conflicted files and choose the correct code to keep. Then, run `git commit` to finish the merge.
 
 
-### 5. Pull request
+### 7. Pull request
 
-Pull requests (PRs) are where code gets reviewed and approved.  Navigate to the [pull request](https://github.com/google/qhbm-library/pulls) page of the library.  If you have recently pushed to a branch of your fork, there should be a yellow banner, with a button labelled ????. Click this button to open the PR interface.
+Pull requests (PRs) are how code gets reviewed and approved. Navigate to the [pull request](https://github.com/google/qhbm-library/pulls) page of the library. If you have recently pushed to a branch of your fork, there should be a yellow banner, with a button labelled ????. Click this button to open the PR interface.
 
 Request a review from one of the project maintainers:
 - zaqqwerty
