@@ -32,17 +32,44 @@ This project follows
 
 We follow a standard open source pull request workflow. Before starting, be sure to follow the instructions to [install from source](https://github.com/google/qhbm-library/blob/main/docs/install.md#install-from-source).
 
-### 2. Set up development tools
+### 1. Update your fork
 
-We use a Python dependency manager called [poetry](https://python-poetry.org/). Install it from source:
+Inside your local copy of your fork, checkout the mainline development branch:
 ```
-curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/install-poetry.py | python -
+git checkout main
 ```
-After installation, follow the on screen instructions to ensure the `poetry` command can be found by your shell. Restart the shell and confirm successful installation:
+Update with any remote changes:
 ```
-poetry --version
+git fetch upstream
+git merge upstream/main
 ```
-Poetry automatically manages your environment using the specifications in the `pyproject.toml` file. To initiate your virtual environment and install all dependencies, run:
+
+### 2. Create a development branch
+
+Choose an [open issue](https://github.com/google/qhbm-library/issues) or [create one](https://github.com/google/qhbm-library/issues/new) describing what you will do. Start a discussion and request to be assigned the issue, ensuring work does not accidentally get duplicated.
+
+Now you can start a new branch for the work, with a name of your choosing:
 ```
-poetry install
+git checkout main
+git checkout -b BRANCH_NAME
 ```
+
+### 3. Develop the feature
+
+Implement your solution to the issue!
+
+
+### 4. Submit code for review
+
+Request a review from one of the project maintainers:
+-zaqqwerty
+-jaeyoo
+
+What we are looking for during our review:
+Test coverage. Any new functionality should be unit tested. Testing serves many functions:
+- tests are an additional source of information beyond the documentation on how to use your features
+- allows code to be refactored or updated with confidence, since good tests will break if there are mistakes after an update
+
+Things to keep in mind:
+- Maximum PR size of around 300 additional lines is a good general limit. Pull requests (PRs) much larger than this should be broken up into smaller PRs. This makes review easier, and modularity is a sign of a good solution (the ability for it to be understood, thus submitted, in small chunks).
+- Respond to all reviewer comments. If you did exactly what was suggested, you can simply say "Done". Otherwise, provide a brief description of how you addressed their concern. Feel free to respond with clarifying questions or open a discussion.
