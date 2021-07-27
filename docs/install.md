@@ -9,15 +9,15 @@ There are three ways to start developing with the QHBM Library:
 
 ### Requirements
 
-## Build from source
+## Install from source
 
-The following steps are adapted from the guide [Hypermodern Python](https://cjolowicz.github.io/posts/hypermodern-python-01-setup/).
+### 1. Fork and clone the repository
 
-### 1. Clone the source code
+In the top right of the GitHub project, under your profile picture, there is a button labelled "Fork". Click this button. You now have a personal repository with a copy of the library code.
 
-From your working directory, clone the code from GitHub:
+Open a terminal. From your working directory, clone your forked copy of the library:
 ```
-git clone https://github.com/google/qhbm-library.git
+git clone https://github.com/USERNAME/qhbm-library.git
 cd qhbm-library
 ```
 

@@ -27,3 +27,22 @@ information on using pull requests.
 
 This project follows
 [Google's Open Source Community Guidelines](https://opensource.google/conduct/).
+
+## Developer Workflow
+
+We follow a standard open source pull request workflow. Before starting, be sure to follow the instructions to [install from source](https://github.com/google/qhbm-library/blob/main/docs/install.md#install-from-source).
+
+### 2. Set up development tools
+
+We use a Python dependency manager called [poetry](https://python-poetry.org/). Install it from source:
+```
+curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/install-poetry.py | python -
+```
+After installation, follow the on screen instructions to ensure the `poetry` command can be found by your shell. Restart the shell and confirm successful installation:
+```
+poetry --version
+```
+Poetry automatically manages your environment using the specifications in the `pyproject.toml` file. To initiate your virtual environment and install all dependencies, run:
+```
+poetry install
+```
