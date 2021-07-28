@@ -25,7 +25,7 @@ import tensorflow_probability as tfp
 import tensorflow_quantum as tfq
 
 
-class EnergyFunction(tf.Module, abc.ABC):
+class EnergyFunction(tf.keras.Model, abc.ABC):
 
   def __init__(self):
     super().__init__()
@@ -94,7 +94,7 @@ class KOBE(EnergyFunction):
     return tfq.convert_to_tensor(operators)
 
 
-class MLP(EnergyFunction, tf.keras.Model):
+class MLP(EnergyFunction):
 
   def __init__(self, num_bits, units, activations):
     super().__init__()
