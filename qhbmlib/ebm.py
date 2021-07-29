@@ -449,7 +449,8 @@ class Bernoulli(EBM):
 
   @tf.function
   def energy(self, bitstrings):
-    return tf.reduce_sum(tf.cast(1 - 2 * bitstrings, tf.float32) * self._variables, -1)
+    return tf.reduce_sum(
+        tf.cast(1 - 2 * bitstrings, tf.float32) * self._variables, -1)
 
   def operators(self, qubits):
     return tfq.convert_to_tensor(
