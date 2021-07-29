@@ -27,6 +27,61 @@ import tensorflow_quantum as tfq
 
 from qhbmlib import qnn
 
+class QHBM_(tf.keras.Model):
+  def __init__(self, ebm, qnn):
+    self.ebm = ebm
+    self.qnn = qnn
+  
+  @property
+  def qubits(self):
+    return self.qnn.qubits
+  
+  @property
+  def has_energy_operators(self):
+    return self.ebm.has_operators
+  
+  @tf.function
+  def energy(self, bitstrings):
+    return self.ebm.energy(bitstrings)
+
+  def energy_operators(self, qubits):
+    return self.ebm.operators(qubits)
+  
+  @tf.function
+  def sample_energy(self, num_samples):
+    return self.ebm.sample(num_samples)
+  
+  @tf.function
+  def log_partition_function(self):
+    return self.ebm.log_partition_function()
+  
+  @tf.function
+  def entropy(self):
+    return self.ebm.entropy()
+  
+  @tf.function
+  def circuits(self, bitstrings):
+    return self.qnn.circuits(bitstrings)
+
+  @tf.function
+  def sample_circuit(self, bitstrings, counts):
+    return self.qnn.sample(bitstrings, counts)
+  
+  @tf.function
+  def expectation(self, bitstrings, counts, operators):
+    return self.qnn.expectation(bitstrings, counts, operators)
+  
+  @tf.function
+  def pulled_back_circuits(self, circuits):
+    return self.qnn.pulled_back_circuits(circuits)
+  
+  @tf.function
+  def sample_pulled_back_circuit(self, circuits, counts):
+    return self.qnn.sample_pulled_back(self, circuits, counts)
+  
+  @tf.function
+  def pulled_back_expectation(self, circuits, counts, operators):
+    return self.qnn.pulled_back_expectation(circuits, counts, operators)
 
 @tf.function
 def unique_with_counts(input_bitstrings, out_idx=tf.int32):
