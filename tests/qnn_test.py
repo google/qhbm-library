@@ -229,7 +229,8 @@ class QNNTest(tf.test.TestCase):
         self.initial_phis,
         self.name,
     )
-    test_circuits = test_qnn.circuits(tf.constant(bitstrings, dtype=tf.int8))
+    test_circuits = test_qnn.circuits(
+        tf.constant(bitstrings, dtype=tf.int8), True)
     test_circuits_deser = tfq.from_tensor(test_circuits)
 
     resolved_u = tfq.from_tensor(test_qnn.resolved_u)[0]
@@ -303,7 +304,7 @@ class QNNTest(tf.test.TestCase):
         self.initial_phis,
         self.name,
     )
-    test_circuits = test_qnn.pulled_back_circuits(data_states_t)
+    test_circuits = test_qnn.pulled_back_circuits(data_states_t, True)
     test_circuits_deser = tfq.from_tensor(test_circuits)
 
     resolved_u_dagger = tfq.from_tensor(test_qnn.resolved_u_dagger)[0]

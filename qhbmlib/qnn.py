@@ -230,7 +230,7 @@ class QNN(tf.Module):
     return tfq.resolve_parameters(self.u_dagger, self.phis_symbols,
                                   tf.expand_dims(self.phis, 0))
 
-  def circuits(self, bitstrings, resolve):
+  def circuits(self, bitstrings, resolve=tf.constant(True)):
     """Returns the current circuits for this QNN given bitstrings.
 
       Args:
@@ -266,7 +266,7 @@ class QNN(tf.Module):
           that `ragged_samples[i]` contains `counts[i]` bitstrings drawn from
           `self.u|bitstrings[i]>`.
     """
-    current_circuits = self.circuits(bitstrings, tf.constant(True))
+    current_circuits = self.circuits(bitstrings)
     return self._sample_function(current_circuits, counts)
 
   def measure(self, bitstrings, counts, observables):
@@ -287,7 +287,7 @@ class QNN(tf.Module):
     current_circuits = self.circuits(bitstrings, tf.constant(False))
     return self._expectation_function(current_circuits, counts, observables)
 
-  def pulled_back_circuits(self, circuit_samples, resolve):
+  def pulled_back_circuits(self, circuit_samples, resolve=tf.constant(True)):
     """Returns the pulled back circuits for this QNN given input quantum data.
 
       Args:
@@ -327,8 +327,7 @@ class QNN(tf.Module):
         ragged_samples: `tf.RaggedTensor` of DType `tf.int8` structured such
             that `ragged_samples[i]` contains `counts[i]` bitstrings.
       """
-    current_circuits = self.pulled_back_circuits(circuit_samples,
-                                                 tf.constant(True))
+    current_circuits = self.pulled_back_circuits(circuit_samples)
     return self._sample_function(current_circuits, counts)
 
   def pulled_back_measure(self, circuit_samples, counts, observables):
