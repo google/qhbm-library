@@ -27,7 +27,7 @@ import tensorflow_quantum as tfq
 
 from qhbmlib import qnn
 
-class QHBM(tf.keras.Model):
+class QHBM_(tf.keras.Model):
   def __init__(self, ebm, qnn):
     self.ebm = ebm
     self.qnn = qnn
