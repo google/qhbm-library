@@ -236,12 +236,14 @@ class QNN(tf.Module):
     return tfq.resolve_parameters(self.u_dagger, self.phis_symbols,
                                   tf.expand_dims(self.phis, 0))
 
-  def circuits(self, bitstrings):
-    """Returns the current concrete circuits for this QNN given bitstrings.
+  def circuits(self, bitstrings, resolve):
+    """Returns the current circuits for this QNN given bitstrings.
 
       Args:
         bitstrings: 2D tensor of dtype `tf.int8` whose entries are bits. These
           specify the state inputs to use in the returned set of circuits.
+        resolve: bool tensor which says whether or not to resolve the QNN
+          unitary before appending to the bit injection circuits.
 
       Returns:
         1D tensor of strings which represent the current QNN circuits.
@@ -250,8 +252,11 @@ class QNN(tf.Module):
     tiled_bit_injectors = tf.tile(self.bit_circuit, [num_labels])
     bit_circuits = tfq.resolve_parameters(tiled_bit_injectors, self.bit_symbols,
                                           tf.cast(bitstrings, tf.float32))
-    tiled_u_concrete = tf.tile(self.resolved_u, [num_labels])
-    return tfq.append_circuit(bit_circuits, tiled_u_concrete)
+    if resolve:
+      tiled_u = tf.tile(self.resolved_u, [num_labels])
+    else:
+      tiled_u = tf.tile(self.u, [num_labels])
+    return tfq.append_circuit(bit_circuits, tiled_u)
 
   def sample(self, bitstrings, counts):
     """Returns bitstring samples from the QNN.
@@ -267,7 +272,7 @@ class QNN(tf.Module):
           that `ragged_samples[i]` contains `counts[i]` bitstrings drawn from
           `self.u|bitstrings[i]>`.
     """
-    current_circuits = self.circuits(bitstrings)
+    current_circuits = self.circuits(bitstrings, tf.constant(True))
     return self._sample_function(current_circuits, counts)
 
   def measure(self, bitstrings, counts, observables):
@@ -285,27 +290,32 @@ class QNN(tf.Module):
       Returns:
         2-D tensor of floats which are the expectation values.
       """
-    current_circuits = self.circuits(bitstrings)
-    return tf.cond(
-        self.analytic,
-        lambda: self._exact_expectation_function(circuits, counts, observables),
-        lambda: self._sample_expectation_function(circuits, counts, observables
-                                                 ))
+    current_circuits = self.circuits(bitstrings, tf.constant(True))
+    if self.analytic:
+      retval = self._exact_expectation_function(current_circuits, counts, observables)
+    else:
+      retval = self._sample_expectation_function(current_circuits, counts, observables)
+    return retval
 
-  def pulled_back_circuits(self, circuit_samples):
+  def pulled_back_circuits(self, circuit_samples, resolve):
     """Returns the pulled back circuits for this QNN given input quantum data.
 
       Args:
         circuit_samples: 1-D `tf.Tensor` of type `tf.string` which contains
           circuits serialized by `tfq.convert_to_tensor`. These represent pure
           state samples from the data density matrix.
+        resolve: bool tensor which says whether or not to resolve the QNN
+          inverse unitary before appending to the data circuits.
 
       Returns:
         1D tensor of strings which represent the pulled back circuits.
       """
     num_samples = tf.shape(circuit_samples)[0]
-    tiled_u_dagger_concrete = tf.tile(self.resolved_u_dagger, [num_samples])
-    return tfq.append_circuit(circuit_samples, tiled_u_dagger_concrete)
+    if resolve:
+      tiled_u_dagger = tf.tile(self.resolved_u_dagger, [num_labels])
+    else:
+      tiled_u_dagger = tf.tile(self.u_dagger, [num_labels])
+    return tfq.append_circuit(circuit_samples, tiled_u_dagger)
 
   def pulled_back_sample(self, circuit_samples, counts):
     """Returns samples from the pulled back data distribution.
@@ -327,7 +337,7 @@ class QNN(tf.Module):
         ragged_samples: `tf.RaggedTensor` of DType `tf.int8` structured such
             that `ragged_samples[i]` contains `counts[i]` bitstrings.
       """
-    current_circuits = self.pulled_back_circuits(circuit_samples)
+    current_circuits = self.pulled_back_circuits(circuit_samples, tf.constant(True))
     return self._sample_function(current_circuits, counts)
 
   def pulled_back_measure(self, circuit_samples, counts, observables):
@@ -348,8 +358,9 @@ class QNN(tf.Module):
       Returns:
         2-D tensor of floats which are the expectation values.
     """
-    current_circuits = self.pulled_back_circuits(circuit_samples)
-    return tf.cond(
-        self.analytic, lambda: self._exact_expectation_function(
-            current_circuits, counts, observables), lambda: self.
-        _sample_expectation_function(current_circuits, counts, observables))
+    current_circuits = self.pulled_back_circuits(circuit_samples, tf.constant(True))
+    if self.analytic:
+      retval = self._exact_expectation_function(current_circuits, counts, observables)
+    else:
+      retval = self._sample_expectation_function(current_circuits, counts, observables)
+    return retval
