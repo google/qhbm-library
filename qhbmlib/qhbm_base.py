@@ -27,7 +27,7 @@ import tensorflow_quantum as tfq
 
 from qhbmlib import qnn
 
-class QHBM_(tf.keras.Model):
+class QHBM(tf.keras.Model):
   def __init__(self, ebm, qnn):
     self.ebm = ebm
     self.qnn = qnn
@@ -39,6 +39,10 @@ class QHBM_(tf.keras.Model):
   @property
   def has_energy_operators(self):
     return self.ebm.has_operators
+  
+  @property
+  def is_analytic(self):
+    return self.ebm.is_analytic and self.qnn.is_analytic
   
   @tf.function
   def energy(self, bitstrings):
@@ -77,11 +81,13 @@ class QHBM_(tf.keras.Model):
   
   @tf.function
   def sample_pulled_back_circuit(self, circuits, counts):
-    return self.qnn.sample_pulled_back(self, circuits, counts)
+    return self.qnn.pulled_back_sample(self, circuits, counts)
   
   @tf.function
   def pulled_back_expectation(self, circuits, counts, operators):
     return self.qnn.pulled_back_expectation(circuits, counts, operators)
+  
+#=======================================================================
 
 @tf.function
 def unique_with_counts(input_bitstrings, out_idx=tf.int32):
