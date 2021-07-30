@@ -116,14 +116,14 @@ def upgrade_circuit(circuit: cirq.Circuit, symbols: tf.Tensor) -> tf.Tensor:
 class QNN(tf.Module):
   """Operations on parameterized unitaries with bitstring inputs."""
 
-  def __init__(self,
-               circuit: cirq.Circuit,
-               symbols: Union[Iterable[sympy.Symbol], tf.Tensor],
-               symbols_initial_values: Union[List[numbers.Real], tf.Tensor,
-                                             tf.Variable],
-               name: str,
-               backend='noiseless',
-               differentiator=None,
+  def __init__(
+      self,
+      circuit: cirq.Circuit,
+      symbols: Union[Iterable[sympy.Symbol], tf.Tensor],
+      symbols_initial_values: Union[List[numbers.Real], tf.Tensor, tf.Variable],
+      name: str,
+      backend='noiseless',
+      differentiator=None,
   ):
     """Initialize a QNN.
 
@@ -159,7 +159,8 @@ class QNN(tf.Module):
       self._expectation_layer = tfq.layers.Expectation(backend, differentiator)
       self.analytic = tf.constant(True)
     else:
-      self._expectation_layer = tfq.layers.SampledExpectation(backend, differentiator)
+      self._expectation_layer = tfq.layers.SampledExpectation(
+          backend, differentiator)
       self.analytic = tf.constant(False)
 
   def copy(self):
@@ -195,19 +196,22 @@ class QNN(tf.Module):
     prob_terms = tf.cast(counts, tf.float32) / tf.cast(
         tf.reduce_sum(counts), tf.float32)
     num_circuits = tf.shape(counts)[0]
-    tiled_observables = tf.tile(tf.expand_dims(observables, 0), [num_circuits, 1])
+    tiled_observables = tf.tile(
+        tf.expand_dims(observables, 0), [num_circuits, 1])
     if self.analytic:
       bare_expectations = self._expectation_layer(
           circuits,
           symbol_names=self.phis_symbols,
-          symbol_values=tf.tile(tf.expand_dims(self.phis, 0), [num_circuits, 1]),
+          symbol_values=tf.tile(
+              tf.expand_dims(self.phis, 0), [num_circuits, 1]),
           operators=tiled_observables,
       )
     else:
       bare_expectations = self._expectation_layer(
           circuits,
           symbol_names=self.phis_symbols,
-          symbol_values=tf.tile(tf.expand_dims(self.phis, 0), [num_circuits, 1]),
+          symbol_values=tf.tile(
+              tf.expand_dims(self.phis, 0), [num_circuits, 1]),
           operators=tiled_observables,
           repetitions=tf.expand_dims(counts, 1),
       )
@@ -323,7 +327,8 @@ class QNN(tf.Module):
         ragged_samples: `tf.RaggedTensor` of DType `tf.int8` structured such
             that `ragged_samples[i]` contains `counts[i]` bitstrings.
       """
-    current_circuits = self.pulled_back_circuits(circuit_samples, tf.constant(True))
+    current_circuits = self.pulled_back_circuits(circuit_samples,
+                                                 tf.constant(True))
     return self._sample_function(current_circuits, counts)
 
   def pulled_back_measure(self, circuit_samples, counts, observables):
@@ -343,5 +348,6 @@ class QNN(tf.Module):
       Returns:
         1-D tensor of floats which are the averaged expectation values.
     """
-    current_circuits = self.pulled_back_circuits(circuit_samples, tf.constant(False))
+    current_circuits = self.pulled_back_circuits(circuit_samples,
+                                                 tf.constant(False))
     return self._expectation_function(current_circuits, counts, observables)
