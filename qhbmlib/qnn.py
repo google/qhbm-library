@@ -122,7 +122,9 @@ class QNN(tf.Module):
                symbols_initial_values: Union[List[numbers.Real], tf.Tensor,
                                              tf.Variable],
                name: str,
-               backend='noiseless'):
+               backend='noiseless',
+               differentiator=None,
+  ):
     """Initialize a QNN.
 
     Args:
@@ -135,11 +137,14 @@ class QNN(tf.Module):
         for operations involving this QNN. Options are {'noisy', 'noiseless'},
         or however users may also specify a preconfigured cirq execution
         object to use instead, which must inherit `cirq.Sampler`.
+      differentiator: Either None or a `tfq.differentiators.Differentiator`,
+        which specifies how to take the derivative of a quantum circuit.
     """
     super().__init__(name)
     self.phis = upgrade_initial_values(symbols_initial_values)
     self.phis_symbols = upgrade_symbols(symbols, self.phis)
     self.backend = backend
+    self.differentiator = differentiator
     self.u = upgrade_circuit(circuit, self.phis_symbols)
     self.u_dagger = upgrade_circuit(circuit**-1, self.phis_symbols)
 
@@ -151,10 +156,10 @@ class QNN(tf.Module):
     self.bit_circuit = upgrade_circuit(raw_bit_circuit, self.bit_symbols)
     self._sample_layer = tfq.layers.Sample(backend=backend)
     if backend == 'noiseless' or backend is None:
-      self._expectation_layer = tfq.layers.Expectation(backend=backend)
+      self._expectation_layer = tfq.layers.Expectation(backend, differentiator)
       self.analytic = tf.constant(True)
     else:
-      self._expectation_layer = tfq.layers.SampledExpectation(backend=backend)
+      self._expectation_layer = tfq.layers.SampledExpectation(backend, differentiator)
       self.analytic = tf.constant(False)
 
   def copy(self):
@@ -164,6 +169,7 @@ class QNN(tf.Module):
         self.phis,
         self.name,
         self.backend,
+        self.differentiator,
     )
 
   def _sample_function(self, circuits, counts):

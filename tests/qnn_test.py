@@ -128,6 +128,7 @@ class QNNTest(tf.test.TestCase):
   initial_phis = tf.random.uniform([len(phis_symbols)], minval=-1.0)
   raw_qubits = cirq.GridQubit.rect(1, num_bits)
   backend = None
+  differentiator = None
   u = cirq.Circuit()
   for s in raw_phis_symbols:
     for q in raw_qubits:
@@ -149,11 +150,13 @@ class QNNTest(tf.test.TestCase):
         self.initial_phis,
         self.name,
         self.backend,
+        self.differentiator,
     )
     self.assertEqual(self.name, test_qnn.name)
     self.assertAllClose(self.initial_phis, test_qnn.phis)
     self.assertAllEqual(self.phis_symbols, test_qnn.phis_symbols)
     self.assertAllEqual(self.backend, test_qnn.backend)
+    self.assertAllEqual(self.differentiator, test_qnn.differentiator)
     self.assertAllEqual(True, test_qnn.analytic)
     self.assertAllEqual(
         tfq.from_tensor(self.u_tfq),
@@ -188,12 +191,14 @@ class QNNTest(tf.test.TestCase):
         self.initial_phis,
         self.name,
         self.backend,
+        self.differentiator,
     )
     test_qnn_copy = test_qnn.copy()
     self.assertEqual(test_qnn_copy.name, test_qnn.name)
     self.assertAllClose(test_qnn_copy.phis, test_qnn.phis)
     self.assertAllEqual(test_qnn_copy.phis_symbols, test_qnn.phis_symbols)
     self.assertAllEqual(test_qnn_copy.backend, test_qnn.backend)
+    self.assertAllEqual(test_qnn_copy.differentiator, test_qnn.differentiator)
     self.assertAllEqual(test_qnn_copy.analytic, test_qnn.analytic)
     self.assertAllEqual(
         tfq.from_tensor(test_qnn_copy.u),
