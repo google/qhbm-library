@@ -302,9 +302,9 @@ class QNN(tf.Module):
       """
     num_samples = tf.shape(circuit_samples)[0]
     if resolve:
-      tiled_u_dagger = tf.tile(self.resolved_u_dagger, [num_labels])
+      tiled_u_dagger = tf.tile(self.resolved_u_dagger, [num_samples])
     else:
-      tiled_u_dagger = tf.tile(self.u_dagger, [num_labels])
+      tiled_u_dagger = tf.tile(self.u_dagger, [num_samples])
     return tfq.append_circuit(circuit_samples, tiled_u_dagger)
 
   def pulled_back_sample(self, circuit_samples, counts):
