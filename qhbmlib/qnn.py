@@ -185,44 +185,34 @@ class QNN(tf.Module):
                                tf.bool)
     return tf.ragged.boolean_mask(raw_samples, num_samples_mask)
 
-  def _sample_expectation_function(self, circuits, counts, observables):
-    """General function for taking sampled expectations from circuits.
-
-    `counts[i]` samples are drawn from `circuits[i]` and used to compute
-    each expectation in `observables`.  Additionally, `counts[i]` sets the
-    weight of `circuits[i]` in the expectation.
-    """
-    prob_terms = tf.cast(counts, tf.float32) / tf.cast(
-        tf.reduce_sum(counts), tf.float32)
-    num_circuits = tf.shape(counts)[0]
-    tiled_observables = tf.tile(observables, [num_circuits, 1])
-    bare_expectations = self._expectation_layer(
-        circuits,
-        symbol_names=tf.constant([], dtype=tf.string),
-        symbol_values=tf.tile(
-            tf.constant([[]], dtype=tf.float32), [num_circuits, 1]),
-        operators=tiled_observables,
-        repetitions=tf.expand_dims(counts, 1),
-    )
-    return tf.expand_dims(prob_terms, 1) * bare_expectations
-
-  def _exact_expectation_function(self, circuits, counts, observables):
+  def _expectation_function(self, circuits, counts, observables):
     """General function for taking sampled expectations from circuits.
 
     `counts[i]` sets the weight of `circuits[i]` in the expectation.
+    Additionally, if `self.analytic` is false, `counts[i]` samples are drawn
+    from `circuits[i]` and used to compute each expectation in `observables`.
     """
     prob_terms = tf.cast(counts, tf.float32) / tf.cast(
         tf.reduce_sum(counts), tf.float32)
     num_circuits = tf.shape(counts)[0]
-    tiled_observables = tf.tile(observables, [num_circuits, 1])
-    bare_expectations = self._expectation_layer(
-        circuits,
-        symbol_names=tf.constant([], dtype=tf.string),
-        symbol_values=tf.tile(
-            tf.constant([[]], dtype=tf.float32), [num_circuits, 1]),
-        operators=tiled_observables,
-    )
-    return tf.expand_dims(prob_terms, 1) * bare_expectations
+    tiled_observables = tf.tile(tf.expand_dims(observables, 0), [num_circuits, 1])
+    if self.analytic:
+      bare_expectations = self._expectation_layer(
+          circuits,
+          symbol_names=self.phis_symbols,
+          symbol_values=tf.tile(tf.expand_dims(self.phis, 0), [num_circuits, 1]),
+          operators=tiled_observables,
+      )
+    else:
+      bare_expectations = self._expectation_layer(
+          circuits,
+          symbol_names=self.phis_symbols,
+          symbol_values=tf.tile(tf.expand_dims(self.phis, 0), [num_circuits, 1]),
+          operators=tiled_observables,
+          repetitions=tf.expand_dims(counts, 1),
+      )
+    weighted_expectations = bare_expectations * prob_terms
+    return tf.reduce_sum(weighted_expectations, 0)
 
   @property
   def resolved_u(self):
@@ -282,20 +272,16 @@ class QNN(tf.Module):
         bitstrings: 2D tensor of dtype `tf.int8` whose entries are bits.
         counts: 1D tensor of dtype `tf.int32` such that `counts[i]` is the
           relative weight of `bitstrings[i]` when computing expectations.
-        observables: 2D tensor of strings, the result of calling
-          `tfq.convert_to_tensor` on a list of lists of cirq.PauliSum which has
-          effectively 1D structure, `[[op1, op2, ... ]]`.  Will be tiled along
-          the 0th dimension to measure `<opj>_self.u|bitstrings[i]>` for each i.
+        observables: 1D tensor of strings, the result of calling
+          `tfq.convert_to_tensor` on a list of cirq.PauliSum, `[op1, op2, ...]`.
+          Will be tiled to measure `<opj>_self.u_dagger|circuit_samples[i]>`
+          for each i and j, then averaged over i.
 
       Returns:
-        2-D tensor of floats which are the expectation values.
+        1-D tensor of floats which are the averaged expectation values.
       """
-    current_circuits = self.circuits(bitstrings, tf.constant(True))
-    if self.analytic:
-      retval = self._exact_expectation_function(current_circuits, counts, observables)
-    else:
-      retval = self._sample_expectation_function(current_circuits, counts, observables)
-    return retval
+    current_circuits = self.circuits(bitstrings, tf.constant(False))
+    return self._expectation_function(current_circuits, counts, observables)
 
   def pulled_back_circuits(self, circuit_samples, resolve):
     """Returns the pulled back circuits for this QNN given input quantum data.
@@ -349,18 +335,13 @@ class QNN(tf.Module):
           state samples from the data density matrix.
         counts: 1D tensor of dtype `tf.int32` such that `counts[i]` is the
           relative weight of `circuit_samples[i]` when computing expectations.
-        observables: 2D tensor of strings, the result of calling
-          `tfq.convert_to_tensor` on a list of lists of cirq.PauliSum which has
-          effectively 1D structure, `[[op1, op2, ... ]]`.  Will be tiled along
-          the 0th dimension to measure `<opj>_self.u_dagger|circuit_samples[i]>`
-          for each i.
+        observables: 1D tensor of strings, the result of calling
+          `tfq.convert_to_tensor` on a list of cirq.PauliSum, `[op1, op2, ...]`.
+          Will be tiled to measure `<opj>_self.u_dagger|circuit_samples[i]>`
+          for each i and j, then averaged over i.
 
       Returns:
-        2-D tensor of floats which are the expectation values.
+        1-D tensor of floats which are the averaged expectation values.
     """
-    current_circuits = self.pulled_back_circuits(circuit_samples, tf.constant(True))
-    if self.analytic:
-      retval = self._exact_expectation_function(current_circuits, counts, observables)
-    else:
-      retval = self._sample_expectation_function(current_circuits, counts, observables)
-    return retval
+    current_circuits = self.pulled_back_circuits(circuit_samples, tf.constant(False))
+    return self._expectation_function(current_circuits, counts, observables)
