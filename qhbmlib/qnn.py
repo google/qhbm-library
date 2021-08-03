@@ -269,7 +269,7 @@ class QNN(tf.Module):
     current_circuits = self.circuits(bitstrings)
     return self._sample_function(current_circuits, counts)
 
-  def measure(self, bitstrings, counts, observables):
+  def expectation(self, bitstrings, counts, observables):
     """Returns the expectation values of the observables against the QNN.
 
       Args:
@@ -330,7 +330,7 @@ class QNN(tf.Module):
     current_circuits = self.pulled_back_circuits(circuit_samples)
     return self._sample_function(current_circuits, counts)
 
-  def pulled_back_measure(self, circuit_samples, counts, observables):
+  def pulled_back_expectation(self, circuit_samples, counts, observables):
     """Returns the expectation values for a given pulled-back dataset.
 
       Args:
