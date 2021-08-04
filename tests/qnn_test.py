@@ -24,6 +24,7 @@ import tensorflow_probability as tfp
 import tensorflow_quantum as tfq
 
 from qhbmlib import qnn
+from tests import test_util
 
 # Global tolerance, set for float32.
 ATOL = 1e-5
@@ -126,10 +127,13 @@ class QNNTest(tf.test.TestCase):
   phis_symbols = tf.constant([str(s) for s in raw_phis_symbols])
   initial_phis = tf.random.uniform([len(phis_symbols)], minval=-1.0)
   raw_qubits = cirq.GridQubit.rect(1, num_bits)
+  backend = None
+  differentiator = None
   u = cirq.Circuit()
   for s in raw_phis_symbols:
     for q in raw_qubits:
       u += cirq.X(q)**s
+      u += cirq.Z(q)**s
   u_dagger = u**-1
   u_tfq = tfq.convert_to_tensor([u])
   u_dagger_tfq = tfq.convert_to_tensor([u_dagger])
@@ -145,10 +149,15 @@ class QNNTest(tf.test.TestCase):
         self.raw_phis_symbols,
         self.initial_phis,
         self.name,
+        self.backend,
+        self.differentiator,
     )
     self.assertEqual(self.name, test_qnn.name)
     self.assertAllClose(self.initial_phis, test_qnn.phis)
     self.assertAllEqual(self.phis_symbols, test_qnn.phis_symbols)
+    self.assertAllEqual(self.backend, test_qnn.backend)
+    self.assertAllEqual(self.differentiator, test_qnn.differentiator)
+    self.assertAllEqual(True, test_qnn.analytic)
     self.assertAllEqual(
         tfq.from_tensor(self.u_tfq),
         tfq.from_tensor(test_qnn.u),
@@ -181,11 +190,16 @@ class QNNTest(tf.test.TestCase):
         self.raw_phis_symbols,
         self.initial_phis,
         self.name,
+        self.backend,
+        self.differentiator,
     )
     test_qnn_copy = test_qnn.copy()
     self.assertEqual(test_qnn_copy.name, test_qnn.name)
     self.assertAllClose(test_qnn_copy.phis, test_qnn.phis)
     self.assertAllEqual(test_qnn_copy.phis_symbols, test_qnn.phis_symbols)
+    self.assertAllEqual(test_qnn_copy.backend, test_qnn.backend)
+    self.assertAllEqual(test_qnn_copy.differentiator, test_qnn.differentiator)
+    self.assertAllEqual(test_qnn_copy.analytic, test_qnn.analytic)
     self.assertAllEqual(
         tfq.from_tensor(test_qnn_copy.u),
         tfq.from_tensor(test_qnn.u),
@@ -215,7 +229,8 @@ class QNNTest(tf.test.TestCase):
         self.initial_phis,
         self.name,
     )
-    test_circuits = test_qnn.circuits(tf.constant(bitstrings, dtype=tf.int8))
+    test_circuits = test_qnn.circuits(
+        tf.constant(bitstrings, dtype=tf.int8), True)
     test_circuits_deser = tfq.from_tensor(test_circuits)
 
     resolved_u = tfq.from_tensor(test_qnn.resolved_u)[0]
@@ -227,6 +242,120 @@ class QNNTest(tf.test.TestCase):
 
     for expected, test in zip(combined, test_circuits_deser):
       self.assertTrue(cirq.approx_eq(expected, test))
+
+  def test_sample_basic(self):
+    """Confirms correct sampling from identity, bit flip, and GHZ QNNs."""
+    bitstrings = tf.constant(
+        list(itertools.product([0, 1], repeat=self.num_bits)), dtype=tf.int8)
+    counts = tf.random.uniform([tf.shape(bitstrings)[0]],
+                               minval=10,
+                               maxval=100,
+                               dtype=tf.int32)
+
+    ident_qnn = qnn.QNN(
+        cirq.Circuit(cirq.I(q) for q in self.raw_qubits), [], [], "identity")
+    test_samples = ident_qnn.sample(bitstrings, counts)
+    for i, (b, c) in enumerate(zip(bitstrings, counts)):
+      self.assertEqual(tf.shape(test_samples[i].to_tensor())[0], c)
+      for j in range(c):
+        self.assertAllEqual(test_samples[i][j], b)
+
+    flip_qnn = qnn.QNN(
+        cirq.Circuit(cirq.X(q) for q in self.raw_qubits), [], [], "flip")
+    test_samples = flip_qnn.sample(bitstrings, counts)
+    for i, (b, c) in enumerate(zip(bitstrings, counts)):
+      self.assertEqual(tf.shape(test_samples[i].to_tensor())[0], c)
+      for j in range(c):
+        self.assertAllEqual(
+            test_samples[i][j],
+            tf.cast(tf.math.logical_not(tf.cast(b, tf.bool)), tf.int8))
+
+    ghz_param = sympy.Symbol("ghz")
+    ghz_circuit = cirq.Circuit(cirq.X(
+        self.raw_qubits[0])**ghz_param) + cirq.Circuit(
+            cirq.CNOT(q0, q1)
+            for q0, q1 in zip(self.raw_qubits, self.raw_qubits[1:]))
+    ghz_qnn = qnn.QNN(ghz_circuit, [ghz_param], [0.5], "ghz")
+    test_samples = ghz_qnn.sample(
+        tf.expand_dims(tf.constant([0] * self.num_bits, dtype=tf.int8), 0),
+        tf.expand_dims(counts[0], 0))[0].to_tensor()
+    # Both |0...0> and |1...1> should be among the measured bitstrings
+    self.assertTrue(
+        test_util.check_bitstring_exists(
+            tf.constant([0] * self.num_bits, dtype=tf.int8), test_samples))
+    self.assertTrue(
+        test_util.check_bitstring_exists(
+            tf.constant([1] * self.num_bits, dtype=tf.int8), test_samples))
+
+  def test_measure(self):
+    """Confirms correct measurement."""
+    #TODO(zaqqwerty)
+    pass
+
+  def test_pulled_back_circuits(self):
+    """Confirms the pulled back circuits correct for a variety of inputs."""
+    num_data_states = 100
+    data_states, _ = tfq.util.random_circuit_resolver_batch(
+        self.raw_qubits, num_data_states)
+    data_states_t = tfq.convert_to_tensor(data_states)
+    test_qnn = qnn.QNN(
+        self.u,
+        self.raw_phis_symbols,
+        self.initial_phis,
+        self.name,
+    )
+    test_circuits = test_qnn.pulled_back_circuits(data_states_t, True)
+    test_circuits_deser = tfq.from_tensor(test_circuits)
+
+    resolved_u_dagger = tfq.from_tensor(test_qnn.resolved_u_dagger)[0]
+    combined = tfq.from_tensor(
+        tfq.convert_to_tensor([d + resolved_u_dagger for d in data_states]))
+    for expected, test in zip(combined, test_circuits_deser):
+      self.assertTrue(cirq.approx_eq(expected, test))
+
+  def test_pulled_back_sample_basic(self):
+    """Confirms correct pulled back sampling from GHZ QNN.
+
+    The state preparation circuit for GHZ is not equal to its inverse,
+    so it tests that the dagger is taken correctly before appending.
+    """
+    ghz_param = sympy.Symbol("ghz")
+    ghz_circuit = cirq.Circuit(cirq.X(
+        self.raw_qubits[0])**ghz_param) + cirq.Circuit(
+            cirq.CNOT(q0, q1)
+            for q0, q1 in zip(self.raw_qubits, self.raw_qubits[1:]))
+    ghz_qnn = qnn.QNN(ghz_circuit, [ghz_param], [0.5], "ghz")
+    flip_circuits = [cirq.Circuit(), cirq.Circuit(cirq.X(self.raw_qubits[0]))]
+    flip_circuits_t = tfq.convert_to_tensor(flip_circuits)
+    counts = tf.random.uniform([len(flip_circuits)],
+                               minval=10,
+                               maxval=100,
+                               dtype=tf.int32)
+
+    test_samples = ghz_qnn.pulled_back_sample(flip_circuits_t, counts)
+    # The first circuit leaves only the Hadamard to superpose the first qubit
+    self.assertTrue(
+        test_util.check_bitstring_exists(
+            tf.constant([0] * self.num_bits, dtype=tf.int8),
+            test_samples[0].to_tensor()))
+    self.assertTrue(
+        test_util.check_bitstring_exists(
+            tf.constant([1] + [0] * (self.num_bits - 1), dtype=tf.int8),
+            test_samples[0].to_tensor()))
+    # The second circuit causes an additional bit flip
+    self.assertTrue(
+        test_util.check_bitstring_exists(
+            tf.constant([0] + [1] + [0] * (self.num_bits - 2), dtype=tf.int8),
+            test_samples[1].to_tensor()))
+    self.assertTrue(
+        test_util.check_bitstring_exists(
+            tf.constant([1, 1] + [0] * (self.num_bits - 2), dtype=tf.int8),
+            test_samples[1].to_tensor()))
+
+  def test_pulled_back_measure(self):
+    """Confirms correct pulled back measurement."""
+    #TODO(zaqqwerty)
+    pass
 
 
 if __name__ == "__main__":
