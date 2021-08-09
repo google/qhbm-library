@@ -51,7 +51,7 @@ def get_random_qhbm(
                                           minval=minval_phis,
                                           maxval=maxval_phis)
 
-  return qhbm_base.ExactQHBM(
+  return qhbm_base.ExactQHBM_(
       thetas_initial_values,
       energy,
       sampler,

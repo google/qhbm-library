@@ -19,61 +19,6 @@ import tensorflow_quantum as tfq
 
 from qhbmlib import qhbm_base
 
-
-class QMHL(tf.keras.losses.Loss):
-
-  def __init__(self, num_samples, name=None):
-    super().__init__(name=name)
-    self._num_samples = num_samples
-
-  @property
-  def num_samples(self):
-    return self._num_samples
-
-  def call(qhbm, circuits_counts):
-    circuits, counts = circuits_counts
-
-    @tf.function
-    @tf.custom_gradient
-    def loss(vars):
-      bitstrings, counts = qhbm.ebm.sample(self.num_samples)
-      probs = tf.cast(counts, tf.float32) / tf.cast(
-          tf.reduce_sum(counts), tf.float32)
-      with tf.GradientTape() as qnn_tape:
-        beta_expectations = beta * tf.squeeze(
-            qhbm.qnn.expectation(bitstrings, counts, hamiltonian, reduce=False),
-            -1)
-        beta_expectation = tf.reduce_sum(probs * beta_expectations)
-
-      def grad(grad_y):
-        with tf.GradientTape() as ebm_tape:
-          energies = qhbm.ebm.energy(bitstrings)
-        energy_gradients = ebm_tape.jacobian(energies,
-                                             qhbm.ebm.trainable_variables)
-        probs_diffs = probs * (beta_expectations - energies)
-        avg_diff = tf.reduce_sum(probs_diffs)
-        grad_ebm = [
-            avg_diff *
-            tf.reduce_sum(tf.transpose(probs * tf.transpose(grad)), 0) -
-            tf.reduce_sum(tf.transpose(probs_diffs * tf.transpose(grad)), 0)
-            for grad in energy_gradients
-        ]
-
-        grad_qnn = qnn_tape.gradient(beta_expectation,
-                                     qhbm.qnn.trainable_variables)
-
-        return grad_y * (grad_ebm + grad_qnn)
-
-      if tf.constant(qhbm.analytic):
-        log_partition_function = qhbm.log_partition_function()
-      else:
-        log_partition_function = 0
-
-      return pulled_back_energy_expectation + log_partition_function, grad
-
-    return loss(qhbm.trainable_variables)
-
-
 # ============================================================================ #
 # Sample based QMHL TODO(zaqqwerty).
 # ============================================================================ #
@@ -85,7 +30,7 @@ class QMHL(tf.keras.losses.Loss):
 
 @tf.function
 def exact_qmhl_loss(
-    qhbm_model: qhbm_base.ExactQHBM,
+    qhbm_model: qhbm_base.ExactQHBM_,
     target_circuits: tf.Tensor,
     target_counts: tf.Tensor,
 ):
@@ -111,7 +56,7 @@ def exact_qmhl_loss(
 
 @tf.function
 def exact_qmhl_loss_thetas_grad(
-    qhbm_model: qhbm_base.ExactQHBM,
+    qhbm_model: qhbm_base.ExactQHBM_,
     num_model_samples: tf.Tensor,
     target_circuits: tf.Tensor,
     target_counts: tf.Tensor,
@@ -179,7 +124,7 @@ def exact_qmhl_loss_thetas_grad(
 
 @tf.function
 def exact_qmhl_loss_phis_grad(
-    qhbm: qhbm_base.ExactQHBM,
+    qhbm: qhbm_base.ExactQHBM_,
     op_tensor: tf.Tensor,
     target_circuits: tf.Tensor,
     target_count: tf.Tensor,

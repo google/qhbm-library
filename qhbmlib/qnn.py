@@ -40,17 +40,17 @@ class QNN(tf.keras.Model):
     """Initialize a QNN.
 
     Args:
-      circuit: Representation of a parameterized unitary.
-      symbols: All parameters of `circuit`.
-      symbols_initial_values: Real number for each entry of `symbols`, which are
-        the initial values of the parameters in `circuit`.
-      name: Identifier for this QNN.
+      pqc: Representation of a parameterized quantum circuit.
+      symbols: All parameters of `pqc`.
+      initializer: A 'tf.keras.initializers.Initializer' which specifies how to initialize the values of the parameters in `circuit`.
       backend: Optional Python `object` that specifies what backend TFQ will use
         for operations involving this QNN. Options are {'noisy', 'noiseless'},
         or however users may also specify a preconfigured cirq execution
         object to use instead, which must inherit `cirq.Sampler`.
       differentiator: Either None or a `tfq.differentiators.Differentiator`,
         which specifies how to take the derivative of a quantum circuit.
+      analytic: bool flag that enables analytic methods. If True, then backend must also be 'noiseless'.
+      name: Identifier for this QNN.
     """
     super().__init__(name=name)
 
@@ -84,8 +84,6 @@ class QNN(tf.keras.Model):
 
     if self.analytic:
       self._unitary_layer = tfq.layers.Unitary()
-
-  #return cirq objects?, tf.constant(primitive)
 
   @property
   def qubits(self):
@@ -191,7 +189,7 @@ class QNN(tf.keras.Model):
       Args:
         bitstrings: 2D tensor of dtype `tf.int8` whose entries are bits. These
           specify the state inputs to use in the returned set of circuits.
-        resolve: bool tensor which says whether or not to resolve the QNN
+        resolve: bool which says whether or not to resolve the QNN
           unitary before appending to the bit injection circuits.
 
       Returns:
@@ -212,7 +210,7 @@ class QNN(tf.keras.Model):
         bitstrings: 2D tensor of dtype `tf.int8` whose entries are bits. These
           specify the state inputs to the unitary of this QNN.
         counts: 1D tensor of dtype `tf.int32` such that `counts[i]` is the
-          number of samples to draw from `self.u|bitstrings[i]>`.
+          number of samples to draw from `self.pqc|bitstrings[i]>`.
 
       Returns:
         ragged_samples: `tf.RaggedTensor` of DType `tf.int8` structured such
@@ -234,10 +232,11 @@ class QNN(tf.keras.Model):
         operators: 1D tensor of strings, the result of calling
           `tfq.convert_to_tensor` on a list of cirq.PauliSum, `[op1, op2, ...]`.
           Will be tiled to measure `<opj>_self.u_dagger|circuits[i]>`
-          for each i and j, then averaged over i.
+          for each i and j.
+        reduce: bool flag for whether or not to average over i.
 
       Returns:
-        1-D tensor of floats which are the averaged expectation values.
+        1-D tensor of floats which are the averaged expectation values if reduce is True or 2-D tensor of floats which are the unaveraged expectation values is reduce is False.
       """
     circuits = self.circuits(bitstrings, resolve=False)
     return self._expectation_function(
@@ -257,8 +256,8 @@ class QNN(tf.keras.Model):
       Returns:
         1D tensor of strings which represent the pulled back circuits.
       """
-    num_circuits = tf.shape(circuits)[0]
-    inverse_pqcs = tf.tile(self.inverse_pqc(resolve=resolve), [num_circuits])
+    inverse_pqcs = tf.tile(
+        self.inverse_pqc(resolve=resolve), [tf.shape(circuits)[0]])
     return tfq.append_circuit(circuits, inverse_pqcs)
 
   @tf.function
@@ -301,7 +300,7 @@ class QNN(tf.keras.Model):
           for each i and j, then averaged over i.
 
       Returns:
-        1-D tensor of floats which are the averaged expectation values.
+        1-D tensor of floats which are the averaged expectation values if reduce is True or 2-D tensor of floats which are the unaveraged expectation values is reduce is False.
     """
     pulled_back_circuits = self.pulled_back_circuits(circuits, resolve=False)
     return self._expectation_function(

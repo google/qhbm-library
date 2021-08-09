@@ -28,6 +28,60 @@ import tensorflow_quantum as tfq
 from qhbmlib import qnn
 
 
+class QHBM(tf.keras.Model):
+
+  def __init__(self, ebm, qnn, name=None):
+    super().__init__(name=name)
+    self._ebm = ebm
+    self._qnn = qnn
+
+  @property
+  def ebm(self):
+    return self._ebm
+
+  @property
+  def qnn(self):
+    return self._qnn
+
+  @property
+  def qubits(self):
+    return self.qnn.qubits
+
+  @property
+  def analytic(self):
+    return self.ebm.analytic and self.qnn.analytic
+
+  def copy(self):
+    return QHBM(self.ebm, self.qnn, name=self.name)
+
+  @tf.function
+  def circuits(self, num_samples):
+    bitstrings, counts = self.ebm.sample(num_samples)
+    circuits = self.qnn.circuits(bitstrings)
+    return circuits, counts
+
+  @tf.function
+  def sample(self, num_samples, mask=True):
+    bitstrings, counts = self.ebm.sample(num_samples)
+    return self.qnn.sample(bitstrings, counts, mask=mask)
+
+  @tf.function
+  def expectation(self, operators, num_samples, reduce=True):
+    bitstrings, counts = self.ebm.sample(num_samples)
+    return self.qnn.expectation(bitstrings, counts, operators, reduce=reduce)
+
+  @tf.function
+  def log_partition_function(self):
+    return self.ebm.log_partition_function()
+
+  @tf.function
+  def entropy(self):
+    return self.ebm.entropy()
+
+
+#=============================================================================
+
+
 @tf.function
 def unique_with_counts(input_bitstrings, out_idx=tf.int32):
   """Extract the unique bitstrings in the given bitstring tensor.
@@ -100,7 +154,7 @@ def check_base_function(
   return fn
 
 
-class QHBM(tf.Module):
+class QHBM_(tf.Module):
   """Class for working with QHBM models in TFQ."""
 
   def __init__(self, initial_thetas, energy, sampler, initial_phis,
@@ -112,23 +166,28 @@ class QHBM(tf.Module):
     self.thetas = qnn.upgrade_initial_values(initial_thetas)
     self.energy_function = check_base_function(energy)
     self.sampler_function = check_base_function(sampler)
-    self.diagonalizing_op = qnn.QNN(u, phis_symbols, initial_phis, name)
-    self.phis = self.diagonalizing_op.phis
-    self.phis_symbols = self.diagonalizing_op.phis_symbols
-    self.u = self.diagonalizing_op.u
-    self.u_dagger = self.diagonalizing_op.u_dagger
+    self.diagonalizing_op = qnn.QNN(u, phis_symbols, name=name)
+    self.diagonalizing_op.trainable_variables[0].assign(initial_phis)
+    self.phis = self.diagonalizing_op.trainable_variables[0]
+    self.phis_symbols = self.diagonalizing_op.symbols
+    self.u = self.diagonalizing_op.pqc(resolve=False)
+    self.u_dagger = self.diagonalizing_op.inverse_pqc(resolve=False)
 
-    self.raw_qubits = self.diagonalizing_op.raw_qubits
+    self.raw_qubits = [
+        cirq.GridQubit(x[0].numpy(), x[1].numpy())
+        for x in self.diagonalizing_op.qubits
+    ]
     self.qubits = self.diagonalizing_op.qubits
-    self.bit_symbols = self.diagonalizing_op.bit_symbols
-    self.bit_and_u = tfq.append_circuit(self.diagonalizing_op.bit_circuit,
-                                        self.diagonalizing_op.u)
+    self.bit_symbols = self.diagonalizing_op._bit_symbols
+    self.bit_and_u = tfq.append_circuit(
+        self.diagonalizing_op._bit_circuit,
+        self.diagonalizing_op.pqc(resolve=False))
 
     # Simulator backends
     self.tfq_sample_layer = tfq.layers.Sample()
 
   def copy(self):
-    return QHBM(
+    return QHBM_(
         self.thetas,
         self.energy_function,
         self.sampler_function,
@@ -292,7 +351,7 @@ class QHBM(tf.Module):
     return average_energy
 
 
-class ExactQHBM(QHBM):
+class ExactQHBM_(QHBM_):
   """Used for QHBMs with exact access to the classical and quantum models."""
 
   def __init__(self, initial_thetas, energy, sampler, initial_phis,
@@ -307,7 +366,7 @@ class ExactQHBM(QHBM):
     self.tfq_expectation_layer = tfq.layers.Expectation()
 
   def copy(self):
-    return ExactQHBM(
+    return ExactQHBM_(
         self.thetas,
         self.energy_function,
         self.sampler_function,
