@@ -1,4 +1,4 @@
-# Copyright 2021 The QHBM Library Authors.
+# Copyright 2021 The QHBM Library Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,13 +24,11 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 import tensorflow_quantum as tfq
 
-from tensorflow_probability.python.mcmc.internal import util as mcmc_util
-
 
 class EnergyFunction(tf.keras.Model, abc.ABC):
 
-  def __init__(self, name=None):
-    super().__init__(name=name)
+  def __init__(self):
+    super().__init__()
 
   @property
   @abc.abstractmethod
@@ -38,8 +36,9 @@ class EnergyFunction(tf.keras.Model, abc.ABC):
     raise NotImplementedError()
 
   @property
+  @abc.abstractmethod
   def has_operators(self):
-    return False
+    raise NotImplementedError()
 
   @abc.abstractmethod
   def energy(self, bitstrings):
@@ -54,20 +53,16 @@ class KOBE(EnergyFunction):
   def __init__(self,
                num_bits,
                order,
-               initializer=tf.keras.initializers.RandomUniform(),
-               name=None):
-    super().__init__(name=name)
+               initializer=tf.keras.initializers.RandomUniform()):
+    super().__init__()
     self._num_bits = num_bits
-    self._order = order
-    self._indices = []
+    self.order = order
+    self.indices = []
     for i in range(1, order + 1):
       combos = itertools.combinations(range(order), i)
-      self._indices.extend([tf.constant(c) for c in combos])
-    self._indices = tf.ragged.stack(self._indices)
-    self._variables = self.add_weight(
-        name=f'{self.name}_variables',
-        shape=[self.indices.nrows()],
-        initializer=initializer)
+      self.indices.extend([tf.constant(c) for c in combos])
+    self.indices = tf.ragged.stack(self.indices)
+    self._variables = tf.Variable(initializer([self.indices.nrows()]))
 
   @property
   def num_bits(self):
@@ -77,17 +72,13 @@ class KOBE(EnergyFunction):
   def has_operators(self):
     return True
 
-  @property
-  def order(self):
-    return self._order
-
   @tf.function
   def energy(self, bitstrings):
     spins = 1 - 2 * bitstrings
     parities_t = tf.zeros(
-        [self._indices.nrows(), tf.shape(bitstrings)[0]], dtype=tf.float32)
-    for i in tf.range(self._indices.nrows()):
-      parity = tf.reduce_prod(tf.gather(spins, self._indices[i], axis=-1), -1)
+        [self.indices.nrows(), tf.shape(bitstrings)[0]], dtype=tf.float32)
+    for i in tf.range(self.indices.nrows()):
+      parity = tf.reduce_prod(tf.gather(spins, self.indices[i], axis=-1), -1)
       parities_t = tf.tensor_scatter_nd_update(parities_t, [[i]], [parity])
     return tf.reduce_sum(tf.transpose(parities_t) * self._variables, -1)
 
@@ -95,36 +86,40 @@ class KOBE(EnergyFunction):
     if len(qubits) != self.num_bits:
       raise ValueError("Need one qubit for every bit.")
     operators = []
-    for i in range(self._indices.nrows()):
+    for i in range(self.indices.nrows()):
       operators.append(
           cirq.PauliString(
-              cirq.Z(qubits[self._indices[i][j]])
-              for j in range(tf.shape(self._indices[i])[0])))
+              cirq.Z(qubits[self.indices[i][j]])
+              for j in range(tf.shape(self.indices[i])[0])))
     return tfq.convert_to_tensor(operators)
 
 
 class MLP(EnergyFunction):
 
-  def __init__(self, num_bits, units, activations, name=None):
-    super().__init__(name=name)
+  def __init__(self, num_bits, units, activations):
+    super().__init__()
     self._num_bits = num_bits
-    self._hidden_layers = [
+    self.hidden_layers = [
         tf.keras.layers.Dense(u, activation=a)
         for u, a in zip(units, activations)
     ]
-    self._energy_layer = tf.keras.layers.Dense(1)
+    self.energy_layer = tf.keras.layers.Dense(1)
     self.build([1, num_bits])
 
   @property
   def num_bits(self):
     return self._num_bits
 
+  @property
+  def has_operators(self):
+    return False
+
   @tf.function
   def call(self, bitstrings):
     x = bitstrings
-    for hidden_layer in self._hidden_layers:
+    for hidden_layer in self.hidden_layers:
       x = hidden_layer(x)
-    x = self._energy_layer(x)
+    x = self.energy_layer(x)
     return tf.squeeze(x, -1)
 
   @tf.function
@@ -147,7 +142,6 @@ class EnergySampler(abc.ABC):
 @tf.function
 def unique_bitstrings_with_counts(bitstrings):
   """Extract the unique bitstrings in the given bitstring tensor.
-
     Works by converting each bitstring to a 64 bit integer, then using built-in
     `tf.unique_with_counts` on this 1-D array, then mapping these integers back
     to
@@ -156,20 +150,17 @@ def unique_bitstrings_with_counts(bitstrings):
     those of `tf.unique_with_counts`,
     y[idx[i]] = input_bitstrings[i] for i in [0, 1,...,rank(input_bitstrings) -
     1]
-
     TODO(zaqqwerty): the signature and return values are designed to be similar
     to those of tf.unique_with_counts.  This function is needed because
     `tf.unique_with_counts` does not work on 2-D tensors.  When it begins to
     work
     on 2-D tensors, then this function will be deprecated.
-
     Args:
       input_bitstrings: 2-D `tf.Tensor` of dtype `int8`.  This tensor is
         interpreted as a list of bitstrings.  Bitstrings are required to be 64
         bits or fewer.
       out_idx: An optional `tf.DType` from: `tf.int32`, `tf.int64`. Defaults to
         `tf.int32`.  Specified type of idx and count outputs.
-
     Returns:
       y: 2-D `tf.Tensor` of dtype `int8` containing the unique 0-axis entries of
         `input_bitstrings`.
@@ -205,65 +196,29 @@ class EnergyKernel(tfp.mcmc.TransitionKernel, abc.ABC):
     raise NotImplementedError()
 
 
-class UncalibratedGWGResults(
-    mcmc_util.PrettyNamedTupleMixin,
-    collections.namedtuple('UncalibratedGWGResults',
-                           ['target_log_prob', 'log_acceptance_correction'])):
-  __slots__ = ()
+UncalibratedGWGResults = collections.namedtuple(
+    "UncalibratedGWGResults", ["target_log_prob", "log_acceptance_correction"])
 
 
 class UncalibratedGWG(EnergyKernel):
 
-  def __init__(self,
-               energy_function,
-               gradient=True,
-               temperature=2.0,
-               num_samples=1,
-               experimental_shard_axis_names=None,
-               name=None):
-    self._parameters = dict(
-        energy_function=energy_function,
-        gradient=gradient,
-        temperature=temperature,
-        num_samples=num_samples,
-        experimental_shard_axis_names=experimental_shard_axis_names,
-        name=name)
-    self._diff_function = self._grad_diff_function if gradient else self._exact_diff_function
+  def __init__(self, energy_function, grad=True, temp=2.0, num_samples=1):
+    self._energy_function = energy_function
+    self.grad = grad
+    self.diff_function = self.grad_diff_function if grad else self.exact_diff_function
+    self.temp = temp
+    self.num_samples = num_samples
 
   @property
   def energy_function(self):
-    return self._parameters['energy_function']
-
-  @property
-  def gradient(self):
-    return self._parameters['gradient']
-
-  @property
-  def temperature(self):
-    return self._parameters['temperature']
-
-  @property
-  def num_samples(self):
-    return self._parameters['num_samples']
-
-  @property
-  def experimental_shard_axis_names(self):
-    return self._parameters['experimental_shard_axis_names']
-
-  @property
-  def name(self):
-    return self._parameters['name']
-
-  @property
-  def parameters(self):
-    return self._parameters
+    return self._energy_function
 
   @property
   def is_calibrated(self):
     return False
 
   @tf.function
-  def _exact_diff_function(self, current_state):
+  def exact_diff_function(self, current_state):
     current_state_t = tf.transpose(current_state)
     diff_t = tf.zeros_like(current_state_t, dtype=tf.float32)
     current_energy = self.energy_function.energy(current_state)
@@ -280,7 +235,7 @@ class UncalibratedGWG(EnergyKernel):
     return tf.transpose(diff_t)
 
   @tf.function
-  def _grad_diff_function(self, current_state):
+  def grad_diff_function(self, current_state):
     current_state = tf.cast(current_state, tf.float32)
     with tf.GradientTape() as tape:
       tape.watch(current_state)
@@ -290,9 +245,9 @@ class UncalibratedGWG(EnergyKernel):
 
   @tf.function
   def one_step(self, current_state, previous_kernel_results):
-    forward_diff = self._diff_function(current_state)
+    forward_diff = self.diff_function(current_state)
     forward_dist = tfp.distributions.OneHotCategorical(
-        logits=forward_diff / self.temperature, dtype=tf.int8)
+        logits=forward_diff / self.temp, dtype=tf.int8)
     all_changes = forward_dist.sample(self.num_samples)
     total_change = tf.cast(tf.reduce_sum(all_changes, 0) > 0, tf.int8)
     next_state = tf.bitwise.bitwise_xor(total_change, current_state)
@@ -300,9 +255,9 @@ class UncalibratedGWG(EnergyKernel):
     target_log_prob = -1 * self.energy_function.energy(next_state)
 
     forward_log_prob = tf.reduce_sum(forward_dist.log_prob(all_changes), 0)
-    backward_diff = self._diff_function(next_state)
+    backward_diff = self.diff_function(next_state)
     backward_dist = tfp.distributions.OneHotCategorical(
-        logits=backward_diff / self.temperature, dtype=tf.int8)
+        logits=backward_diff / self.temp, dtype=tf.int8)
     backward_log_prob = tf.reduce_sum(backward_dist.log_prob(all_changes), 0)
     log_acceptance_correction = backward_log_prob - forward_log_prob
 
@@ -320,14 +275,11 @@ class UncalibratedGWG(EnergyKernel):
         log_acceptance_correction=tf.zeros_like(target_log_prob))
     return kernel_results
 
-  def experimental_with_shard_axes(self, shard_axis_names):
-    return self.copy(experimental_shard_axis_names=shard_axis_names)
-
 
 class MetropolisHastings(tfp.mcmc.MetropolisHastings, EnergyKernel):
 
-  def __init__(self, inner_kernel, name=None):
-    super().__init__(inner_kernel, name=name)
+  def __init__(self, inner_kernel):
+    super().__init__(inner_kernel)
 
   @property
   def energy_function(self):
@@ -336,66 +288,10 @@ class MetropolisHastings(tfp.mcmc.MetropolisHastings, EnergyKernel):
 
 class GWG(MetropolisHastings):
 
-  def __init__(self,
-               energy_function,
-               gradient=True,
-               temperature=2.0,
-               num_samples=1,
-               experimental_shard_axis_names=None,
-               name=None):
-    self._impl = MetropolisHastings(
-        UncalibratedGWG(
-            energy_function,
-            gradient=gradient,
-            temperature=temperature,
-            num_samples=num_samples,
-            experimental_shard_axis_names=experimental_shard_axis_names,
-            name=name)).experimental_with_shard_axes(
-                experimental_shard_axis_names)
-    self._parameters = self._impl.inner_kernel.parameters.copy()
-
-  @property
-  def energy_function(self):
-    return self._impl.inner_kernel.energy_function
-
-  @property
-  def gradient(self):
-    return self._impl.inner_kernel.gradient
-
-  @property
-  def temperature(self):
-    return self._impl.inner_kernel.temperature
-
-  @property
-  def num_samples(self):
-    return self._impl.inner_kernel.num_samples
-
-  @property
-  def experimental_shard_axis_names(self):
-    return self._parameters['experimental_shard_axis_names']
-
-  @property
-  def name(self):
-    return self._impl.inner_kernel.name
-
-  @property
-  def parameters(self):
-    return self._impl.inner_kernel.parameters
-
-  @property
-  def is_calibrated(self):
-    return True
-
-  @tf.function
-  def one_step(self, current_state, previous_kernel_results):
-    return self._impl.one_step(current_state, previous_kernel_results)
-
-  @tf.function
-  def bootstrap_results(self, init_state):
-    return self._impl.bootstrap_results(init_state)
-
-  def experimental_with_shard_axes(self, shard_axis_names):
-    return self.copy(experimental_shard_axis_names=shard_axis_names)
+  def __init__(self, energy_function, grad=True, temp=2.0, num_samples=1):
+    inner_kernel = UncalibratedGWG(
+        energy_function, grad=grad, temp=temp, num_samples=num_samples)
+    super().__init__(inner_kernel)
 
 
 class MCMC(EnergySampler):
@@ -407,56 +303,22 @@ class MCMC(EnergySampler):
                buffer_prob=1,
                num_burnin_steps=0,
                num_steps_between_results=0,
-               parallel_iterations=10,
-               name=None):
-    self._kernel = kernel
-    self._num_chains = num_chains
-    self._num_bits = kernel.energy_function.num_bits
-    self._buffer_capacity = buffer_capacity
-    self._buffer_prob = buffer_prob
-    self._num_burnin_steps = num_burnin_steps
-    self._num_steps_between_results = num_steps_between_results
-    self._parallel_iterations = parallel_iterations
-    self._name = name
+               parallel_iterations=10):
+    self.kernel = kernel
+    self.num_chains = num_chains
+    self.num_bits = kernel.energy_function.num_bits
+    self.buffer_capacity = buffer_capacity
+    self.buffer_prob = buffer_prob
+    self.num_burnin_steps = num_burnin_steps
+    self.num_steps_between_results = num_steps_between_results
+    self.parallel_iterations = parallel_iterations
 
-    self._buffer = tf.queue.RandomShuffleQueue(
+    self.buffer = tf.queue.RandomShuffleQueue(
         buffer_capacity, 0, [tf.int8], shapes=[self.num_bits])
 
   @property
   def energy_function(self):
     return self.kernel.energy_function
-
-  @property
-  def kernel(self):
-    return self._kernel
-
-  @property
-  def num_chains(self):
-    return self._num_chains
-
-  @property
-  def buffer_capacity(self):
-    return self._buffer_capacity
-
-  @property
-  def buffer_prob(self):
-    return self._buffer_prob
-
-  @property
-  def num_burnin_steps(self):
-    return self._num_burnin_steps
-
-  @property
-  def num_steps_between_results(self):
-    return self._num_steps_between_results
-
-  @property
-  def parallel_iterations(self):
-    return self._parallel_iterations
-
-  @property
-  def name(self):
-    return self._name
 
   @tf.function
   def sample(self, num_samples):
@@ -464,17 +326,17 @@ class MCMC(EnergySampler):
 
     if tf.random.uniform(()) > self.buffer_prob:
       init_state = tf.cast(
-          tf.random.uniform([self.num_chains, self._num_bits],
+          tf.random.uniform([self.num_chains, self.num_bits],
                             maxval=2,
                             dtype=tf.int32), tf.int8)
     else:
-      init_state = self._buffer.dequeue_many(
-          tf.math.minimum(self.num_chains, self._buffer.size()))
+      init_state = self.buffer.dequeue_many(
+          tf.math.minimum(self.num_chains, self.buffer.size()))
       init_state = tf.concat([
           init_state,
           tf.cast(
               tf.random.uniform(
-                  [self.num_chains - tf.shape(init_state)[0], self._num_bits],
+                  [self.num_chains - tf.shape(init_state)[0], self.num_bits],
                   maxval=2,
                   dtype=tf.int32), tf.int8)
       ], 0)
@@ -488,36 +350,30 @@ class MCMC(EnergySampler):
         kernel=self.kernel,
         num_burnin_steps=self.num_burnin_steps,
         num_steps_between_results=self.num_steps_between_results,
-        trace_fn=None,
         parallel_iterations=self.parallel_iterations,
-        name=self.name)
+        trace_fn=None)
 
-    sampled_states = tf.reshape(samples, [-1, self._num_bits])
-    if tf.shape(sampled_states)[0] > self.buffer_capacity - self._buffer.size():
-      self._buffer.dequeue_many(
+    sampled_states = tf.reshape(samples, [-1, self.num_bits])
+    if tf.shape(sampled_states)[0] > self.buffer_capacity - self.buffer.size():
+      self.buffer.dequeue_many(
           tf.math.minimum(
               tf.shape(sampled_states)[0] -
-              (self.buffer_capacity - self._buffer.size()),
-              self._buffer.size()))
-    self._buffer.enqueue_many(sampled_states[:tf.math.minimum(
+              (self.buffer_capacity - self.buffer.size()), self.buffer.size()))
+    self.buffer.enqueue_many(sampled_states[:tf.math.minimum(
         tf.shape(sampled_states)[0], self.buffer_capacity)])
 
     return unique_bitstrings_with_counts(sampled_states[:num_samples])
 
 
-class EBM(tf.keras.Model):
+class EBM(tf.Module):
 
-  def __init__(self,
-               energy_function,
-               energy_sampler,
-               analytic=False,
-               name=None):
-    super().__init__(name=name)
-    self._energy_function = energy_function
-    self._energy_sampler = energy_sampler
-    self._analytic = analytic
+  def __init__(self, energy_function, energy_sampler, analytic=False):
+    super().__init__()
+    self.energy_function = energy_function
+    self.energy_sampler = energy_sampler
+    self.analytic = analytic
     if analytic:
-      self._all_bitstrings = tf.constant(
+      self.all_bitstrings = tf.constant(
           list(itertools.product([0, 1], repeat=energy_function.num_bits)),
           dtype=tf.int8)
 
@@ -530,35 +386,35 @@ class EBM(tf.keras.Model):
     return self.energy_function.has_operators
 
   @property
-  def analytic(self):
-    return self._analytic
+  def is_analytic(self):
+    return self.analytic
 
   @tf.function
   def energy(self, bitstrings):
-    return self._energy_function.energy(bitstrings)
+    return self.energy_function.energy(bitstrings)
 
   def operators(self, qubits):
-    return self._energy_function.operators(qubits)
+    return self.energy_function.operators(qubits)
 
   @tf.function
   def sample(self, num_samples):
-    if self.analytic and self._energy_sampler is None:
-      all_energies = self.energy(self._all_bitstrings)
+    if self.analytic and self.energy_sampler is None:
+      all_energies = self.energy(self.all_bitstrings)
       dist = tfp.distributions.Categorical(logits=-1 * all_energies)
-      return tf.gather(self._all_bitstrings, dist.sample(num_samples))
-    return self._energy_sampler.sample(num_samples)
+      return tf.gather(self.all_bitstrings, dist.sample(num_samples))
+    return self.energy_sampler.sample(num_samples)
 
   @tf.function
   def log_partition_function(self):
     if self.analytic:
-      all_energies = self.energy(self._all_bitstrings)
+      all_energies = self.energy(self.all_bitstrings)
       return tf.reduce_logsumexp(-1 * all_energies)
     raise NotImplementedError()
 
   @tf.function
   def entropy(self):
     if self.analytic:
-      all_energies = self.energy(self._all_bitstrings)
+      all_energies = self.energy(self.all_bitstrings)
       dist = tfp.distributions.Categorical(logits=-1 * all_energies)
       return dist.entropy()
     raise NotImplementedError()
@@ -568,15 +424,11 @@ class Bernoulli(EBM):
 
   def __init__(self,
                num_bits,
-               initializer=tf.keras.initializers.RandomUniform(),
-               name=None):
-    super().__init__(name=name)
+               initializer=tf.keras.initializers.RandomUniform()):
+    tf.Module.__init__(self)
     self._num_bits = num_bits
-    self._variables = self.add_weight(
-        name=f'{self.name}_variables',
-        shape=[self.num_bits],
-        initializer=initializer)
-    self._dist = tfp.distributions.Bernoulli(
+    self._variables = tf.Variable(initializer([num_bits]))
+    self.dist = tfp.distributions.Bernoulli(
         logits=2 * self._variables, dtype=tf.int8)
 
   @property
@@ -588,7 +440,7 @@ class Bernoulli(EBM):
     return True
 
   @property
-  def analytic(self):
+  def is_analytic(self):
     return True
 
   @tf.function
@@ -602,7 +454,7 @@ class Bernoulli(EBM):
 
   @tf.function
   def sample(self, num_samples):
-    return unique_bitstrings_with_counts(self._dist.sample(num_samples))
+    return unique_bitstrings_with_counts(self.dist.sample(num_samples))
 
   @tf.function
   def log_partition_function(self):
@@ -610,7 +462,7 @@ class Bernoulli(EBM):
 
   @tf.function
   def entropy(self):
-    return tf.reduce_sum(self._dist.entropy())
+    return tf.reduce_sum(self.dist.entropy())
 
 
 # NEW

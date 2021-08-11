@@ -19,62 +19,6 @@ import tensorflow_quantum as tfq
 
 from qhbmlib import qhbm_base
 
-
-class VQT(tf.keras.losses.Loss):
-
-  def __init__(self, num_samples, name=None):
-    super().__init__(name=name)
-    self._num_samples = num_samples
-
-  @property
-  def num_samples(self):
-    return self._num_samples
-
-  def call(self, qhbm, hamiltonian_beta):
-    hamiltonian, beta = hamiltonian_beta
-
-    @tf.function
-    @tf.custom_gradient
-    def loss(vars):
-      bitstrings, counts = qhbm.ebm.sample(self.num_samples)
-      probs = tf.cast(counts, tf.float32) / tf.cast(
-          tf.reduce_sum(counts), tf.float32)
-      with tf.GradientTape() as qnn_tape:
-        beta_expectations = beta * tf.squeeze(
-            qhbm.qnn.expectation(bitstrings, counts, hamiltonian, reduce=False),
-            -1)
-        beta_expectation = tf.reduce_sum(probs * beta_expectations)
-
-      @tf.function
-      def grad(grad_y):
-        with tf.GradientTape() as ebm_tape:
-          energies = qhbm.ebm.energy(bitstrings)
-        energy_gradients = ebm_tape.jacobian(energies,
-                                             qhbm.ebm.trainable_variables)
-        probs_diffs = probs * (beta_expectations - energies)
-        avg_diff = tf.reduce_sum(probs_diffs)
-        grad_ebm = [
-            avg_diff *
-            tf.reduce_sum(tf.transpose(probs * tf.transpose(grad)), 0) -
-            tf.reduce_sum(tf.transpose(probs_diffs * tf.transpose(grad)), 0)
-            for grad in energy_gradients
-        ]
-
-        grad_qnn = qnn_tape.gradient(beta_expectation,
-                                     qhbm.qnn.trainable_variables)
-
-        return grad_y * (grad_ebm + grad_qnn)
-
-      if qhbm.analytic:
-        entropy = qhbm.entropy()
-      else:
-        entropy = -tf.reduce_sum(probs * tf.math.log(probs))
-
-      return beta_expectation - entropy, grad
-
-    return loss(qhbm.trainable_variables)
-
-
 # ============================================================================ #
 # Sample-based VQT.
 # ============================================================================ #
@@ -88,13 +32,11 @@ def vqt_loss(
     hamiltonian: tf.Tensor,
 ):
   """Estimates the VQT loss function between a QHBM and a Hamiltonian.
-
     The two step process follows the VQT loss estimator described in the paper.
     First, samples are drawn from the classical probability distribution of the
     input QHBM.  Then, two quantities are estimated from these samples: the
     entropy of the distribution is calculated by a frequency estimator, and the
     energy is calculated via the Monte-Carlo estimator defined in the paper.
-
     Args:
       qhbm: The QHBM against which the loss is to be calculated.
       num_samples: The number of samples to draw from the classical probability
@@ -103,7 +45,6 @@ def vqt_loss(
       hamiltonian: Hamiltonian of the target thermal state. It is a 2-D tensor
         of strings, the result of calling `tfq.convert_to_tensor` on a list of
         lists of cirq.PauliSum which has only one term, `[[op]]`.
-
     Returns:
       Estimate of the VQT loss between the input QHBM and target thermal state.
     """
@@ -214,7 +155,6 @@ def vqt_loss_phis_grad(
 
 def _tiled_expectation(circuits: tf.Tensor, hamiltonian: tf.Tensor):
   """Calculates the expectation value for every circuit.
-
     Args:
       circuits: 1-D tensor of strings which are TFQ serialized circuits with no
         free parameters.
@@ -222,7 +162,6 @@ def _tiled_expectation(circuits: tf.Tensor, hamiltonian: tf.Tensor):
         `tfq.convert_to_tensor` on a list of lists of cirq.PauliSum which has
         only one term, `[[op]]`.  Will be tiled along the 0th dimension, to be
         measured against each entry of `circuits`.
-
     Returns:
       1-D tensor of floats which are the expectation values of the single op in
         `hamiltonian` measured against each circuit in `circuits`.
