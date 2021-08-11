@@ -129,26 +129,32 @@ class QNN(tf.keras.Model):
     self._pqc = upgrade_circuit(pqc, self.symbols)
     self._inverse_pqc = upgrade_circuit(pqc**-1, self.symbols)
 
-    qubits = sorted(pqc.all_qubits())
-    self._qubits = tf.constant([[q.row, q.col] for q in qubits])
-    bit_circuit, bit_symbols = build_bit_circuit(qubits)
-    self._bit_symbols = upgrade_symbols(bit_symbols, tf.ones([len(qubits)]))
+    self._raw_qubits = sorted(pqc.all_qubits())
+    self._qubits = tf.constant([[q.row, q.col] for q in self._raw_qubits])
+    bit_circuit, bit_symbols = build_bit_circuit(self._raw_qubits)
+    self._bit_symbols = upgrade_symbols(bit_symbols,
+                                        tf.ones([len(self._raw_qubits)]))
     self._bit_circuit = upgrade_circuit(bit_circuit, self._bit_symbols)
 
-    self._backend = backend
     self._differentiator = differentiator
     self._sample_layer = tfq.layers.Sample(backend=backend)
     if backend == 'noiseless' or backend is None:
+      self._backend = 'noiseless'
       self._analytic = analytic
       self._expectation_layer = tfq.layers.Expectation(
           backend=backend, differentiator=differentiator)
     else:
+      self._backend = backend
       self._analytic = False
       self._expectation_layer = tfq.layers.SampledExpectation(
           backend=backend, differentiator=differentiator)
 
     if self.analytic:
       self._unitary_layer = tfq.layers.Unitary()
+
+  @property
+  def raw_qubits(self):
+    return self._raw_qubits
 
   @property
   def qubits(self):
@@ -363,6 +369,6 @@ class QNN(tf.keras.Model):
 
   @tf.function
   def pqc_unitary(self):
-    if self.analytic:
+    if tf.constant(self.analytic):
       return self._unitary_layer(self.pqc()).to_tensor()[0]
     raise NotImplementedError()
