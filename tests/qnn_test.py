@@ -30,92 +30,74 @@ from tests import test_util
 # Global tolerance, set for float32.
 ATOL = 1e-5
 
-# class BuildBitCircuitTest(tf.test.TestCase):
-#   """Test build_bit_circuit from the qhbm library."""
+class BuildBitCircuitTest(tf.test.TestCase):
+  """Test build_bit_circuit from the qhbm library."""
 
-#   def test_build_bit_circuit(self):
-#     """Confirm correct bit injector circuit creation."""
-#     my_qubits = [
-#         cirq.GridQubit(0, 2),
-#         cirq.GridQubit(1, 4),
-#         cirq.GridQubit(2, 2)
-#     ]
-#     identifier = "build_bit_test"
-#     test_circuit, test_symbols = qnn.build_bit_circuit(my_qubits, identifier)
-#     expected_symbols = list(
-#         sympy.symbols(
-#             "_bit_build_bit_test_0 _bit_build_bit_test_1 _bit_build_bit_test_2")
-#     )
-#     expected_circuit = cirq.Circuit(
-#         [cirq.X(q)**s for q, s in zip(my_qubits, expected_symbols)])
-#     self.assertAllEqual(test_symbols, expected_symbols)
-#     self.assertEqual(test_circuit, expected_circuit)
+  def test_build_bit_circuit(self):
+    """Confirm correct bit injector circuit creation."""
+    my_qubits = [
+        cirq.GridQubit(0, 2),
+        cirq.GridQubit(1, 4),
+        cirq.GridQubit(2, 2)
+    ]
+    identifier = "build_bit_test"
+    test_circuit, test_symbols = qnn.build_bit_circuit(my_qubits, identifier)
+    expected_symbols = list(
+        sympy.symbols(
+            "_bit_build_bit_test_0 _bit_build_bit_test_1 _bit_build_bit_test_2")
+    )
+    expected_circuit = cirq.Circuit(
+        [cirq.X(q)**s for q, s in zip(my_qubits, expected_symbols)])
+    self.assertAllEqual(test_symbols, expected_symbols)
+    self.assertEqual(test_circuit, expected_circuit)
 
-# class InputChecksTest(tf.test.TestCase):
-#   """Tests all the input checking functions used for QHBMs."""
+class InputChecksTest(tf.test.TestCase):
+  """Tests all the input checking functions used for QHBMs."""
 
-#   def test_upgrade_initial_values(self):
-#     """Confirms lists of values are properly upgraded to variables."""
-#     # Test allowed inputs.
-#     true_list = [-5.1, 2.8, -3.4, 4.8]
-#     true_tensor = tf.constant(true_list, dtype=tf.float32)
-#     true_variable = tf.Variable(true_tensor)
-#     self.assertAllClose(
-#         qnn.upgrade_initial_values(true_list), true_variable, atol=ATOL)
-#     self.assertAllClose(
-#         qnn.upgrade_initial_values(true_tensor), true_variable, atol=ATOL)
-#     self.assertAllClose(
-#         qnn.upgrade_initial_values(true_variable), true_variable, atol=ATOL)
-#     # Check for bad inputs.
-#     with self.assertRaisesRegex(TypeError, "numeric type"):
-#       _ = qnn.upgrade_initial_values("junk")
-#     with self.assertRaisesRegex(ValueError, "must be 1D"):
-#       _ = qnn.upgrade_initial_values([[5.2]])
+  def test_upgrade_symbols(self):
+    """Confirms symbols are upgraded appropriately."""
+    true_symbol_names = ["test1", "a", "my_symbol", "MySymbol2"]
+    values = tf.constant([0 for _ in true_symbol_names])
+    true_symbols = [sympy.Symbol(s) for s in true_symbol_names]
+    true_symbols_t = tf.constant(true_symbol_names, dtype=tf.string)
+    self.assertAllEqual(true_symbols_t,
+                        qnn.upgrade_symbols(true_symbols, values))
+    # Test bad inputs.
+    with self.assertRaisesRegex(TypeError, "must be `sympy.Symbol`"):
+      _ = qnn.upgrade_symbols(true_symbols[:-1] + ["bad"], values)
+    with self.assertRaisesRegex(ValueError, "must be unique"):
+      _ = qnn.upgrade_symbols(true_symbols[:-1] + true_symbols[:1], values)
+    with self.assertRaisesRegex(ValueError, "symbol for every value"):
+      _ = qnn.upgrade_symbols(true_symbols, values[:-1])
+    with self.assertRaisesRegex(TypeError, "must be an iterable"):
+      _ = qnn.upgrade_symbols(5, values)
 
-#   def test_upgrade_symbols(self):
-#     """Confirms symbols are upgraded appropriately."""
-#     true_symbol_names = ["test1", "a", "my_symbol", "MySymbol2"]
-#     values = tf.constant([0 for _ in true_symbol_names])
-#     true_symbols = [sympy.Symbol(s) for s in true_symbol_names]
-#     true_symbols_t = tf.constant(true_symbol_names, dtype=tf.string)
-#     self.assertAllEqual(true_symbols_t,
-#                         qnn.upgrade_symbols(true_symbols, values))
-#     # Test bad inputs.
-#     with self.assertRaisesRegex(TypeError, "must be `sympy.Symbol`"):
-#       _ = qnn.upgrade_symbols(true_symbols[:-1] + ["bad"], values)
-#     with self.assertRaisesRegex(ValueError, "must be unique"):
-#       _ = qnn.upgrade_symbols(true_symbols[:-1] + true_symbols[:1], values)
-#     with self.assertRaisesRegex(ValueError, "symbol for every value"):
-#       _ = qnn.upgrade_symbols(true_symbols, values[:-1])
-#     with self.assertRaisesRegex(TypeError, "must be an iterable"):
-#       _ = qnn.upgrade_symbols(5, values)
-
-#   def test_upgrade_circuit(self):
-#     """Confirms circuits are upgraded appropriately."""
-#     qubits = cirq.GridQubit.rect(1, 5)
-#     true_symbol_names = ["a", "b"]
-#     true_symbols = [sympy.Symbol(s) for s in true_symbol_names]
-#     true_symbols_t = tf.constant(true_symbol_names, dtype=tf.string)
-#     true_circuit = cirq.Circuit()
-#     for q in qubits:
-#       for s in true_symbols:
-#         true_circuit += cirq.X(q)**s
-#     true_circuit_t = tfq.convert_to_tensor([true_circuit])
-#     self.assertEqual(
-#         tfq.from_tensor(true_circuit_t),
-#         tfq.from_tensor(qnn.upgrade_circuit(true_circuit, true_symbols_t)),
-#     )
-#     # Test bad inputs.
-#     with self.assertRaisesRegex(TypeError, "must be a `cirq.Circuit`"):
-#       _ = qnn.upgrade_circuit("junk", true_symbols_t)
-#     with self.assertRaisesRegex(TypeError, "must be a `tf.Tensor`"):
-#       _ = qnn.upgrade_circuit(true_circuit, true_symbol_names)
-#     with self.assertRaisesRegex(TypeError, "dtype `tf.string`"):
-#       _ = qnn.upgrade_circuit(true_circuit, tf.constant([5.5]))
-#     with self.assertRaisesRegex(ValueError, "must contain"):
-#       _ = qnn.upgrade_circuit(true_circuit, tf.constant(["a", "junk"]))
-#     with self.assertRaisesRegex(ValueError, "Empty circuit"):
-#       _ = qnn.upgrade_circuit(cirq.Circuit(), tf.constant([], dtype=tf.string))
+  def test_upgrade_circuit(self):
+    """Confirms circuits are upgraded appropriately."""
+    qubits = cirq.GridQubit.rect(1, 5)
+    true_symbol_names = ["a", "b"]
+    true_symbols = [sympy.Symbol(s) for s in true_symbol_names]
+    true_symbols_t = tf.constant(true_symbol_names, dtype=tf.string)
+    true_circuit = cirq.Circuit()
+    for q in qubits:
+      for s in true_symbols:
+        true_circuit += cirq.X(q)**s
+    true_circuit_t = tfq.convert_to_tensor([true_circuit])
+    self.assertEqual(
+        tfq.from_tensor(true_circuit_t),
+        tfq.from_tensor(qnn.upgrade_circuit(true_circuit, true_symbols_t)),
+    )
+    # Test bad inputs.
+    with self.assertRaisesRegex(TypeError, "must be a `cirq.Circuit`"):
+      _ = qnn.upgrade_circuit("junk", true_symbols_t)
+    with self.assertRaisesRegex(TypeError, "must be a `tf.Tensor`"):
+      _ = qnn.upgrade_circuit(true_circuit, true_symbol_names)
+    with self.assertRaisesRegex(TypeError, "dtype `tf.string`"):
+      _ = qnn.upgrade_circuit(true_circuit, tf.constant([5.5]))
+    with self.assertRaisesRegex(ValueError, "must contain"):
+      _ = qnn.upgrade_circuit(true_circuit, tf.constant(["a", "junk"]))
+    with self.assertRaisesRegex(ValueError, "Empty circuit"):
+      _ = qnn.upgrade_circuit(cirq.Circuit(), tf.constant([], dtype=tf.string))
 
 
 class QNNTest(tf.test.TestCase):
@@ -152,7 +134,6 @@ class QNNTest(tf.test.TestCase):
         analytic=True,
         name=self.name)
     self.assertEqual(self.name, test_qnn.name)
-    # self.assertEqual(self.initializer, test_qnn._values.initializer)
     self.assertAllEqual(self.symbols, test_qnn.symbols)
     self.assertAllEqual(self.backend, test_qnn.backend)
     self.assertAllEqual(self.differentiator, test_qnn.differentiator)
@@ -165,7 +146,6 @@ class QNNTest(tf.test.TestCase):
         tfq.from_tensor(self.inverse_pqc_tfq),
         tfq.from_tensor(test_qnn._inverse_pqc),
     )
-    # self.assertAllEqual(self.raw_qubits, test_qnn.raw_qubits)
     self.assertAllEqual(self.bit_symbols, test_qnn._bit_symbols)
     self.assertEqual(
         tfq.from_tensor(self.bit_circuit),

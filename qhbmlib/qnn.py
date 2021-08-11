@@ -24,6 +24,73 @@ import tensorflow_quantum as tfq
 from tensorflow_quantum.python.layers.circuit_executors import input_checks
 
 
+def build_bit_circuit(qubits, name):
+  """Returns exponentiated X gate on each qubit and the exponent symbols."""
+  circuit = cirq.Circuit()
+  symbols = []
+  for n, q in enumerate(qubits):
+    new_bit = sympy.Symbol("{0}_bit_{1}".format(name, n))
+    circuit += cirq.X(q)**new_bit
+    symbols.append(new_bit)
+  return circuit, symbols
+
+
+def upgrade_symbols(
+    symbols: Union[Iterable[sympy.Symbol], tf.Tensor],
+    values: Union[tf.Tensor, tf.Variable],
+) -> tf.Tensor:
+  """Upgrades symbols and checks for correct shape.
+
+    For a circuit compatible with TFQ, there must be a value associated with
+    each symbol. This function ensures `values` is the same shape as `symbols`.
+
+    Args:
+      symbols: Iterable of `sympy.Symbol`s to upgrade.
+      values: Values corresponding to the symbols.
+
+    Returns:
+      `tf.Tensor` containing the string representations of the input `symbols`.
+    """
+  if isinstance(symbols, Iterable):
+    if not all([isinstance(s, sympy.Symbol) for s in symbols]):
+      raise TypeError("Each entry of `symbols` must be `sympy.Symbol`.")
+    symbols_partial_upgrade = [str(s) for s in symbols]
+    if len(set(symbols_partial_upgrade)) != len(symbols):
+      raise ValueError("All entries of `symbols` must be unique.")
+    symbols_upgrade = tf.constant(symbols_partial_upgrade, dtype=tf.string)
+    if tf.shape(symbols_upgrade) != tf.shape(values):
+      raise ValueError("There must be a symbol for every value.")
+    return symbols_upgrade
+  raise TypeError("`symbols` must be an iterable of `sympy.Symbol`s.")
+
+
+def upgrade_circuit(circuit: cirq.Circuit, symbols: tf.Tensor) -> tf.Tensor:
+  """Upgrades a circuit and confirms all symbols are present.
+
+    Args:
+      circuit: Circuit to convert to tensor.
+      symbols: Tensor of strings which are the symbols in `circuit`.
+
+    Returns:
+      Single entry 1D tensor of strings representing the input `circuit`.
+    """
+  if not isinstance(circuit, cirq.Circuit):
+    raise TypeError(f"`circuit` must be a `cirq.Circuit`, got {type(circuit)}")
+  if not isinstance(symbols, tf.Tensor):
+    raise TypeError("`symbols` must be a `tf.Tensor`")
+  if symbols.dtype != tf.string:
+    raise TypeError("`symbols` must have dtype `tf.string`")
+  if set(tfq.util.get_circuit_symbols(circuit)) != {
+      s.decode("utf-8") for s in symbols.numpy()
+  }:
+    raise ValueError(
+        "`circuit` must contain all and only the parameters in `symbols`.")
+  if not circuit:
+    raise ValueError("Empty circuit not allowed. "
+                     "Instead, use identities on all unused qubits.")
+  return tfq.convert_to_tensor([circuit])
+
+
 class QNN(tf.keras.Model):
   """Operations on parameterized unitaries with bitstring inputs."""
 
@@ -54,26 +121,24 @@ class QNN(tf.keras.Model):
     """
     super().__init__(name=name)
 
-    self._pqc, self._symbols, _ = input_checks.expand_circuits(
-        pqc, symbol_names=symbols)
-    pqc_circuit = tfq.from_tensor(self._pqc)[0]
-    self._inverse_pqc, _, _ = input_checks.expand_circuits(
-        pqc_circuit**-1, symbol_names=self.symbols)
     self._values = self.add_weight(
-        name=f'{self.name}_pqc_values',
-        shape=tf.shape(self.symbols),
-        initializer=initializer)
+            name=f'{self.name}_pqc_values',
+            shape=[len(symbols)],
+            initializer=initializer)
+    self._symbols = upgrade_symbols(symbols, self._values)
+    self._pqc = upgrade_circuit(pqc, self.symbols)
+    self._inverse_pqc = upgrade_circuit(pqc**-1, self.symbols)
 
-    qubits = sorted(pqc_circuit.all_qubits())
+    qubits = sorted(pqc.all_qubits())
     self._qubits = tf.constant([[q.row, q.col] for q in qubits])
-    bit_circuit, bit_symbols = self._build_bit_circuit(qubits)
-    self._bit_circuit, self._bit_symbols, _ = input_checks.expand_circuits(
-        bit_circuit, symbol_names=bit_symbols)
+    bit_circuit, bit_symbols = build_bit_circuit(qubits, "bit_circuit")
+    self._bit_symbols = upgrade_symbols(bit_symbols, tf.ones([len(qubits)]))
+    self._bit_circuit = upgrade_circuit(bit_circuit, self._bit_symbols)
 
     self._backend = backend
     self._differentiator = differentiator
     self._sample_layer = tfq.layers.Sample(backend=backend)
-    if backend == 'noiseless':
+    if backend == 'noiseless' or backend is None:
       self._analytic = analytic
       self._expectation_layer = tfq.layers.Expectation(
           backend=backend, differentiator=differentiator)
@@ -84,6 +149,7 @@ class QNN(tf.keras.Model):
 
     if self.analytic:
       self._unitary_layer = tfq.layers.Unitary()
+
 
   @property
   def qubits(self):
@@ -113,19 +179,8 @@ class QNN(tf.keras.Model):
         differentiator=self.differentiator,
         analytic=self.analytic,
         name=self.name)
-    qnn.trainable_variables[0].assign(self.trainable_variables[0])
+    qnn._values.assign(self._values)
     return qnn
-
-  def _build_bit_circuit(self, qubits):
-    """Returns exponentiated X gate on each qubit and the exponent symbols."""
-    circuit = cirq.Circuit()
-    symbols = []
-    for n, q in enumerate(qubits):
-      bit = sympy.Symbol(f"{self.name}_bit_circuit_bit_{n}")
-      circuit += cirq.X(q)**bit
-      symbols.append(bit)
-
-    return circuit, symbols
 
   @tf.function
   def _sample_function(self, circuits, counts, mask=True):
@@ -147,18 +202,18 @@ class QNN(tf.keras.Model):
     from `circuits[i]` and used to compute each expectation in `operators`.
     """
     num_circuits = tf.shape(circuits)[0]
-    if self.analytic:
+    if self.backend == 'noiseless':
       expectations = self._expectation_layer(
           circuits,
           symbol_names=self.symbols,
-          symbol_values=tf.tile(self.trainable_variables, [num_circuits, 1]),
+          symbol_values=tf.tile(tf.expand_dims(self._values, 0), [num_circuits, 1]),
           operators=operators,
       )
     else:
       expectations = self._expectation_layer(
           circuits,
           symbol_names=self.symbols,
-          symbol_values=tf.tile(self.trainable_variables, [num_circuits, 1]),
+          symbol_values=tf.tile(tf.expand_dims(self._values, 0), [num_circuits, 1]),
           operators=operators,
           repetitions=tf.expand_dims(counts, 1),
       )
@@ -172,14 +227,14 @@ class QNN(tf.keras.Model):
   def pqc(self, resolve=True):
     if tf.constant(resolve):
       return tfq.resolve_parameters(self._pqc, self.symbols,
-                                    self.trainable_variables)
+                                    tf.expand_dims(self._values, 0))
     return self._pqc
 
   @tf.function
   def inverse_pqc(self, resolve=True):
     if tf.constant(resolve):
       return tfq.resolve_parameters(self._inverse_pqc, self.symbols,
-                                    self.trainable_variables)
+                                    tf.expand_dims(self._values, 0))
     return self._inverse_pqc
 
   @tf.function
@@ -220,7 +275,6 @@ class QNN(tf.keras.Model):
     circuits = self.circuits(bitstrings)
     return self._sample_function(circuits, counts, mask=mask)
 
-  #diagonal bitstring operator
   @tf.function
   def expectation(self, bitstrings, counts, operators, reduce=True):
     """Returns the expectation values of the operators against the QNN.
@@ -307,101 +361,8 @@ class QNN(tf.keras.Model):
         pulled_back_circuits, counts, operators, reduce=reduce)
 
 
-@tf.function
-def pqc_unitary(self):
-  if self.analytic:
-    return self._unitary_layer(self.pqc()).to_tensor()[0]
-  raise NotImplementedError()
-
-
-#=============================================================================
-
-
-def build_bit_circuit(qubits, ident):
-  """Returns exponentiated X gate on each qubit and the exponent symbols."""
-  circuit = cirq.Circuit()
-  symbols = []
-  for n, q in enumerate(qubits):
-    new_bit = sympy.Symbol("{0}_bit_{1}".format(ident, n))
-    circuit += cirq.X(q)**new_bit
-    symbols.append(new_bit)
-  return circuit, symbols
-
-
-def upgrade_initial_values(
-    initial_values: Union[List[numbers.Real], tf.Tensor, tf.Variable]
-) -> tf.Variable:
-  """Upgrades the given values to a tf.Variable.
-
-    Args:
-      initial_values: Numeric values to upgrade.
-
-    Returns:
-      The input values upgraded to a fresh `tf.Variable` of dtype `tf.float32`.
-    """
-  if isinstance(initial_values, tf.Variable):
-    initial_values = initial_values.read_value()
-  if isinstance(initial_values, (List, tf.Tensor)):
-    initial_values = tf.Variable(
-        tf.cast(initial_values, tf.float32), dtype=tf.float32)
-    if len(tf.shape(initial_values)) != 1:
-      raise ValueError("Values for QHBMs must be 1D.")
-    return initial_values
-  raise TypeError(
-      f"Input needs to be a numeric type, got {type(initial_values)}")
-
-
-def upgrade_symbols(
-    symbols: Union[Iterable[sympy.Symbol], tf.Tensor],
-    values: Union[tf.Tensor, tf.Variable],
-) -> tf.Tensor:
-  """Upgrades symbols and checks for correct shape.
-
-    For a circuit compatible with TFQ, there must be a value associated with
-    each symbol. This function ensures `values` is the same shape as `symbols`.
-
-    Args:
-      symbols: Iterable of `sympy.Symbol`s to upgrade.
-      values: Values corresponding to the symbols.
-
-    Returns:
-      `tf.Tensor` containing the string representations of the input `symbols`.
-    """
-  if isinstance(symbols, Iterable):
-    if not all([isinstance(s, sympy.Symbol) for s in symbols]):
-      raise TypeError("Each entry of `symbols` must be `sympy.Symbol`.")
-    symbols_partial_upgrade = [str(s) for s in symbols]
-    if len(set(symbols_partial_upgrade)) != len(symbols):
-      raise ValueError("All entries of `symbols` must be unique.")
-    symbols_upgrade = tf.constant(symbols_partial_upgrade, dtype=tf.string)
-    if tf.shape(symbols_upgrade) != tf.shape(values):
-      raise ValueError("There must be a symbol for every value.")
-    return symbols_upgrade
-  raise TypeError("`symbols` must be an iterable of `sympy.Symbol`s.")
-
-
-def upgrade_circuit(circuit: cirq.Circuit, symbols: tf.Tensor) -> tf.Tensor:
-  """Upgrades a circuit and confirms all symbols are present.
-
-    Args:
-      circuit: Circuit to convert to tensor.
-      symbols: Tensor of strings which are the symbols in `circuit`.
-
-    Returns:
-      Single entry 1D tensor of strings representing the input `circuit`.
-    """
-  if not isinstance(circuit, cirq.Circuit):
-    raise TypeError(f"`circuit` must be a `cirq.Circuit`, got {type(circuit)}")
-  if not isinstance(symbols, tf.Tensor):
-    raise TypeError("`symbols` must be a `tf.Tensor`")
-  if symbols.dtype != tf.string:
-    raise TypeError("`symbols` must have dtype `tf.string`")
-  if set(tfq.util.get_circuit_symbols(circuit)) != {
-      s.decode("utf-8") for s in symbols.numpy()
-  }:
-    raise ValueError(
-        "`circuit` must contain all and only the parameters in `symbols`.")
-  if not circuit:
-    raise ValueError("Empty circuit not allowed. "
-                     "Instead, use identities on all unused qubits.")
-  return tfq.convert_to_tensor([circuit])
+  @tf.function
+  def pqc_unitary(self):
+    if self.analytic:
+      return self._unitary_layer(self.pqc()).to_tensor()[0]
+    raise NotImplementedError()
