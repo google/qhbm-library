@@ -28,60 +28,6 @@ import tensorflow_quantum as tfq
 from qhbmlib import qnn
 
 
-class QHBM(tf.keras.Model):
-
-  def __init__(self, ebm, qnn, name=None):
-    super().__init__(name=name)
-    self._ebm = ebm
-    self._qnn = qnn
-
-  @property
-  def ebm(self):
-    return self._ebm
-
-  @property
-  def qnn(self):
-    return self._qnn
-
-  @property
-  def qubits(self):
-    return self.qnn.qubits
-
-  @property
-  def analytic(self):
-    return self.ebm.analytic and self.qnn.analytic
-
-  def copy(self):
-    return QHBM(self.ebm, self.qnn, name=self.name)
-
-  @tf.function
-  def circuits(self, num_samples):
-    bitstrings, counts = self.ebm.sample(num_samples)
-    circuits = self.qnn.circuits(bitstrings)
-    return circuits, counts
-
-  @tf.function
-  def sample(self, num_samples, mask=True):
-    bitstrings, counts = self.ebm.sample(num_samples)
-    return self.qnn.sample(bitstrings, counts, mask=mask)
-
-  @tf.function
-  def expectation(self, operators, num_samples, reduce=True):
-    bitstrings, counts = self.ebm.sample(num_samples)
-    return self.qnn.expectation(bitstrings, counts, operators, reduce=reduce)
-
-  @tf.function
-  def log_partition_function(self):
-    return self.ebm.log_partition_function()
-
-  @tf.function
-  def entropy(self):
-    return self.ebm.entropy()
-
-
-#=============================================================================
-
-
 @tf.function
 def unique_with_counts(input_bitstrings, out_idx=tf.int32):
   """Extract the unique bitstrings in the given bitstring tensor.
@@ -154,7 +100,7 @@ def check_base_function(
   return fn
 
 
-class QHBM_(tf.Module):
+class QHBM(tf.Module):
   """Class for working with QHBM models in TFQ."""
 
   def __init__(self, initial_thetas, energy, sampler, initial_phis,
@@ -163,7 +109,7 @@ class QHBM_(tf.Module):
     if not isinstance(name, str):
       raise TypeError("name must be a string")
     super().__init__(name)
-    self.thetas = qnn.upgrade_initial_values(initial_thetas)
+    self.thetas = initial_thetas
     self.energy_function = check_base_function(energy)
     self.sampler_function = check_base_function(sampler)
     self.diagonalizing_op = qnn.QNN(u, phis_symbols, name=name)
@@ -187,7 +133,7 @@ class QHBM_(tf.Module):
     self.tfq_sample_layer = tfq.layers.Sample()
 
   def copy(self):
-    return QHBM_(
+    return QHBM(
         self.thetas,
         self.energy_function,
         self.sampler_function,
@@ -351,7 +297,7 @@ class QHBM_(tf.Module):
     return average_energy
 
 
-class ExactQHBM_(QHBM_):
+class ExactQHBM(QHBM):
   """Used for QHBMs with exact access to the classical and quantum models."""
 
   def __init__(self, initial_thetas, energy, sampler, initial_phis,
@@ -366,7 +312,7 @@ class ExactQHBM_(QHBM_):
     self.tfq_expectation_layer = tfq.layers.Expectation()
 
   def copy(self):
-    return ExactQHBM_(
+    return ExactQHBM(
         self.thetas,
         self.energy_function,
         self.sampler_function,

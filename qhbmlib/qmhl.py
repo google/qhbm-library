@@ -30,7 +30,7 @@ from qhbmlib import qhbm_base
 
 @tf.function
 def exact_qmhl_loss(
-    qhbm_model: qhbm_base.ExactQHBM_,
+    qhbm_model: qhbm_base.ExactQHBM,
     target_circuits: tf.Tensor,
     target_counts: tf.Tensor,
 ):
@@ -56,7 +56,7 @@ def exact_qmhl_loss(
 
 @tf.function
 def exact_qmhl_loss_thetas_grad(
-    qhbm_model: qhbm_base.ExactQHBM_,
+    qhbm_model: qhbm_base.ExactQHBM,
     num_model_samples: tf.Tensor,
     target_circuits: tf.Tensor,
     target_counts: tf.Tensor,
@@ -124,7 +124,7 @@ def exact_qmhl_loss_thetas_grad(
 
 @tf.function
 def exact_qmhl_loss_phis_grad(
-    qhbm: qhbm_base.ExactQHBM_,
+    qhbm: qhbm_base.ExactQHBM,
     op_tensor: tf.Tensor,
     target_circuits: tf.Tensor,
     target_count: tf.Tensor,

@@ -19,6 +19,62 @@ import tensorflow_quantum as tfq
 
 from qhbmlib import qhbm_base
 
+
+class VQT(tf.keras.losses.Loss):
+
+  def __init__(self, num_samples, name=None):
+    super().__init__(name=name)
+    self._num_samples = num_samples
+
+  @property
+  def num_samples(self):
+    return self._num_samples
+
+  def call(self, qhbm, hamiltonian_beta):
+    hamiltonian, beta = hamiltonian_beta
+
+    @tf.function
+    @tf.custom_gradient
+    def loss(vars):
+      bitstrings, counts = qhbm.ebm.sample(self.num_samples)
+      probs = tf.cast(counts, tf.float32) / tf.cast(
+          tf.reduce_sum(counts), tf.float32)
+      with tf.GradientTape() as qnn_tape:
+        beta_expectations = beta * tf.squeeze(
+            qhbm.qnn.expectation(bitstrings, counts, hamiltonian, reduce=False),
+            -1)
+        beta_expectation = tf.reduce_sum(probs * beta_expectations)
+
+      @tf.function
+      def grad(grad_y):
+        with tf.GradientTape() as ebm_tape:
+          energies = qhbm.ebm.energy(bitstrings)
+        energy_gradients = ebm_tape.jacobian(energies,
+                                             qhbm.ebm.trainable_variables)
+        probs_diffs = probs * (beta_expectations - energies)
+        avg_diff = tf.reduce_sum(probs_diffs)
+        grad_ebm = [
+            avg_diff *
+            tf.reduce_sum(tf.transpose(probs * tf.transpose(grad)), 0) -
+            tf.reduce_sum(tf.transpose(probs_diffs * tf.transpose(grad)), 0)
+            for grad in energy_gradients
+        ]
+
+        grad_qnn = qnn_tape.gradient(beta_expectation,
+                                     qhbm.qnn.trainable_variables)
+
+        return grad_y * (grad_ebm + grad_qnn)
+
+      if qhbm.analytic:
+        entropy = qhbm.entropy()
+      else:
+        entropy = -tf.reduce_sum(probs * tf.math.log(probs))
+
+      return beta_expectation - entropy, grad
+
+    return loss(qhbm.trainable_variables)
+
+
 # ============================================================================ #
 # Sample-based VQT.
 # ============================================================================ #
@@ -26,7 +82,7 @@ from qhbmlib import qhbm_base
 
 @tf.function
 def vqt_loss(
-    qhbm: qhbm_base.QHBM_,
+    qhbm: qhbm_base.QHBM,
     num_samples: tf.Tensor,
     beta: tf.Tensor,
     hamiltonian: tf.Tensor,
@@ -75,7 +131,7 @@ def vqt_loss(
 
 @tf.function
 def vqt_loss_thetas_grad(
-    qhbm: qhbm_base.QHBM_,
+    qhbm: qhbm_base.QHBM,
     num_samples: tf.Tensor,
     beta: tf.Tensor,
     hamiltonian: tf.Tensor,
@@ -121,7 +177,7 @@ def vqt_loss_thetas_grad(
 
 @tf.function
 def vqt_loss_phis_grad(
-    qhbm: qhbm_base.QHBM_,
+    qhbm: qhbm_base.QHBM,
     num_samples: tf.Tensor,
     beta: tf.Tensor,
     hamiltonian: tf.Tensor,
@@ -187,7 +243,7 @@ def _tiled_expectation(circuits: tf.Tensor, hamiltonian: tf.Tensor):
 
 @tf.function
 def exact_vqt_loss(
-    qhbm: qhbm_base.ExactQHBM_,
+    qhbm: qhbm_base.ExactQHBM,
     num_samples: tf.Tensor,
     beta: tf.Tensor,
     hamiltonian: tf.Tensor,
@@ -204,7 +260,7 @@ def exact_vqt_loss(
 
 @tf.function
 def exact_vqt_loss_thetas_grad(
-    qhbm: qhbm_base.ExactQHBM_,
+    qhbm: qhbm_base.ExactQHBM,
     num_samples: tf.Tensor,
     beta: tf.Tensor,
     hamiltonian: tf.Tensor,
@@ -237,7 +293,7 @@ def exact_vqt_loss_thetas_grad(
 
 @tf.function
 def exact_vqt_loss_phis_grad(
-    qhbm: qhbm_base.ExactQHBM_,
+    qhbm: qhbm_base.ExactQHBM,
     num_samples: tf.Tensor,
     beta: tf.Tensor,
     hamiltonian: tf.Tensor,

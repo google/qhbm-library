@@ -24,7 +24,7 @@ import tensorflow_quantum as tfq
 from tensorflow_quantum.python.layers.circuit_executors import input_checks
 
 
-def build_bit_circuit(qubits, name):
+def build_bit_circuit(qubits, name='bit_circuit'):
   """Returns exponentiated X gate on each qubit and the exponent symbols."""
   circuit = cirq.Circuit()
   symbols = []
@@ -122,16 +122,16 @@ class QNN(tf.keras.Model):
     super().__init__(name=name)
 
     self._values = self.add_weight(
-            name=f'{self.name}_pqc_values',
-            shape=[len(symbols)],
-            initializer=initializer)
+        name=f'{self.name}_pqc_values',
+        shape=[len(symbols)],
+        initializer=initializer)
     self._symbols = upgrade_symbols(symbols, self._values)
     self._pqc = upgrade_circuit(pqc, self.symbols)
     self._inverse_pqc = upgrade_circuit(pqc**-1, self.symbols)
 
     qubits = sorted(pqc.all_qubits())
     self._qubits = tf.constant([[q.row, q.col] for q in qubits])
-    bit_circuit, bit_symbols = build_bit_circuit(qubits, "bit_circuit")
+    bit_circuit, bit_symbols = build_bit_circuit(qubits)
     self._bit_symbols = upgrade_symbols(bit_symbols, tf.ones([len(qubits)]))
     self._bit_circuit = upgrade_circuit(bit_circuit, self._bit_symbols)
 
@@ -149,7 +149,6 @@ class QNN(tf.keras.Model):
 
     if self.analytic:
       self._unitary_layer = tfq.layers.Unitary()
-
 
   @property
   def qubits(self):
@@ -173,7 +172,7 @@ class QNN(tf.keras.Model):
 
   def copy(self):
     qnn = QNN(
-        self.pqc(resolve=False),
+        tfq.from_tensor(self.pqc(resolve=False))[0],
         [sympy.Symbol(s.decode("utf-8")) for s in self.symbols.numpy()],
         backend=self.backend,
         differentiator=self.differentiator,
@@ -206,14 +205,16 @@ class QNN(tf.keras.Model):
       expectations = self._expectation_layer(
           circuits,
           symbol_names=self.symbols,
-          symbol_values=tf.tile(tf.expand_dims(self._values, 0), [num_circuits, 1]),
+          symbol_values=tf.tile(
+              tf.expand_dims(self._values, 0), [num_circuits, 1]),
           operators=operators,
       )
     else:
       expectations = self._expectation_layer(
           circuits,
           symbol_names=self.symbols,
-          symbol_values=tf.tile(tf.expand_dims(self._values, 0), [num_circuits, 1]),
+          symbol_values=tf.tile(
+              tf.expand_dims(self._values, 0), [num_circuits, 1]),
           operators=operators,
           repetitions=tf.expand_dims(counts, 1),
       )
@@ -359,7 +360,6 @@ class QNN(tf.keras.Model):
     pulled_back_circuits = self.pulled_back_circuits(circuits, resolve=False)
     return self._expectation_function(
         pulled_back_circuits, counts, operators, reduce=reduce)
-
 
   @tf.function
   def pqc_unitary(self):

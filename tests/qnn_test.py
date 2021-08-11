@@ -30,6 +30,7 @@ from tests import test_util
 # Global tolerance, set for float32.
 ATOL = 1e-5
 
+
 class BuildBitCircuitTest(tf.test.TestCase):
   """Test build_bit_circuit from the qhbm library."""
 
@@ -44,12 +45,12 @@ class BuildBitCircuitTest(tf.test.TestCase):
     test_circuit, test_symbols = qnn.build_bit_circuit(my_qubits, identifier)
     expected_symbols = list(
         sympy.symbols(
-            "_bit_build_bit_test_0 _bit_build_bit_test_1 _bit_build_bit_test_2")
-    )
+            "build_bit_test_bit_0 build_bit_test_bit_1 build_bit_test_bit_2"))
     expected_circuit = cirq.Circuit(
         [cirq.X(q)**s for q, s in zip(my_qubits, expected_symbols)])
     self.assertAllEqual(test_symbols, expected_symbols)
     self.assertEqual(test_circuit, expected_circuit)
+
 
 class InputChecksTest(tf.test.TestCase):
   """Tests all the input checking functions used for QHBMs."""
@@ -120,7 +121,7 @@ class QNNTest(tf.test.TestCase):
   inverse_pqc_tfq = tfq.convert_to_tensor([inverse_pqc])
   name = "TestOE"
   raw_bit_circuit, raw_bit_symbols = qnn.build_bit_circuit(
-      raw_qubits, f"{name}_bit_circuit")
+      raw_qubits, "bit_circuit")
   bit_symbols = tf.constant([str(s) for s in raw_bit_symbols])
   bit_circuit = tfq.convert_to_tensor([raw_bit_circuit])
 
@@ -199,7 +200,7 @@ class QNNTest(tf.test.TestCase):
     bitstrings = 2 * list(itertools.product([0, 1], repeat=self.num_qubits))
     test_qnn = qnn.QNN(
         self.pqc,
-        self.symbols,
+        self.raw_symbols,
         initializer=self.initializer,
         name=self.name,
     )

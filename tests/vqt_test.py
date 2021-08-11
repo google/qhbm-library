@@ -42,7 +42,7 @@ class VQTTest(tf.test.TestCase):
   def test_loss_consistency(self):
     """Confirms that the sample-based and exact losses are close."""
     energy, sampler = test_util.get_ebm_functions(self.num_bits)
-    test_qhbm = qhbm_base.ExactQHBM_(
+    test_qhbm = qhbm_base.ExactQHBM(
         self.initial_thetas,
         energy,
         sampler,

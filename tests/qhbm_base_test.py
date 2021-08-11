@@ -118,14 +118,14 @@ class QHBMTest(tf.test.TestCase):
       u += cirq.X(q)**s
   name = "TestQHBM"
   raw_bit_circuit, raw_bit_symbols = qnn.build_bit_circuit(
-      raw_qubits, name + '_bit_circuit')
+      raw_qubits, name='bit_circuit')
   bit_symbols = tf.constant([str(s) for s in raw_bit_symbols])
   bit_and_u = tfq.layers.AddCircuit()(raw_bit_circuit, append=u)
 
   def test_init(self):
     """Confirms QHBM is initialized correctly."""
     energy, sampler = test_util.get_ebm_functions(self.num_bits)
-    test_qhbm = qhbm_base.QHBM_(
+    test_qhbm = qhbm_base.QHBM(
         self.initial_thetas,
         energy,
         sampler,
@@ -156,7 +156,7 @@ class QHBMTest(tf.test.TestCase):
   def test_copy(self):
     """Confirms copy works correctly."""
     energy, sampler = test_util.get_ebm_functions(self.num_bits)
-    test_qhbm = qhbm_base.QHBM_(
+    test_qhbm = qhbm_base.QHBM(
         self.initial_thetas,
         energy,
         sampler,
@@ -197,8 +197,8 @@ def get_basic_qhbm():
     for q in qubits:
       u += cirq.X(q)**s
   name = "static_qhbm"
-  return qhbm_base.QHBM_(initial_thetas, energy, sampler, initial_phis,
-                         phis_symbols, u, name)
+  return qhbm_base.QHBM(initial_thetas, energy, sampler, initial_phis,
+                        phis_symbols, u, name)
 
 
 class QHBMBasicFunctionTest(tf.test.TestCase):
@@ -346,7 +346,7 @@ class QHBMBasicFunctionTest(tf.test.TestCase):
 def get_exact_qhbm():
   """Returns a basic ExactQHBM for testing."""
   qhbm = get_basic_qhbm()
-  return qhbm_base.ExactQHBM_(
+  return qhbm_base.ExactQHBM(
       qhbm.thetas,
       qhbm.energy_function,
       qhbm.sampler_function,
@@ -488,8 +488,8 @@ class ExactQHBMBasicFunctionTest(tf.test.TestCase):
     initial_thetas = tf.constant([-10, -10], dtype=tf.float32)  # pin at |00>
     qubits = cirq.GridQubit.rect(1, n_bits)
     test_u = cirq.Circuit([cirq.H(qubits[0]), cirq.CNOT(qubits[0], qubits[1])])
-    test_qhbm = qhbm_base.ExactQHBM_(initial_thetas, energy, sampler,
-                                     tf.constant([]), [], test_u, "bell")
+    test_qhbm = qhbm_base.ExactQHBM(initial_thetas, energy, sampler,
+                                    tf.constant([]), [], test_u, "bell")
     expected_dm = tf.constant(
         [[0.5, 0, 0, 0.5], [0, 0, 0, 0], [0, 0, 0, 0], [0.5, 0, 0, 0.5]],
         tf.complex64,
