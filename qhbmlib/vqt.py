@@ -32,13 +32,11 @@ def vqt_loss(
     hamiltonian: tf.Tensor,
 ):
   """Estimates the VQT loss function between a QHBM and a Hamiltonian.
-
     The two step process follows the VQT loss estimator described in the paper.
     First, samples are drawn from the classical probability distribution of the
     input QHBM.  Then, two quantities are estimated from these samples: the
     entropy of the distribution is calculated by a frequency estimator, and the
     energy is calculated via the Monte-Carlo estimator defined in the paper.
-
     Args:
       qhbm: The QHBM against which the loss is to be calculated.
       num_samples: The number of samples to draw from the classical probability
@@ -47,7 +45,6 @@ def vqt_loss(
       hamiltonian: Hamiltonian of the target thermal state. It is a 2-D tensor
         of strings, the result of calling `tfq.convert_to_tensor` on a list of
         lists of cirq.PauliSum which has only one term, `[[op]]`.
-
     Returns:
       Estimate of the VQT loss between the input QHBM and target thermal state.
     """
@@ -158,7 +155,6 @@ def vqt_loss_phis_grad(
 
 def _tiled_expectation(circuits: tf.Tensor, hamiltonian: tf.Tensor):
   """Calculates the expectation value for every circuit.
-
     Args:
       circuits: 1-D tensor of strings which are TFQ serialized circuits with no
         free parameters.
@@ -166,7 +162,6 @@ def _tiled_expectation(circuits: tf.Tensor, hamiltonian: tf.Tensor):
         `tfq.convert_to_tensor` on a list of lists of cirq.PauliSum which has
         only one term, `[[op]]`.  Will be tiled along the 0th dimension, to be
         measured against each entry of `circuits`.
-
     Returns:
       1-D tensor of floats which are the expectation values of the single op in
         `hamiltonian` measured against each circuit in `circuits`.

@@ -142,7 +142,6 @@ class EnergySampler(abc.ABC):
 @tf.function
 def unique_bitstrings_with_counts(bitstrings):
   """Extract the unique bitstrings in the given bitstring tensor.
-
     Works by converting each bitstring to a 64 bit integer, then using built-in
     `tf.unique_with_counts` on this 1-D array, then mapping these integers back
     to
@@ -151,20 +150,17 @@ def unique_bitstrings_with_counts(bitstrings):
     those of `tf.unique_with_counts`,
     y[idx[i]] = input_bitstrings[i] for i in [0, 1,...,rank(input_bitstrings) -
     1]
-
     TODO(zaqqwerty): the signature and return values are designed to be similar
     to those of tf.unique_with_counts.  This function is needed because
     `tf.unique_with_counts` does not work on 2-D tensors.  When it begins to
     work
     on 2-D tensors, then this function will be deprecated.
-
     Args:
       input_bitstrings: 2-D `tf.Tensor` of dtype `int8`.  This tensor is
         interpreted as a list of bitstrings.  Bitstrings are required to be 64
         bits or fewer.
       out_idx: An optional `tf.DType` from: `tf.int32`, `tf.int64`. Defaults to
         `tf.int32`.  Specified type of idx and count outputs.
-
     Returns:
       y: 2-D `tf.Tensor` of dtype `int8` containing the unique 0-axis entries of
         `input_bitstrings`.

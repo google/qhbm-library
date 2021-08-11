@@ -19,6 +19,7 @@ from absl import logging
 
 import cirq
 import sympy
+import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 import tensorflow_quantum as tfq
@@ -44,8 +45,7 @@ class BuildBitCircuitTest(tf.test.TestCase):
     test_circuit, test_symbols = qnn.build_bit_circuit(my_qubits, identifier)
     expected_symbols = list(
         sympy.symbols(
-            "_bit_build_bit_test_0 _bit_build_bit_test_1 _bit_build_bit_test_2")
-    )
+            "build_bit_test_bit_0 build_bit_test_bit_1 build_bit_test_bit_2"))
     expected_circuit = cirq.Circuit(
         [cirq.X(q)**s for q, s in zip(my_qubits, expected_symbols)])
     self.assertAllEqual(test_symbols, expected_symbols)
@@ -54,24 +54,6 @@ class BuildBitCircuitTest(tf.test.TestCase):
 
 class InputChecksTest(tf.test.TestCase):
   """Tests all the input checking functions used for QHBMs."""
-
-  def test_upgrade_initial_values(self):
-    """Confirms lists of values are properly upgraded to variables."""
-    # Test allowed inputs.
-    true_list = [-5.1, 2.8, -3.4, 4.8]
-    true_tensor = tf.constant(true_list, dtype=tf.float32)
-    true_variable = tf.Variable(true_tensor)
-    self.assertAllClose(
-        qnn.upgrade_initial_values(true_list), true_variable, atol=ATOL)
-    self.assertAllClose(
-        qnn.upgrade_initial_values(true_tensor), true_variable, atol=ATOL)
-    self.assertAllClose(
-        qnn.upgrade_initial_values(true_variable), true_variable, atol=ATOL)
-    # Check for bad inputs.
-    with self.assertRaisesRegex(TypeError, "numeric type"):
-      _ = qnn.upgrade_initial_values("junk")
-    with self.assertRaisesRegex(ValueError, "must be 1D"):
-      _ = qnn.upgrade_initial_values([[5.2]])
 
   def test_upgrade_symbols(self):
     """Confirms symbols are upgraded appropriately."""
@@ -122,123 +104,118 @@ class InputChecksTest(tf.test.TestCase):
 class QNNTest(tf.test.TestCase):
   """Tests the QNN class."""
 
-  num_bits = 5
-  raw_phis_symbols = [sympy.Symbol("s0"), sympy.Symbol("s1")]
-  phis_symbols = tf.constant([str(s) for s in raw_phis_symbols])
-  initial_phis = tf.random.uniform([len(phis_symbols)], minval=-1.0)
-  raw_qubits = cirq.GridQubit.rect(1, num_bits)
-  backend = None
+  num_qubits = 5
+  raw_symbols = [sympy.Symbol("s0"), sympy.Symbol("s1")]
+  symbols = tf.constant([str(s) for s in raw_symbols])
+  initializer = tf.keras.initializers.RandomUniform(-1.0, 1.0)
+  raw_qubits = cirq.GridQubit.rect(1, num_qubits)
+  backend = "noiseless"
   differentiator = None
-  u = cirq.Circuit()
-  for s in raw_phis_symbols:
+  pqc = cirq.Circuit()
+  for s in raw_symbols:
     for q in raw_qubits:
-      u += cirq.X(q)**s
-      u += cirq.Z(q)**s
-  u_dagger = u**-1
-  u_tfq = tfq.convert_to_tensor([u])
-  u_dagger_tfq = tfq.convert_to_tensor([u_dagger])
+      pqc += cirq.X(q)**s
+      pqc += cirq.Z(q)**s
+  inverse_pqc = pqc**-1
+  pqc_tfq = tfq.convert_to_tensor([pqc])
+  inverse_pqc_tfq = tfq.convert_to_tensor([inverse_pqc])
   name = "TestOE"
-  raw_bit_circuit, raw_bit_symbols = qnn.build_bit_circuit(raw_qubits, name)
+  raw_bit_circuit, raw_bit_symbols = qnn.build_bit_circuit(
+      raw_qubits, "bit_circuit")
   bit_symbols = tf.constant([str(s) for s in raw_bit_symbols])
   bit_circuit = tfq.convert_to_tensor([raw_bit_circuit])
 
   def test_init(self):
     """Confirms QNN is initialized correctly."""
     test_qnn = qnn.QNN(
-        self.u,
-        self.raw_phis_symbols,
-        self.initial_phis,
-        self.name,
-        self.backend,
-        self.differentiator,
-    )
+        self.pqc,
+        self.raw_symbols,
+        backend=self.backend,
+        differentiator=self.differentiator,
+        analytic=True,
+        name=self.name)
     self.assertEqual(self.name, test_qnn.name)
-    self.assertAllClose(self.initial_phis, test_qnn.phis)
-    self.assertAllEqual(self.phis_symbols, test_qnn.phis_symbols)
+    self.assertAllEqual(self.symbols, test_qnn.symbols)
     self.assertAllEqual(self.backend, test_qnn.backend)
     self.assertAllEqual(self.differentiator, test_qnn.differentiator)
     self.assertAllEqual(True, test_qnn.analytic)
     self.assertAllEqual(
-        tfq.from_tensor(self.u_tfq),
-        tfq.from_tensor(test_qnn.u),
+        tfq.from_tensor(self.pqc_tfq),
+        tfq.from_tensor(test_qnn._pqc),
     )
     self.assertAllEqual(
-        tfq.from_tensor(self.u_dagger_tfq),
-        tfq.from_tensor(test_qnn.u_dagger),
+        tfq.from_tensor(self.inverse_pqc_tfq),
+        tfq.from_tensor(test_qnn._inverse_pqc),
     )
-    self.assertAllEqual(self.raw_qubits, test_qnn.raw_qubits)
-    self.assertAllEqual(self.bit_symbols, test_qnn.bit_symbols)
+    self.assertAllEqual(self.bit_symbols, test_qnn._bit_symbols)
     self.assertEqual(
         tfq.from_tensor(self.bit_circuit),
-        tfq.from_tensor(test_qnn.bit_circuit))
+        tfq.from_tensor(test_qnn._bit_circuit))
 
     self.assertEqual(
-        tfq.from_tensor(test_qnn.resolved_u),
+        tfq.from_tensor(test_qnn.pqc(resolve=True)),
         tfq.from_tensor(
-            tfq.resolve_parameters(self.u_tfq, self.phis_symbols,
-                                   tf.expand_dims(self.initial_phis, 0))))
+            tfq.resolve_parameters(self.pqc_tfq, self.symbols,
+                                   tf.expand_dims(test_qnn._values, 0))))
     self.assertEqual(
-        tfq.from_tensor(test_qnn.resolved_u_dagger),
+        tfq.from_tensor(test_qnn.inverse_pqc(resolve=True)),
         tfq.from_tensor(
-            tfq.resolve_parameters(self.u_dagger_tfq, self.phis_symbols,
-                                   tf.expand_dims(self.initial_phis, 0))))
+            tfq.resolve_parameters(self.inverse_pqc_tfq, self.symbols,
+                                   tf.expand_dims(test_qnn._values, 0))))
 
   def test_copy(self):
     """Confirms copied QNN has correct attributes."""
-    test_qnn = qnn.QNN(
-        self.u,
-        self.raw_phis_symbols,
-        self.initial_phis,
-        self.name,
-        self.backend,
-        self.differentiator,
-    )
+    test_qnn = qnn.QNN(self.pqc, self.raw_symbols, self.initializer,
+                       self.backend, self.differentiator, self.name)
     test_qnn_copy = test_qnn.copy()
     self.assertEqual(test_qnn_copy.name, test_qnn.name)
-    self.assertAllClose(test_qnn_copy.phis, test_qnn.phis)
-    self.assertAllEqual(test_qnn_copy.phis_symbols, test_qnn.phis_symbols)
+    self.assertAllClose(test_qnn_copy.trainable_variables,
+                        test_qnn.trainable_variables)
+    self.assertAllEqual(test_qnn_copy.symbols, test_qnn.symbols)
     self.assertAllEqual(test_qnn_copy.backend, test_qnn.backend)
     self.assertAllEqual(test_qnn_copy.differentiator, test_qnn.differentiator)
     self.assertAllEqual(test_qnn_copy.analytic, test_qnn.analytic)
     self.assertAllEqual(
-        tfq.from_tensor(test_qnn_copy.u),
-        tfq.from_tensor(test_qnn.u),
+        tfq.from_tensor(test_qnn_copy._pqc),
+        tfq.from_tensor(test_qnn._pqc),
     )
     self.assertAllEqual(
-        tfq.from_tensor(test_qnn_copy.u_dagger),
-        tfq.from_tensor(test_qnn.u_dagger),
+        tfq.from_tensor(test_qnn_copy._inverse_pqc),
+        tfq.from_tensor(test_qnn._inverse_pqc),
     )
-    self.assertAllEqual(test_qnn_copy.raw_qubits, test_qnn.raw_qubits)
-    self.assertAllEqual(test_qnn_copy.bit_symbols, test_qnn.bit_symbols)
+    self.assertAllEqual(test_qnn_copy.qubits, test_qnn.qubits)
+    self.assertAllEqual(test_qnn_copy._bit_symbols, test_qnn._bit_symbols)
     self.assertEqual(
-        tfq.from_tensor(test_qnn_copy.bit_circuit),
-        tfq.from_tensor(test_qnn.bit_circuit))
+        tfq.from_tensor(test_qnn_copy._bit_circuit),
+        tfq.from_tensor(test_qnn._bit_circuit))
     self.assertEqual(
-        tfq.from_tensor(test_qnn_copy.resolved_u),
-        tfq.from_tensor(test_qnn.resolved_u))
+        tfq.from_tensor(test_qnn_copy.pqc(resolve=True)),
+        tfq.from_tensor(test_qnn.pqc(resolve=True)))
     self.assertEqual(
-        tfq.from_tensor(test_qnn_copy.resolved_u_dagger),
-        tfq.from_tensor(test_qnn.resolved_u_dagger))
+        tfq.from_tensor(test_qnn_copy.inverse_pqc(resolve=True)),
+        tfq.from_tensor(test_qnn.inverse_pqc(resolve=True)))
 
   def test_circuits(self):
-    """Confirms bitstring injectors are prepended to u."""
-    bitstrings = 2 * list(itertools.product([0, 1], repeat=self.num_bits))
+    """Confirms bitstring injectors are prepended to pqc."""
+    bitstrings = 2 * list(itertools.product([0, 1], repeat=self.num_qubits))
     test_qnn = qnn.QNN(
-        self.u,
-        self.raw_phis_symbols,
-        self.initial_phis,
-        self.name,
+        self.pqc,
+        self.raw_symbols,
+        initializer=self.initializer,
+        name=self.name,
     )
     test_circuits = test_qnn.circuits(
-        tf.constant(bitstrings, dtype=tf.int8), True)
+        tf.constant(bitstrings, dtype=tf.int8), resolve=True)
     test_circuits_deser = tfq.from_tensor(test_circuits)
 
-    resolved_u = tfq.from_tensor(test_qnn.resolved_u)[0]
+    resolved_pqc = tfq.from_tensor(
+        tfq.resolve_parameters(self.pqc_tfq, self.symbols,
+                               tf.expand_dims(test_qnn._values, 0)))[0]
     bit_injectors = []
     for b in bitstrings:
       bit_injectors.append(
           cirq.Circuit(cirq.X(q)**b_i for q, b_i in zip(self.raw_qubits, b)))
-    combined = [b + resolved_u for b in bit_injectors]
+    combined = [b + resolved_pqc for b in bit_injectors]
 
     for expected, test in zip(combined, test_circuits_deser):
       self.assertTrue(cirq.approx_eq(expected, test))
@@ -246,14 +223,14 @@ class QNNTest(tf.test.TestCase):
   def test_sample_basic(self):
     """Confirms correct sampling from identity, bit flip, and GHZ QNNs."""
     bitstrings = tf.constant(
-        list(itertools.product([0, 1], repeat=self.num_bits)), dtype=tf.int8)
+        list(itertools.product([0, 1], repeat=self.num_qubits)), dtype=tf.int8)
     counts = tf.random.uniform([tf.shape(bitstrings)[0]],
                                minval=10,
                                maxval=100,
                                dtype=tf.int32)
 
     ident_qnn = qnn.QNN(
-        cirq.Circuit(cirq.I(q) for q in self.raw_qubits), [], [], "identity")
+        cirq.Circuit(cirq.I(q) for q in self.raw_qubits), [], name="identity")
     test_samples = ident_qnn.sample(bitstrings, counts)
     for i, (b, c) in enumerate(zip(bitstrings, counts)):
       self.assertEqual(tf.shape(test_samples[i].to_tensor())[0], c)
@@ -261,7 +238,7 @@ class QNNTest(tf.test.TestCase):
         self.assertAllEqual(test_samples[i][j], b)
 
     flip_qnn = qnn.QNN(
-        cirq.Circuit(cirq.X(q) for q in self.raw_qubits), [], [], "flip")
+        cirq.Circuit(cirq.X(q) for q in self.raw_qubits), [], name="flip")
     test_samples = flip_qnn.sample(bitstrings, counts)
     for i, (b, c) in enumerate(zip(bitstrings, counts)):
       self.assertEqual(tf.shape(test_samples[i].to_tensor())[0], c)
@@ -275,17 +252,20 @@ class QNNTest(tf.test.TestCase):
         self.raw_qubits[0])**ghz_param) + cirq.Circuit(
             cirq.CNOT(q0, q1)
             for q0, q1 in zip(self.raw_qubits, self.raw_qubits[1:]))
-    ghz_qnn = qnn.QNN(ghz_circuit, [ghz_param], [0.5], "ghz")
+    ghz_qnn = qnn.QNN(
+        ghz_circuit, [ghz_param],
+        initializer=tf.keras.initializers.Constant(value=0.5),
+        name="ghz")
     test_samples = ghz_qnn.sample(
-        tf.expand_dims(tf.constant([0] * self.num_bits, dtype=tf.int8), 0),
+        tf.expand_dims(tf.constant([0] * self.num_qubits, dtype=tf.int8), 0),
         tf.expand_dims(counts[0], 0))[0].to_tensor()
     # Both |0...0> and |1...1> should be among the measured bitstrings
     self.assertTrue(
         test_util.check_bitstring_exists(
-            tf.constant([0] * self.num_bits, dtype=tf.int8), test_samples))
+            tf.constant([0] * self.num_qubits, dtype=tf.int8), test_samples))
     self.assertTrue(
         test_util.check_bitstring_exists(
-            tf.constant([1] * self.num_bits, dtype=tf.int8), test_samples))
+            tf.constant([1] * self.num_qubits, dtype=tf.int8), test_samples))
 
   def test_measure(self):
     """Confirms correct measurement."""
@@ -299,17 +279,17 @@ class QNNTest(tf.test.TestCase):
         self.raw_qubits, num_data_states)
     data_states_t = tfq.convert_to_tensor(data_states)
     test_qnn = qnn.QNN(
-        self.u,
-        self.raw_phis_symbols,
-        self.initial_phis,
-        self.name,
+        self.pqc,
+        self.raw_symbols,
+        name=self.name,
     )
-    test_circuits = test_qnn.pulled_back_circuits(data_states_t, True)
+    test_circuits = test_qnn.pulled_back_circuits(data_states_t, resolve=True)
     test_circuits_deser = tfq.from_tensor(test_circuits)
 
-    resolved_u_dagger = tfq.from_tensor(test_qnn.resolved_u_dagger)[0]
+    resolved_inverse_pqc = tfq.from_tensor(
+        test_qnn.inverse_pqc(resolve=True))[0]
     combined = tfq.from_tensor(
-        tfq.convert_to_tensor([d + resolved_u_dagger for d in data_states]))
+        tfq.convert_to_tensor([d + resolved_inverse_pqc for d in data_states]))
     for expected, test in zip(combined, test_circuits_deser):
       self.assertTrue(cirq.approx_eq(expected, test))
 
@@ -324,7 +304,10 @@ class QNNTest(tf.test.TestCase):
         self.raw_qubits[0])**ghz_param) + cirq.Circuit(
             cirq.CNOT(q0, q1)
             for q0, q1 in zip(self.raw_qubits, self.raw_qubits[1:]))
-    ghz_qnn = qnn.QNN(ghz_circuit, [ghz_param], [0.5], "ghz")
+    ghz_qnn = qnn.QNN(
+        ghz_circuit, [ghz_param],
+        initializer=tf.keras.initializers.Constant(value=0.5),
+        name="ghz")
     flip_circuits = [cirq.Circuit(), cirq.Circuit(cirq.X(self.raw_qubits[0]))]
     flip_circuits_t = tfq.convert_to_tensor(flip_circuits)
     counts = tf.random.uniform([len(flip_circuits)],
@@ -336,20 +319,20 @@ class QNNTest(tf.test.TestCase):
     # The first circuit leaves only the Hadamard to superpose the first qubit
     self.assertTrue(
         test_util.check_bitstring_exists(
-            tf.constant([0] * self.num_bits, dtype=tf.int8),
+            tf.constant([0] * self.num_qubits, dtype=tf.int8),
             test_samples[0].to_tensor()))
     self.assertTrue(
         test_util.check_bitstring_exists(
-            tf.constant([1] + [0] * (self.num_bits - 1), dtype=tf.int8),
+            tf.constant([1] + [0] * (self.num_qubits - 1), dtype=tf.int8),
             test_samples[0].to_tensor()))
     # The second circuit causes an additional bit flip
     self.assertTrue(
         test_util.check_bitstring_exists(
-            tf.constant([0] + [1] + [0] * (self.num_bits - 2), dtype=tf.int8),
+            tf.constant([0] + [1] + [0] * (self.num_qubits - 2), dtype=tf.int8),
             test_samples[1].to_tensor()))
     self.assertTrue(
         test_util.check_bitstring_exists(
-            tf.constant([1, 1] + [0] * (self.num_bits - 2), dtype=tf.int8),
+            tf.constant([1, 1] + [0] * (self.num_qubits - 2), dtype=tf.int8),
             test_samples[1].to_tensor()))
 
   def test_pulled_back_measure(self):

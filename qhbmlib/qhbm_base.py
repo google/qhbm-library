@@ -109,20 +109,25 @@ class QHBM(tf.Module):
     if not isinstance(name, str):
       raise TypeError("name must be a string")
     super().__init__(name)
-    self.thetas = qnn.upgrade_initial_values(initial_thetas)
+    self.thetas = initial_thetas
     self.energy_function = check_base_function(energy)
     self.sampler_function = check_base_function(sampler)
-    self.diagonalizing_op = qnn.QNN(u, phis_symbols, initial_phis, name)
-    self.phis = self.diagonalizing_op.phis
-    self.phis_symbols = self.diagonalizing_op.phis_symbols
-    self.u = self.diagonalizing_op.u
-    self.u_dagger = self.diagonalizing_op.u_dagger
+    self.diagonalizing_op = qnn.QNN(u, phis_symbols, name=name)
+    self.diagonalizing_op.trainable_variables[0].assign(initial_phis)
+    self.phis = self.diagonalizing_op.trainable_variables[0]
+    self.phis_symbols = self.diagonalizing_op.symbols
+    self.u = self.diagonalizing_op.pqc(resolve=False)
+    self.u_dagger = self.diagonalizing_op.inverse_pqc(resolve=False)
 
-    self.raw_qubits = self.diagonalizing_op.raw_qubits
+    self.raw_qubits = [
+        cirq.GridQubit(x[0].numpy(), x[1].numpy())
+        for x in self.diagonalizing_op.qubits
+    ]
     self.qubits = self.diagonalizing_op.qubits
-    self.bit_symbols = self.diagonalizing_op.bit_symbols
-    self.bit_and_u = tfq.append_circuit(self.diagonalizing_op.bit_circuit,
-                                        self.diagonalizing_op.u)
+    self.bit_symbols = self.diagonalizing_op._bit_symbols
+    self.bit_and_u = tfq.append_circuit(
+        self.diagonalizing_op._bit_circuit,
+        self.diagonalizing_op.pqc(resolve=False))
 
     # Simulator backends
     self.tfq_sample_layer = tfq.layers.Sample()
