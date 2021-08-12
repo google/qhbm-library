@@ -28,6 +28,80 @@ import tensorflow_quantum as tfq
 from qhbmlib import qnn
 
 
+class QHBM(tf.keras.Model):
+
+  def __init__(self, ebm, qnn, name=None):
+    super().__init__(name=name)
+    self._ebm = ebm
+    self._qnn = qnn
+
+  @property
+  def ebm(self):
+    return self._ebm
+
+  @property
+  def qnn(self):
+    return self._qnn
+
+  @property
+  def raw_qubits(self):
+    return self.qnn.raw_qubits
+
+  @property
+  def qubits(self):
+    return self.qnn.qubits
+
+  @property
+  def analytic(self):
+    return self.ebm.analytic and self.qnn.analytic
+
+  def copy(self):
+    return QHBM(self.ebm, self.qnn, name=self.name)
+
+  @tf.function
+  def circuits(self, num_samples):
+    bitstrings, counts = self.ebm.sample(num_samples)
+    circuits = self.qnn.circuits(bitstrings)
+    return circuits, counts
+
+  @tf.function
+  def sample(self, num_samples, mask=True):
+    bitstrings, counts = self.ebm.sample(num_samples)
+    return self.qnn.sample(bitstrings, counts, mask=mask)
+
+  @tf.function
+  def expectation(self, operators, num_samples, reduce=True):
+    bitstrings, counts = self.ebm.sample(num_samples)
+    return self.qnn.expectation(bitstrings, counts, operators, reduce=reduce)
+
+  @tf.function
+  def probabilities(self):
+    return self.ebm.probabilities()
+
+  @tf.function
+  def log_partition_function(self):
+    return self.ebm.log_partition_function()
+
+  @tf.function
+  def entropy(self):
+    return self.ebm.entropy()
+
+  @tf.function
+  def unitary_matrix(self):
+    return self.qnn.pqc_unitary()
+
+  @tf.function
+  def density_matrix(self):
+    probabilities = tf.cast(self.probabilities(), tf.complex64)
+    unitary_matrix = self.unitary_matrix()
+    return tf.matmul(
+        tf.matmul(unitary_matrix, tf.linalg.diag(probabilities)),
+        tf.linalg.adjoint(unitary_matrix))
+
+
+#======================================================================================================================
+
+
 @tf.function
 def unique_with_counts(input_bitstrings, out_idx=tf.int32):
   """Extract the unique bitstrings in the given bitstring tensor.

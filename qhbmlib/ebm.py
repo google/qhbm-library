@@ -517,24 +517,36 @@ class EBM(tf.keras.Model):
   @tf.function
   def sample(self, num_samples):
     if self.analytic and self._energy_sampler is None:
-      all_energies = self.energy(self._all_bitstrings)
-      dist = tfp.distributions.Categorical(logits=-1 * all_energies)
-      return tf.gather(self._all_bitstrings, dist.sample(num_samples))
+      return tf.gather(
+          self._all_bitstrings,
+          tfp.distributions.Categorical(logits=-1 *
+                                        self.energies()).sample(num_samples))
     return self._energy_sampler.sample(num_samples)
+
+  @tf.function
+  def energies(self):
+    if self.analytic:
+      return self.energy(self._all_bitstrings)
+    raise NotImplementedError()
+
+  @tf.function
+  def probabilities(self):
+    if self.analytic:
+      return tf.exp(-self.ebm.energies()) / tf.exp(
+          self.log_partition_function())
+    raise NotImplementedError()
 
   @tf.function
   def log_partition_function(self):
     if self.analytic:
-      all_energies = self.energy(self._all_bitstrings)
-      return tf.reduce_logsumexp(-1 * all_energies)
+      return tf.reduce_logsumexp(-1 * self.energies())
     raise NotImplementedError()
 
   @tf.function
   def entropy(self):
     if self.analytic:
-      all_energies = self.energy(self._all_bitstrings)
-      dist = tfp.distributions.Categorical(logits=-1 * all_energies)
-      return dist.entropy()
+      return tfp.distributions.Categorical(logits=-1 *
+                                           self.energies()).entropy()
     raise NotImplementedError()
 
 
@@ -552,6 +564,9 @@ class Bernoulli(EBM):
         initializer=initializer)
     self._dist = tfp.distributions.Bernoulli(
         logits=2 * self._variables, dtype=tf.int8)
+    self._all_bitstrings = tf.constant(
+        list(itertools.product([0, 1], repeat=energy_function.num_bits)),
+        dtype=tf.int8)
 
   @property
   def num_bits(self):
@@ -580,6 +595,14 @@ class Bernoulli(EBM):
   @tf.function
   def sample(self, num_samples):
     return unique_bitstrings_with_counts(self._dist.sample(num_samples))
+
+  @tf.function
+  def energies(self):
+    return self.energy(self._all_bitstrings)
+
+  @tf.function
+  def probabilities(self):
+    return tf.exp(-self.ebm.energies()) / tf.exp(self.log_partition_function())
 
   @tf.function
   def log_partition_function(self):
