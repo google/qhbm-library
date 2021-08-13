@@ -56,7 +56,7 @@ class QHBM(tf.keras.Model):
     return self.ebm.analytic and self.qnn.analytic
 
   def copy(self):
-    return QHBM(self.ebm, self.qnn, name=self.name)
+    return QHBM(self.ebm.copy(), self.qnn.copy(), name=self.name)
 
   @tf.function
   def circuits(self, num_samples):
@@ -94,9 +94,11 @@ class QHBM(tf.keras.Model):
   def density_matrix(self):
     probabilities = tf.cast(self.probabilities(), tf.complex64)
     unitary_matrix = self.unitary_matrix()
-    return tf.matmul(
-        tf.matmul(unitary_matrix, tf.linalg.diag(probabilities)),
-        tf.linalg.adjoint(unitary_matrix))
+    unitary_probs = tf.multiply(
+        unitary_matrix,
+        tf.tile(
+            tf.expand_dims(probabilities, 0), [tf.shape(unitary_matrix)[0], 1]))
+    return tf.matmul(unitary_probs, tf.linalg.adjoint(unitary_matrix))
 
 
 #======================================================================================================================

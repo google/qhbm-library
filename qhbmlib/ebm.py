@@ -81,6 +81,11 @@ class KOBE(EnergyFunction):
   def order(self):
     return self._order
 
+  def copy(self):
+    kobe = KOBE(self.num_bits, self.order, name=name)
+    kobe._variables.assign(self._variables)
+    return kobe
+
   @tf.function
   def energy(self, bitstrings):
     spins = 1 - 2 * bitstrings
@@ -115,6 +120,12 @@ class MLP(EnergyFunction):
   @property
   def num_bits(self):
     return self._num_bits
+
+  def copy(self):
+    mlp = tf.keras.models.clone_model(self)
+    for i in tf.range(len(mlp.trainable_variables)):
+      mlp.trainable_variables[i].assign(self.trainable_variables[i])
+    return mlp
 
   @tf.function
   def call(self, bitstrings):
@@ -249,6 +260,14 @@ class UncalibratedGWG(EnergyKernel):
   def is_calibrated(self):
     return False
 
+  def copy(self):
+    return UncalibratedGWG(
+        self.energy_function.copy(),
+        gradient=self.gradient,
+        temperature=self.temperature,
+        num_samples=self.num_samples,
+        name=self.name)
+
   @tf.function
   def _exact_diff_function(self, current_state):
     current_state_t = tf.transpose(current_state)
@@ -317,6 +336,9 @@ class MetropolisHastings(tfp.mcmc.MetropolisHastings, EnergyKernel):
   def energy_function(self):
     return self.inner_kernel.energy_function
 
+  def copy(self):
+    return MetropolisHastings(self.inner_kernel.copy())
+
 
 class GWG(MetropolisHastings):
 
@@ -363,6 +385,14 @@ class GWG(MetropolisHastings):
   def is_calibrated(self):
     return True
 
+  def copy(self):
+    return GWG(
+        self.energy_function.copy(),
+        gradient=self.gradient,
+        temperature=self.temperature,
+        num_samples=self.num_samples,
+        name=self.name)
+
   @tf.function
   def one_step(self, current_state, previous_kernel_results):
     return self._impl.one_step(current_state, previous_kernel_results)
@@ -378,7 +408,7 @@ class MCMC(EnergySampler):
                kernel,
                num_chains=1,
                buffer_capacity=1000,
-               buffer_prob=1,
+               buffer_probability=1,
                num_burnin_steps=0,
                num_steps_between_results=0,
                parallel_iterations=10,
@@ -387,7 +417,7 @@ class MCMC(EnergySampler):
     self._num_chains = num_chains
     self._num_bits = kernel.energy_function.num_bits
     self._buffer_capacity = buffer_capacity
-    self._buffer_prob = buffer_prob
+    self._buffer_probability = buffer_probability
     self._num_burnin_steps = num_burnin_steps
     self._num_steps_between_results = num_steps_between_results
     self._parallel_iterations = parallel_iterations
@@ -413,8 +443,8 @@ class MCMC(EnergySampler):
     return self._buffer_capacity
 
   @property
-  def buffer_prob(self):
-    return self._buffer_prob
+  def buffer_probability(self):
+    return self._buffer_probability
 
   @property
   def num_burnin_steps(self):
@@ -432,11 +462,22 @@ class MCMC(EnergySampler):
   def name(self):
     return self._name
 
+  def copy(self):
+    return MCMC(
+        self.kernel.copy(),
+        num_chains=self.num_chains,
+        buffer_capacity=self.buffer_capacity,
+        buffer_probability=self.buffer_probability,
+        num_burnin_steps=self.num_burnin_steps,
+        num_steps_between_results=self.num_steps_between_results,
+        parallel_iterations=self.parallel_iterations,
+        name=self.name)
+
   @tf.function
   def sample(self, num_samples):
     num_results = tf.cast(tf.math.ceil(num_samples / self.num_chains), tf.int32)
 
-    if tf.random.uniform(()) > self.buffer_prob:
+    if tf.random.uniform(()) > self.buffer_probability:
       init_state = tf.cast(
           tf.random.uniform([self.num_chains, self._num_bits],
                             maxval=2,
@@ -506,6 +547,14 @@ class EBM(tf.keras.Model):
   @property
   def analytic(self):
     return self._analytic
+
+  def copy(self):
+    energy_sampler = self._energy_sampler.copy()
+    return EBM(
+        energy_sampler.energy_function,
+        energy_sampler,
+        analytic=self.analytic,
+        name=self.name)
 
   @tf.function
   def energy(self, bitstrings):
@@ -579,6 +628,11 @@ class Bernoulli(EBM):
   @property
   def analytic(self):
     return True
+
+  def copy(self):
+    bernoulli = Bernoulli(self.num_bits, name=self.name)
+    bernoulli._variables.assign(self._variables)
+    return bernoulli
 
   @tf.function
   def energy(self, bitstrings):
@@ -1235,7 +1289,7 @@ class MCMCSampler:
                num_chains,
                num_bits,
                buffer_size,
-               buffer_prob,
+               buffer_probability,
                num_burnin_steps=0,
                num_steps_between_results=0,
                parallel_iterations=10):
@@ -1243,7 +1297,7 @@ class MCMCSampler:
     self.num_chains = num_chains
     self.num_bits = num_bits
     self.buffer_size = buffer_size
-    self.buffer_prob = buffer_prob
+    self.buffer_probability = buffer_probability
     self.num_burnin_steps = num_burnin_steps
     self.num_steps_between_results = num_steps_between_results
     self.parallel_iterations = parallel_iterations
@@ -1257,7 +1311,8 @@ class MCMCSampler:
     self.kernel.set_energy_function_params(energy_function_params)
     num_results = tf.cast(tf.math.ceil(num_samples / self.num_chains), tf.int32)
 
-    if self.buffer.size() == 0 or tf.random.uniform(()) > self.buffer_prob:
+    if self.buffer.size() == 0 or tf.random.uniform(
+        ()) > self.buffer_probability:
       init_state = tf.cast(
           tf.random.uniform([self.num_chains, self.num_bits],
                             maxval=2,
