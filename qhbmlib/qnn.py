@@ -21,7 +21,6 @@ import sympy
 import numpy as np
 import tensorflow as tf
 import tensorflow_quantum as tfq
-from tensorflow_quantum.python.layers.circuit_executors import input_checks
 
 
 def build_bit_circuit(qubits, name='bit_circuit'):
@@ -165,6 +164,10 @@ class QNN(tf.keras.Model):
     return self._symbols
 
   @property
+  def values(self):
+    return self._values
+
+  @property
   def backend(self):
     return self._backend
 
@@ -192,7 +195,7 @@ class QNN(tf.keras.Model):
     """General function for sampling from circuits."""
     samples = self._sample_layer(
         circuits, repetitions=tf.expand_dims(tf.math.reduce_max(counts), 0))
-    if tf.constant(mask):
+    if mask:
       num_samples_mask = tf.cast((tf.ragged.range(counts) + 1).to_tensor(),
                                  tf.bool)
       return tf.ragged.boolean_mask(samples, num_samples_mask)
@@ -224,7 +227,7 @@ class QNN(tf.keras.Model):
           operators=operators,
           repetitions=tf.expand_dims(counts, 1),
       )
-    if tf.constant(reduce):
+    if reduce:
       probs = tf.cast(counts, tf.float32) / tf.cast(
           tf.reduce_sum(counts), tf.float32)
       return tf.reduce_sum(tf.transpose(probs * tf.transpose(expectations)), 0)
@@ -232,14 +235,14 @@ class QNN(tf.keras.Model):
 
   @tf.function
   def pqc(self, resolve=True):
-    if tf.constant(resolve):
+    if resolve:
       return tfq.resolve_parameters(self._pqc, self.symbols,
                                     tf.expand_dims(self._values, 0))
     return self._pqc
 
   @tf.function
   def inverse_pqc(self, resolve=True):
-    if tf.constant(resolve):
+    if resolve:
       return tfq.resolve_parameters(self._inverse_pqc, self.symbols,
                                     tf.expand_dims(self._values, 0))
     return self._inverse_pqc
@@ -369,6 +372,6 @@ class QNN(tf.keras.Model):
 
   @tf.function
   def pqc_unitary(self):
-    if tf.constant(self.analytic):
+    if self.analytic:
       return self._unitary_layer(self.pqc()).to_tensor()[0]
     raise NotImplementedError()

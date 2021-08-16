@@ -97,12 +97,13 @@ class KOBE(EnergyFunction):
     return tf.reduce_sum(tf.transpose(parities_t) * self._variables, -1)
 
   def operator(self, qubits):
-    return tfq.convert_to_tensor(
+    return tfq.convert_to_tensor([
         cirq.PauliSum.from_pauli_strings(
             float(self._variables[i].numpy()) * cirq.PauliString(
                 cirq.Z(qubits[self._indices[i][j]])
                 for j in range(tf.shape(self._indices[i])[0]))
-            for i in range(self._indices.nrows())))
+            for i in range(self._indices.nrows()))
+    ])
 
 
 class MLP(EnergyFunction):
@@ -463,7 +464,7 @@ class MCMC(EnergySampler):
     return self._name
 
   def copy(self):
-    return MCMC(
+    mcmc = MCMC(
         self.kernel.copy(),
         num_chains=self.num_chains,
         buffer_capacity=self.buffer_capacity,
@@ -472,6 +473,8 @@ class MCMC(EnergySampler):
         num_steps_between_results=self.num_steps_between_results,
         parallel_iterations=self.parallel_iterations,
         name=self.name)
+    mcmc._buffer = tf.queue.QueueBase.from_list(tf.constant(0), [self._buffer])
+    return mcmc
 
   @tf.function
   def sample(self, num_samples):
@@ -604,6 +607,7 @@ class Bernoulli(EBM):
   def __init__(self,
                num_bits,
                initializer=tf.keras.initializers.RandomUniform(),
+               analytic=False,
                name=None):
     tf.keras.Model.__init__(self, name=name)
     self._num_bits = num_bits
@@ -611,11 +615,10 @@ class Bernoulli(EBM):
         name=f'{self.name}_variables',
         shape=[self.num_bits],
         initializer=initializer)
-    self._dist = tfp.distributions.Bernoulli(
-        logits=2 * self._variables, dtype=tf.int8)
-    self._all_bitstrings = tf.constant(
-        list(itertools.product([0, 1], repeat=energy_function.num_bits)),
-        dtype=tf.int8)
+    self._analytic = analytic
+    if analytic:
+      self._all_bitstrings = tf.constant(
+          list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
 
   @property
   def num_bits(self):
@@ -627,7 +630,7 @@ class Bernoulli(EBM):
 
   @property
   def analytic(self):
-    return True
+    return self._analytic
 
   def copy(self):
     bernoulli = Bernoulli(self.num_bits, name=self.name)
@@ -641,30 +644,40 @@ class Bernoulli(EBM):
 
   @tf.function
   def operator(self, qubits):
-    return tfq.convert_to_tensor(
+    return tfq.convert_to_tensor([
         cirq.PauliSum.from_pauli_strings(
             float(self._variables[i].numpy()) * cirq.Z(qubits[i])
-            for i in range(self.num_bits)))
+            for i in range(self.num_bits))
+    ])
 
   @tf.function
   def sample(self, num_samples):
-    return unique_bitstrings_with_counts(self._dist.sample(num_samples))
+    return unique_bitstrings_with_counts(
+        tfp.distributions.Bernoulli(logits=2 * self._variables,
+                                    dtype=tf.int8).sample(num_samples))
 
   @tf.function
   def energies(self):
-    return self.energy(self._all_bitstrings)
+    if self.analytic:
+      return self.energy(self._all_bitstrings)
+    raise NotImplementedError()
 
   @tf.function
   def probabilities(self):
-    return tf.exp(-self.ebm.energies()) / tf.exp(self.log_partition_function())
+    if self.analytic:
+      return tf.exp(-self.energies()) / tf.exp(self.log_partition_function())
+    raise NotImplementedError()
 
   @tf.function
   def log_partition_function(self):
-    return tf.constant(0.0)
+    if self.analytic:
+      return tf.reduce_logsumexp(-1 * self.energies())
+    raise NotImplementedError()
 
   @tf.function
   def entropy(self):
-    return tf.reduce_sum(self._dist.entropy())
+    return tf.reduce_sum(
+        tfp.distributions.Bernoulli(logits=2 * self._variables).entropy())
 
 
 # NEW
