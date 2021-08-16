@@ -20,10 +20,12 @@ import tensorflow_quantum as tfq
 from qhbmlib import qhbm_base
 
 
-@tf.custom_gradient
+@tf.function
 def qmhl_loss(
     model: qhbm_base.QHBM, target_circuits: tf.Tensor, target_counts: tf.Tensor):
   """Calculate the QMHL loss of the model against the target.
+
+    This loss is differentiable with respect to the trainable variables of the model.
 
     Args:
       qhbm_model: Parameterized model density operator.
@@ -36,50 +38,101 @@ def qmhl_loss(
     Returns:
       loss: Quantum cross entropy between the target and model.
     """
-  print("retracing: qmhl_loss")
-  # log_partition estimate
-  if model.ebm.analytic:
-    log_partition = model.log_partition_function()
-  else:
-    bitstrings, _ = model.ebm.sample(tf.reduce_sum(target_counts))
-    energies = model.ebm.energy(bitstrings)
-    log_partition = tf.math.reduce_logsumexp(-1 * energies)
+  print(f"retracing: qmhl_loss on {model.name}")
+  @tf.custom_gradient
+  def call(thetas, phis, target_circuits, target_counts):
+    # log_partition estimate
+    if model.ebm.analytic:
+      log_partition = model.log_partition_function()
+    else:
+      bitstrings, _ = model.ebm.sample(tf.reduce_sum(target_counts))
+      energies = model.ebm.energy(bitstrings)
+      log_partition = tf.math.reduce_logsumexp(-1 * energies)
 
-  # pulled back expectation of energy operator
-  if model.ebm.has_operator and model.qnn.analytic
-    avg_energy = model.qnn.pulled_back_expectation(
-      target_circuits, target_counts, model.ebm.operator)
-  else:
+    # pulled back expectation of energy operator
     samples, counts = model.qnn.pulled_back_sample(target_circuits, target_counts)
     energies = model.ebm.energy(samples)
     probs = tf.cast(counts, tf.float32) / tf.cast(tf.reduce_sum(counts), tf.float32)
     weighted_energies = energies * probs
     avg_energy = tf.reduce_sum(weighted_energies)
     
-  forward_pass_vals = avg_energy + log_partition
+    forward_pass_vals = avg_energy + log_partition
 
-  def gradient(grad):
-    """Gradients are computed using estimators from the QHBM paper."""
-    # Thetas derivative.
-    qnn_bitstrings, qnn_counts = model.qnn.pulled_back_sample(
-      target_circuits, target_counts)
-    qnn_probs = tf.cast(qnn_counts, tf.float32) / tf.cast(tf.reduce_sum(qnn_counts), tf.float32)
-    ebm_bitstrings, ebm_counts = model.ebm.sample(tf.reduce_sum(target_counts))
-    ebm_probs = tf.cast(ebm_counts, tf.float32) / tf.cast(tf.reduce_sum(ebm_counts), tf.float32)
-    with tf.GradientTape() as tape:
-      qnn_energies = model.ebm.energy(qnn_bitstrings)
-    qnn_thetas_grad_weighted = tape.jacobian(qnn_energies, model.ebm.trainable_variables) * qnn_probs
-    qnn_thetas_grad = tf.reduce_sum(qnn_thetas_grad_weights)
-    with tf.GradientTape() as tape:
-      ebm_energies = model.ebm.energy(ebm_bitstrings)
-    ebm_thetas_grad_weighted = tape.jacobian(ebm_energies, model.ebm.trainable_variables) * ebm_probs
-    ebm_thetas_grad = tf.reduce_sum(ebm_thetas_grad_weighted)
-    thetas_grad = qnn_thetas_grad - ebm_thetas_grad
+    def gradient(grad):
+      """Gradients are computed using estimators from the QHBM paper."""
+      # Thetas derivative.
+      qnn_bitstrings, qnn_counts = model.qnn.pulled_back_sample(
+        target_circuits, target_counts)
+      qnn_probs = tf.cast(qnn_counts, tf.float32) / tf.cast(tf.reduce_sum(qnn_counts), tf.float32)
+      ebm_bitstrings, ebm_counts = model.ebm.sample(tf.reduce_sum(target_counts))
+      ebm_probs = tf.cast(ebm_counts, tf.float32) / tf.cast(tf.reduce_sum(ebm_counts), tf.float32)
+      with tf.GradientTape() as tape:
+        qnn_energies = model.ebm.energy(qnn_bitstrings)
+      qnn_thetas_grad_weighted = tape.jacobian(qnn_energies, thetas) * qnn_probs
+      qnn_thetas_grad = tf.reduce_sum(qnn_thetas_grad_weights, 0)
+      with tf.GradientTape() as tape:
+        ebm_energies = model.ebm.energy(ebm_bitstrings)
+      ebm_thetas_grad_weighted = tape.jacobian(ebm_energies, thetas) * ebm_probs
+      ebm_thetas_grad = tf.reduce_sum(ebm_thetas_grad_weighted, 0)
+      thetas_grad = qnn_thetas_grad - ebm_thetas_grad
 
-    # Phis derivative.
-    return grad * tf.concat([thetas_grad, phis_grad], 0), None, None
-    
-  return forward_pass_vals, gradient
+      # Phis derivative.
+      if model.ebm.has_operator:
+        with tf.GradientTape() as tape:
+          pulled_back_energy = model.qnn.pulled_back_expectation(target_circuits, target_counts, model.ebm.operator(model.raw_qubits))
+        phis_grad = tape.gradient(pulled_back_energy, phis)
+      else:
+        # Based on the tfq differentiator codebase
+        (batch_programs, new_symbol_names, batch_symbol_values, batch_weights,
+         batch_mapper) = model.qnn.differentiator.get_gradient_circuits(model.qnn.pulled_back_circuits(target_circuits, resolve=False), model.qnn.symbols, tf.tile(tf.expand_dims(model.qnn.phis, 0), [tf.shape(target_circuits)[0], 1]))
+        m_i = tf.shape(batch_programs)[1]
+        batch_num_samples = tf.tile(tf.expand_dims(num_samples, 1), [1, m_i, 1])
+        n_batch_programs = tf.reduce_prod(tf.shape(batch_programs))
+        n_symbols = tf.shape(new_symbol_names)[0]
+        n_ops = tf.shape(pauli_sums)[1]
+        batch_samples = self.expectation_op(
+            tf.reshape(batch_programs, [n_batch_programs]), new_symbol_names,
+            tf.reshape(batch_symbol_values, [n_batch_programs, n_symbols]),
+            tf.reshape(batch_pauli_sums, [n_batch_programs, n_ops]),
+            tf.reshape(batch_num_samples, [n_batch_programs, n_ops]))
+        batch_expectations = tf.reshape(batch_expectations,
+                                        tf.shape(batch_pauli_sums))
+
+        # has shape [n_programs, n_symbols, n_ops]
+        batch_jacobian = tf.map_fn(
+            lambda x: tf.einsum('sm,smo->so', x[0], tf.gather(x[1], x[2])),
+            (batch_weights, batch_expectations, batch_mapper),
+            fn_output_signature=tf.float32)
+
+        # now apply the chain rule
+        phis_grad = tf.einsum('pso,po->ps', batch_jacobian, grad
+        exp_layer = tfq.layers.Expectation()
+        batch_pauli_sums = tf.tile(
+            tf.expand_dims(pauli_sums, 1),
+            [1, tf.shape(batch_programs)[1], 1])
+        n_batch_programs = tf.reduce_prod(tf.shape(batch_programs))
+        n_symbols = tf.shape(new_symbol_names)[0]
+        n_ops = tf.shape(pauli_sums)[1]
+        batch_expectations = model.qnn.tfq.layers.Expectation()(
+            tf.reshape(batch_programs, [n_batch_programs]),
+            symbol_names=new_symbol_names,
+            symbol_values=tf.reshape(
+                batch_symbol_values, [n_batch_programs, n_symbols]),
+            operators=tf.reshape(
+                batch_pauli_sums, [n_batch_programs, n_ops]))
+        batch_expectations = tf.reshape(
+            batch_expectations, tf.shape(batch_pauli_sums))
+        batch_jacobian = tf.map_fn(
+            lambda x: tf.einsum('km,kmp->kp', x[0], tf.gather(x[1], x[2])),
+            (batch_weights, batch_expectations, batch_mapper),
+            fn_output_signature=tf.float32)
+        phis_grad = tf.reduce_sum(batch_jacobian, -1)
+          
+      return tuple(grad * t for t in thetas_grad) + (grad * phis_grad, None, None)
+  
+    return forward_pass_vals, gradient
+  return call(model.thetas, model.phis, target_circuits, target_counts)
+
 
 # ============================================================================ #
 # Exact QMHL.
