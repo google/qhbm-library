@@ -37,6 +37,7 @@ def qmhl_loss(
       loss: Quantum cross entropy between the target and model.
     """
   print("retracing: qmhl_loss")
+  # log_partition estimate
   if model.ebm.analytic:
     log_partition = model.log_partition_function()
   else:
@@ -44,40 +45,41 @@ def qmhl_loss(
     energies = model.ebm.energy(bitstrings)
     log_partition = tf.math.reduce_logsumexp(-1 * energies)
 
+  # pulled back expectation of energy operator
   if model.ebm.has_operator and model.qnn.analytic
     avg_energy = model.qnn.pulled_back_expectation(
       target_circuits, target_counts, model.ebm.operator)
   else:
-    samples, _ = model.qnn.pulled_back_sample(target_circuits, target_counts)
-    avg_energy = tf.reduce_mean(model.ebm.energy(samples))
+    samples, counts = model.qnn.pulled_back_sample(target_circuits, target_counts)
+    energies = model.ebm.energy(samples)
+    probs = tf.cast(counts, tf.float32) / tf.cast(tf.reduce_sum(counts), tf.float32)
+    weighted_energies = energies * probs
+    avg_energy = tf.reduce_sum(weighted_energies)
     
   forward_pass_vals = avg_energy + log_partition
 
   def gradient(grad):
+    """Gradients are computed using estimators from the QHBM paper."""
+    # Thetas derivative.
     qnn_bitstrings, qnn_counts = model.qnn.pulled_back_sample(
       target_circuits, target_counts)
+    qnn_probs = tf.cast(qnn_counts, tf.float32) / tf.cast(tf.reduce_sum(qnn_counts), tf.float32)
     ebm_bitstrings, ebm_counts = model.ebm.sample(tf.reduce_sum(target_counts))
+    ebm_probs = tf.cast(ebm_counts, tf.float32) / tf.cast(tf.reduce_sum(ebm_counts), tf.float32)
     with tf.GradientTape() as tape:
       qnn_energies = model.ebm.energy(qnn_bitstrings)
-    qnn_thetas_grad = tape.jacobian(qnn_energies, model.ebm.trainable_variables)
+    qnn_thetas_grad_weighted = tape.jacobian(qnn_energies, model.ebm.trainable_variables) * qnn_probs
+    qnn_thetas_grad = tf.reduce_sum(qnn_thetas_grad_weights)
     with tf.GradientTape() as tape:
       ebm_energies = model.ebm.energy(ebm_bitstrings)
-    ebm_thetas_grad = tape.jacobian(ebm_energies, model.ebm.trainable_variables)
-    qnn_probs = 
-    ebm_probs = 
+    ebm_thetas_grad_weighted = tape.jacobian(ebm_energies, model.ebm.trainable_variables) * ebm_probs
+    ebm_thetas_grad = tf.reduce_sum(ebm_thetas_grad_weighted)
+    thetas_grad = qnn_thetas_grad - ebm_thetas_grad
 
-
-    ebm_grad = model.ebm.sample(tf.reduce_sum(target_counts))
-    return self._differentiate_ana(programs, symbol_names,
-                                     symbol_values, pauli_sums,
-                                     forward_pass_vals, grad)
+    # Phis derivative.
+    return grad * tf.concat([thetas_grad, phis_grad], 0), None, None
     
-  else:
-    forward_pass_vals = analytic_op(programs, symbol_names,
-                                            symbol_values, pauli_sums)
-
-
-            return forward_pass_vals, gradient
+  return forward_pass_vals, gradient
 
 # ============================================================================ #
 # Exact QMHL.
