@@ -267,10 +267,29 @@ class QNNTest(tf.test.TestCase):
         test_util.check_bitstring_exists(
             tf.constant([1] * self.num_qubits, dtype=tf.int8), test_samples))
 
-  def test_measure(self):
-    """Confirms correct measurement."""
-    #TODO(zaqqwerty)
-    pass
+  def test_expectation(self):
+    """Confirms basic correct expectation values and derivatives.
+ 
+    <X> measured on a GHZ state should be +1, <Z> 0.
+    Conversely, derivative with respect to hadamard param should be 0 for <X>
+    and -1 for <Z>.
+    """
+    ghz_param = sympy.Symbol("ghz")
+    ghz_circuit = cirq.Circuit(cirq.X(
+        self.raw_qubits[0]) ** ghz_param) + cirq.Circuit(
+            cirq.CNOT(q0, q1)
+            for q0, q1 in zip(self.raw_qubits, self.raw_qubits[1:]))
+    ghz_qnn = qnn.QNN(
+        ghz_circuit, [ghz_param],
+        initializer=tf.keras.initializers.Constant(value=0.5),
+        name="ghz")
+    z_op = tfq.convert_to_tensor([cirq.Z(self.raw_qubits[-1])])
+    x_op = tfq.convert_to_tensor([cirq.X(self.raw_qubits[-1])])
+    with tf.GradientTape() as tape:
+      z_exp = ghz_qnn.expectation(tf.constant([[0] * self.num_qubits] * 2, dtype=tf.int8), tf.constant([100, 100]), z_op)
+      x_exp = ghz_qnn.expectation(tf.constant([[0] * self.num_qubits] * 2, dtype=tf.int8), tf.constant([100, 100]), z_op)
+    self.assertAllClose(z_exp, 0)
+    self.assertAllClose(x_exp, 1)
 
   def test_pulled_back_circuits(self):
     """Confirms the pulled back circuits correct for a variety of inputs."""
@@ -335,7 +354,12 @@ class QNNTest(tf.test.TestCase):
             tf.constant([1, 1] + [0] * (self.num_qubits - 2), dtype=tf.int8),
             test_samples[1].to_tensor()))
 
-  def test_pulled_back_measure(self):
+  def test_pulled_back_expectation(self):
+    """Confirms correct pulled back measurement."""
+    #TODO(zaqqwerty)
+    pass
+
+  def test_pulled_back_expectation_gradient(self):
     """Confirms correct pulled back measurement."""
     #TODO(zaqqwerty)
     pass
