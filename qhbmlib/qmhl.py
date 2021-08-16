@@ -19,14 +19,69 @@ import tensorflow_quantum as tfq
 
 from qhbmlib import qhbm_base
 
-# ============================================================================ #
-# Sample based QMHL TODO(zaqqwerty).
-# ============================================================================ #
+
+@tf.custom_gradient
+def qmhl_loss(
+    model: qhbm_base.QHBM, target_circuits: tf.Tensor, target_counts: tf.Tensor):
+  """Calculate the QMHL loss of the model against the target.
+
+    Args:
+      qhbm_model: Parameterized model density operator.
+      target_circuits: 1-D tensor of strings which are serialized circuits.
+        These circuits represent samples from the data density matrix.
+      target_counts: 1-D tensor of integers which are the number of samples to
+        draw from the data density matrix: `target_counts[i]` is the number of
+          samples to draw from `target_circuits[i]`.
+
+    Returns:
+      loss: Quantum cross entropy between the target and model.
+    """
+  print("retracing: qmhl_loss")
+  if model.ebm.analytic:
+    log_partition = model.log_partition_function()
+  else:
+    bitstrings, _ = model.ebm.sample(tf.reduce_sum(target_counts))
+    energies = model.ebm.energy(bitstrings)
+    log_partition = tf.math.reduce_logsumexp(-1 * energies)
+
+  if model.ebm.has_operator and model.qnn.analytic
+    avg_energy = model.qnn.pulled_back_expectation(
+      target_circuits, target_counts, model.ebm.operator)
+  else:
+    samples, _ = model.qnn.pulled_back_sample(target_circuits, target_counts)
+    avg_energy = tf.reduce_mean(model.ebm.energy(samples))
+    
+  forward_pass_vals = avg_energy + log_partition
+
+  def gradient(grad):
+    qnn_bitstrings, qnn_counts = model.qnn.pulled_back_sample(
+      target_circuits, target_counts)
+    ebm_bitstrings, ebm_counts = model.ebm.sample(tf.reduce_sum(target_counts))
+    with tf.GradientTape() as tape:
+      qnn_energies = model.ebm.energy(qnn_bitstrings)
+    qnn_thetas_grad = tape.jacobian(qnn_energies, model.ebm.trainable_variables)
+    with tf.GradientTape() as tape:
+      ebm_energies = model.ebm.energy(ebm_bitstrings)
+    ebm_thetas_grad = tape.jacobian(ebm_energies, model.ebm.trainable_variables)
+    qnn_probs = 
+    ebm_probs = 
+
+
+    ebm_grad = model.ebm.sample(tf.reduce_sum(target_counts))
+    return self._differentiate_ana(programs, symbol_names,
+                                     symbol_values, pauli_sums,
+                                     forward_pass_vals, grad)
+    
+  else:
+    forward_pass_vals = analytic_op(programs, symbol_names,
+                                            symbol_values, pauli_sums)
+
+
+            return forward_pass_vals, gradient
 
 # ============================================================================ #
 # Exact QMHL.
 # ============================================================================ #
-
 
 @tf.function
 def exact_qmhl_loss(
