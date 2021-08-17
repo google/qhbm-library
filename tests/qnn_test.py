@@ -290,8 +290,8 @@ class QNNTest(tf.test.TestCase):
     with tf.GradientTape() as tape:
       z_exp = ghz_qnn.expectation(bitstrings, counts, z_op)
       x_exp = ghz_qnn.expectation(bitstrings, counts, x_op)
-    self.assertAllClose(z_exp, 0)
-    self.assertAllClose(x_exp, 1)
+    self.assertAllClose(z_exp, [0])
+    self.assertAllClose(x_exp, [1])
 
   def test_pulled_back_circuits(self):
     """Confirms the pulled back circuits correct for a variety of inputs."""
