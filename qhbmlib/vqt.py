@@ -17,7 +17,7 @@
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-from qhbmlib import qhbm_base
+from qhbmlib import qhbm
 
 # ============================================================================ #
 # Sample-based VQT.
@@ -26,7 +26,7 @@ from qhbmlib import qhbm_base
 
 @tf.function
 def vqt_loss(
-    qhbm: qhbm_base.QHBM,
+    qhbm: qhbm.QHBM,
     num_samples: tf.Tensor,
     beta: tf.Tensor,
     hamiltonian: tf.Tensor,
@@ -72,7 +72,7 @@ def vqt_loss(
 
 @tf.function
 def vqt_loss_thetas_grad(
-    qhbm: qhbm_base.QHBM,
+    qhbm: qhbm.QHBM,
     num_samples: tf.Tensor,
     beta: tf.Tensor,
     hamiltonian: tf.Tensor,
@@ -118,7 +118,7 @@ def vqt_loss_thetas_grad(
 
 @tf.function
 def vqt_loss_phis_grad(
-    qhbm: qhbm_base.QHBM,
+    qhbm: qhbm.QHBM,
     num_samples: tf.Tensor,
     beta: tf.Tensor,
     hamiltonian: tf.Tensor,
@@ -182,7 +182,7 @@ def _tiled_expectation(circuits: tf.Tensor, hamiltonian: tf.Tensor):
 
 @tf.function
 def exact_vqt_loss(
-    qhbm: qhbm_base.ExactQHBM,
+    qhbm: qhbm.QHBM,
     num_samples: tf.Tensor,
     beta: tf.Tensor,
     hamiltonian: tf.Tensor,
@@ -199,7 +199,7 @@ def exact_vqt_loss(
 
 @tf.function
 def exact_vqt_loss_thetas_grad(
-    qhbm: qhbm_base.ExactQHBM,
+    qhbm: qhbm.QHBM,
     num_samples: tf.Tensor,
     beta: tf.Tensor,
     hamiltonian: tf.Tensor,
@@ -232,7 +232,7 @@ def exact_vqt_loss_thetas_grad(
 
 @tf.function
 def exact_vqt_loss_phis_grad(
-    qhbm: qhbm_base.ExactQHBM,
+    qhbm: qhbm.QHBM,
     num_samples: tf.Tensor,
     beta: tf.Tensor,
     hamiltonian: tf.Tensor,
