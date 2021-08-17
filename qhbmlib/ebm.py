@@ -149,7 +149,7 @@ class EnergySampler(abc.ABC):
     raise NotImplementedError()
 
   @abc.abstractmethod
-  def sample(self, num_samples):
+  def sample(self, num_samples, unique=True):
     raise NotImplementedError()
 
 
@@ -477,7 +477,7 @@ class MCMC(EnergySampler):
     return mcmc
 
   @tf.function
-  def sample(self, num_samples):
+  def sample(self, num_samples, unique=True):
     num_results = tf.cast(tf.math.ceil(num_samples / self.num_chains), tf.int32)
 
     if tf.random.uniform(()) > self.buffer_probability:
@@ -520,7 +520,10 @@ class MCMC(EnergySampler):
     self._buffer.enqueue_many(sampled_states[:tf.math.minimum(
         tf.shape(sampled_states)[0], self.buffer_capacity)])
 
-    return unique_bitstrings_with_counts(sampled_states[:num_samples])
+    sampled_states = sampled_states[:num_samples]
+    if unique:
+      return unique_bitstrings_with_counts(sampled_states)
+    return sampled_states
 
 
 class EBM(tf.keras.Model):
@@ -567,13 +570,13 @@ class EBM(tf.keras.Model):
     return self._energy_function.operator(qubits)
 
   @tf.function
-  def sample(self, num_samples):
+  def sample(self, num_samples, unique=True):
     if self.analytic and self._energy_sampler is None:
       return tf.gather(
           self._all_bitstrings,
           tfp.distributions.Categorical(logits=-1 *
                                         self.energies()).sample(num_samples))
-    return self._energy_sampler.sample(num_samples)
+    return self._energy_sampler.sample(num_samples, unique=unique)
 
   @tf.function
   def energies(self):
@@ -651,10 +654,12 @@ class Bernoulli(EBM):
     ])
 
   @tf.function
-  def sample(self, num_samples):
-    return unique_bitstrings_with_counts(
-        tfp.distributions.Bernoulli(logits=2 * self._variables,
-                                    dtype=tf.int8).sample(num_samples))
+  def sample(self, num_samples, unique=True):
+    samples = tfp.distributions.Bernoulli(
+        logits=2 * self._variables, dtype=tf.int8).sample(num_samples)
+    if unique:
+      return unique_bitstrings_with_counts(samples)
+    return samples
 
   @tf.function
   def energies(self):
