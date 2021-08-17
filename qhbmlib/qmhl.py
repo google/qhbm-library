@@ -17,7 +17,7 @@
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-from qhbmlib import qhbm_base
+from qhbmlib import qhbm, ebm
 
 # ============================================================================ #
 # Sample based QMHL TODO(zaqqwerty).
@@ -30,12 +30,11 @@ from qhbmlib import qhbm_base
 
 @tf.function
 def exact_qmhl_loss(
-    qhbm_model: qhbm_base.ExactQHBM,
+    qhbm_model: qhbm.QHBM,
     target_circuits: tf.Tensor,
     target_counts: tf.Tensor,
 ):
   """Calculate the QMHL loss of the model against the target.
-
     Args:
       qhbm_model: Parameterized model density operator.
       target_circuits: 1-D tensor of strings which are serialized circuits.
@@ -43,7 +42,6 @@ def exact_qmhl_loss(
       target_counts: 1-D tensor of integers which are the number of samples to
         draw from the data density matrix: `target_counts[i]` is the number of
           samples to draw from `target_circuits[i]`.
-
     Returns:
       loss: Quantum cross entropy between the target and model.
     """
@@ -56,13 +54,12 @@ def exact_qmhl_loss(
 
 @tf.function
 def exact_qmhl_loss_thetas_grad(
-    qhbm_model: qhbm_base.ExactQHBM,
+    qhbm_model: qhbm.QHBM,
     num_model_samples: tf.Tensor,
     target_circuits: tf.Tensor,
     target_counts: tf.Tensor,
 ):
   """Calculate thetas gradient of the QMHL loss of the model against the target.
-
     Args:
       qhbm_model: `QHBM` which is the parameterized model density operator.
       num_model_samples: Scalar integer tensor which is the number of bitstrings
@@ -73,7 +70,6 @@ def exact_qmhl_loss_thetas_grad(
       target_counts: 1-D tensor of integers which are the number of samples to
         draw from the data density matrix: `target_counts[i]` is the number of
           samples to draw from `target_circuits[i]`.
-
     Returns:
       Stochastic estimate of the gradient of the QMHL loss with respect to the
         classical model parameters.
@@ -98,7 +94,8 @@ def exact_qmhl_loss_thetas_grad(
       target_circuits, target_counts)
   # safe when all circuits have the same number of qubits
   all_samples_pb = ragged_samples_pb.values.to_tensor()
-  unique_samples_pb, _, counts_pb = qhbm_base.unique_with_counts(all_samples_pb)
+  unique_samples_pb, _, counts_pb = ebm.unique_bitstring_with_counts(
+      all_samples_pb)
   expanded_counts_pb = tf.cast(
       tf.tile(
           tf.expand_dims(counts_pb, 1), [1, tf.shape(qhbm_model.thetas)[0]]),
@@ -124,13 +121,12 @@ def exact_qmhl_loss_thetas_grad(
 
 @tf.function
 def exact_qmhl_loss_phis_grad(
-    qhbm: qhbm_base.ExactQHBM,
+    qhbm: qhbm.QHBM,
     op_tensor: tf.Tensor,
     target_circuits: tf.Tensor,
     target_count: tf.Tensor,
 ):
   """Calculate phis gradient of the QMHL loss of the model against the target.
-
     Args:
       qhbm: Parameterized model density operator.
       op_tensor: Result of calling `tfq.convert_to_tensor` on a list of Cirq
@@ -143,7 +139,6 @@ def exact_qmhl_loss_phis_grad(
       target_counts: 1-D tensor of integers which are the number of samples to
         draw from the data density matrix: `target_counts[i]` is the number of
           samples to draw from `target_circuits[i]`.
-
     Returns:
       Stochastic estimate of the gradient of the QMHL loss with respect to the
         unitary model parameters.
