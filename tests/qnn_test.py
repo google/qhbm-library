@@ -270,28 +270,55 @@ class QNNTest(tf.test.TestCase):
   def test_expectation(self):
     """Confirms basic correct expectation values and derivatives.
  
-    <X> measured on a GHZ state should be +1, <Z> 0.
-    Conversely, derivative with respect to hadamard param should be 0 for <X>
-    and -1 for <Z>.
+    Consider a circuit where each qubit has a gate X^p. Diagonalization of X is
+        |0 1|   |-1 1||-1 0||-1/2 1/2|
+    X = |1 0| = | 1 1|| 0 1|| 1/2 1/2|
+    Therefore we have
+          |-1 1||(-1)^p 0||-1/2 1/2|       |(-1)^p  -(-1)^p|       |1 1|
+    X^p = | 1 1||   0   1|| 1/2 1/2| = 1/2 |-(-1)^p  (-1)^p| + 1/2 |1 1|
+    where (-1)^p = cos(pi * p) + isin(pi * p).
+    Consider the action on the two basis states:
+                 | (-1)^p|       |1|
+    X^p|0> = 1/2 |-(-1)^p| + 1/2 |1|
+                 |-(-1)^p|       |1|
+    X^p|1> = 1/2 | (-1)^p| + 1/2 |1|
+    so, for s in {0, 1},
+                 | ((-1)^s)(-1)^p|       |1|
+    X^p|s> = 1/2 |-((-1)^s)(-1)^p| + 1/2 |1|
+    similarly,
+    <0|(X^p)^dagger = 1/2 |((-1)^p)^dagger -((-1)^p)^dagger| + 1/2 |1 1|
+    <1|(X^p)^dagger = 1/2 |-((-1)^p)^dagger ((-1)^p)^dagger| + 1/2 |1 1|
+    so
+    <s|(X^p)^dagger = 1/2 |((-1)^s)((-1)^p)^dagger -((-1)^s)((-1)^p)^dagger|
+                                                                     + 1/2 |1 1|
+    where ((-1)^p)^dagger = cos(pi * p) - isin(pi * p).
+
+    We want to see what the expectation values <s|(X^p)^dagger W X^p|s> are,
+    for W in {X, Y, Z}.  Applying the above results, we have
+    <s|(X^p)^dagger X X^p|s> = 0
+    <s|(X^p)^dagger Y X^p|s> = -(-1)^s sin(pi * p)
+    <s|(X^p)^dagger Z X^p|s> = (-1)^s cos(pi * p)
+
+    Since these expectation values are in terms of p, we can calculate their
+    derivatives with respect to p:
+    d/dp <s|(X^p)^dagger X X^p|s> = 0
+    d/dp <s|(X^p)^dagger Y X^p|s> = -(-1)^s pi cos(pi * p)
+    d/dp <s|(X^p)^dagger Z X^p|s> = -(-1)^s pi sin(pi * p)
     """
-    ghz_param = sympy.Symbol("ghz")
-    ghz_circuit = cirq.Circuit(cirq.X(
-        self.raw_qubits[0])**ghz_param) + cirq.Circuit(
-            cirq.CNOT(q0, q1)
-            for q0, q1 in zip(self.raw_qubits, self.raw_qubits[1:]))
-    ghz_qnn = qnn.QNN(
-        ghz_circuit, [ghz_param],
-        initializer=tf.keras.initializers.Constant(value=0.5),
-        name="ghz")
-    z_op = tfq.convert_to_tensor([1 * cirq.Z(self.raw_qubits[-1])])
-    x_op = tfq.convert_to_tensor([1 * cirq.X(self.raw_qubits[-1])])
+    h_param = sympy.Symbol("h")
+    h_circuit = cirq.Circuit(cirq.X(q) ** h_param for q in self.raw_qubits)
+    h_qnn = qnn.QNN(
+        h_circuit, [h_param],
+        initializer=tf.keras.initializers.Constant(value=1.0),
+        name="h_qnn")
+    z_ops = tfq.convert_to_tensor([1 * cirq.Z(q) for q in self.raw_qubits])
+    x_ops = tfq.convert_to_tensor([1 * cirq.X(q) for q in self.raw_qubits])
     bitstrings = tf.constant([[0] * self.num_qubits] * 2, dtype=tf.int8)
     counts = tf.constant([100, 100])
-    with tf.GradientTape() as tape:
-      z_exp = ghz_qnn.expectation(bitstrings, counts, z_op)
-      x_exp = ghz_qnn.expectation(bitstrings, counts, x_op)
-    self.assertAllClose(z_exp, [0])
-    self.assertAllClose(x_exp, [1])
+    z_exps = h_qnn.expectation(bitstrings, counts, z_ops)
+    self.assertAllClose(z_exps, [-1] * self.num_qubits)
+    x_exps = h_qnn.expectation(bitstrings, counts, x_ops)
+    self.assertAllClose(x_exps, [0] * self.num_qubits)
 
   def test_pulled_back_circuits(self):
     """Confirms the pulled back circuits correct for a variety of inputs."""
@@ -357,11 +384,6 @@ class QNNTest(tf.test.TestCase):
             test_samples[1].to_tensor()))
 
   def test_pulled_back_expectation(self):
-    """Confirms correct pulled back measurement."""
-    #TODO(zaqqwerty)
-    pass
-
-  def test_pulled_back_expectation_gradient(self):
     """Confirms correct pulled back measurement."""
     #TODO(zaqqwerty)
     pass

@@ -210,22 +210,25 @@ class QNN(tf.keras.Model):
     from `circuits[i]` and used to compute each expectation in `operators`.
     """
     num_circuits = tf.shape(circuits)[0]
-    operators = tf.tile(tf.expand_dims(operators, 0), [num_circuits, 1])
+    tiled_values = tf.tile(tf.expand_dims(self.values, 0), [num_circuits, 1])
+    tiled_operators = tf.tile(tf.expand_dims(operators, 0), [num_circuits, 1])
     if self.backend == 'noiseless':
+      print("\n\n made it here \n\n")
+      print(tiled_values)
+      print(tfq.from_tensor(circuits)[0])
       expectations = self._expectation_layer(
           circuits,
           symbol_names=self.symbols,
-          symbol_values=tf.tile(
-              tf.expand_dims(self._values, 0), [num_circuits, 1]),
-          operators=operators,
+          symbol_values=tiled_values,
+          operators=tiled_operators,
       )
+      print(expectations)
     else:
       expectations = self._expectation_layer(
           circuits,
           symbol_names=self.symbols,
-          symbol_values=tf.tile(
-              tf.expand_dims(self._values, 0), [num_circuits, 1]),
-          operators=operators,
+          symbol_values=tiled_values,
+          operators=tiled_operators,
           repetitions=tf.expand_dims(counts, 1),
       )
     if reduce:
