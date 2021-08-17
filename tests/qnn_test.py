@@ -276,18 +276,20 @@ class QNNTest(tf.test.TestCase):
     """
     ghz_param = sympy.Symbol("ghz")
     ghz_circuit = cirq.Circuit(cirq.X(
-        self.raw_qubits[0]) ** ghz_param) + cirq.Circuit(
+        self.raw_qubits[0])**ghz_param) + cirq.Circuit(
             cirq.CNOT(q0, q1)
             for q0, q1 in zip(self.raw_qubits, self.raw_qubits[1:]))
     ghz_qnn = qnn.QNN(
         ghz_circuit, [ghz_param],
         initializer=tf.keras.initializers.Constant(value=0.5),
         name="ghz")
-    z_op = tfq.convert_to_tensor([cirq.Z(self.raw_qubits[-1])])
-    x_op = tfq.convert_to_tensor([cirq.X(self.raw_qubits[-1])])
+    z_op = tfq.convert_to_tensor([1 * cirq.Z(self.raw_qubits[-1])])
+    x_op = tfq.convert_to_tensor([1 * cirq.X(self.raw_qubits[-1])])
+    bitstrings = tf.constant([[0] * self.num_qubits] * 2, dtype=tf.int8)
+    counts = tf.constant([100, 100])
     with tf.GradientTape() as tape:
-      z_exp = ghz_qnn.expectation(tf.constant([[0] * self.num_qubits] * 2, dtype=tf.int8), tf.constant([100, 100]), z_op)
-      x_exp = ghz_qnn.expectation(tf.constant([[0] * self.num_qubits] * 2, dtype=tf.int8), tf.constant([100, 100]), z_op)
+      z_exp = ghz_qnn.expectation(bitstrings, counts, z_op)
+      x_exp = ghz_qnn.expectation(bitstrings, counts, x_op)
     self.assertAllClose(z_exp, 0)
     self.assertAllClose(x_exp, 1)
 

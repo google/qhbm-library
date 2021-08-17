@@ -187,7 +187,6 @@ class QNN(tf.keras.Model):
     qnn._values.assign(self._values)
     return qnn
 
-  @tf.function
   def _sample_function(self, circuits, counts, mask=True):
     """General function for sampling from circuits."""
     samples = self._sample_layer(
@@ -198,7 +197,6 @@ class QNN(tf.keras.Model):
       return tf.ragged.boolean_mask(samples, num_samples_mask)
     return samples
 
-  @tf.function
   def _expectation_function(self, circuits, counts, operators, reduce=True):
     """General function for taking sampled expectations from circuits.
 
@@ -282,7 +280,6 @@ class QNN(tf.keras.Model):
     circuits = self.circuits(bitstrings)
     return self._sample_function(circuits, counts, mask=mask)
 
-  @tf.function
   def expectation(self, bitstrings, counts, operators, reduce=True):
     """Returns the expectation values of the operators against the QNN.
 
