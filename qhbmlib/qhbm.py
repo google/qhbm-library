@@ -31,9 +31,9 @@ class QHBM(tf.keras.Model):
   def __init__(self, ebm, qnn, name=None):
     super().__init__(name=name)
     self._ebm = ebm
-    self.thetas = ebm.trainable_variables
+    self.thetas = ebm.trainable_variables[0]
     self._qnn = qnn
-    self.phis = qnn.trainable_variables
+    self.phis = qnn.values
 
   @property
   def ebm(self):

@@ -38,6 +38,7 @@ def qmhl_loss(
       loss: Quantum cross entropy between the target and model.
     """
   print(f"retracing: qmhl_loss on {model.name}")
+
   @tf.custom_gradient
   def call(thetas, phis, target_circuits, target_counts):
     # log_partition estimate
@@ -49,9 +50,11 @@ def qmhl_loss(
       log_partition = tf.math.reduce_logsumexp(-1 * energies)
 
     # pulled back expectation of energy operator
-    samples, counts = model.qnn.pulled_back_sample(target_circuits, target_counts)
-    energies = model.ebm.energy(samples)
-    probs = tf.cast(counts, tf.float32) / tf.cast(tf.reduce_sum(counts), tf.float32)
+    ragged_samples_pb  = model.qnn.pulled_back_sample(target_circuits, target_counts)
+    all_samples_pb = ragged_samples_pb.values.to_tensor()
+    samples_pb, counts_pb = ebm.unique_bitstrings_with_counts(all_samples_pb)
+    energies = model.ebm.energy(samples_pb)
+    probs_pb = tf.cast(counts_pb, tf.float32) / tf.cast(tf.reduce_sum(counts_pb), tf.float32)
     weighted_energies = energies * probs
     avg_energy = tf.reduce_sum(weighted_energies)
     
@@ -60,8 +63,9 @@ def qmhl_loss(
     def gradient(grad):
       """Gradients are computed using estimators from the QHBM paper."""
       # Thetas derivative.
-      qnn_bitstrings, qnn_counts = model.qnn.pulled_back_sample(
-        target_circuits, target_counts)
+      qnn_ragged_samples_pb  = model.qnn.pulled_back_sample(target_circuits, target_counts)
+      qnn_all_samples_pb = qnn_ragged_samples_pb.values.to_tensor()
+      qnn_bitstrings, qnn_counts = ebm.unique_bitstrings_with_counts(all_samples_pb)
       qnn_probs = tf.cast(qnn_counts, tf.float32) / tf.cast(tf.reduce_sum(qnn_counts), tf.float32)
       ebm_bitstrings, ebm_counts = model.ebm.sample(tf.reduce_sum(target_counts))
       ebm_probs = tf.cast(ebm_counts, tf.float32) / tf.cast(tf.reduce_sum(ebm_counts), tf.float32)
@@ -82,7 +86,8 @@ def qmhl_loss(
             target_circuits, target_counts, model.ebm.operator(model.raw_qubits))
         phis_grad = tape.gradient(pulled_back_energy, phis)
       else:
-        raise NotImplementedError("Derivative when EBM has no operator is not yet supported.")
-  
+        raise NotImplementedError(
+          "Derivative when EBM has no operator is not yet supported.")
+      return grad * thetas_grad, grad * phis_grad
     return forward_pass_vals, gradient
   return call(model.thetas, model.phis, target_circuits, target_counts)

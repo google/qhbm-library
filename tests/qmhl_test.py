@@ -26,20 +26,23 @@ class QMHLExactLossTest(tf.test.TestCase):
     """Confirm correct gradients and loss at the optimal settings."""
     for num_qubits in [1, 2, 3, 4, 5]:
       qubits = cirq.GridQubit.rect(1, num_qubits)
-      target_qhbm = test_util.get_random_qhbm(
+      target = test_util.get_random_qhbm(
           qubits, 1, "QMHLLossTest{}".format(num_qubits))
-      model_qhbm = target_qhbm.copy()
+      model = target.copy()
 
       # Get the QMHL loss gradients
-      model_samples = tf.constant(1e1)
-      target_samples = tf.constant(1e1)
-      target_circuits, target_counts = target_qhbm.circuits(target_samples)
+      model_samples = tf.constant(1e6)
+      target_samples = tf.constant(1e6)
+      target_circuits, target_counts = target.circuits(target_samples)
+      print(f"thetas: {model.thetas}")
+      print(f"phis: {model.phis}")
+      print(f"model.trainable_variables:{model.trainable_variables}")
       with tf.GradientTape() as tape:
-        loss = qmhl.qmhl_loss(model_qhbm, target_circuits, target_counts)
-      thetas_grad = tape.gradient(loss, model.ebm.trainable_variables)
+        loss = qmhl.qmhl_loss(model, target_circuits, target_counts)
+      all_grads = tape.gradient(loss, model.trainable_variables)
       print("Current num qubits: {}".format(num_qubits))
-      self.assertAllClose(loss, target_qhbm.entropy_function(), atol=1e-3)
-      self.assertAllClose(thetas_grad, tf.zeros(tf.shape(thetas_grad)), atol=1e-3)
+      self.assertAllClose(loss, target_qhbm.ebm.entropy(), atol=2e-3)
+      self.assertAllClose(all_grads, tf.zeros(tf.shape(all_grads)), atol=1e-3)
 
 if __name__ == "__main__":
   print("Running qmhl_test.py ...")

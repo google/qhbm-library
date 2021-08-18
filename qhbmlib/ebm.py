@@ -617,7 +617,7 @@ class Bernoulli(EBM):
                initializer=tf.keras.initializers.RandomUniform(),
                analytic=False,
                name=None):
-    tf.keras.Model.__init__(self, name=name)
+    super().__init__(None, None, name=name)
     self._num_bits = num_bits
     self._variables = self.add_weight(
         name=f'{self.name}_variables',
@@ -645,7 +645,6 @@ class Bernoulli(EBM):
     bernoulli._variables.assign(self._variables)
     return bernoulli
 
-  @tf.function
   def energy(self, bitstrings):
     return tf.reduce_sum(
         tf.cast(1 - 2 * bitstrings, tf.float32) * self._variables, -1)
@@ -658,10 +657,13 @@ class Bernoulli(EBM):
             for i in range(self.num_bits))
     ])
 
-  def sample(self, num_samples):
+  @tf.function
+  def sample(self, num_samples, unique=True):
     samples = tfp.distributions.Bernoulli(
         logits=2 * self._variables, dtype=tf.int8).sample(num_samples)
-    return unique_bitstrings_with_counts(samples)
+    if unique:
+      return unique_bitstrings_with_counts(samples)
+    return samples
 
   @tf.function
   def energies(self):
