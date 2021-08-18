@@ -21,7 +21,7 @@ from qhbmlib import qhbm, ebm
 
 
 def qmhl_loss(
-    model: qhbm.QHBM, model_operator, target_circuits: tf.Tensor, target_counts: tf.Tensor):
+    model: qhbm.QHBM, target_circuits: tf.Tensor, target_counts: tf.Tensor):
   """Calculate the QMHL loss of the model against the target.
 
     This loss is differentiable with respect to the trainable variables of the model.
@@ -40,7 +40,7 @@ def qmhl_loss(
   print(f"retracing: qmhl_loss on {model.name}")
   
   @tf.custom_gradient
-  def call(thetas, phis, model_operator, target_circuits, target_counts):
+  def call(thetas, phis, target_circuits, target_counts):
     # log_partition estimate
     if model.ebm.analytic:
       log_partition = model.log_partition_function()
@@ -81,6 +81,7 @@ def qmhl_loss(
 
       # Phis derivative.
       if model.ebm.has_operator:
+        model_operator = model.ebm.operator(model.qnn.raw_qubits)
         with tf.GradientTape() as tape:
           pulled_back_energy = model.qnn.pulled_back_expectation(
             target_circuits, target_counts, model_operator)
@@ -88,6 +89,6 @@ def qmhl_loss(
       else:
         raise NotImplementedError(
           "Derivative when EBM has no operator is not yet supported.")
-      return tuple(grad * t for t in thetas_grad) + (grad * phis_grad, None, None, None)
+      return tuple(grad * t for t in thetas_grad) + (grad * phis_grad, None, None)
     return forward_pass_vals, gradient
-  return call(model.thetas, model.phis, model_operator, target_circuits, target_counts)
+  return call(model.thetas, model.phis, target_circuits, target_counts)
