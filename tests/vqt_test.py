@@ -39,10 +39,12 @@ class VQTTest(tf.test.TestCase):
 
   def test_loss_consistency(self):
     """Confirms that the sample-based and exact losses are close."""
-    test_ebm = ebm.Bernoulli(self.num_bits)
-    test_qnn = qnn.QNN(self.u, self.raw_phis_symbols)
+    test_ebm = ebm.Bernoulli(self.num_bits, analytic=True)
+    test_qnn = qnn.QNN(self.u, self.raw_phis_symbols, analytic=True)
     test_qhbm = qhbm.QHBM(test_ebm, test_qnn, self.name)
-    test_qhbm_copy = test_qhbm.copy()
+    test_ebm_copy = ebm.Bernoulli(self.num_bits, analytic=False)
+    test_qnn_copy = qnn.QNN(self.u, self.raw_phis_symbols, analytic=False)
+    test_qhbm_copy = qhbm.QHBM(test_ebm_copy, test_qnn_copy, self.name)
     num_samples = tf.constant(int(5e6))
     num_random_hamiltonians = 2
     for beta in tf.constant([0.1, 0.4, 1.6, 6.4]):
@@ -58,11 +60,11 @@ class VQTTest(tf.test.TestCase):
     qubit = cirq.GridQubit(0, 0)
     cirq_ham = cirq.X(qubit)
     tf_ham = tfq.convert_to_tensor([cirq_ham])
-    test_ebm = ebm.Bernoulli(1)
+    test_ebm = ebm.Bernoulli(1, analytic=True)
     test_ebm._variables.assign(tf.constant([1.0]))
     symbol = sympy.Symbol("p")
     pqc = cirq.Circuit(cirq.H(qubit)**symbol)
-    test_qnn = qnn.QNN(pqc, [symbol])
+    test_qnn = qnn.QNN(pqc, [symbol], analytic=True)
     test_qnn.values.assign(tf.constant([1.0]))
     test_qhbm = qhbm.QHBM(test_ebm, test_qnn)
     with tf.GradientTape() as tape:
@@ -70,6 +72,7 @@ class VQTTest(tf.test.TestCase):
     gradient = tape.gradient(loss, test_qhbm.trainable_variables)
     for grad in gradient:
       self.assertAllClose(grad, tf.zeros_like(grad), atol=1e-2)
+    self.assertAllClose(loss, -test_qhbm.log_partition_function(), atol=1e-2)
 
 
 if __name__ == "__main__":
