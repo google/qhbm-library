@@ -108,14 +108,16 @@ class QNN(tf.keras.Model):
     Args:
       pqc: Representation of a parameterized quantum circuit.
       symbols: All parameters of `pqc`.
-      initializer: A 'tf.keras.initializers.Initializer' which specifies how to initialize the values of the parameters in `circuit`.
+      initializer: A 'tf.keras.initializers.Initializer' which specifies how to
+        initialize the values of the parameters in `circuit`.
       backend: Optional Python `object` that specifies what backend TFQ will use
         for operations involving this QNN. Options are {'noisy', 'noiseless'},
         or however users may also specify a preconfigured cirq execution
         object to use instead, which must inherit `cirq.Sampler`.
       differentiator: Either None or a `tfq.differentiators.Differentiator`,
         which specifies how to take the derivative of a quantum circuit.
-      analytic: bool flag that enables analytic methods. If True, then backend must also be 'noiseless'.
+      analytic: bool flag that enables analytic methods. If True, then backend
+        must also be 'noiseless'.
       name: Identifier for this QNN.
     """
     super().__init__(name=name)
@@ -201,7 +203,6 @@ class QNN(tf.keras.Model):
       return tf.ragged.boolean_mask(samples, num_samples_mask)
     return samples
 
-  @tf.function
   def _expectation_function(self, circuits, counts, operators, reduce=True):
     """General function for taking sampled expectations from circuits.
 
@@ -210,22 +211,23 @@ class QNN(tf.keras.Model):
     from `circuits[i]` and used to compute each expectation in `operators`.
     """
     num_circuits = tf.shape(circuits)[0]
+    num_operators = tf.shape(operators)[0]
+    tiled_values = tf.tile(tf.expand_dims(self.values, 0), [num_circuits, 1])
+    tiled_operators = tf.tile(tf.expand_dims(operators, 0), [num_circuits, 1])
     if self.backend == 'noiseless':
       expectations = self._expectation_layer(
           circuits,
           symbol_names=self.symbols,
-          symbol_values=tf.tile(
-              tf.expand_dims(self._values, 0), [num_circuits, 1]),
-          operators=operators,
+          symbol_values=tiled_values,
+          operators=tiled_operators,
       )
     else:
       expectations = self._expectation_layer(
           circuits,
           symbol_names=self.symbols,
-          symbol_values=tf.tile(
-              tf.expand_dims(self._values, 0), [num_circuits, 1]),
-          operators=operators,
-          repetitions=tf.expand_dims(counts, 1),
+          symbol_values=tiled_values,
+          operators=tiled_operators,
+          repetitions=tf.tile(tf.expand_dims(counts, 1), [1, num_operators]),
       )
     if reduce:
       probs = tf.cast(counts, tf.float32) / tf.cast(
@@ -285,7 +287,6 @@ class QNN(tf.keras.Model):
     circuits = self.circuits(bitstrings)
     return self._sample_function(circuits, counts, mask=mask)
 
-  @tf.function
   def expectation(self, bitstrings, counts, operators, reduce=True):
     """Returns the expectation values of the operators against the QNN.
 
@@ -300,7 +301,9 @@ class QNN(tf.keras.Model):
         reduce: bool flag for whether or not to average over i.
 
       Returns:
-        1-D tensor of floats which are the averaged expectation values if reduce is True or 2-D tensor of floats which are the unaveraged expectation values is reduce is False.
+        1-D tensor of floats which are the bitstring-averaged expectation values
+        if `reduce` is True, else 2-D tensor of floats which are per-bitstring
+        expectation values.
       """
     circuits = self.circuits(bitstrings, resolve=False)
     return self._expectation_function(
@@ -364,7 +367,9 @@ class QNN(tf.keras.Model):
           for each i and j, then averaged over i.
 
       Returns:
-        1-D tensor of floats which are the averaged expectation values if reduce is True or 2-D tensor of floats which are the unaveraged expectation values is reduce is False.
+        1-D tensor of floats which are the bitstring-averaged expectation values
+        if `reduce` is True, else 2-D tensor of floats which are per-bitstring
+        expectation values.
     """
     pulled_back_circuits = self.pulled_back_circuits(circuits, resolve=False)
     return self._expectation_function(
