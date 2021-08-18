@@ -31,7 +31,9 @@ class QHBM(tf.keras.Model):
   def __init__(self, ebm, qnn, name=None):
     super().__init__(name=name)
     self._ebm = ebm
+    self.thetas = ebm.trainable_variables
     self._qnn = qnn
+    self.phis = qnn.trainable_variables
 
   @property
   def ebm(self):
@@ -56,7 +58,6 @@ class QHBM(tf.keras.Model):
   def copy(self):
     return QHBM(self.ebm.copy(), self.qnn.copy(), name=self.name)
 
-  @tf.function
   def circuits(self, num_samples):
     bitstrings, counts = self.ebm.sample(num_samples)
     circuits = self.qnn.circuits(bitstrings)

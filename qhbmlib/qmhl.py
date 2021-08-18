@@ -20,9 +20,8 @@ import tensorflow_quantum as tfq
 from qhbmlib import qhbm, ebm
 
 
-@tf.function
 def qmhl_loss(
-    model: qhbm_base.QHBM, target_circuits: tf.Tensor, target_counts: tf.Tensor):
+    model: qhbm.QHBM, target_circuits: tf.Tensor, target_counts: tf.Tensor):
   """Calculate the QMHL loss of the model against the target.
 
     This loss is differentiable with respect to the trainable variables of the model.

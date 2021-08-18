@@ -26,6 +26,7 @@ import tensorflow_probability as tfp
 from qhbmlib import architectures
 from qhbmlib import ebm
 from qhbmlib import qhbm
+from qhbmlib import qnn
 
 
 def get_random_qhbm(
@@ -39,27 +40,11 @@ def get_random_qhbm(
 ):
   """Create a random QHBM for use in testing."""
   num_qubits = len(qubits)
-  (energy, sampler, _, _,
-   num_thetas) = ebm.build_boltzmann(num_qubits, identifier)
-  thetas_initial_values = tf.random.uniform([num_thetas],
-                                            minval=minval_thetas,
-                                            maxval=maxval_thetas)
-
+  this_ebm = ebm.Bernoulli(num_qubits, tf.keras.initializers.RandomUniform(minval=minval_thetas, maxval=maxval_thetas), analytic=False)
   unitary, phis_symbols = architectures.get_hardware_efficient_model_unitary(
       qubits, num_layers, identifier)
-  phis_initial_values = tf.random.uniform([len(phis_symbols)],
-                                          minval=minval_phis,
-                                          maxval=maxval_phis)
-
-  return qhbm_base.ExactQHBM(
-      thetas_initial_values,
-      energy,
-      sampler,
-      phis_initial_values,
-      phis_symbols,
-      unitary,
-      identifier,
-  )
+  this_qnn = qnn.QNN(unitary, phis_symbols, tf.keras.initializers.RandomUniform(minval=minval_phis, maxval=maxval_phis))
+  return qhbm.QHBM(this_ebm, this_qnn, identifier)
 
 
 def get_ebm_functions(num_bits):

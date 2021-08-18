@@ -82,7 +82,7 @@ class KOBE(EnergyFunction):
     return self._order
 
   def copy(self):
-    kobe = KOBE(self.num_bits, self.order, name=name)
+    kobe = KOBE(self.num_bits, self.order, name=self.name)
     kobe._variables.assign(self._variables)
     return kobe
 
@@ -555,9 +555,14 @@ class EBM(tf.keras.Model):
     return self._analytic
 
   def copy(self):
-    energy_sampler = self._energy_sampler.copy()
+    if self._energy_sampler is not None:
+      energy_sampler = self._energy_sampler.copy()
+      energy_function = energy_sampler.energy_function
+    else:
+      energy_sampler = None
+      energy_function = self._energy_function.copy()
     return EBM(
-        energy_sampler.energy_function,
+        energy_function,
         energy_sampler,
         analytic=self.analytic,
         name=self.name)
@@ -636,7 +641,7 @@ class Bernoulli(EBM):
     return self._analytic
 
   def copy(self):
-    bernoulli = Bernoulli(self.num_bits, name=self.name)
+    bernoulli = Bernoulli(self.num_bits, analytic=self.analytic, name=self.name)
     bernoulli._variables.assign(self._variables)
     return bernoulli
 
@@ -653,13 +658,10 @@ class Bernoulli(EBM):
             for i in range(self.num_bits))
     ])
 
-  @tf.function
-  def sample(self, num_samples, unique=True):
+  def sample(self, num_samples):
     samples = tfp.distributions.Bernoulli(
         logits=2 * self._variables, dtype=tf.int8).sample(num_samples)
-    if unique:
-      return unique_bitstrings_with_counts(samples)
-    return samples
+    return unique_bitstrings_with_counts(samples)
 
   @tf.function
   def energies(self):
