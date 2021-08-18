@@ -18,8 +18,9 @@ import itertools
 from absl import logging
 
 import cirq
-import sympy
+import math
 import numpy as np
+import sympy
 import tensorflow as tf
 import tensorflow_probability as tfp
 import tensorflow_quantum as tfq
@@ -269,7 +270,7 @@ class QNNTest(tf.test.TestCase):
 
   def test_expectation(self):
     """Confirms basic correct expectation values and derivatives.
- 
+
     Consider a circuit where each qubit has a gate X^p. Diagonalization of X is
         |0 1|   |-1 1||-1 0||-1/2 1/2|
     X = |1 0| = | 1 1|| 0 1|| 1/2 1/2|
@@ -305,20 +306,44 @@ class QNNTest(tf.test.TestCase):
     d/dp <s|(X^p)^dagger Y X^p|s> = -(-1)^s pi cos(pi * p)
     d/dp <s|(X^p)^dagger Z X^p|s> = -(-1)^s pi sin(pi * p)
     """
-    h_param = sympy.Symbol("h")
-    h_circuit = cirq.Circuit(cirq.X(q) ** h_param for q in self.raw_qubits)
-    h_qnn = qnn.QNN(
-        h_circuit, [h_param],
-        initializer=tf.keras.initializers.Constant(value=1.0),
-        name="h_qnn")
-    z_ops = tfq.convert_to_tensor([1 * cirq.Z(q) for q in self.raw_qubits])
-    x_ops = tfq.convert_to_tensor([1 * cirq.X(q) for q in self.raw_qubits])
-    bitstrings = tf.constant([[0] * self.num_qubits] * 2, dtype=tf.int8)
+    # Build QNN representing X^p|s>
+    p_param = sympy.Symbol("p")
+    p_circuit = cirq.Circuit(cirq.X(q) ** p_param for q in self.raw_qubits)
+    p_qnn = qnn.QNN(
+        p_circuit, [p_param],
+        initializer=tf.keras.initializers.RandomUniform(minval=-5.0, maxval=5.0),
+        name="p_qnn")
+
+    # Choose bitstrings.
+    bitstrings_raw = [[0] * self.num_qubits] * 2
+    bitstrings = tf.constant(bitstrings_raw, dtype=tf.int8)
     counts = tf.constant([100, 100])
-    z_exps = h_qnn.expectation(bitstrings, counts, z_ops)
-    self.assertAllClose(z_exps, [-1] * self.num_qubits)
-    x_exps = h_qnn.expectation(bitstrings, counts, x_ops)
-    self.assertAllClose(x_exps, [0] * self.num_qubits)
+
+    # Get true expectation values based on the bitstrings.
+    x_exps_true = []
+    y_exps_true = []
+    z_exps_true = []
+    for bits in bitstrings_raw:
+      x_exps_true.append([])
+      y_exps_true.append([])
+      z_exps_true.append([])
+      for s in bits:
+        x_exps_true[-1].append(0)
+        y_exps_true[-1].append(-((-1.0)**s) * math.sin(math.pi * p_qnn.values[0]))
+        z_exps_true[-1].append(((-1.0)**s) * math.cos(math.pi * p_qnn.values[0]))
+
+    # Measure operators on every qubit.
+    x_ops = tfq.convert_to_tensor([1 * cirq.X(q) for q in self.raw_qubits])
+    y_ops = tfq.convert_to_tensor([1 * cirq.Y(q) for q in self.raw_qubits])
+    z_ops = tfq.convert_to_tensor([1 * cirq.Z(q) for q in self.raw_qubits])
+
+    # Check with reduce False
+    x_exps_test = p_qnn.expectation(bitstrings, counts, x_ops, reduce=False)
+    y_exps_test = p_qnn.expectation(bitstrings, counts, y_ops, reduce=False)
+    z_exps_test = p_qnn.expectation(bitstrings, counts, z_ops, reduce=False)
+    self.assertAllClose(x_exps_test, x_exps_true)
+    self.assertAllClose(y_exps_test, y_exps_true)
+    self.assertAllClose(z_exps_test, z_exps_true)
 
   def test_pulled_back_circuits(self):
     """Confirms the pulled back circuits correct for a variety of inputs."""
