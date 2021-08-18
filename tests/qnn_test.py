@@ -31,7 +31,7 @@ from tests import test_util
 
 # Global tolerance, set for float32.
 ATOL = 1e-5
-GRAD_ATOL =2e-4 
+GRAD_ATOL = 2e-4
 
 
 class BuildBitCircuitTest(tf.test.TestCase):
@@ -310,10 +310,11 @@ class QNNTest(tf.test.TestCase):
     """
     # Build QNN representing X^p|s>
     p_param = sympy.Symbol("p")
-    p_circuit = cirq.Circuit(cirq.X(q) ** p_param for q in self.raw_qubits)
+    p_circuit = cirq.Circuit(cirq.X(q)**p_param for q in self.raw_qubits)
     p_qnn = qnn.QNN(
         p_circuit, [p_param],
-        initializer=tf.keras.initializers.RandomUniform(minval=-5.0, maxval=5.0),
+        initializer=tf.keras.initializers.RandomUniform(
+            minval=-5.0, maxval=5.0),
         name="p_qnn")
 
     # Choose some bitstrings.
@@ -327,7 +328,8 @@ class QNNTest(tf.test.TestCase):
         else:
           bitstrings_raw[-1].append(1)
     bitstrings = tf.constant(bitstrings_raw, dtype=tf.int8)
-    counts = tf.random.uniform(shape=[num_bitstrings], minval=1, maxval=1000, dtype=tf.int32)
+    counts = tf.random.uniform(
+        shape=[num_bitstrings], minval=1, maxval=1000, dtype=tf.int32)
 
     # Get true expectation values based on the bitstrings.
     x_exps_true = []
@@ -354,12 +356,18 @@ class QNNTest(tf.test.TestCase):
         z_exps_grad_true[-1].append(-((-1.0)**s) * math.pi * sin_pi_p)
     e_counts = tf.cast(tf.expand_dims(counts, 1), tf.float32)
     total_counts = tf.cast(tf.reduce_sum(counts), tf.float32)
-    x_exps_true_reduced = tf.reduce_sum(x_exps_true * e_counts, 0) / total_counts
-    x_exps_grad_true_reduced = tf.reduce_sum(x_exps_grad_true * e_counts, 0) / total_counts
-    y_exps_true_reduced = tf.reduce_sum(y_exps_true * e_counts, 0) / total_counts
-    y_exps_grad_true_reduced = tf.reduce_sum(y_exps_grad_true * e_counts, 0) / total_counts
-    z_exps_true_reduced = tf.reduce_sum(z_exps_true * e_counts, 0) / total_counts
-    z_exps_grad_true_reduced = tf.reduce_sum(z_exps_grad_true * e_counts, 0) / total_counts
+    x_exps_true_reduced = tf.reduce_sum(x_exps_true * e_counts,
+                                        0) / total_counts
+    x_exps_grad_true_reduced = tf.reduce_sum(x_exps_grad_true * e_counts,
+                                             0) / total_counts
+    y_exps_true_reduced = tf.reduce_sum(y_exps_true * e_counts,
+                                        0) / total_counts
+    y_exps_grad_true_reduced = tf.reduce_sum(y_exps_grad_true * e_counts,
+                                             0) / total_counts
+    z_exps_true_reduced = tf.reduce_sum(z_exps_true * e_counts,
+                                        0) / total_counts
+    z_exps_grad_true_reduced = tf.reduce_sum(z_exps_grad_true * e_counts,
+                                             0) / total_counts
 
     # Measure operators on every qubit.
     x_ops = tfq.convert_to_tensor([1 * cirq.X(q) for q in self.raw_qubits])
@@ -374,13 +382,16 @@ class QNNTest(tf.test.TestCase):
     x_exps_grad_test = tf.squeeze(tape.jacobian(x_exps_test, p_qnn.values))
     y_exps_grad_test = tf.squeeze(tape.jacobian(y_exps_test, p_qnn.values))
     z_exps_grad_test = tf.squeeze(tape.jacobian(z_exps_test, p_qnn.values))
-    del(tape)
+    del (tape)
     self.assertAllClose(x_exps_test, x_exps_true_reduced, atol=ATOL)
-    self.assertAllClose(x_exps_grad_test, x_exps_grad_true_reduced, atol=GRAD_ATOL)
+    self.assertAllClose(
+        x_exps_grad_test, x_exps_grad_true_reduced, atol=GRAD_ATOL)
     self.assertAllClose(y_exps_test, y_exps_true_reduced, atol=ATOL)
-    self.assertAllClose(y_exps_grad_test, y_exps_grad_true_reduced, atol=GRAD_ATOL)
+    self.assertAllClose(
+        y_exps_grad_test, y_exps_grad_true_reduced, atol=GRAD_ATOL)
     self.assertAllClose(z_exps_test, z_exps_true_reduced, atol=ATOL)
-    self.assertAllClose(z_exps_grad_test, z_exps_grad_true_reduced, atol=GRAD_ATOL)   
+    self.assertAllClose(
+        z_exps_grad_test, z_exps_grad_true_reduced, atol=GRAD_ATOL)
 
     # Check with reduce False
     with tf.GradientTape(persistent=True) as tape:
