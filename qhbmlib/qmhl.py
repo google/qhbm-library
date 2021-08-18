@@ -21,7 +21,7 @@ from qhbmlib import qhbm, ebm
 
 
 def qmhl_loss(
-    model: qhbm.QHBM, target_circuits: tf.Tensor, target_counts: tf.Tensor):
+    model: qhbm.QHBM, model_operator, target_circuits: tf.Tensor, target_counts: tf.Tensor):
   """Calculate the QMHL loss of the model against the target.
 
     This loss is differentiable with respect to the trainable variables of the model.
@@ -38,9 +38,9 @@ def qmhl_loss(
       loss: Quantum cross entropy between the target and model.
     """
   print(f"retracing: qmhl_loss on {model.name}")
-
+  
   @tf.custom_gradient
-  def call(thetas, phis, target_circuits, target_counts):
+  def call(thetas, phis, model_operator, target_circuits, target_counts):
     # log_partition estimate
     if model.ebm.analytic:
       log_partition = model.log_partition_function()
@@ -55,11 +55,11 @@ def qmhl_loss(
     samples_pb, counts_pb = ebm.unique_bitstrings_with_counts(all_samples_pb)
     energies = model.ebm.energy(samples_pb)
     probs_pb = tf.cast(counts_pb, tf.float32) / tf.cast(tf.reduce_sum(counts_pb), tf.float32)
-    weighted_energies = energies * probs
+    weighted_energies = energies * probs_pb
     avg_energy = tf.reduce_sum(weighted_energies)
     
     forward_pass_vals = avg_energy + log_partition
-
+    
     def gradient(grad):
       """Gradients are computed using estimators from the QHBM paper."""
       # Thetas derivative.
@@ -72,7 +72,7 @@ def qmhl_loss(
       with tf.GradientTape() as tape:
         qnn_energies = model.ebm.energy(qnn_bitstrings)
       qnn_thetas_grad_weighted = tape.jacobian(qnn_energies, thetas) * qnn_probs
-      qnn_thetas_grad = tf.reduce_sum(qnn_thetas_grad_weights, 0)
+      qnn_thetas_grad = tf.reduce_sum(qnn_thetas_grad_weighted, 0)
       with tf.GradientTape() as tape:
         ebm_energies = model.ebm.energy(ebm_bitstrings)
       ebm_thetas_grad_weighted = tape.jacobian(ebm_energies, thetas) * ebm_probs
@@ -83,11 +83,11 @@ def qmhl_loss(
       if model.ebm.has_operator:
         with tf.GradientTape() as tape:
           pulled_back_energy = model.qnn.pulled_back_expectation(
-            target_circuits, target_counts, model.ebm.operator(model.raw_qubits))
+            target_circuits, target_counts, model_operator)
         phis_grad = tape.gradient(pulled_back_energy, phis)
       else:
         raise NotImplementedError(
           "Derivative when EBM has no operator is not yet supported.")
-      return grad * thetas_grad, grad * phis_grad
+      return tuple(grad * t for t in thetas_grad) + (grad * phis_grad, None, None, None)
     return forward_pass_vals, gradient
-  return call(model.thetas, model.phis, target_circuits, target_counts)
+  return call(model.thetas, model.phis, model_operator, target_circuits, target_counts)
