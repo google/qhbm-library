@@ -108,14 +108,16 @@ class QNN(tf.keras.Model):
     Args:
       pqc: Representation of a parameterized quantum circuit.
       symbols: All parameters of `pqc`.
-      initializer: A 'tf.keras.initializers.Initializer' which specifies how to initialize the values of the parameters in `circuit`.
+      initializer: A 'tf.keras.initializers.Initializer' which specifies how to
+        initialize the values of the parameters in `circuit`.
       backend: Optional Python `object` that specifies what backend TFQ will use
         for operations involving this QNN. Options are {'noisy', 'noiseless'},
         or however users may also specify a preconfigured cirq execution
         object to use instead, which must inherit `cirq.Sampler`.
       differentiator: Either None or a `tfq.differentiators.Differentiator`,
         which specifies how to take the derivative of a quantum circuit.
-      analytic: bool flag that enables analytic methods. If True, then backend must also be 'noiseless'.
+      analytic: bool flag that enables analytic methods. If True, then backend
+        must also be 'noiseless'.
       name: Identifier for this QNN.
     """
     super().__init__(name=name)
@@ -285,7 +287,6 @@ class QNN(tf.keras.Model):
     circuits = self.circuits(bitstrings)
     return self._sample_function(circuits, counts, mask=mask)
 
-  @tf.function
   def expectation(self, bitstrings, counts, operators, reduce=True):
     """Returns the expectation values of the operators against the QNN.
 
@@ -300,7 +301,9 @@ class QNN(tf.keras.Model):
         reduce: bool flag for whether or not to average over i.
 
       Returns:
-        1-D tensor of floats which are the averaged expectation values if reduce is True or 2-D tensor of floats which are the unaveraged expectation values is reduce is False.
+        1-D tensor of floats which are the bitstring-averaged expectation values
+        if `reduce` is True, else 2-D tensor of floats which are per-bitstring
+        expectation values.
       """
     circuits = self.circuits(bitstrings, resolve=False)
     return self._expectation_function(
@@ -364,7 +367,9 @@ class QNN(tf.keras.Model):
           for each i and j, then averaged over i.
 
       Returns:
-        1-D tensor of floats which are the averaged expectation values if reduce is True or 2-D tensor of floats which are the unaveraged expectation values is reduce is False.
+        1-D tensor of floats which are the bitstring-averaged expectation values
+        if `reduce` is True, else 2-D tensor of floats which are per-bitstring
+        expectation values.
     """
     pulled_back_circuits = self.pulled_back_circuits(circuits, resolve=False)
     return self._expectation_function(
