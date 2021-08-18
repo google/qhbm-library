@@ -214,16 +214,12 @@ class QNN(tf.keras.Model):
     tiled_values = tf.tile(tf.expand_dims(self.values, 0), [num_circuits, 1])
     tiled_operators = tf.tile(tf.expand_dims(operators, 0), [num_circuits, 1])
     if self.backend == 'noiseless':
-      print("\n\n made it here \n\n")
-      print(tiled_values)
-      print(tfq.from_tensor(circuits)[0])
       expectations = self._expectation_layer(
           circuits,
           symbol_names=self.symbols,
           symbol_values=tiled_values,
           operators=tiled_operators,
       )
-      print(expectations)
     else:
       expectations = self._expectation_layer(
           circuits,
