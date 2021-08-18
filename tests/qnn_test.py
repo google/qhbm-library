@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for the qnn module."""
 
+import random
 import itertools
 from absl import logging
 
@@ -315,10 +316,18 @@ class QNNTest(tf.test.TestCase):
         initializer=tf.keras.initializers.RandomUniform(minval=-5.0, maxval=5.0),
         name="p_qnn")
 
-    # Choose bitstrings.
-    bitstrings_raw = [[0] * self.num_qubits] * 2
+    # Choose some bitstrings.
+    num_bitstrings = 10
+    bitstrings_raw = []
+    for _ in range(num_bitstrings):
+      bitstrings_raw.append([])
+      for _ in range(self.num_qubits):
+        if random.choice([True, False]):
+          bitstrings_raw[-1].append(0)
+        else:
+          bitstrings_raw[-1].append(1)
     bitstrings = tf.constant(bitstrings_raw, dtype=tf.int8)
-    counts = tf.constant([100, 100])
+    counts = tf.random.uniform(shape=[num_bitstrings], minval=1, maxval=1000, dtype=tf.int32)
 
     # Get true expectation values based on the bitstrings.
     x_exps_true = []
