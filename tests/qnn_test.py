@@ -331,6 +331,11 @@ class QNNTest(tf.test.TestCase):
         x_exps_true[-1].append(0)
         y_exps_true[-1].append(-((-1.0)**s) * math.sin(math.pi * p_qnn.values[0]))
         z_exps_true[-1].append(((-1.0)**s) * math.cos(math.pi * p_qnn.values[0]))
+    expanded_counts = tf.cast(tf.expand_dims(counts, 1), tf.float32)
+    total_counts = tf.cast(tf.reduce_sum(counts), tf.float32)
+    x_exps_true_reduced = tf.reduce_sum(x_exps_true * expanded_counts, 0) / total_counts
+    y_exps_true_reduced = tf.reduce_sum(y_exps_true * expanded_counts, 0) / total_counts
+    z_exps_true_reduced = tf.reduce_sum(z_exps_true * expanded_counts, 0) / total_counts
 
     # Measure operators on every qubit.
     x_ops = tfq.convert_to_tensor([1 * cirq.X(q) for q in self.raw_qubits])
@@ -344,6 +349,14 @@ class QNNTest(tf.test.TestCase):
     self.assertAllClose(x_exps_test, x_exps_true)
     self.assertAllClose(y_exps_test, y_exps_true)
     self.assertAllClose(z_exps_test, z_exps_true)
+
+    # Check with reduce True (this is the default)
+    x_exps_test = p_qnn.expectation(bitstrings, counts, x_ops)
+    y_exps_test = p_qnn.expectation(bitstrings, counts, y_ops)
+    z_exps_test = p_qnn.expectation(bitstrings, counts, z_ops)
+    self.assertAllClose(x_exps_test, x_exps_true_reduced)
+    self.assertAllClose(y_exps_test, y_exps_true_reduced)
+    self.assertAllClose(z_exps_test, z_exps_true_reduced)
 
   def test_pulled_back_circuits(self):
     """Confirms the pulled back circuits correct for a variety of inputs."""
