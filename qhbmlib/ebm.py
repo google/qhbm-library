@@ -44,11 +44,11 @@ class EnergyFunction(tf.keras.Model, abc.ABC):
   @abc.abstractmethod
   def energy(self, bitstrings):
     raise NotImplementedError()
-
-  def operator_expectation_from_components(self, expectations):
-    raise NotImplementedError()
   
   def operators(self, qubits):
+    raise NotImplementedError()
+
+  def operator_expectation_from_components(self, expectations):
     raise NotImplementedError()
 
 
@@ -99,19 +99,19 @@ class KOBE(EnergyFunction):
       parities_t = tf.tensor_scatter_nd_update(parities_t, [[i]], [parity])
     return tf.reduce_sum(tf.transpose(parities_t) * self._variables, -1)
 
-  def operator_expectation_from_components(self, expectations):
+  def operators(self, qubits):
     return tfq.convert_to_tensor([
         cirq.PauliSum.from_pauli_strings(
-            float(self._variables[i].numpy()) * cirq.PauliString(
+            cirq.PauliString(
                 cirq.Z(qubits[self._indices[i][j]])
                 for j in range(tf.shape(self._indices[i])[0]))
             for i in range(self._indices.nrows()))
     ])
 
-  def operators(self, qubits):
+  def operator_expectation_from_components(self, expectations):
     return tfq.convert_to_tensor([
         cirq.PauliSum.from_pauli_strings(
-            cirq.PauliString(
+            float(self._variables[i].numpy()) * cirq.PauliString(
                 cirq.Z(qubits[self._indices[i][j]])
                 for j in range(tf.shape(self._indices[i])[0]))
             for i in range(self._indices.nrows()))
@@ -549,11 +549,18 @@ class EBM(tf.keras.Model):
     self._energy_function = energy_function
     self._energy_sampler = energy_sampler
     self._analytic = analytic
-    if analytic:
-      self._all_bitstrings = tf.constant(
-          list(itertools.product([0, 1], repeat=energy_function.num_bits)),
-          dtype=tf.int8)
+    self._all_bitstrings = None
 
+  @property
+  def all_bitstrings(self):
+    if self.analytic:
+      if self._all_bitstrings is None:
+        self._all_bitstrings = tf.constant(
+          list(itertools.product([0, 1], repeat=self.num_bits)),
+          dtype=tf.int8)
+    return self._all_bitstrings
+
+    
   @property
   def num_bits(self):
     return self._energy_function.num_bits
@@ -578,6 +585,9 @@ class EBM(tf.keras.Model):
   def energy(self, bitstrings):
     return self._energy_function.energy(bitstrings)
 
+  def operator_expectation_from_components(self, expectations):
+    return self._energy_function.operator_expectation_from_components(expectations)
+
   def operators(self, qubits):
     return self._energy_function.operators(qubits)
 
@@ -585,7 +595,7 @@ class EBM(tf.keras.Model):
   def sample(self, num_samples, unique=True):
     if self.analytic and self._energy_sampler is None:
       return tf.gather(
-          self._all_bitstrings,
+          self.all_bitstrings,
           tfp.distributions.Categorical(logits=-1 *
                                         self.energies()).sample(num_samples))
     return self._energy_sampler.sample(num_samples, unique=unique)
@@ -593,7 +603,7 @@ class EBM(tf.keras.Model):
   @tf.function
   def energies(self):
     if self.analytic:
-      return self.energy(self._all_bitstrings)
+      return self.energy(self.all_bitstrings)
     raise NotImplementedError()
 
   @tf.function
@@ -624,19 +634,12 @@ class Bernoulli(EBM):
                initializer=tf.keras.initializers.RandomUniform(),
                analytic=False,
                name=None):
-    tf.keras.Model.__init__(self, name=name)
+    super().__init__(None, None, analytic=analytic, name=name)
     self._num_bits = tf.constant(num_bits)
     self._variables = self.add_weight(
         name=f'{self.name}_variables',
         shape=[self.num_bits],
         initializer=initializer)
-    self._analytic = analytic
-    if analytic:
-      if num_bits > 30:
-        raise ValueError(
-          "Analytic Bernoulli methods not allowed with more than 30 bits.")
-      self._all_bitstrings = tf.constant(
-          list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
 
   @property
   def num_bits(self):
@@ -645,10 +648,6 @@ class Bernoulli(EBM):
   @property
   def has_operators(self):
     return True
-
-  @property
-  def analytic(self):
-    return self._analytic
 
   def copy(self):
     bernoulli = Bernoulli(self.num_bits, name=self.name)
@@ -660,13 +659,14 @@ class Bernoulli(EBM):
     return tf.reduce_sum(
         tf.cast(1 - 2 * bitstrings, tf.float32) * self._variables, -1)
 
-  @tf.function
   def operators(self, qubits):
-    return tfq.convert_to_tensor([
-        cirq.PauliSum.from_pauli_strings(
-            float(self._variables[i].numpy()) * cirq.Z(qubits[i])
-            for i in range(self.num_bits))
-    ])
+    return [
+      cirq.PauliSum.from_pauli_strings(cirq.Z(qubits[i]))
+      for i in range(self.num_bits)
+    ]
+
+  def operator_expectation_from_components(self, expectations):
+    return tf.reduce_sum(expectations * self._variables)
 
   @tf.function
   def sample(self, num_samples, unique=True):
@@ -687,7 +687,7 @@ class Bernoulli(EBM):
   @tf.function
   def energies(self):
     if self.analytic:
-      return self.energy(self._all_bitstrings)
+      return self.energy(self.all_bitstrings)
     raise NotImplementedError()
 
   @tf.function
@@ -725,68 +725,6 @@ def logit_to_probability(logit_in):
   logging.info("retracing: logit_to_probability")
   logit = tf.cast(logit_in, tf.dtypes.float32)
   return tf.math.divide(tf.math.exp(logit), 1 + tf.math.exp(logit))
-
-
-def build_bernoulli(num_nodes, identifier):
-
-  @tf.function
-  def energy_bernoulli(logits, bitstring):
-    """Calculate the energy of a bitstring against a product of Bernoullis.
-    Args:
-      logits: 1-D tf.Tensor of dtype float32 containing the logits for each
-        Bernoulli factor.
-      bitstring: 1-D tf.Tensor of dtype int8 of the form [x_0, ..., x_n-1]. Must
-        be the same shape as thetas.
-    Returns:
-      energy: 0-D tf.Tensor of dtype float32 containing the
-        energy of the bitstring calculated as
-        sum_i[ln(1+exp(logits_i)) - x_i*logits_i].
-    """
-    logging.info("retracing: energy_bernoulli_{}".format(identifier))
-    bitstring = tf.cast(bitstring, dtype=tf.float32)
-    return tf.reduce_sum(
-        tf.nn.sigmoid_cross_entropy_with_logits(bitstring, logits))
-
-  @tf.function
-  def sampler_bernoulli(thetas, num_samples):
-    """Sample bitstrings from a product of Bernoullis.
-    Args:
-      thetas: 1 dimensional `tensor` of dtype `float32` containing the logits
-        for each Bernoulli factor.
-      bitstring: 1 dimensional `tensor` of dtype `int8` of the form [x_0, ...,
-        x_n-1] so that x is a bitstring.
-    Returns:
-      bitstrings: `tensor` of dtype `int8` and shape [num_samples, bits]
-        where bitstrings are sampled according to
-        p(bitstring | thetas) ~ exp(-energy(bitstring | thetas))
-    """
-    logging.info("retracing: sampler_bernoulli_{}".format(identifier))
-    return tfp.distributions.Bernoulli(
-        logits=thetas, dtype=tf.int8).sample(num_samples)
-
-  @tf.function
-  def log_partition_bernoulli(thetas):
-    logging.info("retracing: log_partition_bernoulli_{}".format(identifier))
-    # The result is always zero given our definition of the energy.
-    return tf.constant(0.0)
-
-  @tf.function
-  def entropy_bernoulli(thetas):
-    """Calculate the entropy of a product of Bernoullis.
-    Args:
-        thetas: 1 dimensional `tensor` of dtype `float32` containing the logits
-          for each Bernoulli factor.
-    Returns:
-      entropy: 0 dimensional `tensor` of dtype `float32` containing the
-        entropy (in nats) of the distribution.
-    """
-    logging.info("retracing: entropy_bernoulli_{}".format(identifier))
-    return tf.reduce_sum(
-        tfp.distributions.Bernoulli(logits=thetas,
-                                    dtype=tf.dtypes.int8).entropy())
-
-  return (energy_bernoulli, sampler_bernoulli, log_partition_bernoulli,
-          entropy_bernoulli, num_nodes)
 
 
 def build_boltzmann(num_nodes, identifier):

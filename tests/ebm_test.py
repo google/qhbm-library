@@ -15,9 +15,11 @@
 """Tests for the ebm module."""
 import itertools
 
+import cirq
+import tensorflow as tf
+
 from qhbmlib import ebm
 from qhbmlib import qhbm
-import tensorflow as tf
 
 
 class UniqueBitstringsWithCountsTest(tf.test.TestCase):
@@ -150,15 +152,22 @@ class BernoulliTest(tf.test.TestCase):
     self.assertAllClose(test_energy, ref_energy)
     self.assertAllClose(test_energy_grad, test_spins)
 
+  def test_operators(self):
+    """Confirm operators are single qubit Z only."""
+    test_b = ebm.Bernoulli(self.num_bits)
+    qubits = cirq.GridQubit.rect(1, self.num_bits)
+    test_ops = test_b.operators(qubits)
+    for i, q in enumerate(qubits):
+      self.assertEqual(test_ops[i], 1*cirq.Z(q))
+
   def test_sampler_bernoulli(self):
     """Confirm that bitstrings are sampled as expected."""
-    # Single bit test.
-    _, sampler_bernoulli, _, _, _ = ebm.build_bernoulli(1, "test")
-    # For single factor Bernoulli, 0 logit is 50% chance of 1.
-    test_logits = tf.constant([0.0])
+    test_b = ebm.Bernoulli(1, name="test")
+
+    # For single factor Bernoulli, theta = 0 is 50% chance of 1.
+    test_b._variables.assign(tf.constant([0.0]))
     num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
-    bitstrings = sampler_bernoulli(test_logits, num_bitstrings)
-    _, counts = ebm.unique_bitstrings_with_counts(bitstrings)
+    bitstrings, counts = test_b.sample(num_bitstrings)
     # check that we got both bitstrings
     self.assertTrue(
         tf.reduce_any(tf.equal(tf.constant([0], dtype=tf.int8), bitstrings)))
@@ -166,22 +175,19 @@ class BernoulliTest(tf.test.TestCase):
         tf.reduce_any(tf.equal(tf.constant([1], dtype=tf.int8), bitstrings)))
     # Check that the fraction is approximately 0.5 (equal counts)
     self.assertAllClose(1.0, counts[0] / counts[1], atol=1e-3)
-    # Large logit pins the bit.
-    test_logits = tf.constant([1000.0])
+
+    # Large value of theta pins the bit.
+    test_b._variables.assign(tf.constant([1000.0]))
     num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
-    bitstrings = sampler_bernoulli(test_logits, num_bitstrings)
+    bitstrings, counts = test_b.sample(num_bitstrings)
     # check that we got only one bitstring
-    self.assertFalse(
-        tf.reduce_any(tf.equal(tf.constant([0], dtype=tf.int8), bitstrings)))
-    self.assertTrue(
-        tf.reduce_any(tf.equal(tf.constant([1], dtype=tf.int8), bitstrings)))
+    self.assertAllEqual(bitstrings, [[1]])
 
     # Two bit tests.
-    _, sampler_bernoulli, _, _, _ = ebm.build_bernoulli(2, "test")
-    test_logits = tf.constant([0.0, 0.0])
+    test_b = ebm.Bernoulli(2, name="test")
+    test_b._variables.assign(tf.constant([0.0, 0.0]))
     num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
-    bitstrings = sampler_bernoulli(test_logits, num_bitstrings)
-    _, counts = ebm.unique_bitstrings_with_counts(bitstrings)
+    bitstrings, counts = test_b.sample(num_bitstrings)
 
     @tf.function
     def check_bitstring_exists(bitstring, bitstring_list):
@@ -204,9 +210,9 @@ class BernoulliTest(tf.test.TestCase):
         [counts[i].numpy() / num_bitstrings for i in range(4)],
         atol=1e-3,
     )
-    test_logits = tf.constant([-1000.0, 1000.0])
-    num_bitstrings = tf.constant(int(1e6), dtype=tf.int32)
-    bitstrings = sampler_bernoulli(test_logits, num_bitstrings)
+    test_b._variables.assign(tf.constant([-1000.0, 1000.0]))
+    num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
+    bitstrings, counts = test_b.sample(num_bitstrings)
     # check that we only get 01.
     self.assertFalse(
         check_bitstring_exists(tf.constant([0, 0], dtype=tf.int8), bitstrings))
@@ -216,20 +222,17 @@ class BernoulliTest(tf.test.TestCase):
         check_bitstring_exists(tf.constant([1, 0], dtype=tf.int8), bitstrings))
     self.assertFalse(
         check_bitstring_exists(tf.constant([1, 1], dtype=tf.int8), bitstrings))
+    self.assertAllEqual(counts, [num_bitstrings])
 
   def test_log_partition_bernoulli(self):
-    """Our definition of the energy leads to Z = 1.0 for any parameters."""
-    n_nodes = 7
-    _, _, log_partition_bernoulli, _, _ = ebm.build_bernoulli(n_nodes, "test")
-    test_thetas = tf.random.uniform([n_nodes], minval=-10, maxval=10)
-    expected_log_partition = 0.0
-    test_log_partition = log_partition_bernoulli(test_thetas)
-    self.assertAllClose(expected_log_partition, test_log_partition)
-
+    # TODO
+    pass
+    
   def test_entropy_bernoulli(self):
     """Confirm that the entropy conforms to S(p) = -sum_x p(x)ln(p(x))"""
     test_thetas = tf.constant([-1.5, 0.6, 2.1])
-    test_probs = ebm.logit_to_probability(test_thetas).numpy()
+    # logits = 2 * thetas
+    test_probs = ebm.logit_to_probability(2 * test_thetas).numpy()
     all_probs = tf.constant([
         (1 - test_probs[0]) * (1 - test_probs[1]) * (1 - test_probs[2]),
         (1 - test_probs[0]) * (1 - test_probs[1]) * (test_probs[2]),
@@ -243,15 +246,10 @@ class BernoulliTest(tf.test.TestCase):
     # probabilities sum to 1
     self.assertAllClose(1.0, tf.reduce_sum(all_probs))
     expected_entropy = -1.0 * tf.reduce_sum(all_probs * tf.math.log(all_probs))
-    _, _, _, entropy_bernoulli, _ = ebm.build_bernoulli(2, "test")
-    test_entropy = entropy_bernoulli(test_thetas)
+    test_b = ebm.Bernoulli(3, name="test")
+    test_b._variables.assign(test_thetas)
+    test_entropy = test_b.entropy()
     self.assertAllClose(expected_entropy, test_entropy)
-
-  def test_num_thetas_bernoulli(self):
-    """The number of parameters is the same as the number of nodes."""
-    num_nodes = tf.random.uniform([], minval=1, maxval=100, dtype=tf.int32)
-    _, _, _, _, test_num_thetas = ebm.build_bernoulli(num_nodes, "test")
-    self.assertEqual(num_nodes, test_num_thetas)
 
 
 class BoltzmannTest(tf.test.TestCase):
