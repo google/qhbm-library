@@ -67,7 +67,6 @@ class QHBM(tf.keras.Model):
     bitstrings, counts = self.ebm.sample(num_samples)
     return self.qnn.sample(bitstrings, counts, mask=mask)
 
-  @tf.function
   def expectation(self, operators, num_samples, reduce=True):
     bitstrings, counts = self.ebm.sample(num_samples)
     return self.qnn.expectation(bitstrings, counts, operators, reduce=reduce)

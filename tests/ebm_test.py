@@ -15,58 +15,8 @@
 """Tests for the ebm module."""
 import itertools
 
-from qhbmlib import ebm
-from qhbmlib import qhbm
+from qhbmlib import ebm, qhbm, util
 import tensorflow as tf
-
-
-class UniqueBitstringsWithCountsTest(tf.test.TestCase):
-  """Test unique_with_counts from the qhbm library."""
-
-  def test_identity(self):
-    # Case when all entries are unique.
-    test_bitstrings = tf.constant([[1], [0]], dtype=tf.int8)
-    test_y, test_count = ebm.unique_bitstrings_with_counts(test_bitstrings)
-    self.assertAllEqual(test_y, test_bitstrings)
-    self.assertAllEqual(test_count, tf.constant([1, 1]))
-
-  def test_short(self):
-    # Case when bitstrings are length 1.
-    test_bitstrings = tf.constant(
-        [
-            [0],
-            [1],
-            [0],
-            [1],
-            [1],
-            [0],
-            [1],
-            [1],
-        ],
-        dtype=tf.int8,
-    )
-    test_y, test_count = ebm.unique_bitstrings_with_counts(test_bitstrings)
-    self.assertAllEqual(test_y, tf.constant([[0], [1]]))
-    self.assertAllEqual(test_count, tf.constant([3, 5]))
-
-  def test_long(self):
-    # Case when bitstrings are of length > 1.
-    test_bitstrings = tf.constant(
-        [
-            [1, 0, 1],
-            [1, 1, 1],
-            [0, 1, 1],
-            [1, 0, 1],
-            [1, 1, 1],
-            [0, 1, 1],
-            [1, 0, 1],
-            [1, 0, 1],
-        ],
-        dtype=tf.int8,
-    )
-    test_y, test_count = ebm.unique_bitstrings_with_counts(test_bitstrings)
-    self.assertAllEqual(test_y, tf.constant([[1, 0, 1], [1, 1, 1], [0, 1, 1]]))
-    self.assertAllEqual(test_count, tf.constant([4, 2, 2]))
 
 
 class ProbTest(tf.test.TestCase):
@@ -160,7 +110,7 @@ class BernoulliTest(tf.test.TestCase):
     test_logits = tf.constant([0.0])
     num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
     bitstrings = sampler_bernoulli(test_logits, num_bitstrings)
-    _, counts = ebm.unique_bitstrings_with_counts(bitstrings)
+    _, counts = util.unique_bitstrings_with_counts(bitstrings)
     # check that we got both bitstrings
     self.assertTrue(
         tf.reduce_any(tf.equal(tf.constant([0], dtype=tf.int8), bitstrings)))
@@ -183,7 +133,7 @@ class BernoulliTest(tf.test.TestCase):
     test_logits = tf.constant([0.0, 0.0])
     num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
     bitstrings = sampler_bernoulli(test_logits, num_bitstrings)
-    _, counts = ebm.unique_bitstrings_with_counts(bitstrings)
+    _, counts = util.unique_bitstrings_with_counts(bitstrings)
 
     @tf.function
     def check_bitstring_exists(bitstring, bitstring_list):
@@ -285,7 +235,7 @@ class BoltzmannTest(tf.test.TestCase):
     test_thetas = tf.constant([0.0])
     num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
     bitstrings = sampler_boltzmann(test_thetas, num_bitstrings)
-    _, counts = ebm.unique_bitstrings_with_counts(bitstrings)
+    _, counts = util.unique_bitstrings_with_counts(bitstrings)
     # check that we got both bitstrings
     self.assertTrue(
         tf.reduce_any(tf.equal(tf.constant([0], dtype=tf.int8), bitstrings)))
@@ -309,7 +259,7 @@ class BoltzmannTest(tf.test.TestCase):
     test_thetas = tf.constant([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
     num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
     bitstrings = sampler_boltzmann(test_thetas, num_bitstrings)
-    _, counts = ebm.unique_bitstrings_with_counts(bitstrings)
+    _, counts = util.unique_bitstrings_with_counts(bitstrings)
 
     @tf.function
     def check_bitstring_exists(bitstring, bitstring_list):

@@ -18,7 +18,6 @@ import tensorflow as tf
 import tensorflow_quantum as tfq
 
 
-@tf.function
 def vqt(qhbm, num_samples, hamiltonian, beta):
 
   @tf.custom_gradient
@@ -33,7 +32,7 @@ def vqt(qhbm, num_samples, hamiltonian, beta):
     else:
       entropy = -tf.reduce_sum(probs * tf.math.log(probs))
 
-    def grad(grad_y, variables=None):
+    def grad(grad_y):
       with tf.GradientTape() as qnn_tape:
         beta_expectations = beta * tf.squeeze(
             qhbm.qnn.expectation(bitstrings, counts, hamiltonian, reduce=False),
@@ -57,7 +56,7 @@ def vqt(qhbm, num_samples, hamiltonian, beta):
           for grad in energy_gradients
       ]
       grad_vars = grad_ebm + grad_qnn
-      return grad_vars, grad_vars
+      return grad_vars
 
     return beta * expectation - entropy, grad
 

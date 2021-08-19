@@ -15,9 +15,165 @@
 """Utility functions."""
 
 import numpy as np
-
+import cirq
+import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
+from typing import Any, Callable, Iterable, List, Union
+
+
+def sequence_to_tensor(x, dtype=tf.float32):
+  if isinstance(x, (list, tuple, np.ndarray)):
+    x = tf.convert_to_tensor(x, dtype=dtype)
+    if not tf.is_tensor(x):
+      raise TypeError()
+
+
+def operators_to_tensor(operators=None):
+  """Check and expand operators.
+  Args:
+    operators: a single `cirq.PauliString` or `cirq.PauliSum`, a Python
+      `list` or `tuple` of `cirq.PauliString`s or `cirq.PauliSum`s, which
+      will be tiled to have size `circuit_batch_dim` along the first
+      dimension; or pre-converted `tf.Tensor` of
+      `cirq.PauliString`s or `cirq.PauliSum`s.
+  Returns:
+    operators: `tf.Tensor` of dtype `string` with shape [n_ops]
+      containing the serialized pauli sums to be measured.
+  """
+  if operators is None:
+    raise RuntimeError("Value for operators not provided. operators "
+                       "must be one of cirq.PauliSum, cirq.PauliString"
+                       ", or a list/tensor/tuple containing "
+                       "cirq.PauliSum or cirq.PauliString.")
+
+  if isinstance(operators, (cirq.PauliSum, cirq.PauliString)):
+    # If we are given a single operator promote it to a list and tile
+    # it up to size.
+    operators = [operators]
+
+  if isinstance(operators, (list, tuple)):
+    operators = tfq.convert_to_tensor(operators)
+
+  if not tf.is_tensor(operators):
+    raise TypeError("operators cannot be parsed to string tensor"
+                    " given input: ".format(operators))
+
+  return operators
+
+
+def qubits_to_list(qubits):
+  if isinstance(qubits, tf.Tensor):
+    qubits = sorted([cirq.GridQubit(q[0], q[1]) for q in qubits])
+  if isinstance(qubits, cirq.GridQubit):
+    qubits = [qubits]
+  return qubits
+
+
+@tf.function
+def unique_bitstrings_with_counts(bitstrings):
+  """Extract the unique bitstrings in the given bitstring tensor.
+    Works by converting each bitstring to a 64 bit integer, then using built-in
+    `tf.unique_with_counts` on this 1-D array, then mapping these integers back
+    to
+    bitstrings. The inputs and outputs are to be related by the same invariants
+    as
+    those of `tf.unique_with_counts`,
+    y[idx[i]] = input_bitstrings[i] for i in [0, 1,...,rank(input_bitstrings) -
+    1]
+    TODO(zaqqwerty): the signature and return values are designed to be similar
+    to those of tf.unique_with_counts.  This function is needed because
+    `tf.unique_with_counts` does not work on 2-D tensors.  When it begins to
+    work
+    on 2-D tensors, then this function will be deprecated.
+    Args:
+      input_bitstrings: 2-D `tf.Tensor` of dtype `int8`.  This tensor is
+        interpreted as a list of bitstrings.  Bitstrings are required to be 64
+        bits or fewer.
+      out_idx: An optional `tf.DType` from: `tf.int32`, `tf.int64`. Defaults to
+        `tf.int32`.  Specified type of idx and count outputs.
+    Returns:
+      y: 2-D `tf.Tensor` of dtype `int8` containing the unique 0-axis entries of
+        `input_bitstrings`.
+      idx: 1-D `tf.Tensor` of dtype `out_idx` such that `idx[i]` is the index in
+        `y` containing the value `input_bitstrings[i]`.
+      count: 1-D `tf.Tensor` of dtype `out_idx` such that `count[i]` is the
+      number
+        of occurences of `y[i]` in `input_bitstrings`.
+  """
+  # Convert bitstrings to integers and uniquify those integers.
+  input_shape = tf.shape(bitstrings)
+  mask = tf.cast(bitstrings, tf.int64)
+  base = tf.bitwise.left_shift(
+      mask, tf.range(tf.cast(input_shape[1], tf.int64), dtype=tf.int64))
+  ints_equiv = tf.reduce_sum(base, 1)
+  _, idx, counts = tf.unique_with_counts(ints_equiv)
+
+  # Convert unique integers to corresponding unique bitstrings.
+  unique_bitstrings = tf.zeros((tf.shape(counts)[0], input_shape[1]),
+                               dtype=tf.int8)
+  unique_bitstrings = tf.tensor_scatter_nd_update(unique_bitstrings,
+                                                  tf.expand_dims(idx, axis=1),
+                                                  bitstrings)
+
+  return unique_bitstrings, counts
+
+
+def upgrade_symbols(
+    symbols: Union[Iterable[sympy.Symbol], tf.Tensor],
+    values: Union[tf.Tensor, tf.Variable],
+) -> tf.Tensor:
+  """Upgrades symbols and checks for correct shape.
+
+    For a circuit compatible with TFQ, there must be a value associated with
+    each symbol. This function ensures `values` is the same shape as `symbols`.
+
+    Args:
+      symbols: Iterable of `sympy.Symbol`s to upgrade.
+      values: Values corresponding to the symbols.
+
+    Returns:
+      `tf.Tensor` containing the string representations of the input `symbols`.
+    """
+  if isinstance(symbols, Iterable):
+    if not all([isinstance(s, sympy.Symbol) for s in symbols]):
+      raise TypeError("Each entry of `symbols` must be `sympy.Symbol`.")
+    symbols_partial_upgrade = [str(s) for s in symbols]
+    if len(set(symbols_partial_upgrade)) != len(symbols):
+      raise ValueError("All entries of `symbols` must be unique.")
+    symbols_upgrade = tf.constant(symbols_partial_upgrade, dtype=tf.string)
+    if tf.shape(symbols_upgrade) != tf.shape(values):
+      raise ValueError("There must be a symbol for every value.")
+    return symbols_upgrade
+  raise TypeError("`symbols` must be an iterable of `sympy.Symbol`s.")
+
+
+def upgrade_circuit(circuit: cirq.Circuit, symbols: tf.Tensor) -> tf.Tensor:
+  """Upgrades a circuit and confirms all symbols are present.
+
+    Args:
+      circuit: Circuit to convert to tensor.
+      symbols: Tensor of strings which are the symbols in `circuit`.
+
+    Returns:
+      Single entry 1D tensor of strings representing the input `circuit`.
+    """
+  if not isinstance(circuit, cirq.Circuit):
+    raise TypeError(f"`circuit` must be a `cirq.Circuit`, got {type(circuit)}")
+  if not isinstance(symbols, tf.Tensor):
+    raise TypeError("`symbols` must be a `tf.Tensor`")
+  if symbols.dtype != tf.string:
+    raise TypeError("`symbols` must have dtype `tf.string`")
+  if set(tfq.util.get_circuit_symbols(circuit)) != {
+      s.decode("utf-8") for s in symbols.numpy()
+  }:
+    raise ValueError(
+        "`circuit` must contain all and only the parameters in `symbols`.")
+  if not circuit:
+    raise ValueError("Empty circuit not allowed. "
+                     "Instead, use identities on all unused qubits.")
+  return tfq.convert_to_tensor([circuit])
+
 
 # ============================================================================ #
 # Density matrix utilities.

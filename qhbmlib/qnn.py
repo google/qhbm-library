@@ -21,73 +21,16 @@ import sympy
 import numpy as np
 import tensorflow as tf
 import tensorflow_quantum as tfq
+from qhbmlib import util
 
 
-def build_bit_circuit(qubits, name='bit_circuit'):
+def bit_circuit(qubits, name='bit_circuit'):
   """Returns exponentiated X gate on each qubit and the exponent symbols."""
   circuit = cirq.Circuit()
-  symbols = []
   for n, q in enumerate(qubits):
-    new_bit = sympy.Symbol("{0}_bit_{1}".format(name, n))
-    circuit += cirq.X(q)**new_bit
-    symbols.append(new_bit)
-  return circuit, symbols
-
-
-def upgrade_symbols(
-    symbols: Union[Iterable[sympy.Symbol], tf.Tensor],
-    values: Union[tf.Tensor, tf.Variable],
-) -> tf.Tensor:
-  """Upgrades symbols and checks for correct shape.
-
-    For a circuit compatible with TFQ, there must be a value associated with
-    each symbol. This function ensures `values` is the same shape as `symbols`.
-
-    Args:
-      symbols: Iterable of `sympy.Symbol`s to upgrade.
-      values: Values corresponding to the symbols.
-
-    Returns:
-      `tf.Tensor` containing the string representations of the input `symbols`.
-    """
-  if isinstance(symbols, Iterable):
-    if not all([isinstance(s, sympy.Symbol) for s in symbols]):
-      raise TypeError("Each entry of `symbols` must be `sympy.Symbol`.")
-    symbols_partial_upgrade = [str(s) for s in symbols]
-    if len(set(symbols_partial_upgrade)) != len(symbols):
-      raise ValueError("All entries of `symbols` must be unique.")
-    symbols_upgrade = tf.constant(symbols_partial_upgrade, dtype=tf.string)
-    if tf.shape(symbols_upgrade) != tf.shape(values):
-      raise ValueError("There must be a symbol for every value.")
-    return symbols_upgrade
-  raise TypeError("`symbols` must be an iterable of `sympy.Symbol`s.")
-
-
-def upgrade_circuit(circuit: cirq.Circuit, symbols: tf.Tensor) -> tf.Tensor:
-  """Upgrades a circuit and confirms all symbols are present.
-
-    Args:
-      circuit: Circuit to convert to tensor.
-      symbols: Tensor of strings which are the symbols in `circuit`.
-
-    Returns:
-      Single entry 1D tensor of strings representing the input `circuit`.
-    """
-  if not isinstance(circuit, cirq.Circuit):
-    raise TypeError(f"`circuit` must be a `cirq.Circuit`, got {type(circuit)}")
-  if not isinstance(symbols, tf.Tensor):
-    raise TypeError("`symbols` must be a `tf.Tensor`")
-  if symbols.dtype != tf.string:
-    raise TypeError("`symbols` must have dtype `tf.string`")
-  if set(tfq.util.get_circuit_symbols(circuit)) != {
-      s.decode("utf-8") for s in symbols.numpy()
-  }:
-    raise ValueError(
-        "`circuit` must contain all and only the parameters in `symbols`.")
-  if not circuit:
-    raise ValueError("Empty circuit not allowed. "
-                     "Instead, use identities on all unused qubits.")
-  return tfq.convert_to_tensor([circuit])
+    bit = sympy.Symbol("{0}_bit_{1}".format(name, n))
+    circuit += cirq.X(q)**bit
+  return circuit
 
 
 class QNN(tf.keras.Model):
@@ -96,7 +39,6 @@ class QNN(tf.keras.Model):
   def __init__(
       self,
       pqc,
-      symbols,
       initializer=tf.keras.initializers.RandomUniform(0, 2 * np.pi),
       backend='noiseless',
       differentiator=None,
@@ -107,7 +49,6 @@ class QNN(tf.keras.Model):
 
     Args:
       pqc: Representation of a parameterized quantum circuit.
-      symbols: All parameters of `pqc`.
       initializer: A 'tf.keras.initializers.Initializer' which specifies how to
         initialize the values of the parameters in `circuit`.
       backend: Optional Python `object` that specifies what backend TFQ will use
@@ -122,20 +63,36 @@ class QNN(tf.keras.Model):
     """
     super().__init__(name=name)
 
+    if not isinstance(pqc, cirq.Circuit):
+      raise TypeError("pqc must be a cirq.Circuit object."
+                      " Given: {}".format(pqc))
+
+    symbols = list(sorted(tfq.util.get_circuit_symbols(pqc)))
+    self._symbols = tf.constant([str(x) for x in symbols], dtype=tf.string)
+
     self._values = self.add_weight(
         name=f'{self.name}_pqc_values',
         shape=[len(symbols)],
         initializer=initializer)
-    self._symbols = upgrade_symbols(symbols, self._values)
-    self._pqc = upgrade_circuit(pqc, self.symbols)
-    self._inverse_pqc = upgrade_circuit(pqc**-1, self.symbols)
+
+    self._pqc = tfq.convert_to_tensor([pqc])
+    self._inverse_pqc = tfq.convert_to_tensor([pqc**-1])
+
+    # self._symbols = upgrade_symbols(symbols, self._values)
+    # self._pqc = upgrade_circuit(pqc, self.symbols)
+    # self._inverse_pqc = upgrade_circuit(pqc**-1, self.symbols)
 
     self._raw_qubits = sorted(pqc.all_qubits())
     self._qubits = tf.constant([[q.row, q.col] for q in self._raw_qubits])
-    bit_circuit, bit_symbols = build_bit_circuit(self._raw_qubits)
-    self._bit_symbols = upgrade_symbols(bit_symbols,
-                                        tf.ones([len(self._raw_qubits)]))
-    self._bit_circuit = upgrade_circuit(bit_circuit, self._bit_symbols)
+
+    _bit_circuit = bit_circuit(self._raw_qubits)
+    bit_symbols = list(sorted(tfq.util.get_circuit_symbols(_bit_circuit)))
+    self._bit_symbols = tf.constant([str(x) for x in bit_symbols])
+    self._bit_circuit = tfq.convert_to_tensor([_bit_circuit])
+
+    # self._bit_symbols = upgrade_symbols(bit_symbols,
+    #                                     tf.ones([len(self._raw_qubits)]))
+    # self._bit_circuit = upgrade_circuit(bit_circuit, self._bit_symbols)
 
     self._differentiator = differentiator
     self._sample_layer = tfq.layers.Sample(backend=backend)
@@ -184,23 +141,31 @@ class QNN(tf.keras.Model):
   def copy(self):
     qnn = QNN(
         tfq.from_tensor(self.pqc(resolve=False))[0],
-        [sympy.Symbol(s.decode("utf-8")) for s in self.symbols.numpy()],
         backend=self.backend,
         differentiator=self.differentiator,
         analytic=self.analytic,
         name=self.name)
-    qnn._values.assign(self._values)
+    qnn.values.assign(self.values)
     return qnn
 
   @tf.function
-  def _sample_function(self, circuits, counts, mask=True):
+  def _sample_function(self, circuits, counts, mask=True, unique=False):
     """General function for sampling from circuits."""
     samples = self._sample_layer(
         circuits, repetitions=tf.expand_dims(tf.math.reduce_max(counts), 0))
     if mask:
       num_samples_mask = tf.cast((tf.ragged.range(counts) + 1).to_tensor(),
                                  tf.bool)
-      return tf.ragged.boolean_mask(samples, num_samples_mask)
+      samples = tf.ragged.boolean_mask(samples, num_samples_mask)
+    if unique:
+      return tf.map_fn(
+          lambda x: util.unique_bitstrings_with_counts(x.to_tensor()),
+          samples,
+          fn_output_signature=(tf.RaggedTensorSpec(
+              shape=[None, None], dtype=tf.int8, ragged_rank=0),
+                               tf.RaggedTensorSpec(
+                                   shape=[None], dtype=tf.int32,
+                                   ragged_rank=0)))
     return samples
 
   def _expectation_function(self, circuits, counts, operators, reduce=True):
@@ -239,14 +204,14 @@ class QNN(tf.keras.Model):
   def pqc(self, resolve=True):
     if resolve:
       return tfq.resolve_parameters(self._pqc, self.symbols,
-                                    tf.expand_dims(self._values, 0))
+                                    tf.expand_dims(self.values, 0))
     return self._pqc
 
   @tf.function
   def inverse_pqc(self, resolve=True):
     if resolve:
       return tfq.resolve_parameters(self._inverse_pqc, self.symbols,
-                                    tf.expand_dims(self._values, 0))
+                                    tf.expand_dims(self.values, 0))
     return self._inverse_pqc
 
   @tf.function
@@ -270,7 +235,7 @@ class QNN(tf.keras.Model):
     return tfq.append_circuit(bit_circuits, pqcs)
 
   @tf.function
-  def sample(self, bitstrings, counts, mask=True):
+  def sample(self, bitstrings, counts, mask=True, unique=False):
     """Returns bitstring samples from the QNN.
 
       Args:
@@ -285,7 +250,7 @@ class QNN(tf.keras.Model):
           `self.u|bitstrings[i]>`.
     """
     circuits = self.circuits(bitstrings)
-    return self._sample_function(circuits, counts, mask=mask)
+    return self._sample_function(circuits, counts, mask=mask, unique=unique)
 
   def expectation(self, bitstrings, counts, operators, reduce=True):
     """Returns the expectation values of the operators against the QNN.
@@ -328,7 +293,7 @@ class QNN(tf.keras.Model):
     return tfq.append_circuit(circuits, inverse_pqcs)
 
   @tf.function
-  def pulled_back_sample(self, circuits, counts, mask=True):
+  def pulled_back_sample(self, circuits, counts, mask=True, unique=False):
     """Returns samples from the pulled back data distribution.
 
       The inputs represent the data density matrix. The inverse of `self.u`
@@ -349,7 +314,8 @@ class QNN(tf.keras.Model):
             that `ragged_samples[i]` contains `counts[i]` bitstrings.
       """
     pulled_back_circuits = self.pulled_back_circuits(circuits)
-    return self._sample_function(pulled_back_circuits, counts, mask=mask)
+    return self._sample_function(
+        pulled_back_circuits, counts, mask=mask, unique=unique)
 
   @tf.function
   def pulled_back_expectation(self, circuits, counts, operators, reduce=True):

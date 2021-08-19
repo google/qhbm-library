@@ -16,11 +16,111 @@
 import math
 
 import cirq
+import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
 from qhbmlib import util
 from tests import test_util
+
+
+class UniqueBitstringsWithCountsTest(tf.test.TestCase):
+  """Test unique_with_counts from the qhbm library."""
+
+  def test_identity(self):
+    # Case when all entries are unique.
+    test_bitstrings = tf.constant([[1], [0]], dtype=tf.int8)
+    test_y, test_count = util.unique_bitstrings_with_counts(test_bitstrings)
+    self.assertAllEqual(test_y, test_bitstrings)
+    self.assertAllEqual(test_count, tf.constant([1, 1]))
+
+  def test_short(self):
+    # Case when bitstrings are length 1.
+    test_bitstrings = tf.constant(
+        [
+            [0],
+            [1],
+            [0],
+            [1],
+            [1],
+            [0],
+            [1],
+            [1],
+        ],
+        dtype=tf.int8,
+    )
+    test_y, test_count = util.unique_bitstrings_with_counts(test_bitstrings)
+    self.assertAllEqual(test_y, tf.constant([[0], [1]]))
+    self.assertAllEqual(test_count, tf.constant([3, 5]))
+
+  def test_long(self):
+    # Case when bitstrings are of length > 1.
+    test_bitstrings = tf.constant(
+        [
+            [1, 0, 1],
+            [1, 1, 1],
+            [0, 1, 1],
+            [1, 0, 1],
+            [1, 1, 1],
+            [0, 1, 1],
+            [1, 0, 1],
+            [1, 0, 1],
+        ],
+        dtype=tf.int8,
+    )
+    test_y, test_count = util.unique_bitstrings_with_counts(test_bitstrings)
+    self.assertAllEqual(test_y, tf.constant([[1, 0, 1], [1, 1, 1], [0, 1, 1]]))
+    self.assertAllEqual(test_count, tf.constant([4, 2, 2]))
+
+
+class InputChecksTest(tf.test.TestCase):
+  """Tests all the input checking functions used for QHBMs."""
+
+  def test_upgrade_symbols(self):
+    """Confirms symbols are upgraded appropriately."""
+    true_symbol_names = ["test1", "a", "my_symbol", "MySymbol2"]
+    values = tf.constant([0 for _ in true_symbol_names])
+    true_symbols = [sympy.Symbol(s) for s in true_symbol_names]
+    true_symbols_t = tf.constant(true_symbol_names, dtype=tf.string)
+    self.assertAllEqual(true_symbols_t,
+                        util.upgrade_symbols(true_symbols, values))
+    # Test bad inputs.
+    with self.assertRaisesRegex(TypeError, "must be `sympy.Symbol`"):
+      _ = util.upgrade_symbols(true_symbols[:-1] + ["bad"], values)
+    with self.assertRaisesRegex(ValueError, "must be unique"):
+      _ = util.upgrade_symbols(true_symbols[:-1] + true_symbols[:1], values)
+    with self.assertRaisesRegex(ValueError, "symbol for every value"):
+      _ = util.upgrade_symbols(true_symbols, values[:-1])
+    with self.assertRaisesRegex(TypeError, "must be an iterable"):
+      _ = util.upgrade_symbols(5, values)
+
+  def test_upgrade_circuit(self):
+    """Confirms circuits are upgraded appropriately."""
+    qubits = cirq.GridQubit.rect(1, 5)
+    true_symbol_names = ["a", "b"]
+    true_symbols = [sympy.Symbol(s) for s in true_symbol_names]
+    true_symbols_t = tf.constant(true_symbol_names, dtype=tf.string)
+    true_circuit = cirq.Circuit()
+    for q in qubits:
+      for s in true_symbols:
+        true_circuit += cirq.X(q)**s
+    true_circuit_t = tfq.convert_to_tensor([true_circuit])
+    self.assertEqual(
+        tfq.from_tensor(true_circuit_t),
+        tfq.from_tensor(util.upgrade_circuit(true_circuit, true_symbols_t)),
+    )
+    # Test bad inputs.
+    with self.assertRaisesRegex(TypeError, "must be a `cirq.Circuit`"):
+      _ = util.upgrade_circuit("junk", true_symbols_t)
+    with self.assertRaisesRegex(TypeError, "must be a `tf.Tensor`"):
+      _ = util.upgrade_circuit(true_circuit, true_symbol_names)
+    with self.assertRaisesRegex(TypeError, "dtype `tf.string`"):
+      _ = util.upgrade_circuit(true_circuit, tf.constant([5.5]))
+    with self.assertRaisesRegex(ValueError, "must contain"):
+      _ = util.upgrade_circuit(true_circuit, tf.constant(["a", "junk"]))
+    with self.assertRaisesRegex(ValueError, "Empty circuit"):
+      _ = util.upgrade_circuit(cirq.Circuit(), tf.constant([], dtype=tf.string))
+
 
 # ============================================================================ #
 # Density matrix utilities.

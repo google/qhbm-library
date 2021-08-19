@@ -23,8 +23,8 @@ import cirq
 import tensorflow as tf
 import tensorflow_probability as tfp
 import tensorflow_quantum as tfq
-
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
+from qhbmlib import util
 
 
 class EnergyFunction(tf.keras.Model, abc.ABC):
@@ -82,7 +82,7 @@ class KOBE(EnergyFunction):
     return self._order
 
   def copy(self):
-    kobe = KOBE(self.num_bits, self.order, name=name)
+    kobe = KOBE(self.num_bits, self.order, name=self.name)
     kobe._variables.assign(self._variables)
     return kobe
 
@@ -97,6 +97,7 @@ class KOBE(EnergyFunction):
     return tf.reduce_sum(tf.transpose(parities_t) * self._variables, -1)
 
   def operator(self, qubits):
+    qubits = util.qubits_to_list(qubits)
     return tfq.convert_to_tensor([
         cirq.PauliSum.from_pauli_strings(
             float(self._variables[i].numpy()) * cirq.PauliString(
@@ -151,55 +152,6 @@ class EnergySampler(abc.ABC):
   @abc.abstractmethod
   def sample(self, num_samples, unique=True):
     raise NotImplementedError()
-
-
-@tf.function
-def unique_bitstrings_with_counts(bitstrings):
-  """Extract the unique bitstrings in the given bitstring tensor.
-    Works by converting each bitstring to a 64 bit integer, then using built-in
-    `tf.unique_with_counts` on this 1-D array, then mapping these integers back
-    to
-    bitstrings. The inputs and outputs are to be related by the same invariants
-    as
-    those of `tf.unique_with_counts`,
-    y[idx[i]] = input_bitstrings[i] for i in [0, 1,...,rank(input_bitstrings) -
-    1]
-    TODO(zaqqwerty): the signature and return values are designed to be similar
-    to those of tf.unique_with_counts.  This function is needed because
-    `tf.unique_with_counts` does not work on 2-D tensors.  When it begins to
-    work
-    on 2-D tensors, then this function will be deprecated.
-    Args:
-      input_bitstrings: 2-D `tf.Tensor` of dtype `int8`.  This tensor is
-        interpreted as a list of bitstrings.  Bitstrings are required to be 64
-        bits or fewer.
-      out_idx: An optional `tf.DType` from: `tf.int32`, `tf.int64`. Defaults to
-        `tf.int32`.  Specified type of idx and count outputs.
-    Returns:
-      y: 2-D `tf.Tensor` of dtype `int8` containing the unique 0-axis entries of
-        `input_bitstrings`.
-      idx: 1-D `tf.Tensor` of dtype `out_idx` such that `idx[i]` is the index in
-        `y` containing the value `input_bitstrings[i]`.
-      count: 1-D `tf.Tensor` of dtype `out_idx` such that `count[i]` is the
-      number
-        of occurences of `y[i]` in `input_bitstrings`.
-  """
-  # Convert bitstrings to integers and uniquify those integers.
-  input_shape = tf.shape(bitstrings)
-  mask = tf.cast(bitstrings, tf.int64)
-  base = tf.bitwise.left_shift(
-      mask, tf.range(tf.cast(input_shape[1], tf.int64), dtype=tf.int64))
-  ints_equiv = tf.reduce_sum(base, 1)
-  _, idx, counts = tf.unique_with_counts(ints_equiv)
-
-  # Convert unique integers to corresponding unique bitstrings.
-  unique_bitstrings = tf.zeros((tf.shape(counts)[0], input_shape[1]),
-                               dtype=tf.int8)
-  unique_bitstrings = tf.tensor_scatter_nd_update(unique_bitstrings,
-                                                  tf.expand_dims(idx, axis=1),
-                                                  bitstrings)
-
-  return unique_bitstrings, counts
 
 
 class EnergyKernel(tfp.mcmc.TransitionKernel, abc.ABC):
@@ -522,7 +474,7 @@ class MCMC(EnergySampler):
 
     sampled_states = sampled_states[:num_samples]
     if unique:
-      return unique_bitstrings_with_counts(sampled_states)
+      return util.unique_bitstrings_with_counts(sampled_states)
     return sampled_states
 
 
@@ -647,6 +599,7 @@ class Bernoulli(EBM):
 
   @tf.function
   def operator(self, qubits):
+    qubits = util.qubits_to_list(qubits)
     return tfq.convert_to_tensor([
         cirq.PauliSum.from_pauli_strings(
             float(self._variables[i].numpy()) * cirq.Z(qubits[i])
@@ -658,7 +611,7 @@ class Bernoulli(EBM):
     samples = tfp.distributions.Bernoulli(
         logits=2 * self._variables, dtype=tf.int8).sample(num_samples)
     if unique:
-      return unique_bitstrings_with_counts(samples)
+      return util.unique_bitstrings_with_counts(samples)
     return samples
 
   @tf.function

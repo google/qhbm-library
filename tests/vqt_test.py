@@ -40,10 +40,10 @@ class VQTTest(tf.test.TestCase):
   def test_loss_consistency(self):
     """Confirms that the sample-based and exact losses are close."""
     test_ebm = ebm.Bernoulli(self.num_bits, analytic=True)
-    test_qnn = qnn.QNN(self.u, self.raw_phis_symbols, analytic=True)
+    test_qnn = qnn.QNN(self.u, analytic=True)
     test_qhbm = qhbm.QHBM(test_ebm, test_qnn, self.name)
     test_ebm_copy = ebm.Bernoulli(self.num_bits, analytic=False)
-    test_qnn_copy = qnn.QNN(self.u, self.raw_phis_symbols, analytic=False)
+    test_qnn_copy = qnn.QNN(self.u, analytic=False)
     test_qhbm_copy = qhbm.QHBM(test_ebm_copy, test_qnn_copy, self.name)
     num_samples = tf.constant(int(5e6))
     num_random_hamiltonians = 2
@@ -64,7 +64,7 @@ class VQTTest(tf.test.TestCase):
     test_ebm._variables.assign(tf.constant([1.0]))
     symbol = sympy.Symbol("p")
     pqc = cirq.Circuit(cirq.H(qubit)**symbol)
-    test_qnn = qnn.QNN(pqc, [symbol], analytic=True)
+    test_qnn = qnn.QNN(pqc, analytic=True)
     test_qnn.values.assign(tf.constant([1.0]))
     test_qhbm = qhbm.QHBM(test_ebm, test_qnn)
     with tf.GradientTape() as tape:
