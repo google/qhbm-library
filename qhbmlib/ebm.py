@@ -38,14 +38,17 @@ class EnergyFunction(tf.keras.Model, abc.ABC):
     raise NotImplementedError()
 
   @property
-  def has_operator(self):
+  def has_operators(self):
     return False
 
   @abc.abstractmethod
   def energy(self, bitstrings):
     raise NotImplementedError()
 
-  def operator(self, qubits):
+  def operator_expectation_from_components(self, expectations):
+    raise NotImplementedError()
+  
+  def operators(self, qubits):
     raise NotImplementedError()
 
 
@@ -74,7 +77,7 @@ class KOBE(EnergyFunction):
     return self._num_bits
 
   @property
-  def has_operator(self):
+  def has_operators(self):
     return True
 
   @property
@@ -96,10 +99,19 @@ class KOBE(EnergyFunction):
       parities_t = tf.tensor_scatter_nd_update(parities_t, [[i]], [parity])
     return tf.reduce_sum(tf.transpose(parities_t) * self._variables, -1)
 
-  def operator(self, qubits):
+  def operator_expectation_from_components(self, expectations):
     return tfq.convert_to_tensor([
         cirq.PauliSum.from_pauli_strings(
             float(self._variables[i].numpy()) * cirq.PauliString(
+                cirq.Z(qubits[self._indices[i][j]])
+                for j in range(tf.shape(self._indices[i])[0]))
+            for i in range(self._indices.nrows()))
+    ])
+
+  def operators(self, qubits):
+    return tfq.convert_to_tensor([
+        cirq.PauliSum.from_pauli_strings(
+            cirq.PauliString(
                 cirq.Z(qubits[self._indices[i][j]])
                 for j in range(tf.shape(self._indices[i])[0]))
             for i in range(self._indices.nrows()))
@@ -547,8 +559,8 @@ class EBM(tf.keras.Model):
     return self._energy_function.num_bits
 
   @property
-  def has_operator(self):
-    return self._energy_function.has_operator
+  def has_operators(self):
+    return self._energy_function.has_operators
 
   @property
   def analytic(self):
@@ -566,8 +578,8 @@ class EBM(tf.keras.Model):
   def energy(self, bitstrings):
     return self._energy_function.energy(bitstrings)
 
-  def operator(self, qubits):
-    return self._energy_function.operator(qubits)
+  def operators(self, qubits):
+    return self._energy_function.operators(qubits)
 
   @tf.function
   def sample(self, num_samples, unique=True):
@@ -613,7 +625,7 @@ class Bernoulli(EBM):
                analytic=False,
                name=None):
     tf.keras.Model.__init__(self, name=name)
-    self._num_bits = num_bits
+    self._num_bits = tf.constant(num_bits)
     self._variables = self.add_weight(
         name=f'{self.name}_variables',
         shape=[self.num_bits],
@@ -628,7 +640,7 @@ class Bernoulli(EBM):
     return self._num_bits
 
   @property
-  def has_operator(self):
+  def has_operators(self):
     return True
 
   @property
@@ -646,7 +658,7 @@ class Bernoulli(EBM):
         tf.cast(1 - 2 * bitstrings, tf.float32) * self._variables, -1)
 
   @tf.function
-  def operator(self, qubits):
+  def operators(self, qubits):
     return tfq.convert_to_tensor([
         cirq.PauliSum.from_pauli_strings(
             float(self._variables[i].numpy()) * cirq.Z(qubits[i])
@@ -655,6 +667,22 @@ class Bernoulli(EBM):
 
   @tf.function
   def sample(self, num_samples, unique=True):
+    r"""Fairly samples from the EBM defined by `energy`.
+
+        For Bernoulli distribution, let $p$ be the probability of bit being `1`.
+        In this case, we have $p = \frac{e^{theta}}{{e^{theta}+e^{-theta}}}$.
+        Therefore, each independent logit is:
+          $logit = \log\frac{p}{1-p} = \log\frac{e^{theta}}{e^{-theta}}
+                 = \log{e^{2*theta}} = 2*theta$
+
+        Args:
+          num_samples: a `tf.Tensor` of dtype `tf.int32` representing the number
+            of samples from given Bernoulli distribition.
+
+        Returns:
+          a `tf.Tensor` in the shape of [num_samples, num_bits] of `tf.int8`
+          with bitstrings sampled from the classical distribution.
+        """
     samples = tfp.distributions.Bernoulli(
         logits=2 * self._variables, dtype=tf.int8).sample(num_samples)
     if unique:

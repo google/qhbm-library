@@ -96,8 +96,29 @@ class ProbTest(tf.test.TestCase):
 
 
 class BernoulliTest(tf.test.TestCase):
-  """Test the returns from ebm.build_bernoulli."""
+  """Test the Bernoulli class."""
 
+  num_bits = 5
+  
+  def test_init(self):
+    """Test that components are initialized correctly."""
+    init_const = 1.5
+    test_b = ebm.Bernoulli(self.num_bits, tf.keras.initializers.Constant(init_const))
+    self.assertAllEqual(test_b.num_bits, self.num_bits)
+    self.assertTrue(test_b.has_operators)
+    self.assertFalse(test_b.analytic)
+    self.assertAllEqual(test_b._variables, [init_const] * self.num_bits)
+
+  def test_copy(self):
+    """Test that the copy has the same values, but new variables."""
+    test_b = ebm.Bernoulli(self.num_bits)
+    test_b_copy = test_b.copy()
+    self.assertAllEqual(test_b_copy.num_bits, test_b.num_bits)
+    self.assertEqual(test_b_copy.has_operators, test_b.has_operators)
+    self.assertEqual(test_b_copy.analytic, test_b.analytic)
+    self.assertAllEqual(test_b_copy._variables, test_b._variables)
+    self.assertNotEqual(id(test_b_copy._variables), id(test_b._variables))
+    
   def test_energy_bernoulli(self):
     """Test ebm.build_bernoulli.
 

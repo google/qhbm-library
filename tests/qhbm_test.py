@@ -236,11 +236,10 @@ class ExactQHBMBasicFunctionTest(tf.test.TestCase):
   def test_all_energies(self):
     """Confirms that each bitstring energy is correct."""
     test_qhbm = get_exact_qhbm()
-    energy_function, _ = test_util.get_ebm_functions(3)
     test_energies = test_qhbm.ebm.energies()
     for n_b, b in enumerate(self.all_bitstrings):
       self.assertAllClose(
-          energy_function(test_qhbm.ebm._variables, b),
+          test_qhbm.ebm.energy(tf.expand_dims(b, 0))[0],
           test_energies[n_b],
           atol=ATOL)
 
