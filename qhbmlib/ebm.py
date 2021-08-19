@@ -632,6 +632,9 @@ class Bernoulli(EBM):
         initializer=initializer)
     self._analytic = analytic
     if analytic:
+      if num_bits > 30:
+        raise ValueError(
+          "Analytic Bernoulli methods not allowed with more than 30 bits.")
       self._all_bitstrings = tf.constant(
           list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
 
@@ -674,14 +677,6 @@ class Bernoulli(EBM):
         Therefore, each independent logit is:
           $logit = \log\frac{p}{1-p} = \log\frac{e^{theta}}{e^{-theta}}
                  = \log{e^{2*theta}} = 2*theta$
-
-        Args:
-          num_samples: a `tf.Tensor` of dtype `tf.int32` representing the number
-            of samples from given Bernoulli distribition.
-
-        Returns:
-          a `tf.Tensor` in the shape of [num_samples, num_bits] of `tf.int8`
-          with bitstrings sampled from the classical distribution.
         """
     samples = tfp.distributions.Bernoulli(
         logits=2 * self._variables, dtype=tf.int8).sample(num_samples)

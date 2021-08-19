@@ -120,34 +120,21 @@ class BernoulliTest(tf.test.TestCase):
     self.assertNotEqual(id(test_b_copy._variables), id(test_b._variables))
     
   def test_energy_bernoulli(self):
-    """Test ebm.build_bernoulli.
-
-        The analytic value of the energy function is E(logits, bitstring)
-            = sum_i [ ln(1 + e^{logits[i]}) - bitstring[i] * logits[i] ].
-
-        For example, if bitstring[i] = 0 for all i, then
-            E(logits, bitstring) = sum_i [ ln(1 + e^{logits[i]}) ].
-
-        Picking the logits to have values as logs of integers makes our
-        reference
-        values simpler.
-        """
-    energy_bernoulli, _, _, _, _ = ebm.build_bernoulli(3, "test")
+    """Test Bernoulli.energy."""
+    test_b = ebm.Bernoulli(3, name="test")
 
     # Test energy function.
-    test_logits = tf.math.log(tf.constant([10.0, 7.0, 1.0], dtype=tf.float32))
-    test_bitstring = tf.constant([0, 0, 0])
-    test_energy = energy_bernoulli(test_logits, test_bitstring)
-    ref_energy = tf.reduce_sum(
-        tf.math.log(tf.constant([11.0, 8.0, 2.0], dtype=tf.float32)))
+    test_vars = tf.constant([10.0, -7.0, 1.0], dtype=tf.float32)
+    test_b._variables.assign(test_vars)
+    test_bitstring = tf.constant([[0, 0, 0]])
+    test_energy = test_b.energy(test_bitstring)[0]
+    ref_energy = tf.reduce_sum(test_vars)
     self.assertAllClose(test_energy, ref_energy)
-    test_logits = tf.math.log(tf.constant([1.0, 1.7, 2.8], dtype=tf.float32))
-    test_bitstring = tf.constant([1, 0, 1])
-    test_energy = energy_bernoulli(test_logits, test_bitstring)
-    ref_energy = (
-        tf.reduce_sum(
-            tf.math.log(tf.constant([2.0, 2.7, 3.8], dtype=tf.float32))) -
-        tf.math.log(1.0) - tf.math.log(2.8))
+    test_vars = tf.constant([1.0, 1.7, -2.8], dtype=tf.float32)
+    test_b._variables.assign(test_vars)
+    test_bitstring = tf.constant([[1, 0, 1]])
+    test_energy = test_b.energy(test_bitstring)[0]
+    ref_energy = -test_vars[0] + test_vars[1] - test_vars[2]
     self.assertAllClose(test_energy, ref_energy)
 
   def test_energy_bernoulli_gradients(self):
