@@ -559,7 +559,6 @@ class EBM(tf.keras.Model):
           list(itertools.product([0, 1], repeat=self.num_bits)),
           dtype=tf.int8)
     return self._all_bitstrings
-
     
   @property
   def num_bits(self):

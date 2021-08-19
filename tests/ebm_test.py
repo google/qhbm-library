@@ -158,7 +158,31 @@ class BernoulliTest(tf.test.TestCase):
     qubits = cirq.GridQubit.rect(1, self.num_bits)
     test_ops = test_b.operators(qubits)
     for i, q in enumerate(qubits):
-      self.assertEqual(test_ops[i], 1*cirq.Z(q))
+      self.assertEqual(test_ops[i], cirq.PauliSum.from_pauli_strings(cirq.Z(q)))
+
+  def test_operator_expectation_from_components(self):
+    """Test combining expectations of operators in energy."""
+    # Build Bernoulli
+    num_bits = 3
+    test_b = ebm.Bernoulli(num_bits)
+    qubits = cirq.GridQubit.rect(1, num_bits)
+    # Pin at bitstring [1, 0, 1]
+    test_b._variables.assign(tf.constant([1000.0, -1000.0, 1000.0]))
+    operators = test_b.operators(qubits)
+
+    # True energy
+    bitstring = tf.constant([[0, 0, 1]])  # not the pinned bitstring
+    ref_energy = test_b.energy(bitstring)[0]
+
+    # Test energy
+    circuit = cirq.Circuit([cirq.I(qubits[0]), cirq.I(qubits[1]), cirq.X(qubits[2])])
+    output_state_vector = cirq.Simulator().simulate(circuit).final_state_vector
+    op_expectations = []
+    qubit_map={q: i for i, q in enumerate(qubits)}
+    for op in operators:
+      op_expectations.append(op.expectation_from_state_vector(output_state_vector, qubit_map).real)
+    test_energy = test_b.operator_expectation_from_components(op_expectations)
+    self.assertAllClose(test_energy, ref_energy, atol=1e-4)
 
   def test_sampler_bernoulli(self):
     """Confirm that bitstrings are sampled as expected."""
