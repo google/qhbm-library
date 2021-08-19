@@ -675,8 +675,8 @@ class Bernoulli(EBM):
         For Bernoulli distribution, let $p$ be the probability of bit being `1`.
         In this case, we have $p = \frac{e^{theta}}{{e^{theta}+e^{-theta}}}$.
         Therefore, each independent logit is:
-          $logit = \log\frac{p}{1-p} = \log\frac{e^{theta}}{e^{-theta}}
-                 = \log{e^{2*theta}} = 2*theta$
+          $$logit = \log\frac{p}{1-p} = \log\frac{e^{theta}}{e^{-theta}}
+                 = \log{e^{2*theta}} = 2*theta$$
         """
     samples = tfp.distributions.Bernoulli(
         logits=2 * self._variables, dtype=tf.int8).sample(num_samples)

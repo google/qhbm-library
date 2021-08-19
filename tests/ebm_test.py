@@ -120,45 +120,35 @@ class BernoulliTest(tf.test.TestCase):
     self.assertNotEqual(id(test_b_copy._variables), id(test_b._variables))
     
   def test_energy_bernoulli(self):
-    """Test Bernoulli.energy."""
-    test_b = ebm.Bernoulli(3, name="test")
+    """Test Bernoulli.energy and its derivative.
 
-    # Test energy function.
+    For a given bitstring b, the energy is
+      $$E_\theta(b) = \sum_i (1-2b_i)\theta_i$$
+    Then the derivative of the energy with respect to the thetas vector is
+      $$\partial / \partial \theta E_\theta(b) = [(1-2b_i) for b_i in b]$$
+    """
+    test_b = ebm.Bernoulli(3, name="test")
     test_vars = tf.constant([10.0, -7.0, 1.0], dtype=tf.float32)
     test_b._variables.assign(test_vars)
     test_bitstring = tf.constant([[0, 0, 0]])
-    test_energy = test_b.energy(test_bitstring)[0]
+    test_spins = 1 - 2 * test_bitstring[0]
+    with tf.GradientTape() as tape:
+      test_energy = test_b.energy(test_bitstring)[0]
+    test_energy_grad = tape.gradient(test_energy, test_b._variables)
     ref_energy = tf.reduce_sum(test_vars)
     self.assertAllClose(test_energy, ref_energy)
+    self.assertAllClose(test_energy_grad, test_spins)
+
     test_vars = tf.constant([1.0, 1.7, -2.8], dtype=tf.float32)
     test_b._variables.assign(test_vars)
     test_bitstring = tf.constant([[1, 0, 1]])
-    test_energy = test_b.energy(test_bitstring)[0]
+    test_spins = 1 - 2 * test_bitstring[0]
+    with tf.GradientTape() as tape:
+      test_energy = test_b.energy(test_bitstring)[0]
+    test_energy_grad = tape.gradient(test_energy, test_b._variables)
     ref_energy = -test_vars[0] + test_vars[1] - test_vars[2]
     self.assertAllClose(test_energy, ref_energy)
-
-  def test_energy_bernoulli_gradients(self):
-    """Test gradients of energy_bernoulli.
-
-        The analytic gradient of the energy function w.r.t. a given logit i is
-        (d/(d logit[i])) E(logits, bitstring)
-            = (e^{logit[i]} / (1 + e^{logit[i]})) - bitstring[i]
-        """
-    (
-        energy_bernoulli,
-        sampler_bernoulli,
-        log_partition_bernoulli,
-        entropy_bernoulli,
-        num_nodes,
-    ) = ebm.build_bernoulli(3, "test")
-    test_logits = tf.math.log(tf.constant([10.0, 7.0, 1.0]))
-    test_bitstring = tf.constant([True, False, True])
-    with tf.GradientTape() as tape:
-      tape.watch(test_logits)
-      test_energy = energy_bernoulli(test_logits, test_bitstring)
-    test_gradients = tape.gradient(test_energy, test_logits)
-    ref_gradients = [10 / 11 - 1, 7 / 8, 1 / 2 - 1]
-    self.assertAllClose(test_gradients, ref_gradients)
+    self.assertAllClose(test_energy_grad, test_spins)
 
   def test_sampler_bernoulli(self):
     """Confirm that bitstrings are sampled as expected."""
