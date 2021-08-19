@@ -101,11 +101,12 @@ class BernoulliTest(tf.test.TestCase):
   """Test the Bernoulli class."""
 
   num_bits = 5
-  
+
   def test_init(self):
     """Test that components are initialized correctly."""
     init_const = 1.5
-    test_b = ebm.Bernoulli(self.num_bits, tf.keras.initializers.Constant(init_const))
+    test_b = ebm.Bernoulli(self.num_bits,
+                           tf.keras.initializers.Constant(init_const))
     self.assertAllEqual(test_b.num_bits, self.num_bits)
     self.assertTrue(test_b.has_operators)
     self.assertFalse(test_b.analytic)
@@ -120,7 +121,7 @@ class BernoulliTest(tf.test.TestCase):
     self.assertEqual(test_b_copy.analytic, test_b.analytic)
     self.assertAllEqual(test_b_copy._variables, test_b._variables)
     self.assertNotEqual(id(test_b_copy._variables), id(test_b._variables))
-    
+
   def test_energy_bernoulli(self):
     """Test Bernoulli.energy and its derivative.
 
@@ -175,12 +176,16 @@ class BernoulliTest(tf.test.TestCase):
     ref_energy = test_b.energy(bitstring)[0]
 
     # Test energy
-    circuit = cirq.Circuit([cirq.I(qubits[0]), cirq.I(qubits[1]), cirq.X(qubits[2])])
+    circuit = cirq.Circuit(
+        [cirq.I(qubits[0]),
+         cirq.I(qubits[1]),
+         cirq.X(qubits[2])])
     output_state_vector = cirq.Simulator().simulate(circuit).final_state_vector
     op_expectations = []
-    qubit_map={q: i for i, q in enumerate(qubits)}
+    qubit_map = {q: i for i, q in enumerate(qubits)}
     for op in operators:
-      op_expectations.append(op.expectation_from_state_vector(output_state_vector, qubit_map).real)
+      op_expectations.append(
+          op.expectation_from_state_vector(output_state_vector, qubit_map).real)
     test_energy = test_b.operator_expectation_from_components(op_expectations)
     self.assertAllClose(test_energy, ref_energy, atol=1e-4)
 
@@ -251,7 +256,7 @@ class BernoulliTest(tf.test.TestCase):
   def test_log_partition_bernoulli(self):
     # TODO
     pass
-    
+
   def test_entropy_bernoulli(self):
     """Confirm that the entropy conforms to S(p) = -sum_x p(x)ln(p(x))"""
     test_thetas = tf.constant([-1.5, 0.6, 2.1])
@@ -281,19 +286,23 @@ class KOBETest(tf.test.TestCase):
 
   # TODO: test more orders, and compatibility with Bernoulli at order==1
   order = 2
-  
+
   def test_init(self):
     """Confirm internal values are set correctly."""
     num_bits = 3
     init_const = -3.1
-    test_k = KOBE(num_bits, self.order, tf.keras.initializers.Constant(init_const))
+    test_k = KOBE(num_bits, self.order,
+                  tf.keras.initializers.Constant(init_const))
     self.assertEqual(test_k.num_bits, num_bits)
     self.assertEqual(test_k.order, self.order)
 
     ref_indices = [[[0], [1], [2]], [[0, 1], [0, 2], [1, 2]]]
     self.assertAllClose(test_k._indices, ref_indices)
-    self.assertAllClose(test_k._variables, [init_const] * (sum(len(itertools.combinations(range(num_bits), i) for i in range(1, self.order + 1)))))
-  
+    self.assertAllClose(test_k._variables, [init_const] * (sum(
+        len(
+            itertools.combinations(range(num_bits), i)
+            for i in range(1, self.order + 1)))))
+
   def test_energy_boltzmann(self):
     """The Boltzmann energy function is defined as: TODO
 

@@ -44,7 +44,7 @@ class EnergyFunction(tf.keras.Model, abc.ABC):
   @abc.abstractmethod
   def energy(self, bitstrings):
     raise NotImplementedError()
-  
+
   def operators(self, qubits):
     raise NotImplementedError()
 
@@ -556,10 +556,10 @@ class EBM(tf.keras.Model):
     if self.analytic:
       if self._all_bitstrings is None:
         self._all_bitstrings = tf.constant(
-          list(itertools.product([0, 1], repeat=self.num_bits)),
-          dtype=tf.int8)
+            list(itertools.product([0, 1], repeat=self.num_bits)),
+            dtype=tf.int8)
     return self._all_bitstrings
-    
+
   @property
   def num_bits(self):
     return self._energy_function.num_bits
@@ -585,7 +585,8 @@ class EBM(tf.keras.Model):
     return self._energy_function.energy(bitstrings)
 
   def operator_expectation_from_components(self, expectations):
-    return self._energy_function.operator_expectation_from_components(expectations)
+    return self._energy_function.operator_expectation_from_components(
+        expectations)
 
   def operators(self, qubits):
     return self._energy_function.operators(qubits)
@@ -660,8 +661,8 @@ class Bernoulli(EBM):
 
   def operators(self, qubits):
     return [
-      cirq.PauliSum.from_pauli_strings(cirq.Z(qubits[i]))
-      for i in range(self.num_bits)
+        cirq.PauliSum.from_pauli_strings(cirq.Z(qubits[i]))
+        for i in range(self.num_bits)
     ]
 
   def operator_expectation_from_components(self, expectations):
