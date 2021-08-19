@@ -276,9 +276,24 @@ class BernoulliTest(tf.test.TestCase):
     self.assertAllClose(expected_entropy, test_entropy)
 
 
-class BoltzmannTest(tf.test.TestCase):
-  """Test ebm.build_boltzmann."""
+class KOBETest(tf.test.TestCase):
+  """Test the ebm.KOBE energy function."""
 
+  # TODO: test more orders, and compatibility with Bernoulli at order==1
+  order = 2
+  
+  def test_init(self):
+    """Confirm internal values are set correctly."""
+    num_bits = 3
+    init_const = -3.1
+    test_k = KOBE(num_bits, self.order, tf.keras.initializers.Constant(init_const))
+    self.assertEqual(test_k.num_bits, num_bits)
+    self.assertEqual(test_k.order, self.order)
+
+    ref_indices = [[[0], [1], [2]], [[0, 1], [0, 2], [1, 2]]]
+    self.assertAllClose(test_k._indices, ref_indices)
+    self.assertAllClose(test_k._variables, [init_const] * (sum(len(itertools.combinations(range(num_bits), i) for i in range(1, self.order + 1)))))
+  
   def test_energy_boltzmann(self):
     """The Boltzmann energy function is defined as: TODO
 
