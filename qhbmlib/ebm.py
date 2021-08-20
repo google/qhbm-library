@@ -62,14 +62,15 @@ class KOBE(EnergyFunction):
     super().__init__(name=name)
     self._num_bits = num_bits
     self._order = order
-    self._indices = []
+    indices_list = []
     for i in range(1, order + 1):
       combos = itertools.combinations(range(num_bits), i)
-      self._indices.extend([c for c in combos])
-    self._indices = tf.ragged.stack(self._indices)
+      indices_list.extend([c for c in combos])
+    self._indices = tf.ragged.stack(indices_list)
+    self._num_variables = tf.constant(len(indices_list))
     self._variables = self.add_weight(
         name=f'{self.name}_variables',
-        shape=[self._indices.nrows()],
+        shape=[self._num_variables],
         initializer=initializer)
 
   @property
@@ -93,20 +94,18 @@ class KOBE(EnergyFunction):
   def energy(self, bitstrings):
     spins = 1 - 2 * bitstrings
     parities_t = tf.zeros(
-        [self._indices.nrows(), tf.shape(bitstrings)[0]], dtype=tf.float32)
-    for i in tf.range(self._indices.nrows()):
+        [self._num_variables, tf.shape(bitstrings)[0]], dtype=tf.float32)
+    for i in tf.range(self._num_variables):
       parity = tf.reduce_prod(tf.gather(spins, self._indices[i], axis=-1), -1)
       parities_t = tf.tensor_scatter_nd_update(parities_t, [[i]], [parity])
     return tf.reduce_sum(tf.transpose(parities_t) * self._variables, -1)
 
   def operators(self, qubits):
-    return tfq.convert_to_tensor([
-        cirq.PauliSum.from_pauli_strings(
-            cirq.PauliString(
-                cirq.Z(qubits[self._indices[i][j]])
-                for j in range(tf.shape(self._indices[i])[0]))
-            for i in range(self._indices.nrows()))
-    ])
+    ops = []
+    for i in range(self._num_variables):
+      for j in range(tf.shape(self._indices[i])[0]):
+        ops.append(cirq.PauliSum.from_pauli_strings(cirq.Z(qubits[self._indices[i][j]])))
+    return ops
 
   def operator_expectation_from_components(self, expectations):
     return tfq.convert_to_tensor([
@@ -594,11 +593,15 @@ class EBM(tf.keras.Model):
   @tf.function
   def sample(self, num_samples, unique=True):
     if self.analytic and self._energy_sampler is None:
-      return tf.gather(
+      samples = tf.gather(
           self.all_bitstrings,
           tfp.distributions.Categorical(logits=-1 *
                                         self.energies()).sample(num_samples))
-    return self._energy_sampler.sample(num_samples, unique=unique)
+    else:
+      samples = self._energy_sampler.sample(num_samples, unique=unique)
+    if unique:
+      return unique_bitstrings_with_counts(samples)
+    return samples
 
   @tf.function
   def energies(self):

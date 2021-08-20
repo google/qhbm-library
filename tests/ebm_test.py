@@ -295,6 +295,7 @@ class KOBETest(tf.test.TestCase):
                       tf.keras.initializers.Constant(init_const))
     self.assertEqual(test_k.num_bits, num_bits)
     self.assertEqual(test_k.order, self.order)
+    self.assertTrue(test_k.has_operators)
 
     ref_indices = [[0], [1], [2], [0, 1], [0, 2], [1, 2]]
     self.assertAllClose(test_k._indices, ref_indices)
@@ -302,33 +303,41 @@ class KOBETest(tf.test.TestCase):
       len(list(itertools.combinations(range(num_bits), i)))
       for i in range(1, self.order + 1)))
 
-  def test_energy_boltzmann(self):
-    """The Boltzmann energy function is defined as: TODO
+  def test_copy(self):
+    """Test that the copy has the same values, but new variables."""
+    num_bits = 3
+    init_const = -3.1
+    test_k = ebm.KOBE(num_bits, self.order,
+                      tf.keras.initializers.Constant(init_const))
+    test_k_copy = test_k.copy()
+    self.assertEqual(test_k_copy.num_bits, test_k.num_bits)
+    self.assertEqual(test_k_copy.order, test_k.order)
+    self.assertTrue(test_k_copy.has_operators, test_k.has_operators)
+    self.assertAllClose(test_k_copy._indices, test_k._indices)
+    self.assertAllClose(test_k_copy._variables, test_k._variables)
+    self.assertNotEqual(id(test_k_copy._variables), id(test_k._variables))
 
-        Test every energy on two bits.
-        """
+  def test_energy(self):
+    """Test every energy on two bits."""
     n_nodes = 2
     test_thetas = tf.Variable([1.5, 2.7, -4.0])
     expected_energies = tf.constant([0.2, 2.8, 5.2, -8.2])
-    energy_boltzmann, _, _, _, _ = ebm.build_boltzmann(n_nodes, "test")
+    test_k = ebm.KOBE(n_nodes, self.order)
+    test_k._variables.assign(test_thetas)
     all_strings = tf.constant(
         list(itertools.product([0, 1], repeat=n_nodes)), dtype=tf.int8)
-    test_energies = tf.map_fn(
-        lambda x: energy_boltzmann(test_thetas, x),
-        all_strings,
-        fn_output_signature=tf.float32,
-    )
+    test_energies = test_k.energy(all_strings)
     self.assertAllClose(expected_energies, test_energies)
 
-  def test_sampler_boltzmann(self):
+  def test_sampler(self):
     """Confirm bitstrings are sampled as expected."""
     # Single bit test.
-    _, sampler_boltzmann, _, _, _ = ebm.build_boltzmann(1, "test_single_bit")
-    # For single factor Bernoulli, 0 logit is 50% chance of 1.
+    test_k = ebm.EBM(ebm.KOBE(1, self.order), None, analytic=True)
+    # For single factor Bernoulli, theta=0 is 50% chance of 1.
     test_thetas = tf.constant([0.0])
+    test_k._energy_function._variables.assign(test_thetas)
     num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
-    bitstrings = sampler_boltzmann(test_thetas, num_bitstrings)
-    _, counts = ebm.unique_bitstrings_with_counts(bitstrings)
+    bitstrings, counts = test_k.sample(num_bitstrings)
     # check that we got both bitstrings
     self.assertTrue(
         tf.reduce_any(tf.equal(tf.constant([0], dtype=tf.int8), bitstrings)))
@@ -338,8 +347,9 @@ class KOBETest(tf.test.TestCase):
     self.assertAllClose(1.0, counts[0] / counts[1], atol=1e-3)
     # Large energy penalty pins the bit.
     test_thetas = tf.constant([100.0])
+    test_k._energy_function._variables.assign(test_thetas)
     num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
-    bitstrings = sampler_boltzmann(test_thetas, num_bitstrings)
+    bitstrings, _ = test_k.sample(num_bitstrings)
     # check that we got only one bitstring
     self.assertFalse(
         tf.reduce_any(tf.equal(tf.constant([0], dtype=tf.int8), bitstrings)))
@@ -347,12 +357,10 @@ class KOBETest(tf.test.TestCase):
         tf.reduce_any(tf.equal(tf.constant([1], dtype=tf.int8), bitstrings)))
 
     # Three bit tests.
-    _, sampler_boltzmann, _, _, _ = ebm.build_boltzmann(3, "test")
     # First a uniform sampling test.
-    test_thetas = tf.constant([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    test_k = ebm.EBM(ebm.KOBE(3, self.order, tf.keras.initializers.Constant(0.0)), None, analytic=True)
     num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
-    bitstrings = sampler_boltzmann(test_thetas, num_bitstrings)
-    _, counts = ebm.unique_bitstrings_with_counts(bitstrings)
+    bitstrings, counts = test_k.sample(num_bitstrings)
 
     @tf.function
     def check_bitstring_exists(bitstring, bitstring_list):
@@ -392,8 +400,9 @@ class KOBETest(tf.test.TestCase):
     )
     # Confirm correlated spins.
     test_thetas = tf.constant([100.0, 0.0, 0.0, -100.0, 0.0, 100.0])
+    test_k._energy_function._variables.assign(test_thetas)
     num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
-    bitstrings = sampler_boltzmann(test_thetas, num_bitstrings)
+    bitstrings, _ = test_k.sample(num_bitstrings)
     # Confirm we only get the 110 bitstring.
     self.assertFalse(
         check_bitstring_exists(
