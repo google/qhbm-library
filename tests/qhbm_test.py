@@ -36,6 +36,7 @@ class QHBMTest(tf.test.TestCase):
   raw_phis_symbols = [sympy.Symbol("s0"), sympy.Symbol("s1")]
   phis_symbols = tf.constant([str(s) for s in raw_phis_symbols])
   raw_qubits = cirq.GridQubit.rect(1, num_bits)
+  operators = [cirq.PauliSum.from_pauli_strings(s) for s in [cirq.Z(q) for q in raw_qubits]]
   u = cirq.Circuit()
   for s in raw_phis_symbols:
     for q in raw_qubits:
@@ -51,6 +52,7 @@ class QHBMTest(tf.test.TestCase):
     test_qhbm = qhbm.QHBM(test_ebm, test_qnn, self.name)
     self.assertEqual(self.name, test_qhbm.name)
     self.assertEqual(test_ebm, test_qhbm.ebm)
+    self.assertEqual(test_qhbm.operators, self.operators)
     self.assertAllEqual(self.phis_symbols, test_qhbm.qnn.symbols)
     self.assertAllEqual(
         tfq.from_tensor(tfq.convert_to_tensor([self.u])),

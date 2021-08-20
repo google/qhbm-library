@@ -32,6 +32,7 @@ class QHBM(tf.keras.Model):
     super().__init__(name=name)
     self._ebm = ebm
     self._qnn = qnn
+    self._operators = ebm.operators(qnn.raw_qubits)
 
   @property
   def ebm(self):
@@ -41,6 +42,10 @@ class QHBM(tf.keras.Model):
   def qnn(self):
     return self._qnn
 
+  @property
+  def operators(self):
+    return self._operators
+  
   @property
   def raw_qubits(self):
     return self.qnn.raw_qubits
