@@ -34,15 +34,12 @@ class QMHLExactLossTest(tf.test.TestCase):
       model_samples = tf.constant(1e6)
       target_samples = tf.constant(1e6)
       target_circuits, target_counts = target.circuits(target_samples)
-      print(f"thetas: {model.thetas}")
-      print(f"phis: {model.phis}")
-      print(f"model.trainable_variables:{model.trainable_variables}")
       with tf.GradientTape() as tape:
         loss = qmhl.qmhl_loss(model, target_circuits, target_counts)
-      all_grads = tape.gradient(loss, model.trainable_variables)
-      print("Current num qubits: {}".format(num_qubits))
-      self.assertAllClose(loss, target_qhbm.ebm.entropy(), atol=2e-3)
-      self.assertAllClose(all_grads, tf.zeros(tf.shape(all_grads)), atol=1e-3)
+      thetas_grads, phis_grads = tape.gradient(loss, (model.thetas, model.phis))
+      self.assertAllClose(loss, target.ebm.entropy(), atol=2e-3)
+      self.assertAllClose(thetas_grads, tf.zeros(tf.shape(thetas_grads)), atol=1e-3)
+      self.assertAllClose(phis_grads, tf.zeros(tf.shape(phis_grads)), atol=1e-3)
 
 if __name__ == "__main__":
   print("Running qmhl_test.py ...")

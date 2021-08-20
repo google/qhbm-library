@@ -42,7 +42,7 @@ def qmhl_loss(
   @tf.custom_gradient
   def call(thetas, phis, target_circuits, target_counts):
     # log_partition estimate
-    if model.ebm.analytic:
+    if model.ebm.is_analytic:
       log_partition = model.log_partition_function()
     else:
       bitstrings, _ = model.ebm.sample(tf.reduce_sum(target_counts))
@@ -71,24 +71,28 @@ def qmhl_loss(
       ebm_probs = tf.cast(ebm_counts, tf.float32) / tf.cast(tf.reduce_sum(ebm_counts), tf.float32)
       with tf.GradientTape() as tape:
         qnn_energies = model.ebm.energy(qnn_bitstrings)
-      qnn_thetas_grad_weighted = tape.jacobian(qnn_energies, thetas) * qnn_probs
-      qnn_thetas_grad = tf.reduce_sum(qnn_thetas_grad_weighted, 0)
+      # jacobian is a list over thetas, with ith entry a tensor of shape
+      # [tf.shape(qnn_energies)[0], tf.shape(thetas[i])[0]]
+      qnn_jac = tf.ragged.stack(tape.jacobian(qnn_energies, thetas))
+      # contract over bitstring weights
+      qnn_thetas_grad = tf.einsum("ijk,j->ik", qnn_jac, qnn_probs)
       with tf.GradientTape() as tape:
         ebm_energies = model.ebm.energy(ebm_bitstrings)
-      ebm_thetas_grad_weighted = tape.jacobian(ebm_energies, thetas) * ebm_probs
-      ebm_thetas_grad = tf.reduce_sum(ebm_thetas_grad_weighted, 0)
+      ebm_jac = tf.ragged.stack(tape.jacobian(ebm_energies, thetas))
+      ebm_thetas_grad = tf.einsum("ijk,j->ik", ebm_jac, ebm_probs)
       thetas_grad = qnn_thetas_grad - ebm_thetas_grad
 
       # Phis derivative.
       if model.ebm.has_operator:
-        model_operator = model.ebm.operator(model.qnn.raw_qubits)
+        model_operators = model.operator_shards
         with tf.GradientTape() as tape:
-          pulled_back_energy = model.qnn.pulled_back_expectation(
-            target_circuits, target_counts, model_operator)
+          pulled_back_energy_shards = model.qnn.pulled_back_expectation(
+            target_circuits, target_counts, model_operators)
+          pulled_back_energy = model.ebm.operator_expectation(pulled_back_energy_shards)
         phis_grad = tape.gradient(pulled_back_energy, phis)
       else:
         raise NotImplementedError(
           "Derivative when EBM has no operator is not yet supported.")
-      return tuple(grad * t for t in thetas_grad) + (grad * phis_grad, None, None)
+      return grad * thetas_grad, grad * phis_grad, None, None
     return forward_pass_vals, gradient
   return call(model.thetas, model.phis, target_circuits, target_counts)

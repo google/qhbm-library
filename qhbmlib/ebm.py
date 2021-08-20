@@ -632,7 +632,7 @@ class Bernoulli(EBM):
                initializer=tf.keras.initializers.RandomUniform(),
                is_analytic=False,
                name=None):
-    super().__init__(None, None, name=name)
+    tf.keras.Model.__init__(self, name=name)
     self._num_bits = num_bits
     self._variables = self.add_weight(
         name=f'{self.name}_variables',
@@ -656,7 +656,7 @@ class Bernoulli(EBM):
     return self._is_analytic
 
   def copy(self):
-    bernoulli = Bernoulli(self.num_bits, analytic=self.analytic, name=self.name)
+    bernoulli = Bernoulli(self.num_bits, is_analytic=self.is_analytic, name=self.name)
     bernoulli._variables.assign(self._variables)
     return bernoulli
 

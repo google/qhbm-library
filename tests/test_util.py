@@ -41,7 +41,7 @@ def get_random_qhbm(
   """Create a random QHBM for use in testing."""
   num_qubits = len(qubits)
   this_ebm = ebm.Bernoulli(
-    num_qubits, tf.keras.initializers.RandomUniform(minval=minval_thetas, maxval=maxval_thetas), analytic=False)
+    num_qubits, tf.keras.initializers.RandomUniform(minval=minval_thetas, maxval=maxval_thetas), is_analytic=False)
   unitary, phis_symbols = architectures.get_hardware_efficient_model_unitary(
       qubits, num_layers, identifier)
   this_qnn = qnn.QNN(

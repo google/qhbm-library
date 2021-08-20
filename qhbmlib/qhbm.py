@@ -33,7 +33,7 @@ class QHBM(tf.keras.Model):
     self._ebm = ebm
     self.thetas = ebm.trainable_variables
     self._qnn = qnn
-    self.phis = qnn.values
+    self.phis = qnn.trainable_variables
     self._operator_shards = tfq.convert_to_tensor(
         ebm.operator_shards(qnn.raw_qubits))
 
