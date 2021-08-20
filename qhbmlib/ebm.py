@@ -588,11 +588,11 @@ class EBM(tf.keras.Model):
           self._all_bitstrings,
           tfp.distributions.Categorical(logits=-1 *
                                         self.energies()).sample(num_samples))
+      if unique:
+        return unique_bitstrings_with_counts(samples)
+      return samples
     else:
-      samples = self._energy_sampler.sample(num_samples, unique=unique)
-    if unique:
-      return unique_bitstrings_with_counts(samples)
-    return samples
+      return self._energy_sampler.sample(num_samples, unique=unique)
 
   @tf.function
   def energies(self):
