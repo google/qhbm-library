@@ -86,7 +86,7 @@ class KOBE(EnergyFunction):
     return self._order
 
   def copy(self):
-    kobe = KOBE(self.num_bits, self.order, name=name)
+    kobe = KOBE(self.num_bits, self.order, name=self.name)
     kobe._variables.assign(self._variables)
     return kobe
 
@@ -103,8 +103,11 @@ class KOBE(EnergyFunction):
   def operators(self, qubits):
     ops = []
     for i in range(self._num_variables):
-      for j in range(tf.shape(self._indices[i])[0]):
-        ops.append(cirq.PauliSum.from_pauli_strings(cirq.Z(qubits[self._indices[i][j]])))
+      string_factors = []
+      for loc in self._indices[i]:
+        string_factors.append(cirq.Z(qubits[loc]))
+      string = cirq.PauliString(string_factors)
+      ops.append(cirq.PauliSum.from_pauli_strings(string))
     return ops
 
   def operator_expectation_from_components(self, expectations):

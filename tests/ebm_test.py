@@ -329,6 +329,20 @@ class KOBETest(tf.test.TestCase):
     test_energies = test_k.energy(all_strings)
     self.assertAllClose(expected_energies, test_energies)
 
+  def test_operators(self):
+    """Confirm correct operators for a simple Boltzmann."""
+    num_bits = 3
+    test_k = ebm.KOBE(num_bits, self.order)
+    qubits = cirq.GridQubit.rect(1, num_bits)
+    test_ops = test_k.operators(qubits)
+    ref_ops = [cirq.Z(qubits[0]), cirq.Z(qubits[1]), cirq.Z(qubits[2]), cirq.Z(qubits[0]) * cirq.Z(qubits[1]), cirq.Z(qubits[0]) * cirq.Z(qubits[2]), cirq.Z(qubits[1]) * cirq.Z(qubits[2])]
+    for t_op, r_op in zip(test_ops, ref_ops):
+      self.assertEqual(t_op, cirq.PauliSum.from_pauli_strings(r_op))
+
+  def test_operator_expectation_from_components(self):
+    """Confirm the expectations combine to the correct total energy."""
+    pass
+
   def test_sampler(self):
     """Confirm bitstrings are sampled as expected."""
     # Single bit test.
