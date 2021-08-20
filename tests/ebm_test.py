@@ -300,8 +300,8 @@ class KOBETest(tf.test.TestCase):
     ref_indices = [[0], [1], [2], [0, 1], [0, 2], [1, 2]]
     self.assertAllClose(test_k._indices, ref_indices)
     self.assertAllClose(test_k._variables, [init_const] * sum(
-      len(list(itertools.combinations(range(num_bits), i)))
-      for i in range(1, self.order + 1)))
+        len(list(itertools.combinations(range(num_bits), i)))
+        for i in range(1, self.order + 1)))
 
   def test_copy(self):
     """Test that the copy has the same values, but new variables."""
@@ -335,7 +335,14 @@ class KOBETest(tf.test.TestCase):
     test_k = ebm.KOBE(num_bits, self.order)
     qubits = cirq.GridQubit.rect(1, num_bits)
     test_ops = test_k.operators(qubits)
-    ref_ops = [cirq.Z(qubits[0]), cirq.Z(qubits[1]), cirq.Z(qubits[2]), cirq.Z(qubits[0]) * cirq.Z(qubits[1]), cirq.Z(qubits[0]) * cirq.Z(qubits[2]), cirq.Z(qubits[1]) * cirq.Z(qubits[2])]
+    ref_ops = [
+        cirq.Z(qubits[0]),
+        cirq.Z(qubits[1]),
+        cirq.Z(qubits[2]),
+        cirq.Z(qubits[0]) * cirq.Z(qubits[1]),
+        cirq.Z(qubits[0]) * cirq.Z(qubits[2]),
+        cirq.Z(qubits[1]) * cirq.Z(qubits[2])
+    ]
     for t_op, r_op in zip(test_ops, ref_ops):
       self.assertEqual(t_op, cirq.PauliSum.from_pauli_strings(r_op))
 
@@ -397,7 +404,10 @@ class KOBETest(tf.test.TestCase):
 
     # Three bit tests.
     # First a uniform sampling test.
-    test_k = ebm.EBM(ebm.KOBE(3, self.order, tf.keras.initializers.Constant(0.0)), None, analytic=True)
+    test_k = ebm.EBM(
+        ebm.KOBE(3, self.order, tf.keras.initializers.Constant(0.0)),
+        None,
+        analytic=True)
     num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
     bitstrings, counts = test_k.sample(num_bitstrings)
 

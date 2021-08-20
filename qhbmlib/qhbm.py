@@ -45,7 +45,7 @@ class QHBM(tf.keras.Model):
   @property
   def operators(self):
     return self._operators
-  
+
   @property
   def raw_qubits(self):
     return self.qnn.raw_qubits
