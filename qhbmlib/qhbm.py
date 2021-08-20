@@ -32,6 +32,8 @@ class QHBM(tf.keras.Model):
     super().__init__(name=name)
     self._ebm = ebm
     self._qnn = qnn
+    self._operator_shards = tfq.convert_to_tensor(
+        ebm.operator_shards(qnn.raw_qubits))
 
   @property
   def ebm(self):
@@ -42,6 +44,10 @@ class QHBM(tf.keras.Model):
     return self._qnn
 
   @property
+  def operator_shards(self):
+    return self._operator_shards
+
+  @property
   def raw_qubits(self):
     return self.qnn.raw_qubits
 
@@ -50,8 +56,8 @@ class QHBM(tf.keras.Model):
     return self.qnn.qubits
 
   @property
-  def analytic(self):
-    return self.ebm.analytic and self.qnn.analytic
+  def is_analytic(self):
+    return self.ebm.is_analytic and self.qnn.is_analytic
 
   def copy(self):
     return QHBM(self.ebm.copy(), self.qnn.copy(), name=self.name)

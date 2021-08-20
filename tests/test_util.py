@@ -52,55 +52,6 @@ def get_random_qhbm(
   return test_qhbm
 
 
-def get_ebm_functions(num_bits):
-  """EBM functions to use in a test QHBM.
-
-    The test EBM will be a simple case where the parameters are bias energies
-    for uncoupled bits.
-
-    Args:
-      num_bits: number of bits on which this EBM is defined.
-
-    Returns:
-      tuple of functions required as input args for analytic QHBMs.
-    """
-
-  def energy(thetas, bitstring):
-    """Computes the energy of a bitstring."""
-    spins = tf.subtract(
-        tf.ones(num_bits, dtype=tf.int8),
-        tf.constant(2, dtype=tf.int8) * tf.cast(bitstring, tf.int8),
-    )
-    return tf.reduce_sum(tf.cast(spins, tf.float32) * thetas)
-
-  def sampler(thetas, num_samples):
-    r"""Fairly samples from the EBM defined by `energy`.
-
-        For Bernoulli distribution, we let $p$ be the probability of being `1`
-        bit.
-        In this case, $p = \frac{e^{theta}}{{e^{theta}+e^{-theta}}}$.
-        Therefore, each independent logit is:
-          $logit = \log\frac{p}{1-p} = \log\frac{e^{theta}}{e^{-theta}}
-                 = \log{e^{2*theta}} = 2*theta$
-
-        Args:
-          thetas: a `tf.Tensor` of dtype `tf.float32` representing classical
-            model parameters for classical energies. `tf.shape(thetas)[0] ==
-            num_bits`.
-          num_samples: a `tf.Tensor` of dtype `tf.int32` representing the number
-            of samples from given Bernoulli distribition.
-
-        Returns:
-          a `tf.Tensor` in the shape of [num_samples, num_bits] of `tf.int8`
-          with
-          bitstrings sampled from the classical distribution.
-        """
-    return tfp.distributions.Bernoulli(
-        logits=2 * thetas, dtype=tf.int8).sample(num_samples)
-
-  return energy, sampler
-
-
 def get_random_pauli_sum(qubits):
   """Test fixture.
 

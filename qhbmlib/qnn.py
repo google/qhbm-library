@@ -100,7 +100,7 @@ class QNN(tf.keras.Model):
       initializer=tf.keras.initializers.RandomUniform(0, 2 * np.pi),
       backend='noiseless',
       differentiator=None,
-      analytic=False,
+      is_analytic=False,
       name=None,
   ):
     """Initialize a QNN.
@@ -116,7 +116,7 @@ class QNN(tf.keras.Model):
         object to use instead, which must inherit `cirq.Sampler`.
       differentiator: Either None or a `tfq.differentiators.Differentiator`,
         which specifies how to take the derivative of a quantum circuit.
-      analytic: bool flag that enables analytic methods. If True, then backend
+      is_analytic: bool flag that enables is_analytic methods. If True, then backend
         must also be 'noiseless'.
       name: Identifier for this QNN.
     """
@@ -141,16 +141,16 @@ class QNN(tf.keras.Model):
     self._sample_layer = tfq.layers.Sample(backend=backend)
     if backend == 'noiseless' or backend is None:
       self._backend = 'noiseless'
-      self._analytic = analytic
+      self._is_analytic = is_analytic
       self._expectation_layer = tfq.layers.Expectation(
           backend=backend, differentiator=differentiator)
     else:
       self._backend = backend
-      self._analytic = False
+      self._is_analytic = False
       self._expectation_layer = tfq.layers.SampledExpectation(
           backend=backend, differentiator=differentiator)
 
-    if self.analytic:
+    if self.is_analytic:
       self._unitary_layer = tfq.layers.Unitary()
 
   @property
@@ -178,8 +178,8 @@ class QNN(tf.keras.Model):
     return self._differentiator
 
   @property
-  def analytic(self):
-    return self._analytic
+  def is_analytic(self):
+    return self._is_analytic
 
   def copy(self):
     qnn = QNN(
@@ -187,7 +187,7 @@ class QNN(tf.keras.Model):
         [sympy.Symbol(s.decode("utf-8")) for s in self.symbols.numpy()],
         backend=self.backend,
         differentiator=self.differentiator,
-        analytic=self.analytic,
+        is_analytic=self.is_analytic,
         name=self.name)
     qnn._values.assign(self._values)
     return qnn
@@ -207,7 +207,7 @@ class QNN(tf.keras.Model):
     """General function for taking sampled expectations from circuits.
 
     `counts[i]` sets the weight of `circuits[i]` in the expectation.
-    Additionally, if `self.analytic` is false, `counts[i]` samples are drawn
+    Additionally, if `self.is_analytic` is false, `counts[i]` samples are drawn
     from `circuits[i]` and used to compute each expectation in `operators`.
     """
     num_circuits = tf.shape(circuits)[0]
@@ -377,6 +377,6 @@ class QNN(tf.keras.Model):
 
   @tf.function
   def pqc_unitary(self):
-    if self.analytic:
+    if self.is_analytic:
       return self._unitary_layer(self.pqc()).to_tensor()[0]
     raise NotImplementedError()
