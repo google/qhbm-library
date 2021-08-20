@@ -38,17 +38,17 @@ class EnergyFunction(tf.keras.Model, abc.ABC):
     raise NotImplementedError()
 
   @property
-  def has_operators(self):
+  def has_operator(self):
     return False
 
   @abc.abstractmethod
   def energy(self, bitstrings):
     raise NotImplementedError()
 
-  def operators(self, qubits):
+  def operator_shards(self, qubits):
     raise NotImplementedError()
 
-  def operator_expectation_from_components(self, expectations):
+  def operator_expectation(self, expectations):
     raise NotImplementedError()
 
 
@@ -78,7 +78,7 @@ class KOBE(EnergyFunction):
     return self._num_bits
 
   @property
-  def has_operators(self):
+  def has_operator(self):
     return True
 
   @property
@@ -100,7 +100,7 @@ class KOBE(EnergyFunction):
       parities_t = tf.tensor_scatter_nd_update(parities_t, [[i]], [parity])
     return tf.reduce_sum(tf.transpose(parities_t) * self._variables, -1)
 
-  def operators(self, qubits):
+  def operator_shards(self, qubits):
     ops = []
     for i in range(self._num_variables):
       string_factors = []
@@ -110,7 +110,7 @@ class KOBE(EnergyFunction):
       ops.append(cirq.PauliSum.from_pauli_strings(string))
     return ops
 
-  def operator_expectation_from_components(self, expectations):
+  def operator_expectation(self, expectations):
     return tf.reduce_sum(expectations * self._variables)
 
 
@@ -539,13 +539,13 @@ class EBM(tf.keras.Model):
   def __init__(self,
                energy_function,
                energy_sampler,
-               analytic=False,
+               is_analytic=False,
                name=None):
     super().__init__(name=name)
     self._energy_function = energy_function
     self._energy_sampler = energy_sampler
-    self._analytic = analytic
-    if analytic:
+    self._is_analytic = is_analytic
+    if is_analytic:
       self._all_bitstrings = tf.constant(
           list(itertools.product([0, 1], repeat=energy_function.num_bits)),
           dtype=tf.int8)
@@ -555,35 +555,34 @@ class EBM(tf.keras.Model):
     return self._energy_function.num_bits
 
   @property
-  def has_operators(self):
-    return self._energy_function.has_operators
+  def has_operator(self):
+    return self._energy_function.has_operator
 
   @property
-  def analytic(self):
-    return self._analytic
+  def is_analytic(self):
+    return self._is_analytic
 
   def copy(self):
     energy_sampler = self._energy_sampler.copy()
     return EBM(
         energy_sampler.energy_function,
         energy_sampler,
-        analytic=self.analytic,
+        is_analytic=self.is_analytic,
         name=self.name)
 
   @tf.function
   def energy(self, bitstrings):
     return self._energy_function.energy(bitstrings)
 
-  def operator_expectation_from_components(self, expectations):
-    return self._energy_function.operator_expectation_from_components(
-        expectations)
+  def operator_expectation(self, expectations):
+    return self._energy_function.operator_expectation(expectations)
 
-  def operators(self, qubits):
-    return self._energy_function.operators(qubits)
+  def operator_shards(self, qubits):
+    return self._energy_function.operator_shards(qubits)
 
   @tf.function
   def sample(self, num_samples, unique=True):
-    if self.analytic and self._energy_sampler is None:
+    if self.is_analytic and self._energy_sampler is None:
       samples = tf.gather(
           self._all_bitstrings,
           tfp.distributions.Categorical(logits=-1 *
@@ -596,26 +595,26 @@ class EBM(tf.keras.Model):
 
   @tf.function
   def energies(self):
-    if self.analytic:
+    if self.is_analytic:
       return self.energy(self._all_bitstrings)
     raise NotImplementedError()
 
   @tf.function
   def probabilities(self):
-    if self.analytic:
+    if self.is_analytic:
       return tf.exp(-self.ebm.energies()) / tf.exp(
           self.log_partition_function())
     raise NotImplementedError()
 
   @tf.function
   def log_partition_function(self):
-    if self.analytic:
+    if self.is_analytic:
       return tf.reduce_logsumexp(-1 * self.energies())
     raise NotImplementedError()
 
   @tf.function
   def entropy(self):
-    if self.analytic:
+    if self.is_analytic:
       return tfp.distributions.Categorical(logits=-1 *
                                            self.energies()).entropy()
     raise NotImplementedError()
@@ -626,7 +625,7 @@ class Bernoulli(EBM):
   def __init__(self,
                num_bits,
                initializer=tf.keras.initializers.RandomUniform(),
-               analytic=False,
+               is_analytic=False,
                name=None):
     tf.keras.Model.__init__(self, name=name)
     self._num_bits = num_bits
@@ -634,8 +633,8 @@ class Bernoulli(EBM):
         name=f'{self.name}_variables',
         shape=[self.num_bits],
         initializer=initializer)
-    self._analytic = analytic
-    if analytic:
+    self._is_analytic = is_analytic
+    if is_analytic:
       self._all_bitstrings = tf.constant(
           list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
 
@@ -644,12 +643,12 @@ class Bernoulli(EBM):
     return self._num_bits
 
   @property
-  def has_operators(self):
+  def has_operator(self):
     return True
 
   @property
-  def analytic(self):
-    return self._analytic
+  def is_analytic(self):
+    return self._is_analytic
 
   def copy(self):
     bernoulli = Bernoulli(self.num_bits, name=self.name)
@@ -661,13 +660,13 @@ class Bernoulli(EBM):
     return tf.reduce_sum(
         tf.cast(1 - 2 * bitstrings, tf.float32) * self._variables, -1)
 
-  def operators(self, qubits):
+  def operator_shards(self, qubits):
     return [
         cirq.PauliSum.from_pauli_strings(cirq.Z(qubits[i]))
         for i in range(self.num_bits)
     ]
 
-  def operator_expectation_from_components(self, expectations):
+  def operator_expectation(self, expectations):
     return tf.reduce_sum(expectations * self._variables)
 
   @tf.function
@@ -688,19 +687,19 @@ class Bernoulli(EBM):
 
   @tf.function
   def energies(self):
-    if self.analytic:
+    if self.is_analytic:
       return self.energy(self._all_bitstrings)
     raise NotImplementedError()
 
   @tf.function
   def probabilities(self):
-    if self.analytic:
+    if self.is_analytic:
       return tf.exp(-self.energies()) / tf.exp(self.log_partition_function())
     raise NotImplementedError()
 
   @tf.function
   def log_partition_function(self):
-    if self.analytic:
+    if self.is_analytic:
       return tf.reduce_logsumexp(-1 * self.energies())
     raise NotImplementedError()
 

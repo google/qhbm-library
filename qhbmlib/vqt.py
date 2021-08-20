@@ -28,7 +28,7 @@ def vqt(qhbm, num_samples, hamiltonian, beta):
         tf.reduce_sum(counts), tf.float32)
     expectation = tf.squeeze(
         qhbm.qnn.expectation(bitstrings, counts, hamiltonian))
-    if qhbm.analytic:
+    if qhbm.is_analytic:
       entropy = qhbm.entropy()
     else:
       entropy = -tf.reduce_sum(probs * tf.math.log(probs))

@@ -108,8 +108,8 @@ class BernoulliTest(tf.test.TestCase):
     test_b = ebm.Bernoulli(self.num_bits,
                            tf.keras.initializers.Constant(init_const))
     self.assertAllEqual(test_b.num_bits, self.num_bits)
-    self.assertTrue(test_b.has_operators)
-    self.assertFalse(test_b.analytic)
+    self.assertTrue(test_b.has_operator)
+    self.assertFalse(test_b.is_analytic)
     self.assertAllEqual(test_b._variables, [init_const] * self.num_bits)
 
   def test_copy(self):
@@ -117,8 +117,8 @@ class BernoulliTest(tf.test.TestCase):
     test_b = ebm.Bernoulli(self.num_bits)
     test_b_copy = test_b.copy()
     self.assertAllEqual(test_b_copy.num_bits, test_b.num_bits)
-    self.assertEqual(test_b_copy.has_operators, test_b.has_operators)
-    self.assertEqual(test_b_copy.analytic, test_b.analytic)
+    self.assertEqual(test_b_copy.has_operator, test_b.has_operator)
+    self.assertEqual(test_b_copy.is_analytic, test_b.is_analytic)
     self.assertAllEqual(test_b_copy._variables, test_b._variables)
     self.assertNotEqual(id(test_b_copy._variables), id(test_b._variables))
 
@@ -153,15 +153,15 @@ class BernoulliTest(tf.test.TestCase):
     self.assertAllClose(test_energy, ref_energy)
     self.assertAllClose(test_energy_grad, test_spins)
 
-  def test_operators(self):
+  def test_operator_shards(self):
     """Confirm operators are single qubit Z only."""
     test_b = ebm.Bernoulli(self.num_bits)
     qubits = cirq.GridQubit.rect(1, self.num_bits)
-    test_ops = test_b.operators(qubits)
+    test_ops = test_b.operator_shards(qubits)
     for i, q in enumerate(qubits):
       self.assertEqual(test_ops[i], cirq.PauliSum.from_pauli_strings(cirq.Z(q)))
 
-  def test_operator_expectation_from_components(self):
+  def test_operator_expectation(self):
     """Test combining expectations of operators in energy."""
     # Build Bernoulli
     num_bits = 3
@@ -169,7 +169,7 @@ class BernoulliTest(tf.test.TestCase):
     qubits = cirq.GridQubit.rect(1, num_bits)
     # Pin at bitstring [1, 0, 1]
     test_b._variables.assign(tf.constant([1000.0, -1000.0, 1000.0]))
-    operators = test_b.operators(qubits)
+    operators = test_b.operator_shards(qubits)
 
     # True energy
     bitstring = tf.constant([[0, 0, 1]])  # not the pinned bitstring
@@ -186,7 +186,7 @@ class BernoulliTest(tf.test.TestCase):
     for op in operators:
       op_expectations.append(
           op.expectation_from_state_vector(output_state_vector, qubit_map).real)
-    test_energy = test_b.operator_expectation_from_components(op_expectations)
+    test_energy = test_b.operator_expectation(op_expectations)
     self.assertAllClose(test_energy, ref_energy, atol=1e-4)
 
   def test_sampler_bernoulli(self):
@@ -295,7 +295,7 @@ class KOBETest(tf.test.TestCase):
                       tf.keras.initializers.Constant(init_const))
     self.assertEqual(test_k.num_bits, num_bits)
     self.assertEqual(test_k.order, self.order)
-    self.assertTrue(test_k.has_operators)
+    self.assertTrue(test_k.has_operator)
 
     ref_indices = [[0], [1], [2], [0, 1], [0, 2], [1, 2]]
     self.assertAllClose(test_k._indices, ref_indices)
@@ -312,7 +312,7 @@ class KOBETest(tf.test.TestCase):
     test_k_copy = test_k.copy()
     self.assertEqual(test_k_copy.num_bits, test_k.num_bits)
     self.assertEqual(test_k_copy.order, test_k.order)
-    self.assertTrue(test_k_copy.has_operators, test_k.has_operators)
+    self.assertTrue(test_k_copy.has_operator, test_k.has_operator)
     self.assertAllClose(test_k_copy._indices, test_k._indices)
     self.assertAllClose(test_k_copy._variables, test_k._variables)
     self.assertNotEqual(id(test_k_copy._variables), id(test_k._variables))
@@ -329,12 +329,12 @@ class KOBETest(tf.test.TestCase):
     test_energies = test_k.energy(all_strings)
     self.assertAllClose(expected_energies, test_energies)
 
-  def test_operators(self):
+  def test_operator_shards(self):
     """Confirm correct operators for a simple Boltzmann."""
     num_bits = 3
     test_k = ebm.KOBE(num_bits, self.order)
     qubits = cirq.GridQubit.rect(1, num_bits)
-    test_ops = test_k.operators(qubits)
+    test_ops = test_k.operator_shards(qubits)
     ref_ops = [
         cirq.Z(qubits[0]),
         cirq.Z(qubits[1]),
@@ -346,7 +346,7 @@ class KOBETest(tf.test.TestCase):
     for t_op, r_op in zip(test_ops, ref_ops):
       self.assertEqual(t_op, cirq.PauliSum.from_pauli_strings(r_op))
 
-  def test_operator_expectation_from_components(self):
+  def test_operator_expectation(self):
     """Confirm the expectations combine to the correct total energy."""
     # Build simple Boltzmann
     num_bits = 3
@@ -355,7 +355,7 @@ class KOBETest(tf.test.TestCase):
 
     # Pin at bitstring [1, 0, 1]
     test_b._variables.assign(tf.constant([100.0, -200.0, 300.0, 10, -20, 30]))
-    operators = test_b.operators(qubits)
+    operators = test_b.operator_shards(qubits)
 
     # True energy
     bitstring = tf.constant([[0, 0, 1]])  # not the pinned bitstring
@@ -372,13 +372,13 @@ class KOBETest(tf.test.TestCase):
     for op in operators:
       op_expectations.append(
           op.expectation_from_state_vector(output_state_vector, qubit_map).real)
-    test_energy = test_b.operator_expectation_from_components(op_expectations)
+    test_energy = test_b.operator_expectation(op_expectations)
     self.assertAllClose(test_energy, ref_energy, atol=1e-4)
 
   def test_sampler(self):
     """Confirm bitstrings are sampled as expected."""
     # Single bit test.
-    test_k = ebm.EBM(ebm.KOBE(1, self.order), None, analytic=True)
+    test_k = ebm.EBM(ebm.KOBE(1, self.order), None, is_analytic=True)
     # For single factor Bernoulli, theta=0 is 50% chance of 1.
     test_thetas = tf.constant([0.0])
     test_k._energy_function._variables.assign(test_thetas)
@@ -407,7 +407,7 @@ class KOBETest(tf.test.TestCase):
     test_k = ebm.EBM(
         ebm.KOBE(3, self.order, tf.keras.initializers.Constant(0.0)),
         None,
-        analytic=True)
+        is_analytic=True)
     num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
     bitstrings, counts = test_k.sample(num_bitstrings)
 
@@ -484,7 +484,7 @@ class KOBETest(tf.test.TestCase):
     expected_log_partition = tf.math.log(tf.constant(3641.8353))
     pre_k = ebm.KOBE(2, 2)
     pre_k._variables.assign(test_thetas)
-    test_k = ebm.EBM(pre_k, None, analytic=True)
+    test_k = ebm.EBM(pre_k, None, is_analytic=True)
     test_log_partition = test_k.log_partition_function()
     self.assertAllClose(expected_log_partition, test_log_partition)
 
@@ -494,7 +494,7 @@ class KOBETest(tf.test.TestCase):
     expected_entropy = tf.constant(0.00233551808)
     pre_k = ebm.KOBE(2, 2)
     pre_k._variables.assign(test_thetas)
-    test_k = ebm.EBM(pre_k, None, analytic=True)
+    test_k = ebm.EBM(pre_k, None, is_analytic=True)
     test_entropy = test_k.entropy()
     self.assertAllClose(expected_entropy, test_entropy)
 

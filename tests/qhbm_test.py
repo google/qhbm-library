@@ -36,10 +36,10 @@ class QHBMTest(tf.test.TestCase):
   raw_phis_symbols = [sympy.Symbol("s0"), sympy.Symbol("s1")]
   phis_symbols = tf.constant([str(s) for s in raw_phis_symbols])
   raw_qubits = cirq.GridQubit.rect(1, num_bits)
-  operators = [
+  operators = tfq.convert_to_tensor([
       cirq.PauliSum.from_pauli_strings(s)
       for s in [cirq.Z(q) for q in raw_qubits]
-  ]
+  ])
   u = cirq.Circuit()
   for s in raw_phis_symbols:
     for q in raw_qubits:
@@ -55,7 +55,7 @@ class QHBMTest(tf.test.TestCase):
     test_qhbm = qhbm.QHBM(test_ebm, test_qnn, self.name)
     self.assertEqual(self.name, test_qhbm.name)
     self.assertEqual(test_ebm, test_qhbm.ebm)
-    self.assertEqual(test_qhbm.operators, self.operators)
+    self.assertAllEqual(test_qhbm.operator_shards, self.operators)
     self.assertAllEqual(self.phis_symbols, test_qhbm.qnn.symbols)
     self.assertAllEqual(
         tfq.from_tensor(tfq.convert_to_tensor([self.u])),
@@ -93,11 +93,11 @@ class QHBMTest(tf.test.TestCase):
         tfq.from_tensor(qhbm_copy.qnn._bit_circuit))
 
 
-def get_basic_qhbm(analytic=False):
+def get_basic_qhbm(is_analytic=False):
   """Returns a basic QHBM for testing."""
   num_bits = 3
   initial_thetas = 0.5 * tf.constant([-23, 0, 17], dtype=tf.float32)
-  test_ebm = ebm.Bernoulli(num_bits, analytic=analytic)
+  test_ebm = ebm.Bernoulli(num_bits, is_analytic=is_analytic)
   test_ebm._variables.assign(initial_thetas)
   initial_phis = tf.constant([1.2, -2.5])
   phis_symbols = [sympy.Symbol(s) for s in ["s_static_0", "s_static_1"]]
@@ -106,7 +106,7 @@ def get_basic_qhbm(analytic=False):
   for s in phis_symbols:
     for q in qubits:
       u += cirq.X(q)**s
-  test_qnn = qnn.QNN(u, phis_symbols, analytic=analytic)
+  test_qnn = qnn.QNN(u, phis_symbols, is_analytic=is_analytic)
   test_qnn._values.assign(initial_phis)
   name = "static_qhbm"
   return qhbm.QHBM(test_ebm, test_qnn, name=name)
@@ -201,7 +201,7 @@ class QHBMBasicFunctionTest(tf.test.TestCase):
 
 def get_exact_qhbm():
   """Returns a basic ExactQHBM for testing."""
-  return get_basic_qhbm(analytic=True)
+  return get_basic_qhbm(is_analytic=True)
 
 
 class ExactQHBMBasicFunctionTest(tf.test.TestCase):
@@ -315,12 +315,12 @@ class ExactQHBMBasicFunctionTest(tf.test.TestCase):
     """Confirms the density matrix represented by the QHBM is correct."""
     # Check density matrix of Bell state.
     n_bits = 2
-    test_ebm = ebm.Bernoulli(n_bits, analytic=True)
+    test_ebm = ebm.Bernoulli(n_bits, is_analytic=True)
     test_ebm._variables.assign(tf.constant([-10, -10],
                                            dtype=tf.float32))  # pin at |00>
     qubits = cirq.GridQubit.rect(1, n_bits)
     test_u = cirq.Circuit([cirq.H(qubits[0]), cirq.CNOT(qubits[0], qubits[1])])
-    test_qnn = qnn.QNN(test_u, [], analytic=True)
+    test_qnn = qnn.QNN(test_u, [], is_analytic=True)
     test_qhbm = qhbm.QHBM(test_ebm, test_qnn, name="bell")
     expected_dm = tf.constant(
         [[0.5, 0, 0, 0.5], [0, 0, 0, 0], [0, 0, 0, 0], [0.5, 0, 0, 0.5]],
