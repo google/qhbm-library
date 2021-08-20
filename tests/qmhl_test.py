@@ -19,6 +19,7 @@ from qhbmlib import qmhl
 import tensorflow as tf
 from tests import test_util
 
+
 class QMHLExactLossTest(tf.test.TestCase):
   """Tests for the QMHL loss and gradients."""
 
@@ -26,8 +27,8 @@ class QMHLExactLossTest(tf.test.TestCase):
     """Confirm correct gradients and loss at the optimal settings."""
     for num_qubits in [1, 2, 3, 4, 5]:
       qubits = cirq.GridQubit.rect(1, num_qubits)
-      target = test_util.get_random_qhbm(
-          qubits, 1, "QMHLLossTest{}".format(num_qubits))
+      target = test_util.get_random_qhbm(qubits, 1,
+                                         "QMHLLossTest{}".format(num_qubits))
       model = target.copy()
 
       # Get the QMHL loss gradients
@@ -38,8 +39,10 @@ class QMHLExactLossTest(tf.test.TestCase):
         loss = qmhl.qmhl_loss(model, target_circuits, target_counts)
       thetas_grads, phis_grads = tape.gradient(loss, (model.thetas, model.phis))
       self.assertAllClose(loss, target.ebm.entropy(), atol=2e-3)
-      self.assertAllClose(thetas_grads, tf.zeros(tf.shape(thetas_grads)), atol=1e-3)
+      self.assertAllClose(
+          thetas_grads, tf.zeros(tf.shape(thetas_grads)), atol=1e-3)
       self.assertAllClose(phis_grads, tf.zeros(tf.shape(phis_grads)), atol=1e-3)
+
 
 if __name__ == "__main__":
   print("Running qmhl_test.py ...")

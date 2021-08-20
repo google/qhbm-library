@@ -656,7 +656,8 @@ class Bernoulli(EBM):
     return self._is_analytic
 
   def copy(self):
-    bernoulli = Bernoulli(self.num_bits, is_analytic=self.is_analytic, name=self.name)
+    bernoulli = Bernoulli(
+        self.num_bits, is_analytic=self.is_analytic, name=self.name)
     bernoulli._variables.assign(self._variables)
     return bernoulli
 

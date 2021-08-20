@@ -20,8 +20,8 @@ import tensorflow_quantum as tfq
 from qhbmlib import qhbm, ebm
 
 
-def qmhl_loss(
-    model: qhbm.QHBM, target_circuits: tf.Tensor, target_counts: tf.Tensor):
+def qmhl_loss(model: qhbm.QHBM, target_circuits: tf.Tensor,
+              target_counts: tf.Tensor):
   """Calculate the QMHL loss of the model against the target.
 
     This loss is differentiable with respect to the trainable variables of the model.
@@ -38,7 +38,7 @@ def qmhl_loss(
       loss: Quantum cross entropy between the target and model.
     """
   print(f"retracing: qmhl_loss on {model.name}")
-  
+
   @tf.custom_gradient
   def call(thetas, phis, target_circuits, target_counts):
     # log_partition estimate
@@ -50,25 +50,32 @@ def qmhl_loss(
       log_partition = tf.math.reduce_logsumexp(-1 * energies)
 
     # pulled back expectation of energy operator
-    ragged_samples_pb  = model.qnn.pulled_back_sample(target_circuits, target_counts)
+    ragged_samples_pb = model.qnn.pulled_back_sample(target_circuits,
+                                                     target_counts)
     all_samples_pb = ragged_samples_pb.values.to_tensor()
     samples_pb, counts_pb = ebm.unique_bitstrings_with_counts(all_samples_pb)
     energies = model.ebm.energy(samples_pb)
-    probs_pb = tf.cast(counts_pb, tf.float32) / tf.cast(tf.reduce_sum(counts_pb), tf.float32)
+    probs_pb = tf.cast(counts_pb, tf.float32) / tf.cast(
+        tf.reduce_sum(counts_pb), tf.float32)
     weighted_energies = energies * probs_pb
     avg_energy = tf.reduce_sum(weighted_energies)
-    
+
     forward_pass_vals = avg_energy + log_partition
-    
+
     def gradient(grad):
       """Gradients are computed using estimators from the QHBM paper."""
       # Thetas derivative.
-      qnn_ragged_samples_pb  = model.qnn.pulled_back_sample(target_circuits, target_counts)
+      qnn_ragged_samples_pb = model.qnn.pulled_back_sample(
+          target_circuits, target_counts)
       qnn_all_samples_pb = qnn_ragged_samples_pb.values.to_tensor()
-      qnn_bitstrings, qnn_counts = ebm.unique_bitstrings_with_counts(all_samples_pb)
-      qnn_probs = tf.cast(qnn_counts, tf.float32) / tf.cast(tf.reduce_sum(qnn_counts), tf.float32)
-      ebm_bitstrings, ebm_counts = model.ebm.sample(tf.reduce_sum(target_counts))
-      ebm_probs = tf.cast(ebm_counts, tf.float32) / tf.cast(tf.reduce_sum(ebm_counts), tf.float32)
+      qnn_bitstrings, qnn_counts = ebm.unique_bitstrings_with_counts(
+          all_samples_pb)
+      qnn_probs = tf.cast(qnn_counts, tf.float32) / tf.cast(
+          tf.reduce_sum(qnn_counts), tf.float32)
+      ebm_bitstrings, ebm_counts = model.ebm.sample(
+          tf.reduce_sum(target_counts))
+      ebm_probs = tf.cast(ebm_counts, tf.float32) / tf.cast(
+          tf.reduce_sum(ebm_counts), tf.float32)
       with tf.GradientTape() as tape:
         qnn_energies = model.ebm.energy(qnn_bitstrings)
       # jacobian is a list over thetas, with ith entry a tensor of shape
@@ -87,12 +94,15 @@ def qmhl_loss(
         model_operators = model.operator_shards
         with tf.GradientTape() as tape:
           pulled_back_energy_shards = model.qnn.pulled_back_expectation(
-            target_circuits, target_counts, model_operators)
-          pulled_back_energy = model.ebm.operator_expectation(pulled_back_energy_shards)
+              target_circuits, target_counts, model_operators)
+          pulled_back_energy = model.ebm.operator_expectation(
+              pulled_back_energy_shards)
         phis_grad = tape.gradient(pulled_back_energy, phis)
       else:
         raise NotImplementedError(
-          "Derivative when EBM has no operator is not yet supported.")
+            "Derivative when EBM has no operator is not yet supported.")
       return grad * thetas_grad, grad * phis_grad, None, None
+
     return forward_pass_vals, gradient
+
   return call(model.thetas, model.phis, target_circuits, target_counts)
