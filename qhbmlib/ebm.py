@@ -45,7 +45,10 @@ class EnergyFunction(tf.keras.Model, abc.ABC):
   def energy(self, bitstrings):
     raise NotImplementedError()
 
-  def operator(self, qubits):
+  def operator_shards(self, qubits):
+    raise NotImplementedError()
+
+  def operator_expectation(self, expectations):
     raise NotImplementedError()
 
 
@@ -59,14 +62,15 @@ class KOBE(EnergyFunction):
     super().__init__(name=name)
     self._num_bits = num_bits
     self._order = order
-    self._indices = []
+    indices_list = []
     for i in range(1, order + 1):
-      combos = itertools.combinations(range(order), i)
-      self._indices.extend([tf.constant(c) for c in combos])
-    self._indices = tf.ragged.stack(self._indices)
+      combos = itertools.combinations(range(num_bits), i)
+      indices_list.extend([c for c in combos])
+    self._indices = tf.ragged.stack(indices_list)
+    self._num_variables = tf.constant(len(indices_list))
     self._variables = self.add_weight(
         name=f'{self.name}_variables',
-        shape=[self._indices.nrows()],
+        shape=[self._num_variables],
         initializer=initializer)
 
   @property
@@ -90,20 +94,24 @@ class KOBE(EnergyFunction):
   def energy(self, bitstrings):
     spins = 1 - 2 * bitstrings
     parities_t = tf.zeros(
-        [self._indices.nrows(), tf.shape(bitstrings)[0]], dtype=tf.float32)
-    for i in tf.range(self._indices.nrows()):
+        [self._num_variables, tf.shape(bitstrings)[0]], dtype=tf.float32)
+    for i in tf.range(self._num_variables):
       parity = tf.reduce_prod(tf.gather(spins, self._indices[i], axis=-1), -1)
       parities_t = tf.tensor_scatter_nd_update(parities_t, [[i]], [parity])
     return tf.reduce_sum(tf.transpose(parities_t) * self._variables, -1)
 
-  def operator(self, qubits):
-    return tfq.convert_to_tensor([
-        cirq.PauliSum.from_pauli_strings(
-            float(self._variables[i].numpy()) * cirq.PauliString(
-                cirq.Z(qubits[self._indices[i][j]])
-                for j in range(tf.shape(self._indices[i])[0]))
-            for i in range(self._indices.nrows()))
-    ])
+  def operator_shards(self, qubits):
+    ops = []
+    for i in range(self._num_variables):
+      string_factors = []
+      for loc in self._indices[i]:
+        string_factors.append(cirq.Z(qubits[loc]))
+      string = cirq.PauliString(string_factors)
+      ops.append(cirq.PauliSum.from_pauli_strings(string))
+    return ops
+
+  def operator_expectation(self, expectations):
+    return tf.reduce_sum(expectations * self._variables)
 
 
 class MLP(EnergyFunction):
@@ -531,13 +539,13 @@ class EBM(tf.keras.Model):
   def __init__(self,
                energy_function,
                energy_sampler,
-               analytic=False,
+               is_analytic=False,
                name=None):
     super().__init__(name=name)
     self._energy_function = energy_function
     self._energy_sampler = energy_sampler
-    self._analytic = analytic
-    if analytic:
+    self._is_analytic = is_analytic
+    if is_analytic:
       self._all_bitstrings = tf.constant(
           list(itertools.product([0, 1], repeat=energy_function.num_bits)),
           dtype=tf.int8)
@@ -551,8 +559,8 @@ class EBM(tf.keras.Model):
     return self._energy_function.has_operator
 
   @property
-  def analytic(self):
-    return self._analytic
+  def is_analytic(self):
+    return self._is_analytic
 
   def copy(self):
     if self._energy_sampler is not None:
@@ -564,47 +572,54 @@ class EBM(tf.keras.Model):
     return EBM(
         energy_function,
         energy_sampler,
-        analytic=self.analytic,
+        is_analytic=self.is_analytic,
         name=self.name)
 
   @tf.function
   def energy(self, bitstrings):
     return self._energy_function.energy(bitstrings)
 
-  def operator(self, qubits):
-    return self._energy_function.operator(qubits)
+  def operator_expectation(self, expectations):
+    return self._energy_function.operator_expectation(expectations)
+
+  def operator_shards(self, qubits):
+    return self._energy_function.operator_shards(qubits)
 
   @tf.function
   def sample(self, num_samples, unique=True):
-    if self.analytic and self._energy_sampler is None:
-      return tf.gather(
+    if self.is_analytic and self._energy_sampler is None:
+      samples = tf.gather(
           self._all_bitstrings,
           tfp.distributions.Categorical(logits=-1 *
                                         self.energies()).sample(num_samples))
-    return self._energy_sampler.sample(num_samples, unique=unique)
+      if unique:
+        return unique_bitstrings_with_counts(samples)
+      return samples
+    else:
+      return self._energy_sampler.sample(num_samples, unique=unique)
 
   @tf.function
   def energies(self):
-    if self.analytic:
+    if self.is_analytic:
       return self.energy(self._all_bitstrings)
     raise NotImplementedError()
 
   @tf.function
   def probabilities(self):
-    if self.analytic:
+    if self.is_analytic:
       return tf.exp(-self.ebm.energies()) / tf.exp(
           self.log_partition_function())
     raise NotImplementedError()
 
   @tf.function
   def log_partition_function(self):
-    if self.analytic:
+    if self.is_analytic:
       return tf.reduce_logsumexp(-1 * self.energies())
     raise NotImplementedError()
 
   @tf.function
   def entropy(self):
-    if self.analytic:
+    if self.is_analytic:
       return tfp.distributions.Categorical(logits=-1 *
                                            self.energies()).entropy()
     raise NotImplementedError()
@@ -615,7 +630,7 @@ class Bernoulli(EBM):
   def __init__(self,
                num_bits,
                initializer=tf.keras.initializers.RandomUniform(),
-               analytic=False,
+               is_analytic=False,
                name=None):
     super().__init__(None, None, name=name)
     self._num_bits = num_bits
@@ -623,8 +638,8 @@ class Bernoulli(EBM):
         name=f'{self.name}_variables',
         shape=[self.num_bits],
         initializer=initializer)
-    self._analytic = analytic
-    if analytic:
+    self._is_analytic = is_analytic
+    if is_analytic:
       self._all_bitstrings = tf.constant(
           list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
 
@@ -637,8 +652,8 @@ class Bernoulli(EBM):
     return True
 
   @property
-  def analytic(self):
-    return self._analytic
+  def is_analytic(self):
+    return self._is_analytic
 
   def copy(self):
     bernoulli = Bernoulli(self.num_bits, analytic=self.analytic, name=self.name)
@@ -649,16 +664,25 @@ class Bernoulli(EBM):
     return tf.reduce_sum(
         tf.cast(1 - 2 * bitstrings, tf.float32) * self._variables, -1)
 
-  @tf.function
-  def operator(self, qubits):
-    return tfq.convert_to_tensor([
-        cirq.PauliSum.from_pauli_strings(
-            float(self._variables[i].numpy()) * cirq.Z(qubits[i])
-            for i in range(self.num_bits))
-    ])
+  def operator_shards(self, qubits):
+    return [
+        cirq.PauliSum.from_pauli_strings(cirq.Z(qubits[i]))
+        for i in range(self.num_bits)
+    ]
+
+  def operator_expectation(self, expectations):
+    return tf.reduce_sum(expectations * self._variables)
 
   @tf.function
   def sample(self, num_samples, unique=True):
+    r"""Fairly samples from the EBM defined by `energy`.
+
+        For Bernoulli distribution, let $p$ be the probability of bit being `1`.
+        In this case, we have $p = \frac{e^{theta}}{{e^{theta}+e^{-theta}}}$.
+        Therefore, each independent logit is:
+          $$logit = \log\frac{p}{1-p} = \log\frac{e^{theta}}{e^{-theta}}
+                 = \log{e^{2*theta}} = 2*theta$$
+        """
     samples = tfp.distributions.Bernoulli(
         logits=2 * self._variables, dtype=tf.int8).sample(num_samples)
     if unique:
@@ -667,19 +691,19 @@ class Bernoulli(EBM):
 
   @tf.function
   def energies(self):
-    if self.analytic:
+    if self.is_analytic:
       return self.energy(self._all_bitstrings)
     raise NotImplementedError()
 
   @tf.function
   def probabilities(self):
-    if self.analytic:
+    if self.is_analytic:
       return tf.exp(-self.energies()) / tf.exp(self.log_partition_function())
     raise NotImplementedError()
 
   @tf.function
   def log_partition_function(self):
-    if self.analytic:
+    if self.is_analytic:
       return tf.reduce_logsumexp(-1 * self.energies())
     raise NotImplementedError()
 
@@ -706,237 +730,6 @@ def logit_to_probability(logit_in):
   logging.info("retracing: logit_to_probability")
   logit = tf.cast(logit_in, tf.dtypes.float32)
   return tf.math.divide(tf.math.exp(logit), 1 + tf.math.exp(logit))
-
-
-def build_bernoulli(num_nodes, identifier):
-
-  @tf.function
-  def energy_bernoulli(logits, bitstring):
-    """Calculate the energy of a bitstring against a product of Bernoullis.
-    Args:
-      logits: 1-D tf.Tensor of dtype float32 containing the logits for each
-        Bernoulli factor.
-      bitstring: 1-D tf.Tensor of dtype int8 of the form [x_0, ..., x_n-1]. Must
-        be the same shape as thetas.
-    Returns:
-      energy: 0-D tf.Tensor of dtype float32 containing the
-        energy of the bitstring calculated as
-        sum_i[ln(1+exp(logits_i)) - x_i*logits_i].
-    """
-    logging.info("retracing: energy_bernoulli_{}".format(identifier))
-    bitstring = tf.cast(bitstring, dtype=tf.float32)
-    return tf.reduce_sum(
-        tf.nn.sigmoid_cross_entropy_with_logits(bitstring, logits))
-
-  @tf.function
-  def sampler_bernoulli(thetas, num_samples):
-    """Sample bitstrings from a product of Bernoullis.
-    Args:
-      thetas: 1 dimensional `tensor` of dtype `float32` containing the logits
-        for each Bernoulli factor.
-      bitstring: 1 dimensional `tensor` of dtype `int8` of the form [x_0, ...,
-        x_n-1] so that x is a bitstring.
-    Returns:
-      bitstrings: `tensor` of dtype `int8` and shape [num_samples, bits]
-        where bitstrings are sampled according to
-        p(bitstring | thetas) ~ exp(-energy(bitstring | thetas))
-    """
-    logging.info("retracing: sampler_bernoulli_{}".format(identifier))
-    return tfp.distributions.Bernoulli(
-        logits=thetas, dtype=tf.int8).sample(num_samples)
-
-  @tf.function
-  def log_partition_bernoulli(thetas):
-    logging.info("retracing: log_partition_bernoulli_{}".format(identifier))
-    # The result is always zero given our definition of the energy.
-    return tf.constant(0.0)
-
-  @tf.function
-  def entropy_bernoulli(thetas):
-    """Calculate the entropy of a product of Bernoullis.
-    Args:
-        thetas: 1 dimensional `tensor` of dtype `float32` containing the logits
-          for each Bernoulli factor.
-    Returns:
-      entropy: 0 dimensional `tensor` of dtype `float32` containing the
-        entropy (in nats) of the distribution.
-    """
-    logging.info("retracing: entropy_bernoulli_{}".format(identifier))
-    return tf.reduce_sum(
-        tfp.distributions.Bernoulli(logits=thetas,
-                                    dtype=tf.dtypes.int8).entropy())
-
-  return (energy_bernoulli, sampler_bernoulli, log_partition_bernoulli,
-          entropy_bernoulli, num_nodes)
-
-
-def build_boltzmann(num_nodes, identifier):
-
-  if num_nodes > 30:
-    raise ValueError("Analytic Boltzmann sampling methods fail past 30 bits.")
-
-  def get_all_boltzmann_sub(num_nodes, identifier):
-    flat_spins_mask = tf.cast(
-        tf.reshape(
-            tf.linalg.band_part(tf.ones([num_nodes, num_nodes]), 0, -1) -
-            tf.linalg.diag(tf.ones(num_nodes)), num_nodes * num_nodes), tf.bool)
-
-    @tf.function
-    def boltzmann_bits_to_spins(x):
-      logging.info("retracing: boltzmann_bits_to_spins_{}".format(identifier))
-      return 1 - 2 * x
-
-    @tf.function
-    def energy_boltzmann(thetas, x_in):
-      logging.info("retracing: energy_boltzmann_{}".format(identifier))
-      spins = tf.cast(boltzmann_bits_to_spins(x_in), tf.float32)
-      bias_term = tf.reduce_sum(thetas[:num_nodes] * spins)
-      w_slice = thetas[num_nodes:]
-      spins_outer = tf.matmul(
-          tf.transpose(tf.expand_dims(spins, 0)), tf.expand_dims(spins, 0))
-      spins_flat = tf.reshape(spins_outer, [num_nodes * num_nodes])
-      interaction_spins = tf.boolean_mask(spins_flat, flat_spins_mask)
-      interaction_term = tf.reduce_sum(w_slice * interaction_spins)
-      return bias_term + interaction_term
-
-    all_strings = tf.constant(
-        list(itertools.product([0, 1], repeat=num_nodes)), dtype=tf.int8)
-
-    @tf.function
-    def all_energies(thetas):
-      logging.info("retracing: all_energies_{}".format(identifier))
-      return tf.map_fn(
-          lambda x: energy_boltzmann(thetas, x),
-          all_strings,
-          fn_output_signature=tf.float32)
-
-    @tf.function
-    def all_exponentials(thetas):
-      logging.info("retracing: all_exponentials_{}".format(identifier))
-      return tf.math.exp(
-          tf.multiply(tf.constant(-1, dtype=tf.float32), all_energies(thetas)))
-
-    @tf.function
-    def partition_boltzmann(thetas):
-      logging.info("retracing: partition_boltzmann_{}".format(identifier))
-      return tf.reduce_sum(all_exponentials(thetas))
-
-    @tf.function
-    def log_partition_boltzmann(thetas):
-      logging.info("retracing: log_partition_boltzmann_{}".format(identifier))
-      return tf.math.log(partition_boltzmann(thetas))
-
-    @tf.function
-    def all_probabilities(thetas):
-      logging.info("retracing: all_probabilities_{}".format(identifier))
-      return all_exponentials(thetas) / partition_boltzmann(thetas)
-
-    @tf.function
-    def sampler_boltzmann(thetas, num_samples):
-      logging.info("retracing: sampler_boltzmann_{}".format(identifier))
-      Z = partition_boltzmann(thetas)
-      exponentials = all_exponentials(thetas)
-      raw_samples = tfp.distributions.Categorical(
-          logits=tf.multiply(
-              tf.constant(-1, dtype=tf.float32), all_energies(thetas)),
-          dtype=tf.int32).sample(num_samples)
-      return tf.gather(all_strings, raw_samples)
-
-    @tf.function
-    def entropy_boltzmann(thetas):
-      logging.info("retracing: entropy_boltzmann_{}".format(identifier))
-      these_probs = all_probabilities(thetas)
-      these_logs = tf.math.log(these_probs)
-      return -1.0 * tf.reduce_sum(these_probs * these_logs)
-
-    return (energy_boltzmann, sampler_boltzmann, log_partition_boltzmann,
-            entropy_boltzmann, ((num_nodes**2 - num_nodes) // 2) + num_nodes)
-
-  return get_all_boltzmann_sub(num_nodes, identifier)
-
-
-# ============================================================================ #
-# K-local EBM tools.
-# ============================================================================ #
-
-
-@tf.function
-def bits_to_spins(x, n_bits):
-  logging.info("retracing: bits_to_spins")
-  return 1 - 2 * x
-
-
-def get_parity_index_list(n_bits, k):
-  if k < 1:
-    raise ValueError("The locality of interactions must be at least 1.")
-  if k > n_bits:
-    raise ValueError("The locality cannot be greater than the number of bits.")
-  index_list = list(range(n_bits))
-  return tf.constant(list(itertools.combinations(index_list, k)))
-
-
-def get_single_locality_parities(n_bits, k):
-  indices = get_parity_index_list(n_bits, k)
-
-  @tf.function
-  def single_locality_parities(spins):
-    logging.info("retracing: single_locality_parities")
-    return tf.math.reduce_prod(tf.gather(spins, indices), axis=1)
-
-  return single_locality_parities
-
-
-def get_single_locality_operators(qubits, k):
-  index_list = get_parity_index_list(len(qubits), k)
-  op_list = []
-  for indices in index_list:
-    this_op = cirq.PauliSum().from_pauli_strings(1.0 * cirq.I(qubits[0]))
-    for i in indices:
-      this_op *= cirq.Z(qubits[i])
-    op_list.append(this_op)
-  return op_list
-
-
-def get_all_operators(qubits, max_k):
-  """Operators corresponding to `get_klocal_energy_function`"""
-  op_list = []
-  for k in range(1, max_k + 1):
-    op_list += get_single_locality_operators(qubits, k)
-  return op_list
-
-
-def get_all_parities(n_bits, max_k):
-  func_list = []
-  for k in range(1, max_k + 1):
-    func_list.append(get_single_locality_parities(n_bits, k))
-
-  @tf.function
-  def all_parities(spins, func_list=func_list):
-    logging.info("retracing: all_parities")
-    return tf.concat([f(spins) for f in func_list], axis=0)
-
-  return all_parities
-
-
-def get_klocal_energy_function_num_values(n_bits, max_k):
-  n_vals = 0
-  for i in range(1, max_k + 1):
-    n_vals += scipy.special.comb(n_bits, i, exact=True)
-  return n_vals
-
-
-def get_klocal_energy_function(n_bits, max_k):
-  all_parities = get_all_parities(n_bits, max_k)
-
-  @tf.function
-  def klocal_energy_function(thetas, x):
-    logging.info("retracing: klocal_energy_function")
-    spins = bits_to_spins(x, n_bits)
-    parities = all_parities(spins)
-    return tf.reduce_sum(
-        tf.math.multiply(thetas, tf.cast(parities, tf.float32)))
-
-  return klocal_energy_function
 
 
 # ============================================================================ #
@@ -1042,88 +835,6 @@ def get_swish_network(num_bits, num_layers):
                     this_initial_layer(thetas[:n_init_params], x)))
 
   return swish_network
-
-
-# ============================================================================ #
-# Tools for analytic sampling from small energy functions.
-# ============================================================================ #
-
-
-def get_ebm_functions(num_bits, energy_function, ident):
-  """Gets functions for exact calculations on energy based models over bits.
-  Energy based models (EBMs) are defined by a parameterized energy function,
-  E_theta(b), which maps bitstrings to real numbers.  This energy function
-  corresponds to a probability distribution
-  p(b) = exp(-1.0 * E_theta(b)) / sum_b exp(-1.0 * E_theta(b))
-  Args:
-    num_bits: number of bits in the samples from the ebm.
-    energy_function: function accepting a 1-D `tf.Tensor` of floats and a 1-D
-      `tf.Tensor` of ints.  The floats are parameters of an energy calculation,
-      and the ints are the bitstring whose energy is calculated.
-    ident: Python `str` used to identify functions during tracing.
-  Returns:
-    sampler_function: function for getting samples from the EBM.
-    log_partition_function: function to calculate the natural logarithm of the
-      partition function of the EBM.
-    entropy_function: function for calculating the entropy of the EBM.
-  """
-  all_strings = tf.constant(
-      list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
-
-  @tf.function
-  def all_energies(thetas):
-    """Given the EBM parameters, returns the energy of every bitstring."""
-    logging.info("retracing: all_energies_{}".format(ident))
-    # TODO(zaqqwerty): get code to be nearly as fast but with less memory
-    # overhead.  tf.map_fn seems to get too CPU fragmented.
-    return tf.vectorized_map(lambda x: energy_function(thetas, x), all_strings)
-
-  @tf.function
-  def sampler_function(thetas, num_samples):
-    """Samples from the EBM.
-    Args:
-      thetas: `tf.Tensor` of DType `tf.float32` which are the parameters of the
-        EBM calculation.
-      num_samples: Scalar `tf.Tensor` of DType `tf.int32` which is the number of
-        samples to draw from the EBM.
-    Returns:
-      `tf.Tensor` of DType `tf.int8` of shape [num_samples, num_bits] which is
-        a list of samples from the EBM.
-    """
-    logging.info("retracing: sampler_function_{}".format(ident))
-    negative_energies = -1.0 * all_energies(thetas)
-    raw_samples = tfp.distributions.Categorical(
-        logits=negative_energies, dtype=tf.int32).sample(num_samples)
-    return tf.gather(all_strings, raw_samples)
-
-  @tf.function
-  def log_partition_function(thetas):
-    """Calculates the logarithm of the partition function of the EBM.
-    Args:
-      thetas: `tf.Tensor` of DType `tf.float32` which are the parameters of the
-        EBM calculation.
-    Returns:
-      Scalar `tf.Tensor` of DType `tf.float32` which is the logarithm of the
-        partition function of the EBM.
-    """
-    logging.info("retracing: log_partition_function_{}".format(ident))
-    negative_energies = -1.0 * all_energies(thetas)
-    return tf.reduce_logsumexp(negative_energies)
-
-  @tf.function
-  def entropy_function(thetas):
-    """Calculates the entropy of the EBM.
-    Args:
-      thetas: `tf.Tensor` of DType `tf.float32` which are the parameters of the
-        EBM calculation.
-    Returns:
-      Scalar `tf.Tensor` of DType `tf.float32` which is the entropy of the EBM.
-    """
-    logging.info("retracing: entropy_function_{}".format(ident))
-    negative_energies = -1.0 * all_energies(thetas)
-    return tfp.distributions.Categorical(logits=negative_energies).entropy()
-
-  return sampler_function, log_partition_function, entropy_function
 
 
 # ============================================================================ #

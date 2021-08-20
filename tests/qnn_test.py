@@ -135,13 +135,13 @@ class QNNTest(tf.test.TestCase):
         self.raw_symbols,
         backend=self.backend,
         differentiator=self.differentiator,
-        analytic=True,
+        is_analytic=True,
         name=self.name)
     self.assertEqual(self.name, test_qnn.name)
     self.assertAllEqual(self.symbols, test_qnn.symbols)
     self.assertAllEqual(self.backend, test_qnn.backend)
     self.assertAllEqual(self.differentiator, test_qnn.differentiator)
-    self.assertAllEqual(True, test_qnn.analytic)
+    self.assertAllEqual(True, test_qnn.is_analytic)
     self.assertAllEqual(
         tfq.from_tensor(self.pqc_tfq),
         tfq.from_tensor(test_qnn._pqc),
@@ -177,7 +177,7 @@ class QNNTest(tf.test.TestCase):
     self.assertAllEqual(test_qnn_copy.symbols, test_qnn.symbols)
     self.assertAllEqual(test_qnn_copy.backend, test_qnn.backend)
     self.assertAllEqual(test_qnn_copy.differentiator, test_qnn.differentiator)
-    self.assertAllEqual(test_qnn_copy.analytic, test_qnn.analytic)
+    self.assertAllEqual(test_qnn_copy.is_analytic, test_qnn.is_analytic)
     self.assertAllEqual(
         tfq.from_tensor(test_qnn_copy._pqc),
         tfq.from_tensor(test_qnn._pqc),
