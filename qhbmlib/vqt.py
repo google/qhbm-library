@@ -18,7 +18,6 @@ import tensorflow as tf
 import tensorflow_quantum as tfq
 
 
-@tf.function
 def vqt(qhbm, num_samples, hamiltonian, beta):
 
   @tf.custom_gradient

@@ -218,7 +218,6 @@ class BernoulliTest(tf.test.TestCase):
     num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
     bitstrings, counts = test_b.sample(num_bitstrings)
 
-    @tf.function
     def check_bitstring_exists(bitstring, bitstring_list):
       print("retracing: check_bitstring_exists")
       return tf.math.reduce_any(
@@ -411,7 +410,6 @@ class KOBETest(tf.test.TestCase):
     num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
     bitstrings, counts = test_k.sample(num_bitstrings)
 
-    @tf.function
     def check_bitstring_exists(bitstring, bitstring_list):
       print("retracing: check_bitstring_exists")
       return tf.math.reduce_any(

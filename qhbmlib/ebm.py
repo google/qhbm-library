@@ -90,7 +90,6 @@ class KOBE(EnergyFunction):
     kobe._variables.assign(self._variables)
     return kobe
 
-  @tf.function
   def energy(self, bitstrings):
     spins = 1 - 2 * bitstrings
     parities_t = tf.zeros(
@@ -136,7 +135,6 @@ class MLP(EnergyFunction):
       mlp.trainable_variables[i].assign(self.trainable_variables[i])
     return mlp
 
-  @tf.function
   def call(self, bitstrings):
     x = bitstrings
     for hidden_layer in self._hidden_layers:
@@ -144,7 +142,6 @@ class MLP(EnergyFunction):
     x = self._energy_layer(x)
     return tf.squeeze(x, -1)
 
-  @tf.function
   def energy(self, bitstrings):
     return self(bitstrings)
 
@@ -161,7 +158,6 @@ class EnergySampler(abc.ABC):
     raise NotImplementedError()
 
 
-@tf.function
 def unique_bitstrings_with_counts(bitstrings):
   """Extract the unique bitstrings in the given bitstring tensor.
     Works by converting each bitstring to a 64 bit integer, then using built-in
@@ -277,7 +273,6 @@ class UncalibratedGWG(EnergyKernel):
         num_samples=self.num_samples,
         name=self.name)
 
-  @tf.function
   def _exact_diff_function(self, current_state):
     current_state_t = tf.transpose(current_state)
     diff_t = tf.zeros_like(current_state_t, dtype=tf.float32)
@@ -294,7 +289,6 @@ class UncalibratedGWG(EnergyKernel):
               current_energy - self.energy_function.energy(pert_state), 0))
     return tf.transpose(diff_t)
 
-  @tf.function
   def _grad_diff_function(self, current_state):
     current_state = tf.cast(current_state, tf.float32)
     with tf.GradientTape() as tape:
@@ -303,7 +297,6 @@ class UncalibratedGWG(EnergyKernel):
     grad = tape.gradient(energy, current_state)
     return (2 * current_state - 1) * grad
 
-  @tf.function
   def one_step(self, current_state, previous_kernel_results):
     forward_diff = self._diff_function(current_state)
     forward_dist = tfp.distributions.OneHotCategorical(
@@ -327,7 +320,6 @@ class UncalibratedGWG(EnergyKernel):
 
     return next_state, kernel_results
 
-  @tf.function
   def bootstrap_results(self, init_state):
     target_log_prob = -1 * self.energy_function.energy(init_state)
     kernel_results = UncalibratedGWGResults(
@@ -402,11 +394,9 @@ class GWG(MetropolisHastings):
         num_samples=self.num_samples,
         name=self.name)
 
-  @tf.function
   def one_step(self, current_state, previous_kernel_results):
     return self._impl.one_step(current_state, previous_kernel_results)
 
-  @tf.function
   def bootstrap_results(self, init_state):
     return self._impl.bootstrap_results(init_state)
 
@@ -484,7 +474,6 @@ class MCMC(EnergySampler):
     mcmc._buffer = tf.queue.QueueBase.from_list(tf.constant(0), [self._buffer])
     return mcmc
 
-  @tf.function
   def sample(self, num_samples, unique=True):
     num_results = tf.cast(tf.math.ceil(num_samples / self.num_chains), tf.int32)
 
@@ -570,7 +559,6 @@ class EBM(tf.keras.Model):
         is_analytic=self.is_analytic,
         name=self.name)
 
-  @tf.function
   def energy(self, bitstrings):
     return self._energy_function.energy(bitstrings)
 
@@ -580,7 +568,6 @@ class EBM(tf.keras.Model):
   def operator_shards(self, qubits):
     return self._energy_function.operator_shards(qubits)
 
-  @tf.function
   def sample(self, num_samples, unique=True):
     if self.is_analytic and self._energy_sampler is None:
       samples = tf.gather(
@@ -593,26 +580,22 @@ class EBM(tf.keras.Model):
     else:
       return self._energy_sampler.sample(num_samples, unique=unique)
 
-  @tf.function
   def energies(self):
     if self.is_analytic:
       return self.energy(self._all_bitstrings)
     raise NotImplementedError()
 
-  @tf.function
   def probabilities(self):
     if self.is_analytic:
       return tf.exp(-self.ebm.energies()) / tf.exp(
           self.log_partition_function())
     raise NotImplementedError()
 
-  @tf.function
   def log_partition_function(self):
     if self.is_analytic:
       return tf.reduce_logsumexp(-1 * self.energies())
     raise NotImplementedError()
 
-  @tf.function
   def entropy(self):
     if self.is_analytic:
       return tfp.distributions.Categorical(logits=-1 *
@@ -655,7 +638,6 @@ class Bernoulli(EBM):
     bernoulli._variables.assign(self._variables)
     return bernoulli
 
-  @tf.function
   def energy(self, bitstrings):
     return tf.reduce_sum(
         tf.cast(1 - 2 * bitstrings, tf.float32) * self._variables, -1)
@@ -669,7 +651,6 @@ class Bernoulli(EBM):
   def operator_expectation(self, expectations):
     return tf.reduce_sum(expectations * self._variables)
 
-  @tf.function
   def sample(self, num_samples, unique=True):
     r"""Fairly samples from the EBM defined by `energy`.
 
@@ -685,25 +666,21 @@ class Bernoulli(EBM):
       return unique_bitstrings_with_counts(samples)
     return samples
 
-  @tf.function
   def energies(self):
     if self.is_analytic:
       return self.energy(self._all_bitstrings)
     raise NotImplementedError()
 
-  @tf.function
   def probabilities(self):
     if self.is_analytic:
       return tf.exp(-self.energies()) / tf.exp(self.log_partition_function())
     raise NotImplementedError()
 
-  @tf.function
   def log_partition_function(self):
     if self.is_analytic:
       return tf.reduce_logsumexp(-1 * self.energies())
     raise NotImplementedError()
 
-  @tf.function
   def entropy(self):
     return tf.reduce_sum(
         tfp.distributions.Bernoulli(logits=2 * self._variables).entropy())
@@ -714,14 +691,12 @@ class Bernoulli(EBM):
 #OLD
 
 
-@tf.function
 def probability_to_logit(probability):
   logging.info("retracing: probability_to_logit")
   p = tf.cast(probability, tf.dtypes.float32)
   return tf.math.log(p) - tf.math.log(1 - p)
 
 
-@tf.function
 def logit_to_probability(logit_in):
   logging.info("retracing: logit_to_probability")
   logit = tf.cast(logit_in, tf.dtypes.float32)
@@ -742,7 +717,6 @@ def get_initial_layer(num_bits):
   w_in = num_bits
   w_out = get_swish_net_hidden_width(num_bits)
 
-  @tf.function
   def initial_layer(thetas, x):
     logging.info("retracing: initial_layer")
     mat = tf.reshape(thetas[:w_in * w_out], [w_out, w_in])
@@ -756,7 +730,6 @@ def get_hidden_layer(num_bits, i):
   """Swish hidden unit."""
   w = get_swish_net_hidden_width(num_bits)
 
-  @tf.function
   def hidden_layer(thetas, x):
     logging.info("retracing: hidden_layer_{}".format(i))
     mat = tf.reshape(thetas[:w**2], [w, w])
@@ -771,7 +744,6 @@ def get_final_layer(num_bits):
   w_in = get_swish_net_hidden_width(num_bits)
   w_out = 1
 
-  @tf.function
   def final_layer(thetas, x):
     logging.info("retracing: final_layer")
     mat = tf.reshape(thetas[:w_in * w_out], [w_out, w_in])
@@ -821,7 +793,6 @@ def get_swish_network(num_bits, num_layers):
 
   this_final_layer = get_final_layer(num_bits)
 
-  @tf.function
   def swish_network(thetas, x):
     logging.info("retracing: swish_network")
     x = tf.cast(x, tf.float32)
@@ -843,7 +814,6 @@ def get_batched_energy_function(energy_function):
   argument to one which can accept batches of bitstrings.
   """
 
-  @tf.function
   def batched_energy_function(energy_function_params, x):
     logging.info("retracing: batched_energy_function")
     if tf.rank(x) == 1:
@@ -881,7 +851,6 @@ class BernoulliProposal(tfp.mcmc.TransitionKernel):
     else:
       self.energy_function_params.assign(energy_function_params)
 
-  @tf.function
   def one_step(self, current_state, previous_kernel_results):
     logging.info("retracing: one_step")
     next_state = tf.bitwise.bitwise_xor(
@@ -929,7 +898,6 @@ class GibbsWithGradientsProposal(tfp.mcmc.TransitionKernel):
     else:
       self.energy_function_params.assign(energy_function_params)
 
-  @tf.function
   def exact_difference_function(self, current_state):
     logging.info("retracing: exact_difference_function")
     current_state_transpose = tf.transpose(current_state)
@@ -948,7 +916,6 @@ class GibbsWithGradientsProposal(tfp.mcmc.TransitionKernel):
               self.energy_function(self.energy_function_params, pert_state), 0))
     return tf.transpose(diff)
 
-  @tf.function
   def gradient_difference_function(self, current_state):
     logging.info("retracing: gradient_difference_function")
     current_state = tf.cast(current_state, tf.float32)
@@ -958,7 +925,6 @@ class GibbsWithGradientsProposal(tfp.mcmc.TransitionKernel):
     grad = tape.gradient(energy, current_state)
     return (2 * current_state - 1) * grad
 
-  @tf.function
   def one_step(self, current_state, previous_kernel_results):
     logging.info("retracing: one_step")
     forward_diff = self.difference_function(current_state)
@@ -1034,7 +1000,6 @@ class MCMCSampler:
     self.buffer = tf.queue.RandomShuffleQueue(
         buffer_size, 0, [tf.int8], shapes=[num_bits])
 
-  @tf.function
   def __call__(self, energy_function_params, num_samples):
     logging.info("retracing: MCMCSampler")
     self.kernel.set_energy_function_params(energy_function_params)

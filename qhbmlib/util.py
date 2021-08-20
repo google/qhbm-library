@@ -24,7 +24,6 @@ import tensorflow_quantum as tfq
 # ============================================================================ #
 
 
-@tf.function
 def pure_state_tensor_to_density_matrix(pure_states, counts):
   """Returns the uniform mixture of the given tensor of pure states.
 
@@ -49,14 +48,12 @@ def pure_state_tensor_to_density_matrix(pure_states, counts):
                         tf.cast(tf.reduce_sum(counts), tf.complex64))
 
 
-@tf.function
 def circuits_and_counts_to_density_matrix(circuits, counts):
   print("retracing: circuits_and_counts_to_density_matrix")
   pure_states = tfq.layers.State()(circuits).to_tensor()
   return pure_state_tensor_to_density_matrix(pure_states, counts)
 
 
-@tf.function
 def fidelity(rho, sigma):
   """Calculate the fidelity between the two given density matrices.
 
@@ -82,7 +79,6 @@ def fidelity(rho, sigma):
   return tf.math.abs(tf.math.reduce_sum(tf.math.sqrt(e_omega)))**2
 
 
-@tf.function
 def fast_fidelity(rho, sigma):
   """Calculate the 10x faster fidelity between the two given density matrices.
 
@@ -114,7 +110,6 @@ def fast_fidelity(rho, sigma):
   return tf.math.abs(tf.math.reduce_sum(tf.math.sqrt(e_omega)))**2
 
 
-@tf.function
 def _np_fidelity_internal(e_rho, v_rho, sigma):
   """Internal np fidelity logic for preventing retracing graphs."""
   sqrt_e_rho = tf.cast(tf.sqrt(e_rho), dtype=tf.complex128)
@@ -156,7 +151,6 @@ def np_fidelity(rho, sigma):
   return tf.math.abs(tf.math.reduce_sum(tf.math.sqrt(e_omega)))**2
 
 
-@tf.function
 def optimized_trace_matmul(rho, sigma):
   """Returns optimized version of tf.linalg.trace(tf.matmul(rho, sigma)).
 
@@ -177,7 +171,6 @@ def optimized_trace_matmul(rho, sigma):
           tf.transpose(tf.cast(sigma, tf.complex128))))
 
 
-@tf.function
 def relative_entropy(rho, sigma):
   """Calculate the relative entropy between the two given density matrices.
 
@@ -202,7 +195,6 @@ def relative_entropy(rho, sigma):
   return optimized_trace_matmul(rho, tf.subtract(log_rho, log_sigma))
 
 
-@tf.function
 def get_thermal_state(beta, h_num):
   """Computes the thermal state.
 
@@ -259,7 +251,6 @@ def get_thermal_state(beta, h_num):
       tf.math.multiply(v_raw, tiled_lse_grad), tf.linalg.adjoint(v_raw))
 
 
-@tf.function
 def _np_get_thermal_state_internal(beta, e, h_shape):
   x = -1.0 * beta * e
   with tf.GradientTape() as g:
@@ -298,7 +289,6 @@ def np_get_thermal_state(beta, h_num):
       tf.math.multiply(v_raw, tiled_lse_grad), tf.linalg.adjoint(v_raw))
 
 
-# @tf.function
 def log_partition_function(beta, h_num):
   """Computes the logarithm of the partition function.
 
@@ -322,7 +312,6 @@ def log_partition_function(beta, h_num):
                              tf.cast(h_eigs, tf.float64))
 
 
-@tf.function
 def entropy(rho):
   """Computes the von Neumann entropy of the given density matrix.
 
@@ -351,7 +340,6 @@ def entropy(rho):
   return -tf.math.reduce_sum(rho_prod)
 
 
-@tf.function
 def density_matrix_to_image(dm):
   """Convert multi-qubit density matrix into an RGB image."""
   print("retracing: density_matrix_to_image")
@@ -384,7 +372,6 @@ def density_matrix_to_image(dm):
 # ============================================================================ #
 
 
-@tf.function
 def get_bit_sub_indices(qubits_vqt, qubits_j):
   """Assumes qubits_j is a subset of qubits_vqt."""
   print("retracing: get_bit_sub_indices")
