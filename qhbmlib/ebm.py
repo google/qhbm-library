@@ -545,16 +545,10 @@ class EBM(tf.keras.Model):
     self._energy_function = energy_function
     self._energy_sampler = energy_sampler
     self._analytic = analytic
-    self._all_bitstrings = None
-
-  @property
-  def all_bitstrings(self):
-    if self.analytic:
-      if self._all_bitstrings is None:
-        self._all_bitstrings = tf.constant(
-            list(itertools.product([0, 1], repeat=self.num_bits)),
-            dtype=tf.int8)
-    return self._all_bitstrings
+    if analytic:
+      self._all_bitstrings = tf.constant(
+          list(itertools.product([0, 1], repeat=energy_function.num_bits)),
+          dtype=tf.int8)
 
   @property
   def num_bits(self):
@@ -591,7 +585,7 @@ class EBM(tf.keras.Model):
   def sample(self, num_samples, unique=True):
     if self.analytic and self._energy_sampler is None:
       samples = tf.gather(
-          self.all_bitstrings,
+          self._all_bitstrings,
           tfp.distributions.Categorical(logits=-1 *
                                         self.energies()).sample(num_samples))
     else:
@@ -603,7 +597,7 @@ class EBM(tf.keras.Model):
   @tf.function
   def energies(self):
     if self.analytic:
-      return self.energy(self.all_bitstrings)
+      return self.energy(self._all_bitstrings)
     raise NotImplementedError()
 
   @tf.function
@@ -634,12 +628,16 @@ class Bernoulli(EBM):
                initializer=tf.keras.initializers.RandomUniform(),
                analytic=False,
                name=None):
-    super().__init__(None, None, analytic=analytic, name=name)
-    self._num_bits = tf.constant(num_bits)
+    tf.keras.Model.__init__(self, name=name)
+    self._num_bits = num_bits
     self._variables = self.add_weight(
         name=f'{self.name}_variables',
         shape=[self.num_bits],
         initializer=initializer)
+    self._analytic = analytic
+    if analytic:
+      self._all_bitstrings = tf.constant(
+          list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
 
   @property
   def num_bits(self):
@@ -648,6 +646,10 @@ class Bernoulli(EBM):
   @property
   def has_operators(self):
     return True
+
+  @property
+  def analytic(self):
+    return self._analytic
 
   def copy(self):
     bernoulli = Bernoulli(self.num_bits, name=self.name)
@@ -687,7 +689,7 @@ class Bernoulli(EBM):
   @tf.function
   def energies(self):
     if self.analytic:
-      return self.energy(self.all_bitstrings)
+      return self.energy(self._all_bitstrings)
     raise NotImplementedError()
 
   @tf.function
