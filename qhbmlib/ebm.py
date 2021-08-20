@@ -111,13 +111,7 @@ class KOBE(EnergyFunction):
     return ops
 
   def operator_expectation_from_components(self, expectations):
-    return tfq.convert_to_tensor([
-        cirq.PauliSum.from_pauli_strings(
-            float(self._variables[i].numpy()) * cirq.PauliString(
-                cirq.Z(qubits[self._indices[i][j]])
-                for j in range(tf.shape(self._indices[i])[0]))
-            for i in range(self._indices.nrows()))
-    ])
+    return tf.reduce_sum(expectations * self._variables)
 
 
 class MLP(EnergyFunction):

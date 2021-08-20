@@ -341,7 +341,32 @@ class KOBETest(tf.test.TestCase):
 
   def test_operator_expectation_from_components(self):
     """Confirm the expectations combine to the correct total energy."""
-    pass
+    # Build simple Boltzmann
+    num_bits = 3
+    test_b = ebm.KOBE(num_bits, 2)
+    qubits = cirq.GridQubit.rect(1, num_bits)
+
+    # Pin at bitstring [1, 0, 1]
+    test_b._variables.assign(tf.constant([100.0, -200.0, 300.0, 10, -20, 30]))
+    operators = test_b.operators(qubits)
+
+    # True energy
+    bitstring = tf.constant([[0, 0, 1]])  # not the pinned bitstring
+    ref_energy = test_b.energy(bitstring)[0]
+
+    # Test energy
+    circuit = cirq.Circuit(
+        [cirq.I(qubits[0]),
+         cirq.I(qubits[1]),
+         cirq.X(qubits[2])])
+    output_state_vector = cirq.Simulator().simulate(circuit).final_state_vector
+    op_expectations = []
+    qubit_map = {q: i for i, q in enumerate(qubits)}
+    for op in operators:
+      op_expectations.append(
+          op.expectation_from_state_vector(output_state_vector, qubit_map).real)
+    test_energy = test_b.operator_expectation_from_components(op_expectations)
+    self.assertAllClose(test_energy, ref_energy, atol=1e-4)
 
   def test_sampler(self):
     """Confirm bitstrings are sampled as expected."""
@@ -445,39 +470,23 @@ class KOBETest(tf.test.TestCase):
 
   def test_log_partition_boltzmann(self):
     """Confirm correct value of the log partition function."""
-    n_nodes = 2
     test_thetas = tf.Variable([1.5, 2.7, -4.0])
     expected_log_partition = tf.math.log(tf.constant(3641.8353))
-    _, _, log_partition_boltzmann, _, _ = ebm.build_boltzmann(n_nodes, "test")
-    test_log_partition = log_partition_boltzmann(test_thetas)
+    pre_k = ebm.KOBE(2, 2)
+    pre_k._variables.assign(test_thetas)
+    test_k = ebm.EBM(pre_k, None, analytic=True)
+    test_log_partition = test_k.log_partition_function()
     self.assertAllClose(expected_log_partition, test_log_partition)
 
   def test_entropy_boltzmann(self):
     """Confirm correct value of the entropy function."""
-    n_nodes = 2
     test_thetas = tf.Variable([1.5, 2.7, -4.0])
     expected_entropy = tf.constant(0.00233551808)
-    _, _, _, entropy_boltzmann, _ = ebm.build_boltzmann(n_nodes, "test")
-    test_entropy = entropy_boltzmann(test_thetas)
+    pre_k = ebm.KOBE(2, 2)
+    pre_k._variables.assign(test_thetas)
+    test_k = ebm.EBM(pre_k, None, analytic=True)
+    test_entropy = test_k.entropy()
     self.assertAllClose(expected_entropy, test_entropy)
-
-  def test_num_thetas_boltzmann(self):
-    """Confirm the correct number of parameters are requested.
-
-        There should be one parameter per bit, as well as an additional
-        parameter
-        per pair of bits.
-        """
-    _, _, _, _, test_num_thetas = ebm.build_boltzmann(1, "test")
-    self.assertEqual(1, test_num_thetas)
-    _, _, _, _, test_num_thetas = ebm.build_boltzmann(2, "test")
-    self.assertEqual(3, test_num_thetas)
-    _, _, _, _, test_num_thetas = ebm.build_boltzmann(3, "test")
-    self.assertEqual(6, test_num_thetas)
-    _, _, _, _, test_num_thetas = ebm.build_boltzmann(4, "test")
-    self.assertEqual(10, test_num_thetas)
-
-  # TODO(zaqqwerty): tests for general EBM functions and operators
 
 
 if __name__ == "__main__":
