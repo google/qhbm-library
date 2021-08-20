@@ -833,6 +833,7 @@ def get_swish_network(num_bits, num_layers):
 
   return swish_network
 
+
 # ============================================================================ #
 # Tools for MCMC sampling from arbitrary energy functions.
 # ============================================================================ #
