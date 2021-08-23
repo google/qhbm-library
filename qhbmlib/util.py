@@ -49,7 +49,6 @@ def pure_state_tensor_to_density_matrix(pure_states, counts):
 
 
 def circuits_and_counts_to_density_matrix(circuits, counts):
-  print("retracing: circuits_and_counts_to_density_matrix")
   pure_states = tfq.layers.State()(circuits).to_tensor()
   return pure_state_tensor_to_density_matrix(pure_states, counts)
 
@@ -67,7 +66,6 @@ def fidelity(rho, sigma):
       A tf.Tensor float64 fidelity scalar between the two given density
       matrices.
     """
-  print("retracing: fidelity")
   e_rho, v_rho = tf.linalg.eigh(tf.cast(rho, tf.complex128))
   rho_sqrt = tf.linalg.matmul(
       tf.linalg.matmul(v_rho, tf.linalg.diag(tf.math.sqrt(e_rho))),
@@ -92,7 +90,6 @@ def fast_fidelity(rho, sigma):
       A tf.Tensor float64 fidelity scalar between the two given density
       matrices.
     """
-  print("retracing: fast_fidelity")
   e_rho, v_rho = tf.linalg.eigh(tf.cast(rho, tf.complex128))
   # Optimization
   # 1) tf.matmul(a, tf.linalg.diag(b))
@@ -189,7 +186,6 @@ def relative_entropy(rho, sigma):
       A tf.Tensor float64 fidelity scalar between the two given density
       matrices.
     """
-  print("retracing: relative_entropy")
   log_rho = tf.linalg.logm(tf.cast(rho, tf.complex128))
   log_sigma = tf.linalg.logm(tf.cast(sigma, tf.complex128))
   return optimized_trace_matmul(rho, tf.subtract(log_rho, log_sigma))
@@ -236,7 +232,6 @@ def get_thermal_state(beta, h_num):
       thermal
           state of `h_num` at inverse temperature `beta`.
     """
-  print("retracing: get_thermal_state")
   e_raw, v_raw = tf.linalg.eigh(h_num)
   e = tf.cast(e_raw, tf.float64)
   x = -1.0 * beta * e
@@ -280,7 +275,6 @@ def np_get_thermal_state(beta, h_num):
       thermal
           state of `h_num` at inverse temperature `beta`.
     """
-  print("retracing: get_thermal_state")
   h_num = tf.cast(h_num, tf.complex128)
   e_raw, v_raw = np.linalg.eigh(h_num)
   tiled_lse_grad = _np_get_thermal_state_internal(
@@ -304,7 +298,6 @@ def log_partition_function(beta, h_num):
       Scalar `tf.Tensor` of dtype `float64` which is the logarithm of the
         partition function.
     """
-  print("retracing: log_partition_function")
   # Use eigh instead of eigvalsh to ease backpropagation, see docs on eigvalsh.
   h_eigs, _ = np.linalg.eigh(tf.cast(
       h_num, tf.complex128))  # h_eigs are real since h_num is Hermitian
@@ -342,7 +335,6 @@ def entropy(rho):
 
 def density_matrix_to_image(dm):
   """Convert multi-qubit density matrix into an RGB image."""
-  print("retracing: density_matrix_to_image")
   max_qubits = 9
   total_edge = 2**max_qubits
   dm_len = tf.shape(dm)[0]
@@ -374,7 +366,6 @@ def density_matrix_to_image(dm):
 
 def get_bit_sub_indices(qubits_vqt, qubits_j):
   """Assumes qubits_j is a subset of qubits_vqt."""
-  print("retracing: get_bit_sub_indices")
   qubits_vqt_tiled = tf.tile(
       tf.expand_dims(qubits_vqt, 0), [tf.shape(qubits_j)[0], 1, 1])
   qubits_j_expanded = tf.expand_dims(qubits_j, 1)
