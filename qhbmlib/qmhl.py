@@ -62,7 +62,7 @@ def qmhl_loss(model: qhbm.QHBM, target_circuits: tf.Tensor,
 
     forward_pass_vals = avg_energy + log_partition
 
-    def gradient(grad):
+    def gradient(grad, variables=None):
       """Gradients are computed using estimators from the QHBM paper."""
       # Thetas derivative.
       qnn_ragged_samples_pb = model.qnn.pulled_back_sample(
