@@ -37,6 +37,7 @@ def qmhl_loss(model: qhbm.QHBM, target_circuits: tf.Tensor,
     Returns:
       loss: Quantum cross entropy between the target and model.
     """
+
   @tf.custom_gradient
   def call(model_variables):
     # log_partition estimate
