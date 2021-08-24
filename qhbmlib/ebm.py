@@ -24,6 +24,8 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 import tensorflow_quantum as tfq
 
+from qhbmlib import util
+
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 
@@ -491,7 +493,7 @@ class MCMC(EnergySampler):
 
     sampled_states = sampled_states[:num_samples]
     if unique:
-      return unique_bitstrings_with_counts(sampled_states)
+      return util.unique_bitstrings_with_counts(sampled_states)
     return sampled_states
 
 
@@ -549,7 +551,7 @@ class EBM(tf.keras.Model):
           tfp.distributions.Categorical(logits=-1 *
                                         self.energies()).sample(num_samples))
       if unique:
-        return unique_bitstrings_with_counts(samples)
+        return util.unique_bitstrings_with_counts(samples)
       return samples
     else:
       return self._energy_sampler.sample(num_samples, unique=unique)
@@ -643,7 +645,7 @@ class Bernoulli(EBM):
     samples = tfp.distributions.Bernoulli(
         logits=2 * self._variables, dtype=tf.int8).sample(num_samples)
     if unique:
-      return unique_bitstrings_with_counts(samples)
+      return util.unique_bitstrings_with_counts(samples)
     return samples
 
   @tf.function

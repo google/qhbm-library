@@ -427,7 +427,7 @@ class UniqueBitstringsWithCountsTest(tf.test.TestCase):
   def test_identity(self):
     # Case when all entries are unique.
     test_bitstrings = tf.constant([[1], [0]], dtype=tf.int8)
-    test_y, test_count = ebm.unique_bitstrings_with_counts(test_bitstrings)
+    test_y, test_count = util.unique_bitstrings_with_counts(test_bitstrings)
     self.assertAllEqual(test_y, test_bitstrings)
     self.assertAllEqual(test_count, tf.constant([1, 1]))
 
@@ -446,7 +446,7 @@ class UniqueBitstringsWithCountsTest(tf.test.TestCase):
         ],
         dtype=tf.int8,
     )
-    test_y, test_count = ebm.unique_bitstrings_with_counts(test_bitstrings)
+    test_y, test_count = util.unique_bitstrings_with_counts(test_bitstrings)
     self.assertAllEqual(test_y, tf.constant([[0], [1]]))
     self.assertAllEqual(test_count, tf.constant([3, 5]))
 
@@ -465,7 +465,7 @@ class UniqueBitstringsWithCountsTest(tf.test.TestCase):
         ],
         dtype=tf.int8,
     )
-    test_y, test_count = ebm.unique_bitstrings_with_counts(test_bitstrings)
+    test_y, test_count = util.unique_bitstrings_with_counts(test_bitstrings)
     self.assertAllEqual(test_y, tf.constant([[1, 0, 1], [1, 1, 1], [0, 1, 1]]))
     self.assertAllEqual(test_count, tf.constant([4, 2, 2]))
 
