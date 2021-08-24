@@ -37,8 +37,6 @@ def qmhl_loss(model: qhbm.QHBM, target_circuits: tf.Tensor,
     Returns:
       loss: Quantum cross entropy between the target and model.
     """
-  print(f"retracing: qmhl_loss on {model.name}")
-
   @tf.custom_gradient
   def call(model_variables):
     # log_partition estimate
@@ -65,19 +63,14 @@ def qmhl_loss(model: qhbm.QHBM, target_circuits: tf.Tensor,
     def gradient(grad, variables=None):
       """Gradients are computed using estimators from the QHBM paper."""
       # Thetas derivative.
-      qnn_ragged_samples_pb = model.qnn.pulled_back_sample(
-          target_circuits, target_counts)
-      qnn_all_samples_pb = qnn_ragged_samples_pb.values.to_tensor()
-      qnn_bitstrings, qnn_counts = ebm.unique_bitstrings_with_counts(
-          qnn_all_samples_pb)
-      qnn_probs = tf.cast(qnn_counts, tf.float32) / tf.cast(
-          tf.reduce_sum(qnn_counts), tf.float32)
+      qnn_probs = tf.cast(counts_pb, tf.float32) / tf.cast(
+          tf.reduce_sum(counts_pb), tf.float32)
       ebm_bitstrings, ebm_counts = model.ebm.sample(
           tf.reduce_sum(target_counts))
       ebm_probs = tf.cast(ebm_counts, tf.float32) / tf.cast(
           tf.reduce_sum(ebm_counts), tf.float32)
       with tf.GradientTape() as tape:
-        qnn_energies = model.ebm.energy(qnn_bitstrings)
+        qnn_energies = model.ebm.energy(samples_pb)
       # jacobian is a list over thetas, with ith entry a tensor of shape
       # [tf.shape(qnn_energies)[0], tf.shape(thetas[i])[0]]
       qnn_jac = tf.ragged.stack(tape.jacobian(qnn_energies, model.thetas))
