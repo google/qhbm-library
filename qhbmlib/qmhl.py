@@ -15,7 +15,6 @@
 """Impementations of the QMHL loss and its derivatives."""
 
 import tensorflow as tf
-import tensorflow_quantum as tfq
 
 from qhbmlib import qhbm, ebm
 
@@ -39,7 +38,7 @@ def qmhl_loss(model: qhbm.QHBM, target_circuits: tf.Tensor,
     """
 
   @tf.custom_gradient
-  def call(model_variables):
+  def call(thetas, phis):
     # log_partition estimate
     if model.ebm.is_analytic:
       log_partition = model.log_partition_function()
@@ -99,4 +98,4 @@ def qmhl_loss(model: qhbm.QHBM, target_circuits: tf.Tensor,
 
     return forward_pass_vals, gradient
 
-  return call(model.trainable_variables)
+  return call(model.thetas, model.phis)
