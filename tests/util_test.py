@@ -421,6 +421,7 @@ class EntropyTest(tf.test.TestCase):
 # Bitstring utilities.
 # ============================================================================ #
 
+
 class UniqueBitstringsWithCountsTest(tf.test.TestCase):
   """Test unique_with_counts from the qhbm library."""
 
