@@ -71,32 +71,6 @@ class UniqueBitstringsWithCountsTest(tf.test.TestCase):
     self.assertAllEqual(test_count, tf.constant([4, 2, 2]))
 
 
-class ProbTest(tf.test.TestCase):
-  """Test the probability<-->logit functions."""
-
-  def test_probability_to_logit(self):
-    """If p is the probability of drawing 1 from a Bernoulli distribution, then
-
-        logit = ln(p/(1-p))
-        """
-    num_vals = 11
-    probs = tf.random.uniform([num_vals])
-    expected_logits = tf.math.log(probs / (tf.ones([num_vals]) - probs))
-    test_logits = ebm.probability_to_logit(probs)
-    self.assertAllClose(expected_logits, test_logits)
-
-  def test_logit_to_probability(self):
-    """If L is the log-odds of drawing a 1 from a Bernoulli distribution, then
-
-        p = exp(L)/(1 + exp(L))
-        """
-    num_vals = 17
-    logits = tf.random.uniform([num_vals], minval=-1000, maxval=1000)
-    expected_probs = tf.math.exp(logits) / (1 + tf.math.exp(logits))
-    test_probs = ebm.logit_to_probability(logits)
-    self.assertAllClose(expected_probs, test_probs)
-
-
 class BernoulliTest(tf.test.TestCase):
   """Test the Bernoulli class."""
 
