@@ -707,3 +707,13 @@ class Bernoulli(EBM):
   def entropy(self):
     return tf.reduce_sum(
         tfp.distributions.Bernoulli(logits=2 * self._variables).entropy())
+
+  
+def probability_to_logit(probability):
+  p = tf.cast(probability, tf.dtypes.float32)
+  return tf.math.log(p) - tf.math.log(1 - p)
+
+
+def logit_to_probability(logit_in):
+  logit = tf.cast(logit_in, tf.dtypes.float32)
+  return tf.math.divide(tf.math.exp(logit), 1 + tf.math.exp(logit))
