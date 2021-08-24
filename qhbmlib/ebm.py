@@ -65,7 +65,7 @@ class KOBE(EnergyFunction):
     indices_list = []
     for i in range(1, order + 1):
       combos = itertools.combinations(range(num_bits), i)
-      indices_list.extend(list(combos)])
+      indices_list.extend(list(combos))
     self._indices = tf.ragged.stack(indices_list)
     self._num_variables = tf.constant(len(indices_list))
     self._variables = self.add_weight(
