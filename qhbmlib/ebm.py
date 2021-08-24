@@ -709,25 +709,6 @@ class Bernoulli(EBM):
         tfp.distributions.Bernoulli(logits=2 * self._variables).entropy())
 
 
-# NEW
-# =======================================================================
-#OLD
-
-
-@tf.function
-def probability_to_logit(probability):
-  logging.info("retracing: probability_to_logit")
-  p = tf.cast(probability, tf.dtypes.float32)
-  return tf.math.log(p) - tf.math.log(1 - p)
-
-
-@tf.function
-def logit_to_probability(logit_in):
-  logging.info("retracing: logit_to_probability")
-  logit = tf.cast(logit_in, tf.dtypes.float32)
-  return tf.math.divide(tf.math.exp(logit), 1 + tf.math.exp(logit))
-
-
 # ============================================================================ #
 # Swish neural network tools.
 # ============================================================================ #
