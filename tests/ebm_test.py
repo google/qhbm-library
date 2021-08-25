@@ -19,61 +19,6 @@ import cirq
 import tensorflow as tf
 
 from qhbmlib import ebm
-from qhbmlib import qhbm
-
-from tensorflow.python.framework import test_util as tf_test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
-
-
-class UniqueBitstringsWithCountsTest(tf.test.TestCase):
-  """Test unique_with_counts from the qhbm library."""
-
-  @tf_test_util.run_in_graph_and_eager_modes(assert_no_eager_garbage=True)
-  def test_identity(self):
-    # Case when all entries are unique.
-    test_bitstrings = tf.constant([[1], [0]], dtype=tf.int8)
-    test_y, test_count = ebm.unique_bitstrings_with_counts(test_bitstrings)
-    self.assertAllEqual(test_y, test_bitstrings)
-    self.assertAllEqual(test_count, tf.constant([1, 1]))
-
-  @tf_test_util.run_in_graph_and_eager_modes(assert_no_eager_garbage=True)
-  def test_short(self):
-    # Case when bitstrings are length 1.
-    test_bitstrings = tf.constant(
-        [
-            [0],
-            [1],
-            [0],
-            [1],
-            [1],
-            [0],
-            [1],
-            [1],
-        ],
-        dtype=tf.int8,
-    )
-    test_y, test_count = ebm.unique_bitstrings_with_counts(test_bitstrings)
-    self.assertAllEqual(test_y, tf.constant([[0], [1]]))
-    self.assertAllEqual(test_count, tf.constant([3, 5]))
-
-  @tf_test_util.run_in_graph_and_eager_modes(assert_no_eager_garbage=True)
-  def test_long(self):
-    # Case when bitstrings are of length > 1.
-    test_bitstrings = tf.constant(
-        [
-            [1, 0, 1],
-            [1, 1, 1],
-            [0, 1, 1],
-            [1, 0, 1],
-            [1, 1, 1],
-            [0, 1, 1],
-            [1, 0, 1],
-            [1, 0, 1],
-        ],
-        dtype=tf.int8,
-    )
-    test_y, test_count = ebm.unique_bitstrings_with_counts(test_bitstrings)
-    self.assertAllEqual(test_y, tf.constant([[1, 0, 1], [1, 1, 1], [0, 1, 1]]))
-    self.assertAllEqual(test_count, tf.constant([4, 2, 2]))
 
 
 class ProbTest(tf.test.TestCase):
@@ -82,7 +27,6 @@ class ProbTest(tf.test.TestCase):
   @tf_test_util.run_in_graph_and_eager_modes(assert_no_eager_garbage=True)
   def test_probability_to_logit(self):
     """If p is the probability of drawing 1 from a Bernoulli distribution, then
-
         logit = ln(p/(1-p))
         """
     num_vals = 11
@@ -94,7 +38,6 @@ class ProbTest(tf.test.TestCase):
   @tf_test_util.run_in_graph_and_eager_modes(assert_no_eager_garbage=True)
   def test_logit_to_probability(self):
     """If L is the log-odds of drawing a 1 from a Bernoulli distribution, then
-
         p = exp(L)/(1 + exp(L))
         """
     num_vals = 17
