@@ -24,7 +24,19 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 import tensorflow_quantum as tfq
 
+from qhbmlib import util
+
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
+
+
+def probability_to_logit(probability):
+  p = tf.cast(probability, tf.dtypes.float32)
+  return tf.math.log(p) - tf.math.log(1 - p)
+
+
+def logit_to_probability(logit_in):
+  logit = tf.cast(logit_in, tf.dtypes.float32)
+  return tf.math.divide(tf.math.exp(logit), 1 + tf.math.exp(logit))
 
 
 class EnergyFunction(tf.keras.Model, abc.ABC):
@@ -159,55 +171,6 @@ class EnergySampler(abc.ABC):
   @abc.abstractmethod
   def sample(self, num_samples, unique=True):
     raise NotImplementedError()
-
-
-@tf.function
-def unique_bitstrings_with_counts(bitstrings):
-  """Extract the unique bitstrings in the given bitstring tensor.
-    Works by converting each bitstring to a 64 bit integer, then using built-in
-    `tf.unique_with_counts` on this 1-D array, then mapping these integers back
-    to
-    bitstrings. The inputs and outputs are to be related by the same invariants
-    as
-    those of `tf.unique_with_counts`,
-    y[idx[i]] = input_bitstrings[i] for i in [0, 1,...,rank(input_bitstrings) -
-    1]
-    TODO(zaqqwerty): the signature and return values are designed to be similar
-    to those of tf.unique_with_counts.  This function is needed because
-    `tf.unique_with_counts` does not work on 2-D tensors.  When it begins to
-    work
-    on 2-D tensors, then this function will be deprecated.
-    Args:
-      input_bitstrings: 2-D `tf.Tensor` of dtype `int8`.  This tensor is
-        interpreted as a list of bitstrings.  Bitstrings are required to be 64
-        bits or fewer.
-      out_idx: An optional `tf.DType` from: `tf.int32`, `tf.int64`. Defaults to
-        `tf.int32`.  Specified type of idx and count outputs.
-    Returns:
-      y: 2-D `tf.Tensor` of dtype `int8` containing the unique 0-axis entries of
-        `input_bitstrings`.
-      idx: 1-D `tf.Tensor` of dtype `out_idx` such that `idx[i]` is the index in
-        `y` containing the value `input_bitstrings[i]`.
-      count: 1-D `tf.Tensor` of dtype `out_idx` such that `count[i]` is the
-      number
-        of occurences of `y[i]` in `input_bitstrings`.
-  """
-  # Convert bitstrings to integers and uniquify those integers.
-  input_shape = tf.shape(bitstrings)
-  mask = tf.cast(bitstrings, tf.int64)
-  base = tf.bitwise.left_shift(
-      mask, tf.range(tf.cast(input_shape[1], tf.int64), dtype=tf.int64))
-  ints_equiv = tf.reduce_sum(base, 1)
-  _, idx, counts = tf.unique_with_counts(ints_equiv)
-
-  # Convert unique integers to corresponding unique bitstrings.
-  unique_bitstrings = tf.zeros((tf.shape(counts)[0], input_shape[1]),
-                               dtype=tf.int8)
-  unique_bitstrings = tf.tensor_scatter_nd_update(unique_bitstrings,
-                                                  tf.expand_dims(idx, axis=1),
-                                                  bitstrings)
-
-  return unique_bitstrings, counts
 
 
 class EnergyKernel(tfp.mcmc.TransitionKernel, abc.ABC):
@@ -530,7 +493,7 @@ class MCMC(EnergySampler):
 
     sampled_states = sampled_states[:num_samples]
     if unique:
-      return unique_bitstrings_with_counts(sampled_states)
+      return util.unique_bitstrings_with_counts(sampled_states)
     return sampled_states
 
 
@@ -593,7 +556,7 @@ class EBM(tf.keras.Model):
           tfp.distributions.Categorical(logits=-1 *
                                         self.energies()).sample(num_samples))
       if unique:
-        return unique_bitstrings_with_counts(samples)
+        return util.unique_bitstrings_with_counts(samples)
       return samples
     else:
       return self._energy_sampler.sample(num_samples, unique=unique)
@@ -687,7 +650,7 @@ class Bernoulli(EBM):
     samples = tfp.distributions.Bernoulli(
         logits=2 * self._variables, dtype=tf.int8).sample(num_samples)
     if unique:
-      return unique_bitstrings_with_counts(samples)
+      return util.unique_bitstrings_with_counts(samples)
     return samples
 
   @tf.function
@@ -712,362 +675,3 @@ class Bernoulli(EBM):
   def entropy(self):
     return tf.reduce_sum(
         tfp.distributions.Bernoulli(logits=2 * self._variables).entropy())
-
-
-# NEW
-# =======================================================================
-#OLD
-
-
-@tf.function
-def probability_to_logit(probability):
-  logging.info("retracing: probability_to_logit")
-  p = tf.cast(probability, tf.dtypes.float32)
-  return tf.math.log(p) - tf.math.log(1 - p)
-
-
-@tf.function
-def logit_to_probability(logit_in):
-  logging.info("retracing: logit_to_probability")
-  logit = tf.cast(logit_in, tf.dtypes.float32)
-  return tf.math.divide(tf.math.exp(logit), 1 + tf.math.exp(logit))
-
-
-# ============================================================================ #
-# Swish neural network tools.
-# ============================================================================ #
-
-
-def get_swish_net_hidden_width(num_bits):
-  return num_bits + 1 + 2
-
-
-def get_initial_layer(num_bits):
-  """Linear initial layer."""
-  w_in = num_bits
-  w_out = get_swish_net_hidden_width(num_bits)
-
-  @tf.function
-  def initial_layer(thetas, x):
-    logging.info("retracing: initial_layer")
-    mat = tf.reshape(thetas[:w_in * w_out], [w_out, w_in])
-    bias = thetas[w_in * w_out:w_in * w_out + w_out]
-    return tf.linalg.matvec(mat, x) + bias
-
-  return initial_layer
-
-
-def get_hidden_layer(num_bits, i):
-  """Swish hidden unit."""
-  w = get_swish_net_hidden_width(num_bits)
-
-  @tf.function
-  def hidden_layer(thetas, x):
-    logging.info("retracing: hidden_layer_{}".format(i))
-    mat = tf.reshape(thetas[:w**2], [w, w])
-    bias = thetas[w**2:w**2 + w]
-    return tf.nn.swish(tf.linalg.matvec(mat, x) + bias)
-
-  return hidden_layer
-
-
-def get_final_layer(num_bits):
-  """Linear final layer."""
-  w_in = get_swish_net_hidden_width(num_bits)
-  w_out = 1
-
-  @tf.function
-  def final_layer(thetas, x):
-    logging.info("retracing: final_layer")
-    mat = tf.reshape(thetas[:w_in * w_out], [w_out, w_in])
-    bias = thetas[w_in * w_out:w_in * w_out + w_out]
-    return tf.reduce_sum(tf.linalg.matvec(mat, x) + bias)
-
-  return final_layer
-
-
-def get_swish_num_values(num_bits, num_layers):
-  h_w = get_swish_net_hidden_width(num_bits)
-  n_init_params = num_bits * h_w + h_w
-  n_hidden_params = h_w**2 + h_w
-  n_hidden_params_total = n_hidden_params * num_layers
-  n_final_params = h_w + 1
-  return n_init_params + n_hidden_params_total + n_final_params
-
-
-def get_swish_network(num_bits, num_layers):
-  """Any function mapping [0,1]^n to R^m can be approximated by
-  a Swish network with hidden layer width n+m+2.
-  """
-  h_w = get_swish_net_hidden_width(num_bits)
-  n_init_params = num_bits * h_w + h_w
-  n_hidden_params = h_w**2 + h_w
-  n_hidden_params_total = n_hidden_params * num_layers
-  n_final_params = h_w + 1
-
-  this_initial_layer = get_initial_layer(num_bits)
-
-  def identity(thetas, x):
-    return x
-
-  hidden_func = identity
-
-  def get_hidden_stack_inner(previous_func, i):
-
-    def current_hidden_stack(thetas, x):
-      cropped_variables = thetas[i * n_hidden_params:(i + 1) * n_hidden_params]
-      return get_hidden_layer(num_bits, i)(cropped_variables,
-                                           previous_func(thetas, x))
-
-    return current_hidden_stack
-
-  for i in range(num_layers):
-    hidden_func = get_hidden_stack_inner(hidden_func, i)
-
-  this_final_layer = get_final_layer(num_bits)
-
-  @tf.function
-  def swish_network(thetas, x):
-    logging.info("retracing: swish_network")
-    x = tf.cast(x, tf.float32)
-    return this_final_layer(
-        thetas[n_init_params + n_hidden_params_total:],
-        hidden_func(thetas[n_init_params:n_init_params + n_hidden_params_total],
-                    this_initial_layer(thetas[:n_init_params], x)))
-
-  return swish_network
-
-
-# ============================================================================ #
-# Tools for MCMC sampling from arbitrary energy functions.
-# ============================================================================ #
-
-
-def get_batched_energy_function(energy_function):
-  """Converts a given energy function that takes only a single bitstring as an
-  argument to one which can accept batches of bitstrings.
-  """
-
-  @tf.function
-  def batched_energy_function(energy_function_params, x):
-    logging.info("retracing: batched_energy_function")
-    if tf.rank(x) == 1:
-      return energy_function(energy_function_params, x)
-    shape = tf.shape(x)
-    return tf.reshape(
-        tf.vectorized_map(lambda x: energy_function(energy_function_params, x),
-                          tf.reshape(x, [-1, shape[-1]])), shape[:-1])
-
-  return batched_energy_function
-
-
-BernoulliProposalResults = collections.namedtuple(
-    "BernoulliProposalResults",
-    ["target_log_prob", "log_acceptance_correction"])
-
-
-class BernoulliProposal(tfp.mcmc.TransitionKernel):
-  """Proposes the next bitstring by flipping the current bitstring according to
-  a Bernoulli distribution.
-  """
-
-  def __init__(self, energy_function, flip_prob, num_bits):
-    super().__init__()
-    self.energy_function = get_batched_energy_function(energy_function)
-    self.energy_function_params = None
-    self.flip_prob = flip_prob
-    self.num_bits = num_bits
-    self.dist = tfp.distributions.Bernoulli(
-        probs=[flip_prob] * num_bits, dtype=tf.int8)
-
-  def set_energy_function_params(self, energy_function_params):
-    if self.energy_function_params is None:
-      self.energy_function_params = tf.Variable(energy_function_params)
-    else:
-      self.energy_function_params.assign(energy_function_params)
-
-  @tf.function
-  def one_step(self, current_state, previous_kernel_results):
-    logging.info("retracing: one_step")
-    next_state = tf.bitwise.bitwise_xor(
-        self.dist.sample(tf.shape(current_state)[0]), current_state)
-    target_log_prob = -1.0 * self.energy_function(self.energy_function_params,
-                                                  next_state)
-    kernel_results = BernoulliProposalResults(
-        target_log_prob=target_log_prob,
-        log_acceptance_correction=tf.zeros_like(target_log_prob))
-    return next_state, kernel_results
-
-  @property
-  def is_calibrated(self):
-    return False
-
-  def bootstrap_results(self, init_state):
-    target_log_prob = -1.0 * self.energy_function(self.energy_function_params,
-                                                  init_state)
-    kernel_results = BernoulliProposalResults(
-        target_log_prob=target_log_prob,
-        log_acceptance_correction=tf.zeros_like(target_log_prob))
-    return kernel_results
-
-
-GibbsWithGradientsProposalResults = collections.namedtuple(
-    "GibbsWithGradientsProposalResults",
-    ["target_log_prob", "log_acceptance_correction"])
-
-
-class GibbsWithGradientsProposal(tfp.mcmc.TransitionKernel):
-  """Proposes the next bitstring using Gibbs with Gradients."""
-
-  def __init__(self, energy_function, gradient=True, temp=2.0, num_samples=1):
-    super().__init__()
-    self.energy_function = get_batched_energy_function(energy_function)
-    self.energy_function_params = None
-    self.gradient = gradient
-    self.difference_function = self.gradient_difference_function if gradient else self.exact_difference_function
-    self.temp = temp
-    self.num_samples = num_samples
-
-  def set_energy_function_params(self, energy_function_params):
-    if self.energy_function_params is None:
-      self.energy_function_params = tf.Variable(energy_function_params)
-    else:
-      self.energy_function_params.assign(energy_function_params)
-
-  @tf.function
-  def exact_difference_function(self, current_state):
-    logging.info("retracing: exact_difference_function")
-    current_state_transpose = tf.transpose(current_state)
-    diff = tf.zeros_like(current_state_transpose, dtype=tf.float32)
-    current_energy = self.energy_function(self.energy_function_params,
-                                          current_state)
-    for i in range(tf.shape(current_state)[-1]):
-      pert_state = tf.transpose(
-          tf.tensor_scatter_nd_update(
-              current_state_transpose, [[i]],
-              tf.expand_dims(1 - current_state_transpose[i], 0)))
-      diff = tf.tensor_scatter_nd_update(
-          diff, [[i]],
-          tf.expand_dims(
-              current_energy -
-              self.energy_function(self.energy_function_params, pert_state), 0))
-    return tf.transpose(diff)
-
-  @tf.function
-  def gradient_difference_function(self, current_state):
-    logging.info("retracing: gradient_difference_function")
-    current_state = tf.cast(current_state, tf.float32)
-    with tf.GradientTape() as tape:
-      tape.watch(current_state)
-      energy = self.energy_function(self.energy_function_params, current_state)
-    grad = tape.gradient(energy, current_state)
-    return (2 * current_state - 1) * grad
-
-  @tf.function
-  def one_step(self, current_state, previous_kernel_results):
-    logging.info("retracing: one_step")
-    forward_diff = self.difference_function(current_state)
-    forward_dist = tfp.distributions.OneHotCategorical(
-        logits=forward_diff / self.temp, dtype=tf.int8)
-    all_changes = forward_dist.sample(self.num_samples)
-    change = tf.cast(tf.reduce_sum(all_changes, 0) > 0, dtype=tf.int8)
-    next_state = tf.bitwise.bitwise_xor(change, current_state)
-
-    target_log_prob = -1.0 * self.energy_function(self.energy_function_params,
-                                                  next_state)
-
-    forward_log_prob = tf.reduce_sum(forward_dist.log_prob(all_changes), 0)
-    backward_diff = self.difference_function(next_state)
-    backward_dist = tfp.distributions.OneHotCategorical(
-        logits=backward_diff / self.temp, dtype=tf.int8)
-    backward_log_prob = tf.reduce_sum(backward_dist.log_prob(all_changes), 0)
-    log_acceptance_correction = backward_log_prob - forward_log_prob
-
-    kernel_results = GibbsWithGradientsProposalResults(
-        target_log_prob=target_log_prob,
-        log_acceptance_correction=log_acceptance_correction)
-
-    return next_state, kernel_results
-
-  @property
-  def is_calibrated(self):
-    return False
-
-  def bootstrap_results(self, init_state):
-    target_log_prob = -1.0 * self.energy_function(self.energy_function_params,
-                                                  init_state)
-    kernel_results = GibbsWithGradientsProposalResults(
-        target_log_prob=target_log_prob,
-        log_acceptance_correction=tf.zeros_like(target_log_prob))
-    return kernel_results
-
-
-class MetropolisHastingsMCMC(tfp.mcmc.MetropolisHastings):
-  """Wrapper around tpc.mcmc.MetropolisHastings that sets the energy function
-  parameters of the inner kernel's energy function.
-  """
-
-  def __init__(self, inner_kernel):
-    super().__init__(inner_kernel)
-
-  def set_energy_function_params(self, energy_function_params):
-    logging.info("retracing: set_energy_function_params")
-    self.inner_kernel.set_energy_function_params(energy_function_params)
-
-
-class MCMCSampler:
-  """Samples from an MCMC kernel."""
-
-  def __init__(self,
-               kernel,
-               num_chains,
-               num_bits,
-               buffer_size,
-               buffer_probability,
-               num_burnin_steps=0,
-               num_steps_between_results=0,
-               parallel_iterations=10):
-    self.kernel = kernel
-    self.num_chains = num_chains
-    self.num_bits = num_bits
-    self.buffer_size = buffer_size
-    self.buffer_probability = buffer_probability
-    self.num_burnin_steps = num_burnin_steps
-    self.num_steps_between_results = num_steps_between_results
-    self.parallel_iterations = parallel_iterations
-
-    self.buffer = tf.queue.RandomShuffleQueue(
-        buffer_size, 0, [tf.int8], shapes=[num_bits])
-
-  @tf.function
-  def __call__(self, energy_function_params, num_samples):
-    logging.info("retracing: MCMCSampler")
-    self.kernel.set_energy_function_params(energy_function_params)
-    num_results = tf.cast(tf.math.ceil(num_samples / self.num_chains), tf.int32)
-
-    if self.buffer.size() == 0 or tf.random.uniform(
-        ()) > self.buffer_probability:
-      init_state = tf.cast(
-          tf.random.uniform([self.num_chains, self.num_bits],
-                            maxval=2,
-                            dtype=tf.int32), tf.int8)
-    else:
-      init_state = self.buffer.dequeue_many(self.num_chains)
-    previous_kernel_results = self.kernel.bootstrap_results(init_state)
-
-    samples = tfp.mcmc.sample_chain(
-        num_results,
-        init_state,
-        previous_kernel_results=previous_kernel_results,
-        kernel=self.kernel,
-        num_burnin_steps=self.num_burnin_steps,
-        num_steps_between_results=self.num_steps_between_results,
-        parallel_iterations=self.parallel_iterations,
-        trace_fn=None)
-
-    sampled_states = tf.reshape(samples, [-1, self.num_bits])
-    projected_buffer_size = self.buffer.size() + tf.shape(sampled_states)[0]
-    if projected_buffer_size > self.buffer_size:
-      self.buffer.dequeue_many(projected_buffer_size - self.buffer_size)
-    self.buffer.enqueue_many(sampled_states)
-    return sampled_states[:num_samples]
