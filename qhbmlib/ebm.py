@@ -516,9 +516,14 @@ class EBM(tf.keras.Model):
     return self._is_analytic
 
   def copy(self):
-    energy_sampler = self._energy_sampler.copy()
+    if self._energy_sampler is not None:
+      energy_sampler = self._energy_sampler.copy()
+      energy_function = energy_sampler.energy_function
+    else:
+      energy_sampler = None
+      energy_function = self._energy_function.copy()
     return EBM(
-        energy_sampler.energy_function,
+        energy_function,
         energy_sampler,
         is_analytic=self.is_analytic,
         name=self.name)
@@ -598,7 +603,8 @@ class Bernoulli(EBM):
     return self._is_analytic
 
   def copy(self):
-    bernoulli = Bernoulli(self.num_bits, name=self.name)
+    bernoulli = Bernoulli(
+        self.num_bits, is_analytic=self.is_analytic, name=self.name)
     bernoulli._variables.assign(self._variables)
     return bernoulli
 

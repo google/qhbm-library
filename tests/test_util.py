@@ -23,7 +23,10 @@ import scipy
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from qhbmlib import ebm, qnn, architectures, qhbm
+from qhbmlib import architectures
+from qhbmlib import ebm
+from qhbmlib import qhbm
+from qhbmlib import qnn
 
 
 def get_random_qhbm(
@@ -37,19 +40,20 @@ def get_random_qhbm(
 ):
   """Create a random QHBM for use in testing."""
   num_qubits = len(qubits)
-  test_ebm = ebm.KOBE(
+  this_ebm = ebm.Bernoulli(
       num_qubits,
-      2,
-      initializer=tf.keras.initializers.RandomUniform(minval_thetas,
-                                                      maxval_thetas))
+      tf.keras.initializers.RandomUniform(
+          minval=minval_thetas, maxval=maxval_thetas),
+      is_analytic=True)
   unitary, phis_symbols = architectures.get_hardware_efficient_model_unitary(
       qubits, num_layers, identifier)
-  test_qnn = qnn.QNN(
+  this_qnn = qnn.QNN(
       unitary,
       phis_symbols,
-      initializer=tf.keras.initializers.RandomUniform(minval_phis, maxval_phis))
-  test_qhbm = qhbm.QHBM(test_ebm, test_qnn, identifier)
-  return test_qhbm
+      tf.keras.initializers.RandomUniform(
+          minval=minval_phis, maxval=maxval_phis),
+      is_analytic=True)
+  return qhbm.QHBM(this_ebm, this_qnn, identifier)
 
 
 def get_random_pauli_sum(qubits):
