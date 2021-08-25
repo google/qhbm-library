@@ -192,7 +192,6 @@ class QNN(tf.keras.Model):
     qnn._values.assign(self._values)
     return qnn
 
-  @tf.function
   def _sample_function(self, circuits, counts, mask=True):
     """General function for sampling from circuits."""
     samples = self._sample_layer(
@@ -235,21 +234,18 @@ class QNN(tf.keras.Model):
       return tf.reduce_sum(tf.transpose(probs * tf.transpose(expectations)), 0)
     return expectations
 
-  @tf.function
   def pqc(self, resolve=True):
     if resolve:
       return tfq.resolve_parameters(self._pqc, self.symbols,
                                     tf.expand_dims(self._values, 0))
     return self._pqc
 
-  @tf.function
   def inverse_pqc(self, resolve=True):
     if resolve:
       return tfq.resolve_parameters(self._inverse_pqc, self.symbols,
                                     tf.expand_dims(self._values, 0))
     return self._inverse_pqc
 
-  @tf.function
   def circuits(self, bitstrings, resolve=True):
     """Returns the current circuits for this QNN given bitstrings.
 
@@ -269,7 +265,6 @@ class QNN(tf.keras.Model):
     pqcs = tf.tile(self.pqc(resolve=resolve), [num_bitstrings])
     return tfq.append_circuit(bit_circuits, pqcs)
 
-  @tf.function
   def sample(self, bitstrings, counts, mask=True):
     """Returns bitstring samples from the QNN.
 
@@ -309,7 +304,6 @@ class QNN(tf.keras.Model):
     return self._expectation_function(
         circuits, counts, operators, reduce=reduce)
 
-  @tf.function
   def pulled_back_circuits(self, circuits, resolve=True):
     """Returns the pulled back circuits for this QNN given input quantum data.
 
@@ -327,7 +321,6 @@ class QNN(tf.keras.Model):
         self.inverse_pqc(resolve=resolve), [tf.shape(circuits)[0]])
     return tfq.append_circuit(circuits, inverse_pqcs)
 
-  @tf.function
   def pulled_back_sample(self, circuits, counts, mask=True):
     """Returns samples from the pulled back data distribution.
 
@@ -351,7 +344,6 @@ class QNN(tf.keras.Model):
     pulled_back_circuits = self.pulled_back_circuits(circuits)
     return self._sample_function(pulled_back_circuits, counts, mask=mask)
 
-  @tf.function
   def pulled_back_expectation(self, circuits, counts, operators, reduce=True):
     """Returns the expectation values for a given pulled-back dataset.
 
@@ -375,7 +367,6 @@ class QNN(tf.keras.Model):
     return self._expectation_function(
         pulled_back_circuits, counts, operators, reduce=reduce)
 
-  @tf.function
   def pqc_unitary(self):
     if self.is_analytic:
       return self._unitary_layer(self.pqc()).to_tensor()[0]

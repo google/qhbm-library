@@ -28,7 +28,6 @@ from qhbmlib import qhbm, ebm
 # ============================================================================ #
 
 
-@tf.function
 def exact_qmhl_loss(
     qhbm_model: qhbm.QHBM,
     target_circuits: tf.Tensor,
@@ -52,7 +51,6 @@ def exact_qmhl_loss(
   return expected + log_partition
 
 
-@tf.function
 def exact_qmhl_loss_thetas_grad(
     qhbm_model: qhbm.QHBM,
     num_model_samples: tf.Tensor,
@@ -119,7 +117,6 @@ def exact_qmhl_loss_thetas_grad(
   return tf.math.subtract(e_grad_pb_avg, e_grad_c_avg)
 
 
-@tf.function
 def exact_qmhl_loss_phis_grad(
     qhbm: qhbm.QHBM,
     op_tensor: tf.Tensor,
