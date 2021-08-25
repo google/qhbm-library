@@ -17,7 +17,6 @@
 import abc
 import collections
 import itertools
-from absl import logging
 
 import cirq
 import tensorflow as tf
@@ -102,7 +101,6 @@ class KOBE(EnergyFunction):
     kobe._variables.assign(self._variables)
     return kobe
 
-  @tf.function
   def energy(self, bitstrings):
     spins = 1 - 2 * bitstrings
     parities_t = tf.zeros(
@@ -148,7 +146,6 @@ class MLP(EnergyFunction):
       mlp.trainable_variables[i].assign(self.trainable_variables[i])
     return mlp
 
-  @tf.function
   def call(self, bitstrings):
     x = bitstrings
     for hidden_layer in self._hidden_layers:
@@ -156,7 +153,6 @@ class MLP(EnergyFunction):
     x = self._energy_layer(x)
     return tf.squeeze(x, -1)
 
-  @tf.function
   def energy(self, bitstrings):
     return self(bitstrings)
 
@@ -240,7 +236,6 @@ class UncalibratedGWG(EnergyKernel):
         num_samples=self.num_samples,
         name=self.name)
 
-  @tf.function
   def _exact_diff_function(self, current_state):
     current_state_t = tf.transpose(current_state)
     diff_t = tf.zeros_like(current_state_t, dtype=tf.float32)
@@ -257,7 +252,6 @@ class UncalibratedGWG(EnergyKernel):
               current_energy - self.energy_function.energy(pert_state), 0))
     return tf.transpose(diff_t)
 
-  @tf.function
   def _grad_diff_function(self, current_state):
     current_state = tf.cast(current_state, tf.float32)
     with tf.GradientTape() as tape:
@@ -266,7 +260,6 @@ class UncalibratedGWG(EnergyKernel):
     grad = tape.gradient(energy, current_state)
     return (2 * current_state - 1) * grad
 
-  @tf.function
   def one_step(self, current_state, previous_kernel_results):
     forward_diff = self._diff_function(current_state)
     forward_dist = tfp.distributions.OneHotCategorical(
@@ -290,7 +283,6 @@ class UncalibratedGWG(EnergyKernel):
 
     return next_state, kernel_results
 
-  @tf.function
   def bootstrap_results(self, init_state):
     target_log_prob = -1 * self.energy_function.energy(init_state)
     kernel_results = UncalibratedGWGResults(
@@ -365,11 +357,9 @@ class GWG(MetropolisHastings):
         num_samples=self.num_samples,
         name=self.name)
 
-  @tf.function
   def one_step(self, current_state, previous_kernel_results):
     return self._impl.one_step(current_state, previous_kernel_results)
 
-  @tf.function
   def bootstrap_results(self, init_state):
     return self._impl.bootstrap_results(init_state)
 
@@ -447,7 +437,6 @@ class MCMC(EnergySampler):
     mcmc._buffer = tf.queue.QueueBase.from_list(tf.constant(0), [self._buffer])
     return mcmc
 
-  @tf.function
   def sample(self, num_samples, unique=True):
     num_results = tf.cast(tf.math.ceil(num_samples / self.num_chains), tf.int32)
 
@@ -538,7 +527,6 @@ class EBM(tf.keras.Model):
         is_analytic=self.is_analytic,
         name=self.name)
 
-  @tf.function
   def energy(self, bitstrings):
     return self._energy_function.energy(bitstrings)
 
@@ -548,7 +536,6 @@ class EBM(tf.keras.Model):
   def operator_shards(self, qubits):
     return self._energy_function.operator_shards(qubits)
 
-  @tf.function
   def sample(self, num_samples, unique=True):
     if self.is_analytic and self._energy_sampler is None:
       samples = tf.gather(
@@ -561,26 +548,22 @@ class EBM(tf.keras.Model):
     else:
       return self._energy_sampler.sample(num_samples, unique=unique)
 
-  @tf.function
   def energies(self):
     if self.is_analytic:
       return self.energy(self._all_bitstrings)
     raise NotImplementedError()
 
-  @tf.function
   def probabilities(self):
     if self.is_analytic:
       return tf.exp(-self.ebm.energies()) / tf.exp(
           self.log_partition_function())
     raise NotImplementedError()
 
-  @tf.function
   def log_partition_function(self):
     if self.is_analytic:
       return tf.reduce_logsumexp(-1 * self.energies())
     raise NotImplementedError()
 
-  @tf.function
   def entropy(self):
     if self.is_analytic:
       return tfp.distributions.Categorical(logits=-1 *
@@ -637,7 +620,6 @@ class Bernoulli(EBM):
   def operator_expectation(self, expectations):
     return tf.reduce_sum(expectations * self._variables)
 
-  @tf.function
   def sample(self, num_samples, unique=True):
     r"""Fairly samples from the EBM defined by `energy`.
 
@@ -653,25 +635,21 @@ class Bernoulli(EBM):
       return util.unique_bitstrings_with_counts(samples)
     return samples
 
-  @tf.function
   def energies(self):
     if self.is_analytic:
       return self.energy(self._all_bitstrings)
     raise NotImplementedError()
 
-  @tf.function
   def probabilities(self):
     if self.is_analytic:
       return tf.exp(-self.energies()) / tf.exp(self.log_partition_function())
     raise NotImplementedError()
 
-  @tf.function
   def log_partition_function(self):
     if self.is_analytic:
       return tf.reduce_logsumexp(-1 * self.energies())
     raise NotImplementedError()
 
-  @tf.function
   def entropy(self):
     return tf.reduce_sum(
         tfp.distributions.Bernoulli(logits=2 * self._variables).entropy())

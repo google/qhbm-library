@@ -134,7 +134,7 @@ class QHBMBasicFunctionTest(tf.test.TestCase):
     # Only the two expected bitstrings should exist.
     self.assertAllEqual(tf.shape(test_bitstrings), [2, 3])
     self.assertEqual(tf.reduce_sum(test_counts), num_samples)
-    self.assertAllClose(1.0, test_counts[0] / test_counts[1], atol=1e-3)
+    self.assertAllClose(1.0, test_counts[0] / test_counts[1], atol=2e-3)
 
   def test_sample_state_circuits(self):
     """Confirm circuits are sampled correctly."""

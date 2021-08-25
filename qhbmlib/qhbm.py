@@ -31,6 +31,7 @@ class QHBM(tf.keras.Model):
   def __init__(self, ebm, qnn, name=None):
     super().__init__(name=name)
     self._ebm = ebm
+    self.thetas = ebm.trainable_variables
     self._qnn = qnn
     if ebm.has_operator:
       self._operator_shards = tfq.convert_to_tensor(
@@ -70,33 +71,26 @@ class QHBM(tf.keras.Model):
     circuits = self.qnn.circuits(bitstrings)
     return circuits, counts
 
-  @tf.function
   def sample(self, num_samples, mask=True, reduce=True, unique=True):
     bitstrings, counts = self.ebm.sample(num_samples)
     return self.qnn.sample(bitstrings, counts, mask=mask, reduce=reduce, unique=unique)
 
-  @tf.function
   def expectation(self, operators, num_samples, reduce=True):
     bitstrings, counts = self.ebm.sample(num_samples)
     return self.qnn.expectation(bitstrings, counts, operators, reduce=reduce)
 
-  @tf.function
   def probabilities(self):
     return self.ebm.probabilities()
 
-  @tf.function
   def log_partition_function(self):
     return self.ebm.log_partition_function()
 
-  @tf.function
   def entropy(self):
     return self.ebm.entropy()
 
-  @tf.function
   def unitary_matrix(self):
     return self.qnn.pqc_unitary()
 
-  @tf.function
   def density_matrix(self):
     probabilities = tf.cast(self.probabilities(), tf.complex64)
     unitary_matrix = self.unitary_matrix()
@@ -106,7 +100,6 @@ class QHBM(tf.keras.Model):
             tf.expand_dims(probabilities, 0), [tf.shape(unitary_matrix)[0], 1]))
     return tf.matmul(unitary_probs, tf.linalg.adjoint(unitary_matrix))
 
-  @tf.function
   def fidelity(self, sigma: tf.Tensor):
     """TODO: convert to tf.keras.metric.Metric
     Calculate the fidelity between a QHBM and a density matrix.
