@@ -38,10 +38,10 @@ class QMHLExactLossTest(tf.test.TestCase):
       with tf.GradientTape() as tape:
         loss = qmhl.qmhl_loss(model, target_circuits, target_counts)
       thetas_grads, phis_grads = tape.gradient(loss, (model.thetas, model.phis))
-      self.assertAllClose(loss, target.ebm.entropy(), atol=2e-3)
+      self.assertAllClose(loss, target.ebm.entropy(), atol=5e-3)
       self.assertAllClose(
-          thetas_grads, tf.zeros(tf.shape(thetas_grads)), atol=1e-3)
-      self.assertAllClose(phis_grads, tf.zeros(tf.shape(phis_grads)), atol=1e-3)
+          thetas_grads, tf.zeros(tf.shape(thetas_grads)), atol=5e-3)
+      self.assertAllClose(phis_grads, tf.zeros(tf.shape(phis_grads)), atol=5e-3)
 
 
 if __name__ == "__main__":
