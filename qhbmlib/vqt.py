@@ -17,6 +17,8 @@
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
+
+@tf.function
 def vqt(qhbm, num_samples, hamiltonian, beta):
 
   @tf.custom_gradient
@@ -37,14 +39,12 @@ def vqt(qhbm, num_samples, hamiltonian, beta):
             qhbm.qnn.expectation(bitstrings, counts, hamiltonian, reduce=False),
             -1)
         beta_expectation = tf.reduce_sum(probs * beta_expectations)
-      grad_qnn = tape.gradient(beta_expectation,
-                                   qhbm.qnn.trainable_variables)
+      grad_qnn = tape.gradient(beta_expectation, qhbm.qnn.trainable_variables)
       grad_qnn = [grad_y * grad for grad in grad_qnn]
 
       with tf.GradientTape() as tape:
         energies = qhbm.ebm.energy(bitstrings)
-      energy_grads = tape.jacobian(energies,
-                                           qhbm.ebm.trainable_variables)
+      energy_grads = tape.jacobian(energies, qhbm.ebm.trainable_variables)
       probs_diffs = probs * (beta_expectations - energies)
       avg_diff = tf.reduce_sum(probs_diffs)
       grad_ebm = [

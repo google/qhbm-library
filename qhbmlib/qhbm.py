@@ -35,7 +35,7 @@ class QHBM(tf.keras.Model):
     self._qnn = qnn
     if ebm.has_operator:
       self._operator_shards = tfq.convert_to_tensor(
-        ebm.operator_shards(qnn.raw_qubits))
+          ebm.operator_shards(qnn.raw_qubits))
 
   @property
   def ebm(self):
@@ -73,7 +73,8 @@ class QHBM(tf.keras.Model):
 
   def sample(self, num_samples, mask=True, reduce=True, unique=True):
     bitstrings, counts = self.ebm.sample(num_samples)
-    return self.qnn.sample(bitstrings, counts, mask=mask, reduce=reduce, unique=unique)
+    return self.qnn.sample(
+        bitstrings, counts, mask=mask, reduce=reduce, unique=unique)
 
   def expectation(self, operators, num_samples, reduce=True):
     bitstrings, counts = self.ebm.sample(num_samples)

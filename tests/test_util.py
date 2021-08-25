@@ -44,25 +44,14 @@ def get_random_qhbm(
       num_qubits,
       tf.keras.initializers.RandomUniform(
           minval=minval_thetas, maxval=maxval_thetas),
-<<<<<<< HEAD
-      is_analytic=False)
-  unitary, phis_symbols = architectures.get_hardware_efficient_model_unitary(
-      qubits, num_layers, identifier)
-  this_qnn = qnn.QNN(
-      unitary, phis_symbols,
-      tf.keras.initializers.RandomUniform(
-          minval=minval_phis, maxval=maxval_phis))
-=======
       is_analytic=True)
   unitary, phis_symbols = architectures.get_hardware_efficient_model_unitary(
       qubits, num_layers, identifier)
   this_qnn = qnn.QNN(
       unitary,
-      phis_symbols,
       tf.keras.initializers.RandomUniform(
           minval=minval_phis, maxval=maxval_phis),
       is_analytic=True)
->>>>>>> main
   return qhbm.QHBM(this_ebm, this_qnn, identifier)
 
 

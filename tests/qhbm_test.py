@@ -46,13 +46,14 @@ class QHBMTest(tf.test.TestCase):
     for q in raw_qubits:
       u += cirq.X(q)**s
   name = "TestQHBM"
-  raw_bit_circuit, raw_bit_symbols = qnn.build_bit_circuit(raw_qubits)
+  raw_bit_circuit = qnn.bit_circuit(raw_qubits)
+  raw_bit_symbols = list(sorted(tfq.util.get_circuit_symbols(raw_bit_circuit)))
   bit_symbols = tf.constant([str(s) for s in raw_bit_symbols])
 
   def test_init(self):
     """Confirms QHBM is initialized correctly."""
     test_ebm = ebm.Bernoulli(self.num_bits)
-    test_qnn = qnn.QNN(self.u, self.raw_phis_symbols)
+    test_qnn = qnn.QNN(self.u)
     test_qhbm = qhbm.QHBM(test_ebm, test_qnn, self.name)
     self.assertEqual(self.name, test_qhbm.name)
     self.assertEqual(test_ebm, test_qhbm.ebm)
@@ -74,7 +75,7 @@ class QHBMTest(tf.test.TestCase):
   def test_copy(self):
     """Confirms copy works correctly."""
     test_ebm = ebm.Bernoulli(self.num_bits)
-    test_qnn = qnn.QNN(self.u, self.raw_phis_symbols)
+    test_qnn = qnn.QNN(self.u)
     test_qhbm = qhbm.QHBM(test_ebm, test_qnn, self.name)
     qhbm_copy = test_qhbm.copy()
     self.assertEqual(test_qhbm.name, qhbm_copy.name)
@@ -107,7 +108,7 @@ def get_basic_qhbm(is_analytic=False):
   for s in phis_symbols:
     for q in qubits:
       u += cirq.X(q)**s
-  test_qnn = qnn.QNN(u, phis_symbols, is_analytic=is_analytic)
+  test_qnn = qnn.QNN(u, is_analytic=is_analytic)
   test_qnn._values.assign(initial_phis)
   name = "static_qhbm"
   return qhbm.QHBM(test_ebm, test_qnn, name=name)
@@ -187,7 +188,8 @@ class QHBMBasicFunctionTest(tf.test.TestCase):
     n_samples_0 = int(1e4)
     n_samples_1 = int(2e4)
     counts = tf.constant([n_samples_0, n_samples_1])
-    ragged_samples = test_qhbm.qnn.pulled_back_sample(circuits, counts)
+    ragged_samples = test_qhbm.qnn.pulled_back_sample(
+        circuits, counts, reduce=False, unique=False)
     test_samples_0 = ragged_samples[0].to_tensor()
     test_samples_1 = ragged_samples[1].to_tensor()
     self.assertEqual(n_samples_0, test_samples_0.shape[0])
@@ -321,7 +323,7 @@ class ExactQHBMBasicFunctionTest(tf.test.TestCase):
                                            dtype=tf.float32))  # pin at |00>
     qubits = cirq.GridQubit.rect(1, n_bits)
     test_u = cirq.Circuit([cirq.H(qubits[0]), cirq.CNOT(qubits[0], qubits[1])])
-    test_qnn = qnn.QNN(test_u, [], is_analytic=True)
+    test_qnn = qnn.QNN(test_u, is_analytic=True)
     test_qhbm = qhbm.QHBM(test_ebm, test_qnn, name="bell")
     expected_dm = tf.constant(
         [[0.5, 0, 0, 0.5], [0, 0, 0, 0], [0, 0, 0, 0], [0.5, 0, 0, 0.5]],
