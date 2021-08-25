@@ -150,9 +150,11 @@ class QNN(tf.keras.Model):
       num_samples_mask = tf.cast((tf.ragged.range(counts) + 1).to_tensor(),
                                  tf.bool)
       samples = tf.ragged.boolean_mask(samples, num_samples_mask)
-    if reduce:
-      samples = samples.values.to_tensor()
     if unique:
+      samples = samples.values.to_tensor()
+      return util.unique_bitstrings_with_counts(samples)
+    elif reduce:
+      samples = samples.values.to_tensor()
     return samples
 
   def _expectation_function(self, circuits, counts, operators, reduce=True):
@@ -191,14 +193,14 @@ class QNN(tf.keras.Model):
   def pqc(self, resolve=True):
     if resolve:
       return tfq.resolve_parameters(self._pqc, self.symbols,
-                                    tf.expand_dims(self._values, 0))
+                                    tf.expand_dims(self.values, 0))
     return self._pqc
 
   @tf.function
   def inverse_pqc(self, resolve=True):
     if resolve:
       return tfq.resolve_parameters(self._inverse_pqc, self.symbols,
-                                    tf.expand_dims(self._values, 0))
+                                    tf.expand_dims(self.values, 0))
     return self._inverse_pqc
 
   @tf.function
@@ -222,7 +224,7 @@ class QNN(tf.keras.Model):
     return tfq.append_circuit(bit_circuits, pqcs)
 
   @tf.function
-  def sample(self, bitstrings, counts, mask=True):
+  def sample(self, bitstrings, counts, mask=True, reduce=True, unique=True):
     """Returns bitstring samples from the QNN.
 
       Args:
@@ -237,7 +239,7 @@ class QNN(tf.keras.Model):
           `self.u|bitstrings[i]>`.
     """
     circuits = self.circuits(bitstrings)
-    return self._sample_function(circuits, counts, mask=mask)
+    return self._sample_function(circuits, counts, mask=mask, reduce=reduce, unique=unique)
 
   def expectation(self, bitstrings, counts, operators, reduce=True):
     """Returns the expectation values of the operators against the QNN.
@@ -280,7 +282,7 @@ class QNN(tf.keras.Model):
     return tfq.append_circuit(circuits, inverse_pqcs)
 
   @tf.function
-  def pulled_back_sample(self, circuits, counts, mask=True):
+  def pulled_back_sample(self, circuits, counts, mask=True, reduce=True, unique=True):
     """Returns samples from the pulled back data distribution.
 
       The inputs represent the data density matrix. The inverse of `self.u`
@@ -301,7 +303,7 @@ class QNN(tf.keras.Model):
             that `ragged_samples[i]` contains `counts[i]` bitstrings.
       """
     pulled_back_circuits = self.pulled_back_circuits(circuits)
-    return self._sample_function(pulled_back_circuits, counts, mask=mask)
+    return self._sample_function(pulled_back_circuits, counts, mask=mask, reduce=reduce, unique=unique)
 
   @tf.function
   def pulled_back_expectation(self, circuits, counts, operators, reduce=True):
