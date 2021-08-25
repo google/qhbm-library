@@ -16,7 +16,9 @@
 
 import tensorflow as tf
 
-from qhbmlib import qhbm, ebm
+from qhbmlib import ebm
+from qhbmlib import qhbm
+from qhbmlib import util
 
 
 @tf.function
@@ -52,7 +54,7 @@ def qmhl_loss(model: qhbm.QHBM, target_circuits: tf.Tensor,
     ragged_samples_pb = model.qnn.pulled_back_sample(target_circuits,
                                                      target_counts)
     all_samples_pb = ragged_samples_pb.values.to_tensor()
-    samples_pb, counts_pb = ebm.unique_bitstrings_with_counts(all_samples_pb)
+    samples_pb, counts_pb = util.unique_bitstrings_with_counts(all_samples_pb)
     energies = model.ebm.energy(samples_pb)
     probs_pb = tf.cast(counts_pb, tf.float32) / tf.cast(
         tf.reduce_sum(counts_pb), tf.float32)
@@ -84,15 +86,15 @@ def qmhl_loss(model: qhbm.QHBM, target_circuits: tf.Tensor,
       thetas_grad = qnn_thetas_grad - ebm_thetas_grad
 
       # Phis derivative.
-#      if model.ebm.has_operator:
+      #      if model.ebm.has_operator:
       model_operators = model.operator_shards
       with tf.GradientTape() as tape:
         pulled_back_energy_shards = model.qnn.pulled_back_expectation(
-          target_circuits, target_counts, model_operators)
+            target_circuits, target_counts, model_operators)
         pulled_back_energy = model.ebm.operator_expectation(
-          pulled_back_energy_shards)
+            pulled_back_energy_shards)
       phis_grad = tape.gradient(pulled_back_energy,
-                                  model.qnn.trainable_variables)
+                                model.qnn.trainable_variables)
       # else:
       #   raise NotImplementedError(
       #       "Derivative when EBM has no operator is not yet supported.")
