@@ -19,6 +19,7 @@ import tensorflow as tf
 from qhbmlib import qhbm, ebm
 
 
+@tf.function
 def qmhl_loss(model: qhbm.QHBM, target_circuits: tf.Tensor,
               target_counts: tf.Tensor):
   """Calculate the QMHL loss of the model against the target.
@@ -83,18 +84,18 @@ def qmhl_loss(model: qhbm.QHBM, target_circuits: tf.Tensor,
       thetas_grad = qnn_thetas_grad - ebm_thetas_grad
 
       # Phis derivative.
-      if model.ebm.has_operator:
-        model_operators = model.operator_shards
-        with tf.GradientTape() as tape:
-          pulled_back_energy_shards = model.qnn.pulled_back_expectation(
-              target_circuits, target_counts, model_operators)
-          pulled_back_energy = model.ebm.operator_expectation(
-              pulled_back_energy_shards)
-        phis_grad = tape.gradient(pulled_back_energy,
+#      if model.ebm.has_operator:
+      model_operators = model.operator_shards
+      with tf.GradientTape() as tape:
+        pulled_back_energy_shards = model.qnn.pulled_back_expectation(
+          target_circuits, target_counts, model_operators)
+        pulled_back_energy = model.ebm.operator_expectation(
+          pulled_back_energy_shards)
+      phis_grad = tape.gradient(pulled_back_energy,
                                   model.qnn.trainable_variables)
-      else:
-        raise NotImplementedError(
-            "Derivative when EBM has no operator is not yet supported.")
+      # else:
+      #   raise NotImplementedError(
+      #       "Derivative when EBM has no operator is not yet supported.")
       return grad * thetas_grad, grad * phis_grad
 
     return forward_pass_vals, gradient
