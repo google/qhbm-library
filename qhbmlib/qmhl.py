@@ -21,7 +21,6 @@ from qhbmlib import qhbm
 from qhbmlib import util
 
 
-@tf.function
 def qmhl_loss(model: qhbm.QHBM, target_circuits: tf.Tensor,
               target_counts: tf.Tensor):
   """Calculate the QMHL loss of the model against the target.
