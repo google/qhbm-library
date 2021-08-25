@@ -24,7 +24,6 @@ from qhbmlib import ebm
 class ProbTest(tf.test.TestCase):
   """Test the probability<-->logit functions."""
 
-  @tf_test_util.run_in_graph_and_eager_modes(assert_no_eager_garbage=True)
   def test_probability_to_logit(self):
     """If p is the probability of drawing 1 from a Bernoulli distribution, then
         logit = ln(p/(1-p))
@@ -35,7 +34,6 @@ class ProbTest(tf.test.TestCase):
     test_logits = ebm.probability_to_logit(probs)
     self.assertAllClose(expected_logits, test_logits)
 
-  @tf_test_util.run_in_graph_and_eager_modes(assert_no_eager_garbage=True)
   def test_logit_to_probability(self):
     """If L is the log-odds of drawing a 1 from a Bernoulli distribution, then
         p = exp(L)/(1 + exp(L))
