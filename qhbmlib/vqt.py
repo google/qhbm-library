@@ -28,23 +28,25 @@ def vqt(qhbm, num_samples, hamiltonian, beta):
         tf.reduce_sum(counts), tf.float32)
     expectation = tf.squeeze(
         qhbm.qnn.expectation(bitstrings, counts, hamiltonian))
-    if qhbm.ebm.is_analytic:
+    if qhbm.is_analytic:
       entropy = qhbm.entropy()
     else:
       entropy = -tf.reduce_sum(probs * tf.math.log(probs))
 
     def grad(grad_y, variables=None):
-      with tf.GradientTape() as tape:
+      with tf.GradientTape() as qnn_tape:
         beta_expectations = beta * tf.squeeze(
             qhbm.qnn.expectation(bitstrings, counts, hamiltonian, reduce=False),
             -1)
         beta_expectation = tf.reduce_sum(probs * beta_expectations)
-      grad_qnn = tape.gradient(beta_expectation, qhbm.qnn.trainable_variables)
+      grad_qnn = qnn_tape.gradient(beta_expectation,
+                                   qhbm.qnn.trainable_variables)
       grad_qnn = [grad_y * grad for grad in grad_qnn]
 
-      with tf.GradientTape() as tape:
+      with tf.GradientTape() as ebm_tape:
         energies = qhbm.ebm.energy(bitstrings)
-      energy_grads = tape.jacobian(energies, qhbm.ebm.trainable_variables)
+      energy_gradients = ebm_tape.jacobian(energies,
+                                           qhbm.ebm.trainable_variables)
       probs_diffs = probs * (beta_expectations - energies)
       avg_diff = tf.reduce_sum(probs_diffs)
       grad_ebm = [
@@ -52,11 +54,9 @@ def vqt(qhbm, num_samples, hamiltonian, beta):
           (avg_diff *
            tf.reduce_sum(tf.transpose(probs * tf.transpose(grad)), 0) -
            tf.reduce_sum(tf.transpose(probs_diffs * tf.transpose(grad)), 0))
-          for grad in energy_grads
+          for grad in energy_gradients
       ]
       grad_vars = grad_ebm + grad_qnn
-      if variables is None:
-        return grad_vars
       return grad_vars, grad_vars
 
     return beta * expectation - entropy, grad
