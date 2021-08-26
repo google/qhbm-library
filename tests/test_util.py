@@ -49,7 +49,6 @@ def get_random_qhbm(
       qubits, num_layers, identifier)
   this_qnn = qnn.QNN(
       unitary,
-      phis_symbols,
       tf.keras.initializers.RandomUniform(
           minval=minval_phis, maxval=maxval_phis),
       is_analytic=True)

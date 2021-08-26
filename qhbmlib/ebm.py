@@ -17,7 +17,6 @@
 import abc
 import collections
 import itertools
-from absl import logging
 
 import cirq
 import tensorflow as tf

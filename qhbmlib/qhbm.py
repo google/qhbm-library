@@ -33,9 +33,10 @@ class QHBM(tf.keras.Model):
     self._ebm = ebm
     self.thetas = ebm.trainable_variables
     self._qnn = qnn
-    self.phis = qnn.trainable_variables
-    self._operator_shards = tfq.convert_to_tensor(
-        ebm.operator_shards(qnn.raw_qubits))
+    self.phis = self.qnn.trainable_variables
+    if ebm.has_operator:
+      self._operator_shards = tfq.convert_to_tensor(
+          ebm.operator_shards(qnn.raw_qubits))
 
   @property
   def ebm(self):
@@ -47,7 +48,9 @@ class QHBM(tf.keras.Model):
 
   @property
   def operator_shards(self):
-    return self._operator_shards
+    if self.ebm.has_operator:
+      return self._operator_shards
+    raise NotImplementedError()
 
   @property
   def raw_qubits(self):
@@ -69,9 +72,10 @@ class QHBM(tf.keras.Model):
     circuits = self.qnn.circuits(bitstrings)
     return circuits, counts
 
-  def sample(self, num_samples, mask=True):
+  def sample(self, num_samples, mask=True, reduce=True, unique=True):
     bitstrings, counts = self.ebm.sample(num_samples)
-    return self.qnn.sample(bitstrings, counts, mask=mask)
+    return self.qnn.sample(
+        bitstrings, counts, mask=mask, reduce=reduce, unique=unique)
 
   def expectation(self, operators, num_samples, reduce=True):
     bitstrings, counts = self.ebm.sample(num_samples)

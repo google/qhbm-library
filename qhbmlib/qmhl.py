@@ -50,8 +50,8 @@ def qmhl_loss(model: qhbm.QHBM, target_circuits: tf.Tensor,
       log_partition = tf.math.reduce_logsumexp(-1 * energies)
 
     # pulled back expectation of energy operator
-    ragged_samples_pb = model.qnn.pulled_back_sample(target_circuits,
-                                                     target_counts)
+    ragged_samples_pb = model.qnn.pulled_back_sample(
+        target_circuits, target_counts, reduce=False, unique=False)
     all_samples_pb = ragged_samples_pb.values.to_tensor()
     samples_pb, counts_pb = util.unique_bitstrings_with_counts(all_samples_pb)
     energies = model.ebm.energy(samples_pb)
