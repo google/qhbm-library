@@ -57,7 +57,7 @@ class VQTTest(tf.test.TestCase):
         tf_ham = tfq.convert_to_tensor([cirq_ham])
         loss = vqt.vqt(test_qhbm, num_samples, tf_ham, beta)
         loss_copy = vqt.vqt(test_qhbm_copy, num_samples, tf_ham, beta)
-        self.assertAllClose(loss_copy, loss, rtol=1e-2)
+        self.assertAllClose(loss_copy, loss, rtol=RTOL)
 
   def test_zero_grad(self):
     """Confirm correct gradients and loss at the optimal settings."""
@@ -75,8 +75,8 @@ class VQTTest(tf.test.TestCase):
       loss = vqt.vqt(test_qhbm, tf.constant(int(5e6)), tf_ham, tf.constant(1.0))
     gradient = tape.gradient(loss, test_qhbm.trainable_variables)
     for grad in gradient:
-      self.assertAllClose(grad, tf.zeros_like(grad), rtol=1e-2)
-    self.assertAllClose(loss, -test_qhbm.log_partition_function(), rtol=1e-2)
+      self.assertAllClose(grad, tf.zeros_like(grad), rtol=RTOL)
+    self.assertAllClose(loss, -test_qhbm.log_partition_function(), rtol=RTOL)
 
   def test_loss_value_x_rot(self):
     """Confirms correct values for a single qubit X rotation with H=Y.
