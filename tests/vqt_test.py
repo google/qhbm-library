@@ -82,6 +82,7 @@ class VQTTest(tf.test.TestCase):
     """Confirms correct values for a single qubit X rotation with H=Y.
 
     See the notebook linked in the PR for derivations.
+
     Since each qubit is independent, the loss is the sum over the individual
     qubit losses, and the gradients are the the per-qubit gradients.
     """
@@ -105,7 +106,7 @@ class VQTTest(tf.test.TestCase):
 
       # VQT arguments
       test_qhbm = qhbm.QHBM(test_ebm, test_qnn)
-      test_num_samples = tf.constant(1000000)
+      test_num_samples = tf.constant(1e6)
       test_h = tfq.convert_to_tensor(
           [cirq.PauliSum.from_pauli_strings(cirq.Y(q) for q in qubits)])
       test_beta = tf.random.uniform([], minval=0.01, maxval=100.0, seed=seed)
