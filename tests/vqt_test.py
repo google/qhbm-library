@@ -81,7 +81,7 @@ class VQTTest(tf.test.TestCase):
   def test_loss_value_x_rot(self):
     """Confirms correct values for a single qubit X rotation with H=Y.
 
-    See the notebook linked in the PR for derivations.
+    See the colab notebook linked in PR #84 for derivations.
 
     Since each qubit is independent, the loss is the sum over the individual
     qubit losses, and the gradients are the the per-qubit gradients.
