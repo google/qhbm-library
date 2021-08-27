@@ -18,16 +18,14 @@ import tensorflow as tf
 import tensorflow_quantum as tfq
 
 
-@tf.function
 def vqt(qhbm, num_samples, hamiltonian, beta):
 
   @tf.custom_gradient
   def loss(variables):
     bitstrings, counts = qhbm.ebm.sample(num_samples)
-    probs = tf.cast(counts, tf.float32) / tf.cast(
-        tf.reduce_sum(counts), tf.float32)
+    probs = tf.cast(counts, tf.float32) / tf.cast(num_samples, tf.float32)
     expectation = tf.squeeze(
-        qhbm.qnn.expectation(bitstrings, counts, hamiltonian))
+        qhbm.qnn.expectation(bitstrings, counts, hamiltonian), -1)
     if qhbm.is_analytic:
       entropy = qhbm.entropy()
     else:
@@ -57,7 +55,7 @@ def vqt(qhbm, num_samples, hamiltonian, beta):
           for grad in energy_gradients
       ]
       grad_vars = grad_ebm + grad_qnn
-      return grad_vars, grad_vars
+      return grad_vars
 
     return beta * expectation - entropy, grad
 
