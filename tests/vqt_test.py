@@ -111,8 +111,10 @@ class VQTTest(tf.test.TestCase):
       test_beta = tf.random.uniform([], minval=0.01, maxval=100.0, seed=seed)
 
       # Compute losses
-      test_thetas = test_qhbm.thetas[0]  # Bernoulli has only one tf.Variable
-      test_phis = test_qhbm.phis[0]  # QNN has only one tf.Variable
+      # Bernoulli has only one tf.Variable
+      test_thetas = tf.squeeze(test_qhbm.thetas, 0)
+      # QNN has only one tf.Variable
+      test_phis = tf.squeeze(test_qhbm.phis, 0)
       actual_expectation = test_qhbm.expectation(test_h, test_num_samples)[0]
       expected_expectation = tf.reduce_sum(
           tf.math.tanh(test_thetas) * tf.math.sin(test_phis))
@@ -130,7 +132,7 @@ class VQTTest(tf.test.TestCase):
       self.assertAllClose(actual_loss, expected_loss, rtol=RTOL)
 
       actual_thetas_grads, actual_phis_grads = tape.gradient(
-          test_loss, (test_qhbm.thetas[0], test_qhbm.phis[0]))
+          test_loss, (tf.squeeze(test_qhbm.thetas, 0), tf.squueze(test_qhbm.phis, 0)))
       expected_thetas_grads = (1 - tf.math.tanh(test_thetas)**2) * (
           test_beta * tf.math.sin(test_phis) + test_thetas)
       expected_phis_grads = test_beta * tf.math.tanh(test_thetas) * tf.math.cos(
