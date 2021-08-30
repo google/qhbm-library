@@ -119,8 +119,9 @@ class VQTTest(tf.test.TestCase):
       self.assertAllClose(actual_expectation, expected_expectation, rtol=RTOL)
 
       actual_entropy = test_qhbm.entropy()
-      expected_entropy = tf.reduce_sum(-test_thetas * tf.math.tanh(test_thetas) +
-                                       tf.math.log(2 * tf.math.cosh(test_thetas)))
+      expected_entropy = tf.reduce_sum(
+          -test_thetas * tf.math.tanh(test_thetas) +
+          tf.math.log(2 * tf.math.cosh(test_thetas)))
       self.assertAllClose(actual_entropy, expected_entropy, rtol=RTOL)
 
       with tf.GradientTape() as tape:
