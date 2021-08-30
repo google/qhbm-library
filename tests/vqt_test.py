@@ -128,7 +128,7 @@ class VQTTest(tf.test.TestCase):
 
       with tf.GradientTape() as tape:
         actual_loss = vqt.vqt(test_qhbm, test_num_samples, test_h, test_beta)
-      expected_loss = test_beta * ref_expectation - ref_entropy
+      expected_loss = test_beta * expected_expectation - expected_entropy
       self.assertAllClose(actual_loss, expected_loss, rtol=RTOL)
 
       actual_thetas_grads, actual_phis_grads = tape.gradient(
