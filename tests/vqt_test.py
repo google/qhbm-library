@@ -81,7 +81,8 @@ class VQTTest(tf.test.TestCase):
   def test_loss_value_x_rot(self):
     """Confirms correct values for a single qubit X rotation with H=Y.
 
-    See the colab notebook linked in PR #84 for derivations.
+    See the colab notebook at the following link in for derivations:
+    https://colab.research.google.com/drive/14987JCMju_8AVvvVoojwe6hA7Nlw-Dhe?usp=sharing
 
     Since each qubit is independent, the loss is the sum over the individual
     qubit losses, and the gradients are the the per-qubit gradients.
@@ -92,7 +93,6 @@ class VQTTest(tf.test.TestCase):
       ebm_init = tf.keras.initializers.RandomUniform(
           minval=-2.0, maxval=2.0, seed=seed)
       test_ebm = ebm.Bernoulli(num_qubits, ebm_init, True)
-      test_thetas = test_ebm.trainable_variables[0]
 
       # QNN
       qubits = cirq.GridQubit.rect(1, num_qubits)
@@ -102,7 +102,6 @@ class VQTTest(tf.test.TestCase):
       qnn_init = tf.keras.initializers.RandomUniform(
           minval=-6.2, maxval=6.2, seed=seed)
       test_qnn = qnn.QNN(r_circuit, qnn_init, is_analytic=True)
-      test_phis = test_qnn.values
 
       # VQT arguments
       test_qhbm = qhbm.QHBM(test_ebm, test_qnn)
@@ -112,30 +111,32 @@ class VQTTest(tf.test.TestCase):
       test_beta = tf.random.uniform([], minval=0.01, maxval=100.0, seed=seed)
 
       # Compute losses
-      test_expectation = test_qhbm.expectation(test_h, test_num_samples)[0]
-      ref_expectation = tf.reduce_sum(
+      test_thetas = test_qhbm.thetas[0]  # Bernoulli has only one tf.Variable
+      test_phis = test_qhbm.phis[0]  # QNN has only one tf.Variable
+      actual_expectation = test_qhbm.expectation(test_h, test_num_samples)[0]
+      expected_expectation = tf.reduce_sum(
           tf.math.tanh(test_thetas) * tf.math.sin(test_phis))
+      self.assertAllClose(actual_expectation, expected_expectation, rtol=RTOL)
 
-      self.assertAllClose(test_expectation, ref_expectation, rtol=RTOL)
-      test_entropy = test_qhbm.entropy()
-      ref_entropy = tf.reduce_sum(-test_thetas * tf.math.tanh(test_thetas) +
-                                  tf.math.log(2 * tf.math.cosh(test_thetas)))
-      self.assertAllClose(test_entropy, ref_entropy, rtol=RTOL)
+      actual_entropy = test_qhbm.entropy()
+      expected_entropy = tf.reduce_sum(-test_thetas * tf.math.tanh(test_thetas) +
+                                       tf.math.log(2 * tf.math.cosh(test_thetas)))
+      self.assertAllClose(actual_entropy, expected_entropy, rtol=RTOL)
 
       with tf.GradientTape() as tape:
-        test_loss = vqt.vqt(test_qhbm, test_num_samples, test_h, test_beta)
-      ref_loss = test_beta * ref_expectation - ref_entropy
-      self.assertAllClose(test_loss, ref_loss, rtol=RTOL)
+        actual_loss = vqt.vqt(test_qhbm, test_num_samples, test_h, test_beta)
+      expected_loss = test_beta * ref_expectation - ref_entropy
+      self.assertAllClose(actual_loss, expected_loss, rtol=RTOL)
 
-      test_thetas_grads, test_phis_grads = tape.gradient(
-          test_loss, (test_ebm.trainable_variables[0], test_qnn.values))
-      ref_thetas_grads = (1 - tf.math.tanh(test_thetas)**2) * (
+      actual_thetas_grads, actual_phis_grads = tape.gradient(
+          test_loss, (test_qhbm.thetas[0], test_qhbm.phis[0]))
+      expected_thetas_grads = (1 - tf.math.tanh(test_thetas)**2) * (
           test_beta * tf.math.sin(test_phis) + test_thetas)
-      ref_phis_grads = test_beta * tf.math.tanh(test_thetas) * tf.math.cos(
+      expected_phis_grads = test_beta * tf.math.tanh(test_thetas) * tf.math.cos(
           test_phis)
 
-      self.assertAllClose(test_thetas_grads, ref_thetas_grads, rtol=RTOL)
-      self.assertAllClose(test_phis_grads, ref_phis_grads, rtol=RTOL)
+      self.assertAllClose(actual_thetas_grads, expected_thetas_grads, rtol=RTOL)
+      self.assertAllClose(actual_phis_grads, expected_phis_grads, rtol=RTOL)
 
 
 if __name__ == "__main__":
