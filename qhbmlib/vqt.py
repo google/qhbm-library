@@ -15,10 +15,26 @@
 """Impementations of the VQT loss and its derivatives."""
 
 import tensorflow as tf
-import tensorflow_quantum as tfq
 
 
 def vqt(qhbm, num_samples, hamiltonian, beta):
+  """Computes the VQT loss of a given QHBM against given thermal state params.
+
+  This function is differentiable within a `tf.GradientTape` scope.
+
+  Args:
+    qhbm: A `qhbm.QHBM` which is the model whose loss is to be calculated.
+    num_samples: A scalar `tf.Tensor` specifying the number of samples to draw
+      from the EBM of `qhbm` when estimating the loss and its gradients.
+    hamiltonian: 1D tensor of strings with one entry, the result of calling
+      `tfq.convert_to_tensor` on a list containing one cirq.PauliSum, `[op]`.
+      Here, `op` is the Hamiltonian against which the loss is calculated.
+    beta: A scalar `tf.Tensor` which is the inverse temperature at which the
+      loss is calculated.
+
+  Returns:
+    The VQT loss.
+  """
 
   @tf.custom_gradient
   def loss(variables):
