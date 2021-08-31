@@ -132,7 +132,7 @@ class VQTTest(tf.test.TestCase):
       self.assertAllClose(actual_loss, expected_loss, rtol=RTOL)
 
       actual_thetas_grads, actual_phis_grads = tape.gradient(
-        actual_loss, (test_thetas, test_phis))
+          actual_loss, (test_thetas, test_phis))
       expected_thetas_grads = (1 - tf.math.tanh(test_thetas)**2) * (
           test_beta * tf.math.sin(test_phis) + test_thetas)
       expected_phis_grads = test_beta * tf.math.tanh(test_thetas) * tf.math.cos(
