@@ -12,16 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-# """Tests for the VQT loss and gradients."""
+"""Tests for the VQT loss and gradients."""
 
 import cirq
 import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-from qhbmlib import ebm, qnn, qhbm
+from qhbmlib import ebm
+from qhbmlib import qhbm
+from qhbmlib import qnn
 from qhbmlib import vqt
 from tests import test_util
+
+RTOL = 3e-2
 
 
 class VQTTest(tf.test.TestCase):
@@ -53,7 +57,7 @@ class VQTTest(tf.test.TestCase):
         tf_ham = tfq.convert_to_tensor([cirq_ham])
         loss = vqt.vqt(test_qhbm, num_samples, tf_ham, beta)
         loss_copy = vqt.vqt(test_qhbm_copy, num_samples, tf_ham, beta)
-        self.assertAllClose(loss_copy, loss, rtol=1e-2)
+        self.assertAllClose(loss_copy, loss, rtol=RTOL)
 
   def test_zero_grad(self):
     """Confirm correct gradients and loss at the optimal settings."""
@@ -71,8 +75,70 @@ class VQTTest(tf.test.TestCase):
       loss = vqt.vqt(test_qhbm, tf.constant(int(5e6)), tf_ham, tf.constant(1.0))
     gradient = tape.gradient(loss, test_qhbm.trainable_variables)
     for grad in gradient:
-      self.assertAllClose(grad, tf.zeros_like(grad), atol=1e-2)
-    self.assertAllClose(loss, -test_qhbm.log_partition_function(), atol=1e-2)
+      self.assertAllClose(grad, tf.zeros_like(grad), rtol=RTOL)
+    self.assertAllClose(loss, -test_qhbm.log_partition_function(), rtol=RTOL)
+
+  def test_loss_value_x_rot(self):
+    """Confirms correct values for a single qubit X rotation with H=Y.
+
+    See the colab notebook at the following link in for derivations:
+    https://colab.research.google.com/drive/14987JCMju_8AVvvVoojwe6hA7Nlw-Dhe?usp=sharing
+
+    Since each qubit is independent, the loss is the sum over the individual
+    qubit losses, and the gradients are the the per-qubit gradients.
+    """
+    seed = None
+    for num_qubits in [1, 2, 3, 4, 5]:
+      # EBM
+      ebm_init = tf.keras.initializers.RandomUniform(
+          minval=-2.0, maxval=2.0, seed=seed)
+      test_ebm = ebm.Bernoulli(num_qubits, ebm_init, True)
+
+      # QNN
+      qubits = cirq.GridQubit.rect(1, num_qubits)
+      r_symbols = [sympy.Symbol(f"phi_{n}") for n in range(num_qubits)]
+      r_circuit = cirq.Circuit(
+          cirq.rx(r_s)(q) for r_s, q in zip(r_symbols, qubits))
+      qnn_init = tf.keras.initializers.RandomUniform(
+          minval=-6.2, maxval=6.2, seed=seed)
+      test_qnn = qnn.QNN(r_circuit, qnn_init, is_analytic=True)
+
+      # VQT arguments
+      test_qhbm = qhbm.QHBM(test_ebm, test_qnn)
+      test_num_samples = tf.constant(1e6)
+      test_h = tfq.convert_to_tensor(
+          [cirq.PauliSum.from_pauli_strings(cirq.Y(q) for q in qubits)])
+      test_beta = tf.random.uniform([], minval=0.01, maxval=100.0, seed=seed)
+
+      # Compute losses
+      # Bernoulli has only one tf.Variable
+      test_thetas = test_qhbm.thetas[0]
+      # QNN has only one tf.Variable
+      test_phis = test_qhbm.phis[0]
+      actual_expectation = test_qhbm.expectation(test_h, test_num_samples)[0]
+      expected_expectation = tf.reduce_sum(
+          tf.math.tanh(test_thetas) * tf.math.sin(test_phis))
+      self.assertAllClose(actual_expectation, expected_expectation, rtol=RTOL)
+
+      actual_entropy = test_qhbm.entropy()
+      expected_entropy = tf.reduce_sum(
+          -test_thetas * tf.math.tanh(test_thetas) +
+          tf.math.log(2 * tf.math.cosh(test_thetas)))
+      self.assertAllClose(actual_entropy, expected_entropy, rtol=RTOL)
+
+      with tf.GradientTape() as tape:
+        actual_loss = vqt.vqt(test_qhbm, test_num_samples, test_h, test_beta)
+      expected_loss = test_beta * expected_expectation - expected_entropy
+      self.assertAllClose(actual_loss, expected_loss, rtol=RTOL)
+
+      actual_thetas_grads, actual_phis_grads = tape.gradient(
+          actual_loss, (test_thetas, test_phis))
+      expected_thetas_grads = (1 - tf.math.tanh(test_thetas)**2) * (
+          test_beta * tf.math.sin(test_phis) + test_thetas)
+      expected_phis_grads = test_beta * tf.math.tanh(test_thetas) * tf.math.cos(
+          test_phis)
+      self.assertAllClose(actual_thetas_grads, expected_thetas_grads, rtol=RTOL)
+      self.assertAllClose(actual_phis_grads, expected_phis_grads, rtol=RTOL)
 
 
 if __name__ == "__main__":

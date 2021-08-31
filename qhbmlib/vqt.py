@@ -15,19 +15,33 @@
 """Impementations of the VQT loss and its derivatives."""
 
 import tensorflow as tf
-import tensorflow_quantum as tfq
 
 
-@tf.function
 def vqt(qhbm, num_samples, hamiltonian, beta):
+  """Computes the VQT loss of a given QHBM against given thermal state params.
+
+  This function is differentiable within a `tf.GradientTape` scope.
+
+  Args:
+    qhbm: A `qhbm.QHBM` which is the model whose loss is to be calculated.
+    num_samples: A scalar `tf.Tensor` specifying the number of samples to draw
+      from the EBM of `qhbm` when estimating the loss and its gradients.
+    hamiltonian: 1D tensor of strings with one entry, the result of calling
+      `tfq.convert_to_tensor` on a list containing one cirq.PauliSum, `[op]`.
+      Here, `op` is the Hamiltonian against which the loss is calculated.
+    beta: A scalar `tf.Tensor` which is the inverse temperature at which the
+      loss is calculated.
+
+  Returns:
+    The VQT loss.
+  """
 
   @tf.custom_gradient
   def loss(variables):
     bitstrings, counts = qhbm.ebm.sample(num_samples)
-    probs = tf.cast(counts, tf.float32) / tf.cast(
-        tf.reduce_sum(counts), tf.float32)
+    probs = tf.cast(counts, tf.float32) / tf.cast(num_samples, tf.float32)
     expectation = tf.squeeze(
-        qhbm.qnn.expectation(bitstrings, counts, hamiltonian))
+        qhbm.qnn.expectation(bitstrings, counts, hamiltonian), -1)
     if qhbm.is_analytic:
       entropy = qhbm.entropy()
     else:
@@ -57,7 +71,7 @@ def vqt(qhbm, num_samples, hamiltonian, beta):
           for grad in energy_gradients
       ]
       grad_vars = grad_ebm + grad_qnn
-      return grad_vars, grad_vars
+      return grad_vars
 
     return beta * expectation - entropy, grad
 
