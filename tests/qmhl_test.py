@@ -15,6 +15,7 @@
 """Tests for the QMHL loss and gradients."""
 
 import cirq
+import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
@@ -54,8 +55,8 @@ class QMHLTest(tf.test.TestCase):
   def test_loss_value_x_rot(self):
     """Confirms correct values for a single qubit X rotation QHBM.
 
-    We use a data state which is the thermal state of a Pauli Y at inverse
-    temperature beta.  The QHBM is a Bernoulli latent state with X rotation QNN.
+    We use a data state which is a Y rotation of an initially diagonal density
+    operator.  The QHBM is a Bernoulli latent state with X rotation QNN.
 
     See the colab notebook at the following link for derivations:
     https://colab.research.google.com/drive/14987JCMju_8AVvvVoojwe6hA7Nlw-Dhe?usp=sharing
@@ -63,7 +64,7 @@ class QMHLTest(tf.test.TestCase):
     Since each qubit is independent, the loss is the sum over the individual
     qubit losses, and the gradients are the the per-qubit gradients.
     """
-    seed = None
+    seed = 107
     for num_qubits in [1, 2, 3, 4, 5]:
       # EBM
       ebm_init = tf.keras.initializers.RandomUniform(
@@ -72,18 +73,19 @@ class QMHLTest(tf.test.TestCase):
 
       # QNN
       qubits = cirq.GridQubit.rect(1, num_qubits)
-      q_const_limit = 6.2
+      q_const = 6.2
       r_symbols = [sympy.Symbol(f"phi_{n}") for n in range(num_qubits)]
       r_circuit = cirq.Circuit(
           cirq.rx(r_s)(q) for r_s, q in zip(r_symbols, qubits))
       qnn_init = tf.keras.initializers.RandomUniform(
-          minval=-q_const_limit, maxval=q_const_limit, seed=seed)
+          minval=-q_const, maxval=q_const, seed=seed)
       test_qnn = qnn.QNN(r_circuit, qnn_init, is_analytic=True)
 
       # Build target data
       alphas = tf.random.uniform([num_qubits], minval=-q_const, maxval=q_const)
-      y_rot = cirq.Circuit(cirq.ry(r)(q) for r, q in zip(alphas, qubits))
+      y_rot = cirq.Circuit(cirq.ry(r.numpy())(q) for r, q in zip(alphas, qubits))
       data_probs = tf.random.uniform([num_qubits])
+      data_probs_numpy = data_probs.numpy()
       count_scale = 1e6
       target_states_list = []
       target_counts_list = []
@@ -95,12 +97,13 @@ class QMHLTest(tf.test.TestCase):
           if m % 2:  # state |1> on qubit n
             c += cirq.X(q)
             m //= 2
-            p *= (1 - data_probs[n])
-          p *= data_probs[n]
+            p *= (1 - data_probs_numpy[n])
+          p *= data_probs_numpy[n]
         target_states_list.append(c)
         target_counts_list.append(round(p * count_scale))
       target_states = tfq.convert_to_tensor(target_states_list)
-      target_counts = tf.convert_to_tensor*(target_counts_list)
+      target_counts = tf.convert_to_tensor(target_counts_list)
+      print(target_counts_list)
       
       # Compute losses
       test_qhbm = qhbm.QHBM(test_ebm, test_qnn)
@@ -113,10 +116,10 @@ class QMHLTest(tf.test.TestCase):
       actual_log_partition = test_qhbm.log_partition_function()
       expected_log_partition = tf.reduce_sum(
           tf.math.log(2 * tf.math.cosh(test_thetas)))
-      self.assertAllClose(actual_entropy, expected_entropy, rtol=RTOL)
+      self.assertAllClose(actual_log_partition, expected_log_partition, rtol=RTOL)
 
       with tf.GradientTape() as tape:
-        actual_loss = qmhl.qmhl(test_qhbm, target_states, target_counts)
+        actual_loss = qmhl.qmhl_loss(test_qhbm, target_states, target_counts)
       expected_loss = expected_expectation + expected_log_partition
       self.assertAllClose(actual_loss, expected_loss, rtol=RTOL)
 
@@ -124,6 +127,10 @@ class QMHLTest(tf.test.TestCase):
           actual_loss, (test_thetas, test_phis))
       expected_thetas_grads = (2 * data_probs - 1) * tf.math.cos(alphas) * tf.math.cos(test_phis) + tf.math.tanh(test_thetas)
       expected_phis_grads = - test_thetas * (2 * data_probs - 1) * tf.math.cos(alphas) * tf.math.sin(test_phis)
+      print(expected_thetas_grads)
+      print(actual_thetas_grads)
+      print(expected_phis_grads)
+      print(actual_phis_grads)
       self.assertAllClose(actual_thetas_grads, expected_thetas_grads, rtol=RTOL)
       self.assertAllClose(actual_phis_grads, expected_phis_grads, rtol=RTOL)
 
