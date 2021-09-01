@@ -16,6 +16,7 @@
 
 import cirq
 import tensorflow as tf
+import tensorflow_quantum as tfq
 
 from qhbmlib import ebm
 from qhbmlib import qhbm
@@ -50,7 +51,7 @@ class QMHLTest(tf.test.TestCase):
       self.assertAllClose(phis_grads, tf.zeros(tf.shape(phis_grads)), atol=5e-3)
 
 
-    def test_loss_value_x_rot(self):
+  def test_loss_value_x_rot(self):
     """Confirms correct values for a single qubit X rotation QHBM.
 
     We use a data state which is the thermal state of a Pauli Y at inverse
@@ -105,28 +106,24 @@ class QMHLTest(tf.test.TestCase):
       test_qhbm = qhbm.QHBM(test_ebm, test_qnn)
       test_thetas = test_qhbm.thetas[0]
       test_phis = test_qhbm.phis[0]
-      actual_expectation = test_qhbm.pulled_back_expectationtest_qhbm.expectation(test_h, test_num_samples)[0]
+      # TODO(zaqqwerty): add way to use a log QHBM as observable on states
       expected_expectation = tf.reduce_sum(
-          tf.math.tanh(test_thetas) * tf.math.sin(test_phis))
-      self.assertAllClose(actual_expectation, expected_expectation, rtol=RTOL)
+          test_thetas * (2 * data_probs - 1) * tf.math.cos(alphas) * tf.math.cos(test_phis))
 
-      actual_entropy = test_qhbm.entropy()
-      expected_entropy = tf.reduce_sum(
-          -test_thetas * tf.math.tanh(test_thetas) +
+      actual_log_partition = test_qhbm.log_partition_function()
+      expected_log_partition = tf.reduce_sum(
           tf.math.log(2 * tf.math.cosh(test_thetas)))
       self.assertAllClose(actual_entropy, expected_entropy, rtol=RTOL)
 
       with tf.GradientTape() as tape:
-        actual_loss = vqt.vqt(test_qhbm, test_num_samples, test_h, test_beta)
-      expected_loss = test_beta * expected_expectation - expected_entropy
+        actual_loss = qmhl.qmhl(test_qhbm, target_states, target_counts)
+      expected_loss = expected_expectation + expected_log_partition
       self.assertAllClose(actual_loss, expected_loss, rtol=RTOL)
 
       actual_thetas_grads, actual_phis_grads = tape.gradient(
           actual_loss, (test_thetas, test_phis))
-      expected_thetas_grads = (1 - tf.math.tanh(test_thetas)**2) * (
-          test_beta * tf.math.sin(test_phis) + test_thetas)
-      expected_phis_grads = test_beta * tf.math.tanh(test_thetas) * tf.math.cos(
-          test_phis)
+      expected_thetas_grads = (2 * data_probs - 1) * tf.math.cos(alphas) * tf.math.cos(test_phis) + tf.math.tanh(test_thetas)
+      expected_phis_grads = - test_thetas * (2 * data_probs - 1) * tf.math.cos(alphas) * tf.math.sin(test_phis)
       self.assertAllClose(actual_thetas_grads, expected_thetas_grads, rtol=RTOL)
       self.assertAllClose(actual_phis_grads, expected_phis_grads, rtol=RTOL)
 
