@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "qhbmlib"
-version = "0.1.1"
+version = "0.2.0"
 description = "Quantum Hamiltonian-Based Models built on TensorFlow Quantum"
 license = "Apache-2.0"
 readme = "README.md"
