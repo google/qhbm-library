@@ -21,7 +21,6 @@ import itertools
 import cirq
 import tensorflow as tf
 import tensorflow_probability as tfp
-import tensorflow_quantum as tfq
 
 from qhbmlib import util
 
@@ -577,13 +576,19 @@ class Bernoulli(EBM):
                num_bits,
                initializer=tf.keras.initializers.RandomUniform(),
                is_analytic=False,
-               name=None):
-    tf.keras.Model.__init__(self, name=name)
+               name=None,
+               copy_vars=None):
     self._num_bits = num_bits
-    self._variables = self.add_weight(
-        name=f'{self.name}_variables',
-        shape=[self.num_bits],
-        initializer=initializer)
+
+    if not copy_vars:
+      tf.keras.Model.__init__(self, name=name)
+      self._variables = self.add_weight(
+          name=f'{self.name}_variables',
+          shape=[self.num_bits],
+          initializer=initializer)
+    else:
+      self._variables = copy_vars
+
     self._is_analytic = is_analytic
     if is_analytic:
       self._all_bitstrings = tf.constant(

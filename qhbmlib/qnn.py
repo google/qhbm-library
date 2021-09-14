@@ -28,7 +28,7 @@ def bit_circuit(qubits, name='bit_circuit'):
   """Returns exponentiated X gate on each qubit and the exponent symbols."""
   circuit = cirq.Circuit()
   for n, q in enumerate(qubits):
-    bit = sympy.Symbol("{0}_bit_{1}".format(name, n))
+    bit = sympy.Symbol('{0}_bit_{1}'.format(name, n))
     circuit += cirq.X(q)**bit
   return circuit
 
@@ -63,8 +63,8 @@ class QNN(tf.keras.Model):
     super().__init__(name=name)
 
     if not isinstance(pqc, cirq.Circuit):
-      raise TypeError("pqc must be a cirq.Circuit object."
-                      " Given: {}".format(pqc))
+      raise TypeError('pqc must be a cirq.Circuit object.'
+                      ' Given: {}'.format(pqc))
 
     symbols = list(sorted(tfq.util.get_circuit_symbols(pqc)))
     self._symbols = tf.constant([str(x) for x in symbols], dtype=tf.string)

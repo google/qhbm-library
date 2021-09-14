@@ -378,7 +378,6 @@ def get_bit_sub_indices(qubits_vqt, qubits_j):
   return tf.gather_nd(all_wheres, this_gather_inds)
 
 
-@tf.function
 def unique_bitstrings_with_counts(bitstrings):
   """Extract the unique bitstrings in the given bitstring tensor.
 
