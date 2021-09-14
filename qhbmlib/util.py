@@ -1,4 +1,4 @@
-# Copyright 2021 The QHBM Library Authors.
+# Copyright 2021 The QHBM Library Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,7 +24,6 @@ import tensorflow_quantum as tfq
 # ============================================================================ #
 
 
-@tf.function
 def pure_state_tensor_to_density_matrix(pure_states, counts):
   """Returns the uniform mixture of the given tensor of pure states.
 
@@ -49,14 +48,11 @@ def pure_state_tensor_to_density_matrix(pure_states, counts):
                         tf.cast(tf.reduce_sum(counts), tf.complex64))
 
 
-@tf.function
 def circuits_and_counts_to_density_matrix(circuits, counts):
-  print("retracing: circuits_and_counts_to_density_matrix")
   pure_states = tfq.layers.State()(circuits).to_tensor()
   return pure_state_tensor_to_density_matrix(pure_states, counts)
 
 
-@tf.function
 def fidelity(rho, sigma):
   """Calculate the fidelity between the two given density matrices.
 
@@ -70,7 +66,6 @@ def fidelity(rho, sigma):
       A tf.Tensor float64 fidelity scalar between the two given density
       matrices.
     """
-  print("retracing: fidelity")
   e_rho, v_rho = tf.linalg.eigh(tf.cast(rho, tf.complex128))
   rho_sqrt = tf.linalg.matmul(
       tf.linalg.matmul(v_rho, tf.linalg.diag(tf.math.sqrt(e_rho))),
@@ -82,7 +77,6 @@ def fidelity(rho, sigma):
   return tf.math.abs(tf.math.reduce_sum(tf.math.sqrt(e_omega)))**2
 
 
-@tf.function
 def fast_fidelity(rho, sigma):
   """Calculate the 10x faster fidelity between the two given density matrices.
 
@@ -96,7 +90,6 @@ def fast_fidelity(rho, sigma):
       A tf.Tensor float64 fidelity scalar between the two given density
       matrices.
     """
-  print("retracing: fast_fidelity")
   e_rho, v_rho = tf.linalg.eigh(tf.cast(rho, tf.complex128))
   # Optimization
   # 1) tf.matmul(a, tf.linalg.diag(b))
@@ -114,7 +107,6 @@ def fast_fidelity(rho, sigma):
   return tf.math.abs(tf.math.reduce_sum(tf.math.sqrt(e_omega)))**2
 
 
-@tf.function
 def _np_fidelity_internal(e_rho, v_rho, sigma):
   """Internal np fidelity logic for preventing retracing graphs."""
   sqrt_e_rho = tf.cast(tf.sqrt(e_rho), dtype=tf.complex128)
@@ -156,7 +148,6 @@ def np_fidelity(rho, sigma):
   return tf.math.abs(tf.math.reduce_sum(tf.math.sqrt(e_omega)))**2
 
 
-@tf.function
 def optimized_trace_matmul(rho, sigma):
   """Returns optimized version of tf.linalg.trace(tf.matmul(rho, sigma)).
 
@@ -177,7 +168,6 @@ def optimized_trace_matmul(rho, sigma):
           tf.transpose(tf.cast(sigma, tf.complex128))))
 
 
-@tf.function
 def relative_entropy(rho, sigma):
   """Calculate the relative entropy between the two given density matrices.
 
@@ -196,13 +186,11 @@ def relative_entropy(rho, sigma):
       A tf.Tensor float64 fidelity scalar between the two given density
       matrices.
     """
-  print("retracing: relative_entropy")
   log_rho = tf.linalg.logm(tf.cast(rho, tf.complex128))
   log_sigma = tf.linalg.logm(tf.cast(sigma, tf.complex128))
   return optimized_trace_matmul(rho, tf.subtract(log_rho, log_sigma))
 
 
-@tf.function
 def get_thermal_state(beta, h_num):
   """Computes the thermal state.
 
@@ -244,7 +232,6 @@ def get_thermal_state(beta, h_num):
       thermal
           state of `h_num` at inverse temperature `beta`.
     """
-  print("retracing: get_thermal_state")
   e_raw, v_raw = tf.linalg.eigh(h_num)
   e = tf.cast(e_raw, tf.float64)
   x = -1.0 * beta * e
@@ -259,7 +246,6 @@ def get_thermal_state(beta, h_num):
       tf.math.multiply(v_raw, tiled_lse_grad), tf.linalg.adjoint(v_raw))
 
 
-@tf.function
 def _np_get_thermal_state_internal(beta, e, h_shape):
   x = -1.0 * beta * e
   with tf.GradientTape() as g:
@@ -289,7 +275,6 @@ def np_get_thermal_state(beta, h_num):
       thermal
           state of `h_num` at inverse temperature `beta`.
     """
-  print("retracing: get_thermal_state")
   h_num = tf.cast(h_num, tf.complex128)
   e_raw, v_raw = np.linalg.eigh(h_num)
   tiled_lse_grad = _np_get_thermal_state_internal(
@@ -298,7 +283,6 @@ def np_get_thermal_state(beta, h_num):
       tf.math.multiply(v_raw, tiled_lse_grad), tf.linalg.adjoint(v_raw))
 
 
-# @tf.function
 def log_partition_function(beta, h_num):
   """Computes the logarithm of the partition function.
 
@@ -314,7 +298,6 @@ def log_partition_function(beta, h_num):
       Scalar `tf.Tensor` of dtype `float64` which is the logarithm of the
         partition function.
     """
-  print("retracing: log_partition_function")
   # Use eigh instead of eigvalsh to ease backpropagation, see docs on eigvalsh.
   h_eigs, _ = np.linalg.eigh(tf.cast(
       h_num, tf.complex128))  # h_eigs are real since h_num is Hermitian
@@ -322,7 +305,6 @@ def log_partition_function(beta, h_num):
                              tf.cast(h_eigs, tf.float64))
 
 
-@tf.function
 def entropy(rho):
   """Computes the von Neumann entropy of the given density matrix.
 
@@ -351,10 +333,8 @@ def entropy(rho):
   return -tf.math.reduce_sum(rho_prod)
 
 
-@tf.function
 def density_matrix_to_image(dm):
   """Convert multi-qubit density matrix into an RGB image."""
-  print("retracing: density_matrix_to_image")
   max_qubits = 9
   total_edge = 2**max_qubits
   dm_len = tf.shape(dm)[0]
@@ -384,10 +364,8 @@ def density_matrix_to_image(dm):
 # ============================================================================ #
 
 
-@tf.function
 def get_bit_sub_indices(qubits_vqt, qubits_j):
   """Assumes qubits_j is a subset of qubits_vqt."""
-  print("retracing: get_bit_sub_indices")
   qubits_vqt_tiled = tf.tile(
       tf.expand_dims(qubits_vqt, 0), [tf.shape(qubits_j)[0], 1, 1])
   qubits_j_expanded = tf.expand_dims(qubits_j, 1)
@@ -398,3 +376,49 @@ def get_bit_sub_indices(qubits_vqt, qubits_j):
   indices_j = tf.expand_dims(tf.range(tf.shape(qubits_j)[0]), 1)
   this_gather_inds = tf.concat([indices_j, this_ones], 1)
   return tf.gather_nd(all_wheres, this_gather_inds)
+
+
+@tf.function
+def unique_bitstrings_with_counts(bitstrings):
+  """Extract the unique bitstrings in the given bitstring tensor.
+
+    Works by converting each bitstring to a 64 bit integer, then using built-in
+    `tf.unique_with_counts` on this 1-D array, then mapping these integers back
+    to bitstrings. The inputs and outputs are to be related by the same
+    invariants as those of `tf.unique_with_counts`,
+    y[idx[i]] = input_bitstrings[i] for i in [0, ..., rank(input_bitstrings)-1]
+
+    TODO(zaqqwerty): the signature and return values are designed to be similar
+    to those of tf.unique_with_counts.  This function is needed because
+    `tf.unique_with_counts` does not work on 2-D tensors.  When it begins to
+    work on 2-D tensors, then this function will be deprecated.
+
+    Args:
+      input_bitstrings: 2-D `tf.Tensor` of dtype `int8`.  This tensor is
+        interpreted as a list of bitstrings.  Bitstrings are required to be 64
+        bits or fewer.
+      out_idx: An optional `tf.DType` from: `tf.int32`, `tf.int64`. Defaults to
+        `tf.int32`.  Specified type of idx and count outputs.
+
+    Returns:
+      y: 2-D `tf.Tensor` of dtype `int8` containing the unique 0-axis entries of
+        `input_bitstrings`.
+      count: 1-D `tf.Tensor` of dtype `out_idx` such that `count[i]` is the
+        number of occurences of `y[i]` in `input_bitstrings`.
+  """
+  # Convert bitstrings to integers and uniquify those integers.
+  input_shape = tf.shape(bitstrings)
+  mask = tf.cast(bitstrings, tf.int64)
+  base = tf.bitwise.left_shift(
+      mask, tf.range(tf.cast(input_shape[1], tf.int64), dtype=tf.int64))
+  ints_equiv = tf.reduce_sum(base, 1)
+  _, idx, counts = tf.unique_with_counts(ints_equiv)
+
+  # Convert unique integers to corresponding unique bitstrings.
+  unique_bitstrings = tf.zeros((tf.shape(counts)[0], input_shape[1]),
+                               dtype=tf.int8)
+  unique_bitstrings = tf.tensor_scatter_nd_update(unique_bitstrings,
+                                                  tf.expand_dims(idx, axis=1),
+                                                  bitstrings)
+
+  return unique_bitstrings, counts

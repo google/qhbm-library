@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021 The QHBM Library Authors.
+# Copyright 2021 The QHBM Library Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,5 +16,5 @@
 
 poetry run yapf --in-place --recursive qhbmlib/
 poetry run yapf --in-place --recursive tests/
-./scripts/check_lint.sh
+# ./scripts/check_lint.sh <-- add back in during #44
 poetry run pytest --cov .

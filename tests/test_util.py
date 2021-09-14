@@ -1,4 +1,4 @@
-# Copyright 2021 The QHBM Library Authors.
+# Copyright 2021 The QHBM Library Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,7 +25,8 @@ import tensorflow_probability as tfp
 
 from qhbmlib import architectures
 from qhbmlib import ebm
-from qhbmlib import qhbm_base
+from qhbmlib import qhbm
+from qhbmlib import qnn
 
 
 def get_random_qhbm(
@@ -39,76 +40,19 @@ def get_random_qhbm(
 ):
   """Create a random QHBM for use in testing."""
   num_qubits = len(qubits)
-  (energy, sampler, _, _,
-   num_thetas) = ebm.build_boltzmann(num_qubits, identifier)
-  thetas_initial_values = tf.random.uniform([num_thetas],
-                                            minval=minval_thetas,
-                                            maxval=maxval_thetas)
-
+  this_ebm = ebm.Bernoulli(
+      num_qubits,
+      tf.keras.initializers.RandomUniform(
+          minval=minval_thetas, maxval=maxval_thetas),
+      is_analytic=True)
   unitary, phis_symbols = architectures.get_hardware_efficient_model_unitary(
       qubits, num_layers, identifier)
-  phis_initial_values = tf.random.uniform([len(phis_symbols)],
-                                          minval=minval_phis,
-                                          maxval=maxval_phis)
-
-  return qhbm_base.ExactQHBM(
-      thetas_initial_values,
-      energy,
-      sampler,
-      phis_initial_values,
-      phis_symbols,
+  this_qnn = qnn.QNN(
       unitary,
-      identifier,
-  )
-
-
-def get_ebm_functions(num_bits):
-  """EBM functions to use in a test QHBM.
-
-    The test EBM will be a simple case where the parameters are bias energies
-    for uncoupled bits.
-
-    Args:
-      num_bits: number of bits on which this EBM is defined.
-
-    Returns:
-      tuple of functions required as input args for analytic QHBMs.
-    """
-
-  def energy(thetas, bitstring):
-    """Computes the energy of a bitstring."""
-    spins = tf.subtract(
-        tf.ones(num_bits, dtype=tf.int8),
-        tf.constant(2, dtype=tf.int8) * tf.cast(bitstring, tf.int8),
-    )
-    return tf.reduce_sum(tf.cast(spins, tf.float32) * thetas)
-
-  def sampler(thetas, num_samples):
-    r"""Fairly samples from the EBM defined by `energy`.
-
-        For Bernoulli distribution, we let $p$ be the probability of being `1`
-        bit.
-        In this case, $p = \frac{e^{theta}}{{e^{theta}+e^{-theta}}}$.
-        Therefore, each independent logit is:
-          $logit = \log\frac{p}{1-p} = \log\frac{e^{theta}}{e^{-theta}}
-                 = \log{e^{2*theta}} = 2*theta$
-
-        Args:
-          thetas: a `tf.Tensor` of dtype `tf.float32` representing classical
-            model parameters for classical energies. `tf.shape(thetas)[0] ==
-            num_bits`.
-          num_samples: a `tf.Tensor` of dtype `tf.int32` representing the number
-            of samples from given Bernoulli distribition.
-
-        Returns:
-          a `tf.Tensor` in the shape of [num_samples, num_bits] of `tf.int8`
-          with
-          bitstrings sampled from the classical distribution.
-        """
-    return tfp.distributions.Bernoulli(
-        logits=2 * thetas, dtype=tf.int8).sample(num_samples)
-
-  return energy, sampler
+      tf.keras.initializers.RandomUniform(
+          minval=minval_phis, maxval=maxval_phis),
+      is_analytic=True)
+  return qhbm.QHBM(this_ebm, this_qnn, identifier)
 
 
 def get_random_pauli_sum(qubits):
@@ -213,3 +157,9 @@ def generate_mixed_random_density_operator_pair(num_qubits, perm_basis=False):
 def stable_classical_entropy(probs):
   """Entropy function for a list of probabilities, allowing zeros."""
   return -tf.reduce_sum(tf.math.multiply_no_nan(tf.math.log(probs), probs))
+
+
+def check_bitstring_exists(bitstring, bitstring_list):
+  """True if `bitstring` is an entry of `bitstring_list`."""
+  return tf.math.reduce_any(
+      tf.reduce_all(tf.math.equal(bitstring, bitstring_list), 1))
