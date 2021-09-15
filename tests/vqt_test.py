@@ -87,58 +87,66 @@ class VQTTest(tf.test.TestCase):
     Since each qubit is independent, the loss is the sum over the individual
     qubit losses, and the gradients are the the per-qubit gradients.
     """
-    seed = None
-    for num_qubits in [1, 2, 3, 4, 5]:
-      # EBM
-      ebm_init = tf.keras.initializers.RandomUniform(
-          minval=-2.0, maxval=2.0, seed=seed)
-      test_ebm = ebm.Bernoulli(num_qubits, ebm_init, True)
+    bare_vqt = vqt.vqt
 
-      # QNN
-      qubits = cirq.GridQubit.rect(1, num_qubits)
-      r_symbols = [sympy.Symbol(f"phi_{n}") for n in range(num_qubits)]
-      r_circuit = cirq.Circuit(
-          cirq.rx(r_s)(q) for r_s, q in zip(r_symbols, qubits))
-      qnn_init = tf.keras.initializers.RandomUniform(
-          minval=-6.2, maxval=6.2, seed=seed)
-      test_qnn = qnn.QNN(r_circuit, qnn_init, is_analytic=True)
+    @tf.function
+    def tf_func_vqt(qhbm, num_samples, hamiltonian, beta):
+      """Simple wrapper to test tf.function tracing."""
+      return vqt.vqt(qhbm, num_samples, hamiltonian, beta)
+    
+    for vqt_func in [bare_vqt, tf_func_vqt]:
+      seed = None
+      for num_qubits in [1, 2, 3, 4, 5]:
+        # EBM
+        ebm_init = tf.keras.initializers.RandomUniform(
+            minval=-2.0, maxval=2.0, seed=seed)
+        test_ebm = ebm.Bernoulli(num_qubits, ebm_init, True)
 
-      # VQT arguments
-      test_qhbm = qhbm.QHBM(test_ebm, test_qnn)
-      test_num_samples = tf.constant(1e6)
-      test_h = tfq.convert_to_tensor(
-          [cirq.PauliSum.from_pauli_strings(cirq.Y(q) for q in qubits)])
-      test_beta = tf.random.uniform([], minval=0.01, maxval=100.0, seed=seed)
+        # QNN
+        qubits = cirq.GridQubit.rect(1, num_qubits)
+        r_symbols = [sympy.Symbol(f"phi_{n}") for n in range(num_qubits)]
+        r_circuit = cirq.Circuit(
+            cirq.rx(r_s)(q) for r_s, q in zip(r_symbols, qubits))
+        qnn_init = tf.keras.initializers.RandomUniform(
+            minval=-6.2, maxval=6.2, seed=seed)
+        test_qnn = qnn.QNN(r_circuit, qnn_init, is_analytic=True)
 
-      # Compute losses
-      # Bernoulli has only one tf.Variable
-      test_thetas = test_qhbm.thetas[0]
-      # QNN has only one tf.Variable
-      test_phis = test_qhbm.phis[0]
-      actual_expectation = test_qhbm.expectation(test_h, test_num_samples)[0]
-      expected_expectation = tf.reduce_sum(
-          tf.math.tanh(test_thetas) * tf.math.sin(test_phis))
-      self.assertAllClose(actual_expectation, expected_expectation, rtol=RTOL)
+        # VQT arguments
+        test_qhbm = qhbm.QHBM(test_ebm, test_qnn)
+        test_num_samples = tf.constant(1e6)
+        test_h = tfq.convert_to_tensor(
+            [cirq.PauliSum.from_pauli_strings(cirq.Y(q) for q in qubits)])
+        test_beta = tf.random.uniform([], minval=0.01, maxval=100.0, seed=seed)
 
-      actual_entropy = test_qhbm.entropy()
-      expected_entropy = tf.reduce_sum(
-          -test_thetas * tf.math.tanh(test_thetas) +
-          tf.math.log(2 * tf.math.cosh(test_thetas)))
-      self.assertAllClose(actual_entropy, expected_entropy, rtol=RTOL)
+        # Compute losses
+        # Bernoulli has only one tf.Variable
+        test_thetas = test_qhbm.thetas[0]
+        # QNN has only one tf.Variable
+        test_phis = test_qhbm.phis[0]
+        actual_expectation = test_qhbm.expectation(test_h, test_num_samples)[0]
+        expected_expectation = tf.reduce_sum(
+            tf.math.tanh(test_thetas) * tf.math.sin(test_phis))
+        self.assertAllClose(actual_expectation, expected_expectation, rtol=RTOL)
 
-      with tf.GradientTape() as tape:
-        actual_loss = vqt.vqt(test_qhbm, test_num_samples, test_h, test_beta)
-      expected_loss = test_beta * expected_expectation - expected_entropy
-      self.assertAllClose(actual_loss, expected_loss, rtol=RTOL)
+        actual_entropy = test_qhbm.entropy()
+        expected_entropy = tf.reduce_sum(
+            -test_thetas * tf.math.tanh(test_thetas) +
+            tf.math.log(2 * tf.math.cosh(test_thetas)))
+        self.assertAllClose(actual_entropy, expected_entropy, rtol=RTOL)
 
-      actual_thetas_grads, actual_phis_grads = tape.gradient(
-          actual_loss, (test_thetas, test_phis))
-      expected_thetas_grads = (1 - tf.math.tanh(test_thetas)**2) * (
-          test_beta * tf.math.sin(test_phis) + test_thetas)
-      expected_phis_grads = test_beta * tf.math.tanh(test_thetas) * tf.math.cos(
-          test_phis)
-      self.assertAllClose(actual_thetas_grads, expected_thetas_grads, rtol=RTOL)
-      self.assertAllClose(actual_phis_grads, expected_phis_grads, rtol=RTOL)
+        with tf.GradientTape() as tape:
+          actual_loss = vqt_func(test_qhbm, test_num_samples, test_h, test_beta)
+        expected_loss = test_beta * expected_expectation - expected_entropy
+        self.assertAllClose(actual_loss, expected_loss, rtol=RTOL)
+
+        actual_thetas_grads, actual_phis_grads = tape.gradient(
+            actual_loss, (test_thetas, test_phis))
+        expected_thetas_grads = (1 - tf.math.tanh(test_thetas)**2) * (
+            test_beta * tf.math.sin(test_phis) + test_thetas)
+        expected_phis_grads = test_beta * tf.math.tanh(test_thetas) * tf.math.cos(
+            test_phis)
+        self.assertAllClose(actual_thetas_grads, expected_thetas_grads, rtol=RTOL)
+        self.assertAllClose(actual_phis_grads, expected_phis_grads, rtol=RTOL)
 
 
 if __name__ == "__main__":
