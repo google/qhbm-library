@@ -93,7 +93,7 @@ class VQTTest(tf.test.TestCase):
     def tf_func_vqt(qhbm, num_samples, hamiltonian, beta):
       """Simple wrapper to test tf.function tracing."""
       return vqt.vqt(qhbm, num_samples, hamiltonian, beta)
-    
+
     for vqt_func in [bare_vqt, tf_func_vqt]:
       seed = None
       for num_qubits in [1, 2, 3, 4, 5]:
@@ -143,9 +143,10 @@ class VQTTest(tf.test.TestCase):
             actual_loss, (test_thetas, test_phis))
         expected_thetas_grads = (1 - tf.math.tanh(test_thetas)**2) * (
             test_beta * tf.math.sin(test_phis) + test_thetas)
-        expected_phis_grads = test_beta * tf.math.tanh(test_thetas) * tf.math.cos(
-            test_phis)
-        self.assertAllClose(actual_thetas_grads, expected_thetas_grads, rtol=RTOL)
+        expected_phis_grads = test_beta * tf.math.tanh(
+            test_thetas) * tf.math.cos(test_phis)
+        self.assertAllClose(
+            actual_thetas_grads, expected_thetas_grads, rtol=RTOL)
         self.assertAllClose(actual_phis_grads, expected_phis_grads, rtol=RTOL)
 
 

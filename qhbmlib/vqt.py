@@ -50,8 +50,8 @@ def vqt(model, num_samples, hamiltonian, beta):
     def grad(grad_y, variables=None):
       with tf.GradientTape() as tape:
         beta_expectations = beta * tf.squeeze(
-            model.qnn.expectation(bitstrings, counts, hamiltonian, reduce=False),
-            -1)
+            model.qnn.expectation(
+                bitstrings, counts, hamiltonian, reduce=False), -1)
         beta_expectation = tf.reduce_sum(probs * beta_expectations)
       grad_qnn = tape.gradient(beta_expectation, model.phis)
       grad_qnn = [grad_y * grad for grad in grad_qnn]
