@@ -86,11 +86,11 @@ class VQTTest(tf.test.TestCase):
 
     Since each qubit is independent, the loss is the sum over the individual
     qubit losses, and the gradients are the the per-qubit gradients.
-    """    
+    """
     for vqt_func in [
         vqt.vqt,
         tf.function(vqt.vqt, experimental_compile=False),
-#        tf.function(vqt.vqt, experimental_compile=True)
+        #        tf.function(vqt.vqt, experimental_compile=True)
     ]:
       seed = None
       for num_qubits in [1, 2, 3, 4, 5]:
