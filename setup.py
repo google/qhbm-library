@@ -14,7 +14,7 @@ install_requires = \
 
 setup_kwargs = {
     'name': 'qhbmlib',
-    'version': '0.2.0',
+    'version': '0.2.1',
     'description': 'Quantum Hamiltonian-Based Models built on TensorFlow Quantum',
     'long_description': '# QHBM Library\n\nThis repository is a collection of tools for building and training\nQuantum Hamiltonian-Based Models.  These tools depend on\n[TensorFlow Quantum](https://www.tensorflow.org/quantum),\nand are thus compatible with both real and simulated quantum computers.\n\nThis is not an officially supported Google product.\n',
     'author': 'The QHBM Library Authors',
