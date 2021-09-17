@@ -80,7 +80,7 @@ def qmhl_loss(model: qhbm.QHBM, target_circuits: tf.Tensor,
       # contract over bitstring weights
       thetas_grad = [
           grad * (tf.reduce_sum(tf.transpose(qnn_probs * tf.transpose(qj)), 0) -
-          tf.reduce_sum(tf.transpose(ebm_probs * tf.transpose(ej)), 0))
+                  tf.reduce_sum(tf.transpose(ebm_probs * tf.transpose(ej)), 0))
           for qj, ej in zip(qnn_jac, ebm_jac)
       ]
 
@@ -92,7 +92,9 @@ def qmhl_loss(model: qhbm.QHBM, target_circuits: tf.Tensor,
             target_circuits, target_counts, model_operators)
         pulled_back_energy = model.ebm.operator_expectation(
             pulled_back_energy_shards)
-      phis_grad = [grad * g for g in tape.gradient(pulled_back_energy, model.phis)]
+      phis_grad = [
+          grad * g for g in tape.gradient(pulled_back_energy, model.phis)
+      ]
       # else:
       #   raise NotImplementedError(
       #       "Derivative when EBM has no operator is not yet supported.")

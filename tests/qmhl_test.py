@@ -51,7 +51,6 @@ class QMHLTest(tf.test.TestCase):
           thetas_grads, tf.zeros(tf.shape(thetas_grads)), atol=5e-3)
       self.assertAllClose(phis_grads, tf.zeros(tf.shape(phis_grads)), atol=5e-3)
 
-
   def test_loss_value_x_rot(self):
     """Confirms correct values for a single qubit X rotation QHBM.
 
@@ -83,14 +82,15 @@ class QMHLTest(tf.test.TestCase):
 
       # Build target data
       alphas = tf.random.uniform([num_qubits], minval=-q_const, maxval=q_const)
-      y_rot = cirq.Circuit(cirq.ry(r.numpy())(q) for r, q in zip(alphas, qubits))
+      y_rot = cirq.Circuit(
+          cirq.ry(r.numpy())(q) for r, q in zip(alphas, qubits))
       data_probs = tf.random.uniform([num_qubits])
       data_probs_numpy = data_probs.numpy()
       count_scale = 1e6
       target_states_list = []
       target_counts_list = []
       # Enumerate all possible excitations.
-      for m in range(2 ** num_qubits):
+      for m in range(2**num_qubits):
         c = y_rot.copy()
         p = 1
         for n, q in enumerate(qubits):
@@ -104,19 +104,21 @@ class QMHLTest(tf.test.TestCase):
       target_states = tfq.convert_to_tensor(target_states_list)
       target_counts = tf.convert_to_tensor(target_counts_list)
       print(target_counts_list)
-      
+
       # Compute losses
       test_qhbm = qhbm.QHBM(test_ebm, test_qnn)
       test_thetas = test_qhbm.thetas[0]
       test_phis = test_qhbm.phis[0]
       # TODO(zaqqwerty): add way to use a log QHBM as observable on states
-      expected_expectation = tf.reduce_sum(
-          test_thetas * (2 * data_probs - 1) * tf.math.cos(alphas) * tf.math.cos(test_phis))
+      expected_expectation = tf.reduce_sum(test_thetas * (2 * data_probs - 1) *
+                                           tf.math.cos(alphas) *
+                                           tf.math.cos(test_phis))
 
       actual_log_partition = test_qhbm.log_partition_function()
       expected_log_partition = tf.reduce_sum(
           tf.math.log(2 * tf.math.cosh(test_thetas)))
-      self.assertAllClose(actual_log_partition, expected_log_partition, rtol=RTOL)
+      self.assertAllClose(
+          actual_log_partition, expected_log_partition, rtol=RTOL)
 
       with tf.GradientTape() as tape:
         actual_loss = qmhl.qmhl_loss(test_qhbm, target_states, target_counts)
@@ -125,8 +127,10 @@ class QMHLTest(tf.test.TestCase):
 
       actual_thetas_grads, actual_phis_grads = tape.gradient(
           actual_loss, (test_thetas, test_phis))
-      expected_thetas_grads = (2 * data_probs - 1) * tf.math.cos(alphas) * tf.math.cos(test_phis) + tf.math.tanh(test_thetas)
-      expected_phis_grads = - test_thetas * (2 * data_probs - 1) * tf.math.cos(alphas) * tf.math.sin(test_phis)
+      expected_thetas_grads = (2 * data_probs - 1) * tf.math.cos(
+          alphas) * tf.math.cos(test_phis) + tf.math.tanh(test_thetas)
+      expected_phis_grads = -test_thetas * (
+          2 * data_probs - 1) * tf.math.cos(alphas) * tf.math.sin(test_phis)
       print(expected_thetas_grads)
       print(actual_thetas_grads)
       print(expected_phis_grads)
