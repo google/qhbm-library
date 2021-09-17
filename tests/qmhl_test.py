@@ -85,25 +85,18 @@ class QMHLTest(tf.test.TestCase):
       y_rot = cirq.Circuit(
           cirq.ry(r.numpy())(q) for r, q in zip(alphas, qubits))
       data_probs = tf.random.uniform([num_qubits])
-      data_probs_numpy = data_probs.numpy()
-      count_scale = 1e6
+      num_data_samples = 1e6
+      raw_samples = tfp.distributions.Bernoulli(probs=data_probs).sample(num_data_samples)
+      unique_bitstrings, target_counts = unique_bitstrings_with_counts(raw_samples)
+
+      # Flip bits according to the distribution
       target_states_list = []
-      target_counts_list = []
-      # Enumerate all possible excitations.
-      for m in range(2**num_qubits):
+      for b in unique_bitstrings:
         c = y_rot.copy()
-        p = 1
-        for n, q in enumerate(qubits):
-          if m % 2:  # state |1> on qubit n
-            c += cirq.X(q)
-            m //= 2
-            p *= (1 - data_probs_numpy[n])
-          p *= data_probs_numpy[n]
+        for i, b_i in enumerate(b.numpy()):
+          c = cirq.X(qubits[i]) + c
         target_states_list.append(c)
-        target_counts_list.append(round(p * count_scale))
       target_states = tfq.convert_to_tensor(target_states_list)
-      target_counts = tf.convert_to_tensor(target_counts_list)
-      print(target_counts_list)
 
       # Compute losses
       test_qhbm = qhbm.QHBM(test_ebm, test_qnn)
