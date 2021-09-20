@@ -27,6 +27,7 @@ import tensorflow_probability as tfp
 import tensorflow_quantum as tfq
 
 from qhbmlib import qnn
+from qhbmlib import util
 from tests import test_util
 
 # Global tolerance, set for float32.
@@ -223,6 +224,16 @@ class QNNTest(tf.test.TestCase):
     self.assertTrue(
         test_util.check_bitstring_exists(
             tf.constant([1] * self.num_qubits, dtype=tf.int8), test_samples))
+
+  def test_sample_uneven(self):
+    """Check for discrepancy in samples when count entries differ."""
+    max_counts = int(1e7)
+    counts = tf.constant([max_counts // 2, max_counts])
+    test_qnn = qnn.QNN(cirq.Circuit(cirq.H(cirq.GridQubit(0, 0))))
+    bitstrings = tf.constant([[0], [0]], dtype=tf.int8)
+    samples, samples_counts = test_qnn.sample(bitstrings, counts)
+    # QNN samples should be half 0 and half 1.
+    self.assertAllClose(samples_counts[0], samples_counts[1], atol=max_counts // 1000)
 
   def test_expectation(self):
     """Confirms basic correct expectation values and derivatives.
