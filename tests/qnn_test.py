@@ -27,7 +27,6 @@ import tensorflow_probability as tfp
 import tensorflow_quantum as tfq
 
 from qhbmlib import qnn
-from qhbmlib import util
 from tests import test_util
 
 # Global tolerance, set for float32.
@@ -233,7 +232,8 @@ class QNNTest(tf.test.TestCase):
     bitstrings = tf.constant([[0], [0]], dtype=tf.int8)
     samples, samples_counts = test_qnn.sample(bitstrings, counts)
     # QNN samples should be half 0 and half 1.
-    self.assertAllClose(samples_counts[0], samples_counts[1], atol=max_counts // 1000)
+    self.assertAllClose(
+        samples_counts[0], samples_counts[1], atol=max_counts // 1000)
 
   def test_expectation(self):
     """Confirms basic correct expectation values and derivatives.
