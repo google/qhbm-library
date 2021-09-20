@@ -152,6 +152,7 @@ class QNN(tf.keras.Model):
       
       num_samples_mask = tf.cast((tf.ragged.range(counts) + 1).to_tensor(),
                                  tf.bool)
+      num_samples_mask = tf.map_fn(tf.random.shuffle, num_samples_mask)
       samples = tf.ragged.boolean_mask(samples, num_samples_mask)
     if unique:
       samples = samples.values.to_tensor()
