@@ -14,6 +14,8 @@
 # ==============================================================================
 """Tests for the QMHL loss and gradients."""
 
+import math
+
 import cirq
 import sympy
 import tensorflow as tf
@@ -66,22 +68,23 @@ class QMHLTest(tf.test.TestCase):
     Since each qubit is independent, the loss is the sum over the individual
     qubit losses, and the gradients are the the per-qubit gradients.
     """
+    seed = None
+    ebm_const = 2.0
+    q_const = 2 * math.pi
+    num_data_samples = 1e6
     for qmhl_func in [
         qmhl.qmhl,
-        tf.function(qmhl.qmhl, experimental_compile=False),
+        #        tf.function(qmhl.qmhl, experimental_compile=False),
         #        tf.function(qmhl.qmhl, experimental_compile=True)
     ]:
-      seed = None
       for num_qubits in [1, 2, 3, 4, 5]:
         # EBM
-        ebm_const = 2.0
         ebm_init = tf.keras.initializers.RandomUniform(
             minval=-ebm_const, maxval=ebm_const, seed=seed)
         test_ebm = ebm.Bernoulli(num_qubits, ebm_init, True)
 
         # QNN
         qubits = cirq.GridQubit.rect(1, num_qubits)
-        q_const = 6.2
         r_symbols = [sympy.Symbol(f"phi_{n}") for n in range(num_qubits)]
         r_circuit = cirq.Circuit(
             cirq.rx(r_s)(q) for r_s, q in zip(r_symbols, qubits))
@@ -119,7 +122,6 @@ class QMHLTest(tf.test.TestCase):
         y_rot = cirq.Circuit(
             cirq.ry(r.numpy())(q) for r, q in zip(alphas, qubits))
         data_probs = tf.random.uniform([num_qubits])
-        num_data_samples = 1e6
         raw_samples = tfp.distributions.Bernoulli(
             probs=1 - data_probs, dtype=tf.int8).sample(num_data_samples)
         unique_bitstrings, target_counts = util.unique_bitstrings_with_counts(
@@ -135,7 +137,7 @@ class QMHLTest(tf.test.TestCase):
         target_states = tfq.convert_to_tensor(target_states_list)
 
         with tf.GradientTape() as tape:
-          actual_loss = qmhl.qmhl(test_qhbm, target_states, target_counts)
+          actual_loss = qmhl_func(test_qhbm, target_states, target_counts)
         # TODO(zaqqwerty): add way to use a log QHBM as observable on states
         expected_expectation = tf.reduce_sum(
             test_thetas * (2 * data_probs - 1) * tf.math.cos(alphas) *

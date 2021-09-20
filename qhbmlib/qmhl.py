@@ -37,6 +37,7 @@ def qmhl(model, target_circuits, target_counts):
   @tf.custom_gradient
   def loss(unused):
     # log_partition estimate
+
     if model.ebm.is_analytic:
       log_partition = model.log_partition_function()
     else:
