@@ -149,6 +149,7 @@ class QNN(tf.keras.Model):
     samples = self._sample_layer(
         circuits, repetitions=tf.expand_dims(tf.math.reduce_max(counts), 0))
     if mask:
+      
       num_samples_mask = tf.cast((tf.ragged.range(counts) + 1).to_tensor(),
                                  tf.bool)
       samples = tf.ragged.boolean_mask(samples, num_samples_mask)

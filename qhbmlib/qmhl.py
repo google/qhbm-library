@@ -53,6 +53,7 @@ def qmhl_loss(model: qhbm.QHBM, target_circuits: tf.Tensor,
     samples_pb, counts_pb = model.qnn.pulled_back_sample(
         target_circuits, target_counts)
     energies = model.ebm.energy(samples_pb)
+    print(f"counts_pb: {counts_pb}")
     probs_pb = tf.cast(counts_pb, tf.float32) / tf.cast(
         tf.reduce_sum(counts_pb), tf.float32)
     weighted_energies = energies * probs_pb
