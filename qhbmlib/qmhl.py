@@ -20,19 +20,20 @@ import tensorflow as tf
 def qmhl(model, target_circuits, target_counts):
   """Calculate the QMHL loss of the model against the target.
 
-    This loss is differentiable with respect to the trainable variables of the model.
+  This loss is differentiable with respect to the trainable variables of the
+    model.
 
-    Args:
-      model: Parameterized model density operator.
-      target_circuits: 1-D tensor of strings which are serialized circuits.
-        These circuits represent samples from the data density matrix.
-      target_counts: 1-D tensor of integers which are the number of samples to
-        draw from the data density matrix: `target_counts[i]` is the number of
-          samples to draw from `target_circuits[i]`.
+  Args:
+    model: Parameterized model density operator.
+    target_circuits: 1-D tensor of strings which are serialized circuits.
+      These circuits represent samples from the data density matrix.
+    target_counts: 1-D tensor of integers which are the number of samples to
+      draw from the data density matrix: `target_counts[i]` is the number of
+        samples to draw from `target_circuits[i]`.
 
-    Returns:
-      loss: Quantum cross entropy between the target and model.
-    """
+  Returns:
+    loss: Quantum cross entropy between the target and model.
+  """
 
   @tf.custom_gradient
   def loss(unused):
