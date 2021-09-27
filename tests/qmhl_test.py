@@ -74,7 +74,7 @@ class QMHLTest(tf.test.TestCase):
     num_data_samples = 1e6
     for qmhl_func in [
         qmhl.qmhl,
-        #        tf.function(qmhl.qmhl, experimental_compile=False),
+        tf.function(qmhl.qmhl, experimental_compile=False),
         #        tf.function(qmhl.qmhl, experimental_compile=True)
     ]:
       for num_qubits in [1, 2, 3, 4, 5]:
