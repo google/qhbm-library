@@ -20,19 +20,20 @@ import tensorflow as tf
 def qmhl(model, target_circuits, target_counts):
   """Calculate the QMHL loss of the model against the target.
 
-    This loss is differentiable with respect to the trainable variables of the model.
+  This loss is differentiable with respect to the trainable variables of the
+    model.
 
-    Args:
-      model: Parameterized model density operator.
-      target_circuits: 1-D tensor of strings which are serialized circuits.
-        These circuits represent samples from the data density matrix.
-      target_counts: 1-D tensor of integers which are the number of samples to
-        draw from the data density matrix: `target_counts[i]` is the number of
-          samples to draw from `target_circuits[i]`.
+  Args:
+    model: Parameterized model density operator.
+    target_circuits: 1-D tensor of strings which are serialized circuits.
+      These circuits represent samples from the data density matrix.
+    target_counts: 1-D tensor of integers which are the number of samples to
+      draw from the data density matrix: `target_counts[i]` is the number of
+        samples to draw from `target_circuits[i]`.
 
-    Returns:
-      loss: Quantum cross entropy between the target and model.
-    """
+  Returns:
+    loss: Quantum cross entropy between the target and model.
+  """
 
   @tf.custom_gradient
   def loss(unused):
@@ -46,12 +47,12 @@ def qmhl(model, target_circuits, target_counts):
       log_partition = tf.math.reduce_logsumexp(-1 * energies)
 
     # pulled back expectation of energy operator
-    samples_pb, counts_pb = model.qnn.pulled_back_sample(
+    qnn_bitstrings, qnn_counts = model.qnn.pulled_back_sample(
         target_circuits, target_counts)
-    energies = model.ebm.energy(samples_pb)
-    probs_pb = tf.cast(counts_pb, tf.float32) / tf.cast(
-        tf.reduce_sum(counts_pb), tf.float32)
-    weighted_energies = energies * probs_pb
+    energies = model.ebm.energy(qnn_bitstrings)
+    qnn_probs = tf.cast(qnn_counts, tf.float32) / tf.cast(
+        tf.reduce_sum(qnn_counts), tf.float32)
+    weighted_energies = energies * qnn_probs
     avg_energy = tf.reduce_sum(weighted_energies)
 
     forward_pass_vals = avg_energy + log_partition
@@ -59,20 +60,20 @@ def qmhl(model, target_circuits, target_counts):
     def gradient(grad, variables=None):
       """Gradients are computed using estimators from the QHBM paper."""
       # Thetas derivative.
-      qnn_probs = tf.cast(counts_pb, tf.float32) / tf.cast(
-          tf.reduce_sum(counts_pb), tf.float32)
       ebm_bitstrings, ebm_counts = model.ebm.sample(
           tf.reduce_sum(target_counts))
       ebm_probs = tf.cast(ebm_counts, tf.float32) / tf.cast(
           tf.reduce_sum(ebm_counts), tf.float32)
       with tf.GradientTape() as tape:
-        qnn_energies = model.ebm.energy(samples_pb)
+        qnn_energies = model.ebm.energy(qnn_bitstrings)
       # jacobian is a list over thetas, with ith entry a tensor of shape
       # [tf.shape(qnn_energies)[0], tf.shape(thetas[i])[0]]
-      qnn_jac = tf.ragged.stack(tape.jacobian(qnn_energies, model.thetas))
+      qnn_jac = tape.jacobian(qnn_energies, model.thetas)
+
       with tf.GradientTape() as tape:
         ebm_energies = model.ebm.energy(ebm_bitstrings)
-      ebm_jac = tf.ragged.stack(tape.jacobian(ebm_energies, model.thetas))
+      ebm_jac = tape.jacobian(ebm_energies, model.thetas)
+
       # contract over bitstring weights
       thetas_grad = [
           grad * (tf.reduce_sum(tf.transpose(qnn_probs * tf.transpose(qj)), 0) -
