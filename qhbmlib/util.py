@@ -364,17 +364,19 @@ def density_matrix_to_image(dm):
 # ============================================================================ #
 
 
-def get_bit_sub_indices(qubits_vqt, qubits_j):
-  """Assumes qubits_j is a subset of qubits_vqt."""
-  qubits_vqt_tiled = tf.tile(
-      tf.expand_dims(qubits_vqt, 0), [tf.shape(qubits_j)[0], 1, 1])
-  qubits_j_expanded = tf.expand_dims(qubits_j, 1)
-  expanded_where = tf.equal(qubits_vqt_tiled, qubits_j_expanded)
+def get_bit_sub_indices(qubits_qhbm, qubits_mod_ham):
+  """Assumes qubits_mod_ham is a subset of qubits_qhbm."""
+  # Dimensions are [num_qubits_mod_ham, num_qubits_qhbm, 2]
+  qubits_qhbm_tiled = tf.tile(
+      tf.expand_dims(qubits_qhbm, 0), [tf.shape(qubits_mod_ham)[0], 1, 1])
+  # Dimensions are [num_qubits_mod_ham, 1, 2]
+  qubits_mod_ham_expanded = tf.expand_dims(qubits_mod_ham, 1)
+  expanded_where = tf.equal(qubits_qhbm_tiled, qubits_mod_ham_expanded)
   reduced_where = tf.reduce_all(expanded_where, 2)
   all_wheres = tf.where(reduced_where)
-  this_ones = tf.expand_dims(tf.ones(tf.shape(qubits_j)[0], dtype=tf.int32), 1)
-  indices_j = tf.expand_dims(tf.range(tf.shape(qubits_j)[0]), 1)
-  this_gather_inds = tf.concat([indices_j, this_ones], 1)
+  this_ones = tf.expand_dims(tf.ones(tf.shape(qubits_mod_ham)[0], dtype=tf.int32), 1)
+  indices_mod_ham = tf.expand_dims(tf.range(tf.shape(qubits_mod_ham)[0]), 1)
+  this_gather_inds = tf.concat([indices_mod_ham, this_ones], 1)
   return tf.gather_nd(all_wheres, this_gather_inds)
 
 

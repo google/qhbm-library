@@ -422,6 +422,13 @@ class EntropyTest(tf.test.TestCase):
 # ============================================================================ #
 
 
+class GetBitSubIndicesTest(tf.test.TestCase):
+  """Test get_bit_sub_indices"""
+
+  def test_identity(self):
+    pass
+
+
 class UniqueBitstringsWithCountsTest(tf.test.TestCase):
   """Test unique_with_counts from the qhbm library."""
 
