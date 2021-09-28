@@ -62,6 +62,7 @@ def qmhl(model, target_circuits, target_counts):
       ebm_probs = tf.cast(ebm_counts, tf.float32) / tf.cast(
           tf.reduce_sum(ebm_counts), tf.float32)
       with tf.GradientTape() as tape:
+        tape.watch(model.ebm.trainable_variables)
         qnn_energies = model.ebm.energy(qnn_bitstrings)
       # jacobian is a list over thetas, with ith entry a tensor of shape
       # [tf.shape(qnn_energies)[0], tf.shape(thetas[i])[0]]
@@ -69,6 +70,7 @@ def qmhl(model, target_circuits, target_counts):
                                      model.ebm.trainable_variables)
 
       with tf.GradientTape() as tape:
+        tape.watch(model.ebm.trainable_variables)
         ebm_energies = model.ebm.energy(ebm_bitstrings)
       ebm_energy_jac = tape.jacobian(ebm_energies,
                                      model.ebm.trainable_variables)
@@ -87,6 +89,7 @@ def qmhl(model, target_circuits, target_counts):
       # Phis derivative.
       if model.ebm.has_operator:
         with tf.GradientTape() as tape:
+          tape.watch(model.qnn.trainable_variables)
           energy_shards = model.qnn.pulled_back_expectation(
               target_circuits, target_counts, model.operator_shards)
           energy = model.ebm.operator_expectation(energy_shards)
@@ -98,7 +101,7 @@ def qmhl(model, target_circuits, target_counts):
       grad_qhbm = grad_ebm + grad_qnn
       if variables is None:
         return grad_qhbm
-      return grad_qhbm, [tf.zeros_like(g) for g in grad_qhbm]
+      return grad_qhbm, [tf.zeros_like(grad) for grad in grad_qhbm]
 
     return avg_energy + log_partition_function, grad
 

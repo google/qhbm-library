@@ -49,6 +49,7 @@ def vqt(model, num_samples, hamiltonian, beta):
 
     def grad(grad_y, variables=None):
       with tf.GradientTape() as tape:
+        tape.watch(model.qnn.trainable_variables)
         beta_expectations = beta * tf.squeeze(
             model.qnn.expectation(
                 bitstrings, counts, hamiltonian, reduce=False), -1)
@@ -57,6 +58,7 @@ def vqt(model, num_samples, hamiltonian, beta):
       grad_qnn = [grad_y * grad for grad in grad_qnn]
 
       with tf.GradientTape() as tape:
+        tape.watch(model.ebm.trainable_variables)
         energies = model.ebm.energy(bitstrings)
       energy_jac = tape.jacobian(energies, model.ebm.trainable_variables)
       probs_diffs = probs * (beta_expectations - energies)
