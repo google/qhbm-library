@@ -50,7 +50,8 @@ class QMHLTest(tf.test.TestCase):
       target_circuits, target_counts = target.circuits(target_samples)
       with tf.GradientTape() as tape:
         loss = qmhl.qmhl(model, target_circuits, target_counts)
-      thetas_grads, phis_grads = tape.gradient(loss, (model.thetas, model.phis))
+      thetas_grads, phis_grads = tape.gradient(
+          loss, (model.ebm.trainable_variables, model.qnn.trainable_variables))
       self.assertAllClose(loss, target.ebm.entropy(), atol=5e-3)
       self.assertAllClose(
           thetas_grads, tf.zeros(tf.shape(thetas_grads)), atol=5e-3)
@@ -94,8 +95,8 @@ class QMHLTest(tf.test.TestCase):
 
         # Confirm model QHBM
         test_qhbm = qhbm.QHBM(test_ebm, test_qnn)
-        test_thetas = test_qhbm.thetas[0]
-        test_phis = test_qhbm.phis[0]
+        test_thetas = test_qhbm.ebm.trainable_variables[0]
+        test_phis = test_qhbm.qnn.trainable_variables[0]
         actual_log_partition = test_qhbm.log_partition_function()
         expected_log_partition = tf.reduce_sum(
             tf.math.log(2 * tf.math.cosh(test_thetas)))

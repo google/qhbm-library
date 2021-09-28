@@ -69,10 +69,11 @@ class QNN(tf.keras.Model):
     symbols = list(sorted(tfq.util.get_circuit_symbols(pqc)))
     self._symbols = tf.constant([str(x) for x in symbols], dtype=tf.string)
 
-    self._values = self.add_weight(
-        name=f'{self.name}_pqc_values',
+    self.values = self.add_weight(
+        name=f'values',
         shape=[len(symbols)],
-        initializer=initializer)
+        initializer=initializer,
+        trainable=True)
 
     self._pqc = tfq.convert_to_tensor([pqc])
     self._inverse_pqc = tfq.convert_to_tensor([pqc**-1])

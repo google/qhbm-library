@@ -110,12 +110,12 @@ class QNNTest(tf.test.TestCase):
         tfq.from_tensor(test_qnn.pqc(resolve=True)),
         tfq.from_tensor(
             tfq.resolve_parameters(self.pqc_tfq, self.symbols,
-                                   tf.expand_dims(test_qnn._values, 0))))
+                                   tf.expand_dims(test_qnn.values, 0))))
     self.assertEqual(
         tfq.from_tensor(test_qnn.inverse_pqc(resolve=True)),
         tfq.from_tensor(
             tfq.resolve_parameters(self.inverse_pqc_tfq, self.symbols,
-                                   tf.expand_dims(test_qnn._values, 0))))
+                                   tf.expand_dims(test_qnn.values, 0))))
 
   def test_copy(self):
     """Confirms copied QNN has correct attributes."""
@@ -163,7 +163,7 @@ class QNNTest(tf.test.TestCase):
 
     resolved_pqc = tfq.from_tensor(
         tfq.resolve_parameters(self.pqc_tfq, self.symbols,
-                               tf.expand_dims(test_qnn._values, 0)))[0]
+                               tf.expand_dims(test_qnn.values, 0)))[0]
     bit_injectors = []
     for b in bitstrings:
       bit_injectors.append(

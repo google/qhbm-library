@@ -65,7 +65,7 @@ class VQTTest(tf.test.TestCase):
     cirq_ham = cirq.X(qubit)
     tf_ham = tfq.convert_to_tensor([cirq_ham])
     test_ebm = ebm.Bernoulli(1, is_analytic=True)
-    test_ebm._variables.assign(tf.constant([1.0]))
+    test_ebm.kernel.assign(tf.constant([1.0]))
     symbol = sympy.Symbol("p")
     pqc = cirq.Circuit(cirq.H(qubit)**symbol)
     test_qnn = qnn.QNN(pqc, is_analytic=True)
@@ -117,9 +117,9 @@ class VQTTest(tf.test.TestCase):
 
         # Compute losses
         # Bernoulli has only one tf.Variable
-        test_thetas = test_qhbm.thetas[0]
+        test_thetas = test_qhbm.ebm.trainable_variables[0]
         # QNN has only one tf.Variable
-        test_phis = test_qhbm.phis[0]
+        test_phis = test_qhbm.qnn.trainable_variables[0]
         actual_expectation = test_qhbm.expectation(test_h, test_num_samples)[0]
         expected_expectation = tf.reduce_sum(
             tf.math.tanh(test_thetas) * tf.math.sin(test_phis))

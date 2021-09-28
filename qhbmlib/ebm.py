@@ -100,7 +100,7 @@ class KOBE(EnergyFunction):
 
   @trainable_variables.setter
   def trainable_variables(self, value):
-    return self.kernel = value[0]
+    self.kernel = value[0]
 
   @property
   def num_bits(self):
@@ -157,7 +157,7 @@ class MLP(EnergyFunction):
   @property
   def num_bits(self):
     return self._num_bits
-  
+
   @property
   def trainable_variables(self):
     trainable_variables = []
@@ -565,7 +565,7 @@ class EBM(tf.keras.Model):
 
   def operator_shards(self, qubits):
     return self._energy_function.operator_shards(qubits)
-  
+
   def operator_expectation(self, expectation_shards):
     return self._energy_function.operator_expectation(expectation_shards)
 
@@ -634,7 +634,6 @@ class Bernoulli(EBM):
   @trainable_variables.setter
   def trainable_variables(self, value):
     self.kernel = value[0]
-
 
   @property
   def has_operator(self):

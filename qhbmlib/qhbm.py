@@ -43,7 +43,7 @@ class QHBM(tf.keras.Model):
   @property
   def qnn(self):
     return self._qnn
-  
+
   @property
   def trainable_variables(self):
     return self.ebm.trainable_variables + self.qnn.trainable_variables

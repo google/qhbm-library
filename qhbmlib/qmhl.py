@@ -65,17 +65,23 @@ def qmhl(model, target_circuits, target_counts):
         qnn_energies = model.ebm.energy(qnn_bitstrings)
       # jacobian is a list over thetas, with ith entry a tensor of shape
       # [tf.shape(qnn_energies)[0], tf.shape(thetas[i])[0]]
-      qnn_energy_jac = tape.jacobian(qnn_energies, model.ebm.trainable_variables)
+      qnn_energy_jac = tape.jacobian(qnn_energies,
+                                     model.ebm.trainable_variables)
 
       with tf.GradientTape() as tape:
         ebm_energies = model.ebm.energy(ebm_bitstrings)
-      ebm_energy_jac = tape.jacobian(ebm_energies, model.ebm.trainable_variables)
+      ebm_energy_jac = tape.jacobian(ebm_energies,
+                                     model.ebm.trainable_variables)
 
       # contract over bitstring weights
       grad_ebm = [
-          grad_y * (tf.reduce_sum(tf.transpose(qnn_probs * tf.transpose(qnn_energy_grad)), 0) -
-                  tf.reduce_sum(tf.transpose(ebm_probs * tf.transpose(ebm_energy_grad)), 0))
-          for qnn_energy_grad, ebm_energy_grad in zip(qnn_energy_jac, ebm_energy_jac)
+          grad_y *
+          (tf.reduce_sum(
+              tf.transpose(qnn_probs * tf.transpose(qnn_energy_grad)), 0) -
+           tf.reduce_sum(
+               tf.transpose(ebm_probs * tf.transpose(ebm_energy_grad)), 0))
+          for qnn_energy_grad, ebm_energy_grad in zip(qnn_energy_jac,
+                                                      ebm_energy_jac)
       ]
 
       # Phis derivative.
@@ -83,8 +89,7 @@ def qmhl(model, target_circuits, target_counts):
         with tf.GradientTape() as tape:
           energy_shards = model.qnn.pulled_back_expectation(
               target_circuits, target_counts, model.operator_shards)
-          energy = model.ebm.operator_expectation(
-              energy_shards)
+          energy = model.ebm.operator_expectation(energy_shards)
         grad_qnn = tape.gradient(energy, model.qnn.trainable_variables)
         grad_qnn = [grad_y * grad for grad in grad_qnn]
       else:
