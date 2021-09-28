@@ -422,11 +422,28 @@ class EntropyTest(tf.test.TestCase):
 # ============================================================================ #
 
 
-class GetBitSubIndicesTest(tf.test.TestCase):
-  """Test get_bit_sub_indices"""
+class QubitToIndicesTest(tf.test.TestCase):
+  """Test qubits_to_indices"""
 
-  def test_identity(self):
-    pass
+  def test_basic_conversion(self):
+    """Confirms a given list of qubits is converted correctly."""
+    row_col_list = [[0, 0], [1, 2], [100, 2]]
+    expected_indices = tf.constant(row_col_list, dtype=tf.int32)
+    qubits = [cirq.GridQubit(i[0], i[1]) for i in row_col_list] 
+    actual_indices = util.qubits_to_indices(qubits)
+    self.assertAllEqual(actual_indices, expected_indices)
+
+
+class QubitSubIndicesTest(tf.test.TestCase):
+  """Test qubit_sub_indices"""
+
+  def test_basic_sublist(self):
+    """Confirms a sublist of qubits is correctly picked out of a larger list."""
+    row_col_total = tf.constant([[5, 7], [6, 6], [7, 4], [10, 0], [11, 12]])
+    row_col_sublist = tf.constant([[6, 6], [10, 0]])
+    expected_sub_indices = tf.constant([1, 3])
+    actual_sub_indices = util.qubit_sub_indices(row_col_total, row_col_sublist)
+    self.assertAllEqual(actual_sub_indices, expected_sub_indices)
 
 
 class UniqueBitstringsWithCountsTest(tf.test.TestCase):

@@ -78,7 +78,7 @@ class QNN(tf.keras.Model):
     self._inverse_pqc = tfq.convert_to_tensor([pqc**-1])
 
     self._raw_qubits = sorted(pqc.all_qubits())
-    self._qubits = tf.constant([[q.row, q.col] for q in self._raw_qubits])
+    self._qubits = util.qubits_to_indices(self._raw_qubits)
 
     _bit_circuit = bit_circuit(self._raw_qubits)
     bit_symbols = list(sorted(tfq.util.get_circuit_symbols(_bit_circuit)))
