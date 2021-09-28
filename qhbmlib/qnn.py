@@ -114,8 +114,12 @@ class QNN(tf.keras.Model):
     return self._symbols
 
   @property
-  def values(self):
-    return self._values
+  def trainable_variables(self):
+    return [self.values]
+
+  @trainable_variables.setter
+  def trainable_variables(self, value):
+    self.values = value[0]
 
   @property
   def backend(self):

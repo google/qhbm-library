@@ -31,9 +31,7 @@ class QHBM(tf.keras.Model):
   def __init__(self, ebm, qnn, name=None):
     super().__init__(name=name)
     self._ebm = ebm
-    self.thetas = ebm.trainable_variables
     self._qnn = qnn
-    self.phis = self.qnn.trainable_variables
     if ebm.has_operator:
       self._operator_shards = tfq.convert_to_tensor(
           ebm.operator_shards(qnn.raw_qubits))
@@ -45,6 +43,15 @@ class QHBM(tf.keras.Model):
   @property
   def qnn(self):
     return self._qnn
+  
+  @property
+  def trainable_variables(self):
+    return self.ebm.trainable_variables + self.qnn.trainable_variables
+
+  @trainable_variables.setter
+  def trainable_variables(self, value):
+    self.ebm.trainable_variables = value[:-1]
+    self.qnn.trainable_variables = value[-1:]
 
   @property
   def operator_shards(self):
