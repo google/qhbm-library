@@ -226,6 +226,18 @@ class BernoulliTest(tf.test.TestCase):
     test_entropy = test_b.entropy()
     self.assertAllClose(expected_entropy, test_entropy)
 
+  def test_trainable_variables_bernoulli(self):
+    test_b = ebm.Bernoulli(self.num_bits, name="test")
+    self.assertAllEqual(test_b.kernel, test_b.trainable_variables[0])
+
+    kernel = tf.random.uniform([self.num_bits])
+    test_b.trainable_variables = [kernel]
+    self.assertAllEqual(kernel, test_b.trainable_variables[0])
+
+    kernel = tf.Variable(kernel)
+    test_b.trainable_variables = [kernel]
+    self.assertAllEqual(kernel, test_b.trainable_variables[0])
+
 
 class KOBETest(tf.test.TestCase):
   """Test the ebm.KOBE energy function."""
@@ -441,6 +453,19 @@ class KOBETest(tf.test.TestCase):
     test_k = ebm.EBM(pre_k, None, is_analytic=True)
     test_entropy = test_k.entropy()
     self.assertAllClose(expected_entropy, test_entropy)
+
+  def test_trainable_variables_kobe(self):
+    num_bits = 3
+    test_k = ebm.KOBE(num_bits, self.order, name="test")
+    self.assertAllEqual(test_k.kernel, test_k.trainable_variables[0])
+
+    kernel = tf.random.uniform([num_bits])
+    test_k.trainable_variables = [kernel]
+    self.assertAllEqual(kernel, test_k.trainable_variables[0])
+
+    kernel = tf.Variable(kernel)
+    test_k.trainable_variables = [kernel]
+    self.assertAllEqual(kernel, test_k.trainable_variables[0])
 
 
 if __name__ == "__main__":

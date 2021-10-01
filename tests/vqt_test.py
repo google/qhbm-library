@@ -146,6 +146,49 @@ class VQTTest(tf.test.TestCase):
             actual_thetas_grads, expected_thetas_grads, rtol=RTOL)
         self.assertAllClose(actual_phis_grads, expected_phis_grads, rtol=RTOL)
 
+  def test_hyernetwork(self):
+    qubit = cirq.GridQubit(0, 0)
+    cirq_ham = cirq.X(qubit)
+    tf_ham = tfq.convert_to_tensor([cirq_ham])
+    test_ebm = ebm.Bernoulli(1, is_analytic=True)
+    test_ebm.kernel.assign(tf.constant([1.0]))
+    symbol = sympy.Symbol("p")
+    pqc = cirq.Circuit(cirq.H(qubit)**symbol)
+    test_qnn = qnn.QNN(pqc, is_analytic=True)
+    test_qnn.values.assign(tf.constant([1.0]))
+    test_qhbm = qhbm.QHBM(test_ebm, test_qnn)
+
+    trainable_variables_shapes = [
+        tf.shape(var) for var in test_qhbm.trainable_variables
+    ]
+    trainable_variables_sizes = [
+        tf.size(var) for var in test_qhbm.trainable_variables
+    ]
+    trainable_variables_size = tf.reduce_sum(
+        tf.stack(trainable_variables_sizes))
+
+    input_size = 10
+    hypernetwork = tf.keras.Sequential([
+        tf.keras.layers.Dense(10, 'relu', input_shape=(input_size,)),
+        tf.keras.layers.Dense(trainable_variables_size)
+    ])
+    input = tf.random.uniform([1, input_size])
+
+    with tf.GradientTape() as tape:
+      output = tf.squeeze(hypernetwork(input))
+      index = 0
+      output_trainable_variables = []
+      for size, shape in zip(trainable_variables_sizes,
+                             trainable_variables_shapes):
+        output_trainable_variables.append(
+            tf.reshape(output[index:index + size], shape))
+        index += size
+      test_qhbm.trainable_variables = output_trainable_variables
+      loss = vqt.vqt(test_qhbm, tf.constant(int(5e6)), tf_ham, tf.constant(1.0))
+    grads = tape.gradient(loss, test_qhbm.trainable_variables)
+    for grad in grads:
+      self.assertIsNotNone(grad)
+
 
 if __name__ == "__main__":
   print("Running vqt_test.py ...")
