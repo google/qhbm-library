@@ -468,6 +468,32 @@ class KOBETest(tf.test.TestCase):
     self.assertAllEqual(kernel, test_k.trainable_variables[0])
 
 
+class MLPTest(tf.test.TestCase):
+  num_bits = 5
+
+  def test_trainable_variables_mlp(self):
+    test_mlp = ebm.MLP(
+        self.num_bits, [4, 3, 2], activations=['relu', 'tanh', 'sigmoid'])
+
+    i = 0
+    for layer in test_mlp.layers:
+      self.assertAllEqual(layer.kernel, test_mlp.trainable_variables[i])
+      self.assertAllEqual(layer.bias, test_mlp.trainable_variables[i + 1])
+      i += 2
+
+    variables = [
+        tf.random.uniform(tf.shape(v)) for v in test_mlp.trainable_variables
+    ]
+    test_mlp.trainable_variables = variables
+    for i in range(len(test_mlp.trainable_variables)):
+      self.assertAllEqual(variables[i], test_mlp.trainable_variables[i])
+
+    variables = [tf.Variable(v) for v in variables]
+    test_mlp.trainable_variables = variables
+    for i in range(len(test_mlp.trainable_variables)):
+      self.assertAllEqual(variables[i], test_mlp.trainable_variables[i])
+
+
 if __name__ == "__main__":
   print("Running ebm_test.py ...")
   tf.test.main()

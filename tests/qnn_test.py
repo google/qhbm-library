@@ -441,6 +441,24 @@ class QNNTest(tf.test.TestCase):
     #TODO(zaqqwerty)
     pass
 
+  def test_trainable_variables(self):
+    test_qnn = qnn.QNN(
+        self.pqc,
+        backend=self.backend,
+        differentiator=self.differentiator,
+        is_analytic=True,
+        name=self.name)
+
+    self.assertAllEqual(test_qnn.values, test_qnn.trainable_variables[0])
+
+    values = tf.random.uniform(tf.shape(test_qnn.trainable_variables[0]))
+    test_qnn.trainable_variables = [values]
+    self.assertAllEqual(values, test_qnn.trainable_variables[0])
+
+    values = tf.Variable(values)
+    test_qnn.trainable_variables = [values]
+    self.assertAllEqual(values, test_qnn.trainable_variables[0])
+
 
 if __name__ == "__main__":
   logging.info("Running qnn_test.py ...")

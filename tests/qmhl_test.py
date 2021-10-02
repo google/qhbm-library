@@ -173,9 +173,11 @@ class QMHLTest(tf.test.TestCase):
       trainable_variables_size = tf.reduce_sum(
           tf.stack(trainable_variables_sizes))
 
-      input_size = 10
+      input_size = 15
       hypernetwork = tf.keras.Sequential([
-          tf.keras.layers.Dense(10, 'relu', input_shape=(input_size,)),
+          tf.keras.layers.Dense(15, 'relu', input_shape=(input_size,)),
+          tf.keras.layers.Dense(10, 'tanh', input_shape=(input_size,)),
+          tf.keras.layers.Dense(5, 'sigmoid', input_shape=(input_size,)),
           tf.keras.layers.Dense(trainable_variables_size)
       ])
       input = tf.random.uniform([1, input_size])

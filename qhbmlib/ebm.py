@@ -171,7 +171,7 @@ class MLP(EnergyFunction):
     for layer in self.layers:
       layer.kernel = value[i]
       layer.bias = value[i + 1]
-      i += 1
+      i += 2
 
   def copy(self):
     mlp = tf.keras.models.clone_model(self)

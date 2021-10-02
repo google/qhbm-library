@@ -339,6 +339,31 @@ class ExactQHBMBasicFunctionTest(tf.test.TestCase):
     dm = test_qhbm.density_matrix()
     self.assertAllClose(1.0, test_qhbm.fidelity(dm), atol=ATOL)
 
+  def test_trainable_variables(self):
+    test_qhbm = get_exact_qhbm()
+
+    for i in range(len(test_qhbm.trainable_variables)):
+      if i < len(test_qhbm.ebm.trainable_variables):
+        self.assertAllEqual(test_qhbm.ebm.trainable_variables[i],
+                            test_qhbm.trainable_variables[i])
+      else:
+        self.assertAllEqual(
+            test_qhbm.qnn.trainable_variables[
+                i - len(test_qhbm.ebm.trainable_variables)],
+            test_qhbm.trainable_variables[i])
+
+    variables = [
+        tf.random.uniform(tf.shape(v)) for v in test_qhbm.trainable_variables
+    ]
+    test_qhbm.trainable_variables = variables
+    for i in range(len(test_qhbm.trainable_variables)):
+      self.assertAllEqual(variables[i], test_qhbm.trainable_variables[i])
+
+    variables = [tf.Variable(v) for v in variables]
+    test_qhbm.trainable_variables = variables
+    for i in range(len(test_qhbm.trainable_variables)):
+      self.assertAllEqual(variables[i], test_qhbm.trainable_variables[i])
+
 
 if __name__ == "__main__":
   print("Running qhbm_test.py ...")
