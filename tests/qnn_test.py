@@ -127,8 +127,8 @@ class QNNTest(tf.test.TestCase):
     
   def test_copy(self):
     """Confirms copied QNN has correct attributes."""
-    test_qnn = qnn.QNN(self.pqc, self.initializer, self.backend,
-                       self.differentiator, self.name)
+    test_qnn = qnn.QNN(self.pqc, initializer=self.initializer, backend=self.backend,
+                       differentiator=self.differentiator, name=self.name)
     test_qnn_copy = test_qnn.copy()
     self.assertEqual(test_qnn_copy.name, test_qnn.name)
     self.assertAllClose(test_qnn_copy.trainable_variables,

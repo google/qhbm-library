@@ -39,7 +39,7 @@ class QNN(tf.keras.Model):
   def __init__(
       self,
       pqc,
-      *
+      *,
       symbols=None,
       values=None,
       initializer=tf.keras.initializers.RandomUniform(0, 2 * np.pi),
