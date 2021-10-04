@@ -130,7 +130,24 @@ class QNNTest(tf.test.TestCase):
 
   def test_pow(self):
     """Confirms inverse works correctly."""
-    pass
+    actual_qnn = qnn.QNN(self.pqc)
+    with self.assertRaisesRegex(ValueError,
+                                expected_regex="only the inverse"):
+      _ = actual_qnn ** -2
+
+    inverse_qnn = actual_qnn ** -1
+    actual_pqc = tfq.from_tensor(inverse_qnn.pqc(resolve=True))
+    expected_pqc = tfq.from_tensor(
+      tfq.resolve_parameters(self.inverse_pqc_tfq, self.symbols,
+                             tf.expand_dims(actual_qnn._values, 0)))
+    actual_inverse_pqc = tfq.from_tensor(inverse_qnn.inverse_pqc(resolve=True))
+    expected_inverse_pqc = tfq.from_tensor(
+      tfq.resolve_parameters(self.pqc_tfq, self.symbols,
+                             tf.expand_dims(actual_qnn._values, 0)))
+    self.assertEqual(actual_pqc, expected_pqc)
+    self.assertEqual(actual_inverse_pqc, expected_inverse_pqc)
+    # Ensure swapping circuits was actually meaningful
+    self.assertNotEqual(actual_pqc, actual_inverse_pqc)
     
   def test_copy(self):
     """Confirms copied QNN has correct attributes."""

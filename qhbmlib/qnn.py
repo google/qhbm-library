@@ -348,10 +348,13 @@ class QNN(tf.keras.Model):
       return self._unitary_layer(self.pqc()).to_tensor()[0]
     raise NotImplementedError()
 
-  def __add__(self, other):
+  def __add__(self, other: QNN) -> QNN:
     """Returns QNN whose pqc is pqc of `other` appended to pqc of `self`."""
     pass
 
-  def __pow__(self, other):
-    """Returns `self` to the power of `other`; only supports `other==-1`."""
-    pass
+  def __pow__(self, exponent: int) -> QNN:
+    """QNN raised to a power, only valid for exponent -1, the inverse."""
+    if exponent != -1:
+      raise ValueError("Only the inverse (exponent == -1) is supported.")
+    new_qnn = self.copy()
+    
