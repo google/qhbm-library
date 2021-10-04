@@ -170,6 +170,21 @@ class QHBMBasicFunctionTest(tf.test.TestCase):
             expected_circuit_samples[1] == test_circuit_samples_deser[1],
         ]))
 
+  def test_expectation_modular_hamiltonian(self):
+    """Confirms modular hamiltonian expectations have the correct value.
+
+    See the "Modular Hamiltonian expectation value" section of the colab:
+    https://colab.research.google.com/drive/14987JCMju_8AVvvVoojwe6hA7Nlw-Dhe?usp=sharing
+    """
+    # Confirm on single qubit Hamiltonian and model
+
+    # Confirm on single qubit Hamiltonian but multi-qubit model.
+
+    # Test derivatives of modular Hamiltonian
+
+    # Test derivatives of model QHBM
+    pass
+    
   def test_sample_unresolved_state_circuits(self):
     """Confirm unresolved circuits are sampled correctly."""
     # TODO(b/182904206)

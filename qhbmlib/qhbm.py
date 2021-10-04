@@ -25,6 +25,8 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 import tensorflow_quantum as tfq
 
+from qhbmlib import qnn
+
 
 class QHBM(tf.keras.Model):
 
@@ -78,8 +80,28 @@ class QHBM(tf.keras.Model):
         bitstrings, counts, mask=mask, reduce=reduce, unique=unique)
 
   def expectation(self, operators, num_samples, reduce=True):
+    """Calculate expectation values of operators using fixed number of samples.
+
+    Args:
+      operators: Either a 1D tensor of strings, the result of calling
+        `tfq.convert_to_tensor` on a list of cirq.PauliSum, `[op1, op2, ...]`,
+        or a Python list of `QHBM`s which are treated as modular Hamiltonians.
+      num_samples: number of samples to draw from the classical distribution
+        in this QHBM.
+      reduce: bool flag for whether or not to average over i.
+
+    Returns:
+      1-D tensor of floats which are the bitstring-averaged expectation values
+      if `reduce` is True, else 2-D tensor of floats which are per-bitstring
+      expectation values.
+    """
     bitstrings, counts = self.ebm.sample(num_samples)
-    return self.qnn.expectation(bitstrings, counts, operators, reduce=reduce)
+    if isinstance(operators, tf.Tensor):
+      return self.qnn.expectation(bitstrings, counts, operators, reduce=True)
+    else:
+      for mod_ham in operators:
+        mixed_qnn = self.qnn + mod_ham.qnn ** -1
+        
 
   def probabilities(self):
     return self.ebm.probabilities()
