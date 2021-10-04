@@ -132,7 +132,7 @@ class QNNTest(tf.test.TestCase):
     """Confirms inverse works correctly."""
     actual_qnn = qnn.QNN(self.pqc)
     with self.assertRaisesRegex(ValueError,
-                                expected_regex="only the inverse"):
+                                expected_regex="Only the inverse"):
       _ = actual_qnn ** -2
 
     inverse_qnn = actual_qnn ** -1
