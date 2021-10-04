@@ -39,17 +39,25 @@ class QNN(tf.keras.Model):
   def __init__(
       self,
       pqc,
+      *
+      symbols=None,
+      values=None,
       initializer=tf.keras.initializers.RandomUniform(0, 2 * np.pi),
       backend='noiseless',
       differentiator=None,
       is_analytic=False,
       name=None,
   ):
-    """Initialize a QNN.
+    """Initializes a QNN.
+
     Args:
       pqc: Representation of a parameterized quantum circuit.
+      symbols: Python `list` of `sympy.Symbol`s.
+      values: 1-D `tf.Tensor` of floats which are the parameter values
+        corresponding to the symbols.
       initializer: A 'tf.keras.initializers.Initializer' which specifies how to
-        initialize the values of the parameters in `circuit`.
+        initialize the values of the parameters in `circuit`.  This argument is
+        ignored if `values` is not None.
       backend: Optional Python `object` that specifies what backend TFQ will use
         for operations involving this QNN. Options are {'noisy', 'noiseless'},
         or however users may also specify a preconfigured cirq execution
@@ -66,13 +74,13 @@ class QNN(tf.keras.Model):
       raise TypeError("pqc must be a cirq.Circuit object."
                       " Given: {}".format(pqc))
 
-    symbols = list(sorted(tfq.util.get_circuit_symbols(pqc)))
+    if symbols is None:
+      symbols = list(sorted(tfq.util.get_circuit_symbols(pqc)))
     self._symbols = tf.constant([str(x) for x in symbols], dtype=tf.string)
 
-    self._values = self.add_weight(
-        name=f'{self.name}_pqc_values',
-        shape=[len(symbols)],
-        initializer=initializer)
+    if values is None:
+      values = initializer(shape=[len(symbols)])
+    self._values = tf.Variable(initial_value=values, name=f'{self.name}_pqc_values')      
 
     self._pqc = tfq.convert_to_tensor([pqc])
     self._inverse_pqc = tfq.convert_to_tensor([pqc**-1])
@@ -100,7 +108,7 @@ class QNN(tf.keras.Model):
 
     if self.is_analytic:
       self._unitary_layer = tfq.layers.Unitary()
-
+      
   @property
   def raw_qubits(self):
     return self._raw_qubits
@@ -336,3 +344,11 @@ class QNN(tf.keras.Model):
     if self.is_analytic:
       return self._unitary_layer(self.pqc()).to_tensor()[0]
     raise NotImplementedError()
+
+  def __add__(self, other):
+    """Returns QNN whose pqc is pqc of `other` appended to pqc of `self`."""
+    pass
+
+  def __pow__(self, other):
+    """Returns `self` to the power of `other`; only supports `other==-1`."""
+    pass

@@ -117,6 +117,14 @@ class QNNTest(tf.test.TestCase):
             tfq.resolve_parameters(self.inverse_pqc_tfq, self.symbols,
                                    tf.expand_dims(test_qnn._values, 0))))
 
+  def test_add(self):
+    """Confirms two QNNs are added succesfully."""
+    pass
+
+  def test_pow(self):
+    """Confirms inverse works correctly."""
+    pass
+    
   def test_copy(self):
     """Confirms copied QNN has correct attributes."""
     test_qnn = qnn.QNN(self.pqc, self.initializer, self.backend,
