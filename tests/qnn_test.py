@@ -123,7 +123,7 @@ class QNNTest(tf.test.TestCase):
     actual_qnn = qnn.QNN(self.pqc, symbols=self.symbols, values=expected_values)
     self.assertAllEqual(actual_qnn.symbols, self.symbols)
     self.assertAllEqual(actual_qnn.values, expected_values)
-    
+
   def test_add(self):
     """Confirms two QNNs are added successfully."""
     num_qubits = 5
@@ -149,35 +149,41 @@ class QNNTest(tf.test.TestCase):
     qnn_2 = qnn.QNN(pqc_2, symbols=symbols_2, values=values_2)
     actual_added = qnn_1 + qnn_2
 
-    self.assertAllEqual(tfq.from_tensor(actual_added.pqc(False))[0], tfq.from_tensor(tfq.convert_to_tensor([pqc_1 + pqc_2]))[0])
-    self.assertAllEqual(actual_added.symbols, tf.concat([symbols_1, symbols_2], 0))
+    self.assertAllEqual(
+        tfq.from_tensor(actual_added.pqc(False))[0],
+        tfq.from_tensor(tfq.convert_to_tensor([pqc_1 + pqc_2]))[0])
+    self.assertAllEqual(actual_added.symbols,
+                        tf.concat([symbols_1, symbols_2], 0))
     self.assertAllEqual(actual_added.values, tf.concat([values_1, values_2], 0))
-    
+
   def test_pow(self):
     """Confirms inverse works correctly."""
     actual_qnn = qnn.QNN(self.pqc)
-    with self.assertRaisesRegex(ValueError,
-                                expected_regex="Only the inverse"):
-      _ = actual_qnn ** -2
+    with self.assertRaisesRegex(ValueError, expected_regex="Only the inverse"):
+      _ = actual_qnn**-2
 
-    inverse_qnn = actual_qnn ** -1
+    inverse_qnn = actual_qnn**-1
     actual_pqc = tfq.from_tensor(inverse_qnn.pqc(resolve=True))
     expected_pqc = tfq.from_tensor(
-      tfq.resolve_parameters(self.inverse_pqc_tfq, self.symbols,
-                             tf.expand_dims(actual_qnn._values, 0)))
+        tfq.resolve_parameters(self.inverse_pqc_tfq, self.symbols,
+                               tf.expand_dims(actual_qnn._values, 0)))
     actual_inverse_pqc = tfq.from_tensor(inverse_qnn.inverse_pqc(resolve=True))
     expected_inverse_pqc = tfq.from_tensor(
-      tfq.resolve_parameters(self.pqc_tfq, self.symbols,
-                             tf.expand_dims(actual_qnn._values, 0)))
+        tfq.resolve_parameters(self.pqc_tfq, self.symbols,
+                               tf.expand_dims(actual_qnn._values, 0)))
     self.assertEqual(actual_pqc, expected_pqc)
     self.assertEqual(actual_inverse_pqc, expected_inverse_pqc)
     # Ensure swapping circuits was actually meaningful
     self.assertNotEqual(actual_pqc, actual_inverse_pqc)
-    
+
   def test_copy(self):
     """Confirms copied QNN has correct attributes."""
-    test_qnn = qnn.QNN(self.pqc, initializer=self.initializer, backend=self.backend,
-                       differentiator=self.differentiator, name=self.name)
+    test_qnn = qnn.QNN(
+        self.pqc,
+        initializer=self.initializer,
+        backend=self.backend,
+        differentiator=self.differentiator,
+        name=self.name)
     test_qnn_copy = test_qnn.copy()
     self.assertEqual(test_qnn_copy.name, test_qnn.name)
     self.assertAllClose(test_qnn_copy.trainable_variables,

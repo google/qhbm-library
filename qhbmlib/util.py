@@ -392,9 +392,9 @@ def qubit_sub_indices(qubits_total, qubits_sublist):
       qubits in the total list of qubits.
   """
   qubits_total_tiled = tf.tile(
-    tf.expand_dims(qubits_total, 0), [tf.shape(qubits_sublist)[0], 1, 1])
+      tf.expand_dims(qubits_total, 0), [tf.shape(qubits_sublist)[0], 1, 1])
   qubits_sublist_tiled = tf.tile(
-    tf.expand_dims(qubits_sublist, 1), [1, tf.shape(qubits_total)[0], 1])
+      tf.expand_dims(qubits_sublist, 1), [1, tf.shape(qubits_total)[0], 1])
   qubit_overlaps = tf.equal(qubits_total_tiled, qubits_sublist_tiled)
   reduced_qubit_overlaps = tf.reduce_all(qubit_overlaps, 2)
   doubled_indices = tf.where(reduced_qubit_overlaps)

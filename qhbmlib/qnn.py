@@ -83,7 +83,8 @@ class QNN(tf.keras.Model):
 
     if values is None:
       values = initializer(shape=[tf.shape(self._symbols)[0]])
-    self._values = tf.Variable(initial_value=values, name=f'{self.name}_pqc_values')      
+    self._values = tf.Variable(
+        initial_value=values, name=f'{self.name}_pqc_values')
 
     self._pqc = tfq.convert_to_tensor([pqc])
     self._inverse_pqc = tfq.convert_to_tensor([pqc**-1])
@@ -111,7 +112,7 @@ class QNN(tf.keras.Model):
 
     if self.is_analytic:
       self._unitary_layer = tfq.layers.Unitary()
-      
+
   @property
   def raw_qubits(self):
     return self._raw_qubits
@@ -359,13 +360,13 @@ class QNN(tf.keras.Model):
     new_symbols = tf.concat([self.symbols, other.symbols], 0)
     new_values = tf.concat([self.values, other.values], 0)
     new_qnn = QNN(
-      tfq.from_tensor(new_pqc)[0],
-      symbols=new_symbols,
-      values=new_values,
-      backend=copy_qnn.backend,
-      differentiator=copy_qnn.differentiator,
-      is_analytic=copy_qnn.is_analytic,
-      name=f"{self.name}_plus_{other.name}")
+        tfq.from_tensor(new_pqc)[0],
+        symbols=new_symbols,
+        values=new_values,
+        backend=copy_qnn.backend,
+        differentiator=copy_qnn.differentiator,
+        is_analytic=copy_qnn.is_analytic,
+        name=f"{self.name}_plus_{other.name}")
     return new_qnn
 
   def __pow__(self, exponent):

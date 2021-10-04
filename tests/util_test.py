@@ -429,7 +429,7 @@ class QubitToIndicesTest(tf.test.TestCase):
     """Confirms a given list of qubits is converted correctly."""
     row_col_list = [[0, 0], [1, 2], [100, 2]]
     expected_indices = tf.constant(row_col_list, dtype=tf.int32)
-    qubits = [cirq.GridQubit(i[0], i[1]) for i in row_col_list] 
+    qubits = [cirq.GridQubit(i[0], i[1]) for i in row_col_list]
     actual_indices = util.qubits_to_indices(qubits)
     self.assertAllEqual(actual_indices, expected_indices)
 
