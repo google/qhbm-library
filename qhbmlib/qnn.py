@@ -349,8 +349,24 @@ class QNN(tf.keras.Model):
     raise NotImplementedError()
 
   def __add__(self, other):
-    """Returns QNN whic is the pqc of `other` appended to the pqc of `self`."""
-    pass
+    """Returns QNN which is the pqc of `other` appended to the pqc of `self`."""
+    # Use the backend and differentiator of the larger QNN.
+    if len(self.raw_qubits) >= len(other.raw_qubits):
+      copy_qnn = self
+    else:
+      copy_qnn = other
+    new_pqc = tfq.append_circuit(self.pqc(False), other.pqc(False))
+    new_symbols = tf.concat([self.symbols, other.symbols], 0)
+    new_values = tf.concat([self.values, other.values], 0)
+    new_qnn = QNN(
+      tfq.from_tensor(new_pqc)[0],
+      symbols=new_symbols,
+      values=new_values,
+      backend=copy_qnn.backend,
+      differentiator=copy_qnn.differentiator,
+      is_analytic=copy_qnn.is_analytic,
+      name=f"{self.name}_plus_{other.name}")
+    return new_qnn
 
   def __pow__(self, exponent):
     """QNN raised to a power, only valid for exponent -1, the inverse."""

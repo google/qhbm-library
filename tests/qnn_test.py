@@ -125,9 +125,34 @@ class QNNTest(tf.test.TestCase):
     self.assertAllEqual(actual_qnn.values, expected_values)
     
   def test_add(self):
-    """Confirms two QNNs are added succesfully."""
-    pass
+    """Confirms two QNNs are added successfully."""
+    num_qubits = 5
+    qubits = cirq.GridQubit.rect(1, num_qubits)
 
+    pqc_1 = cirq.Circuit()
+    symbols_1_str = ["s_1_{n}" for n in range(num_qubits)]
+    symbols_1_sympy = [sympy.Symbol(s) for s in symbols_1_str]
+    symbols_1 = tf.constant(symbols_1_str)
+    for s, q in zip(symbols_1_sympy, qubits):
+      pqc_1 += cirq.rx(s)(q)
+    values_1 = self.initializer(shape=[num_qubits])
+
+    pqc_2 = cirq.Circuit()
+    symbols_2_str = ["s_2_{n}" for n in range(num_qubits)]
+    symbols_2_sympy = [sympy.Symbol(s) for s in symbols_2_str]
+    symbols_2 = tf.constant(symbols_2_str)
+    for s, q in zip(symbols_2_sympy, qubits):
+      pqc_2 += cirq.ry(s)(q)
+    values_2 = self.initializer(shape=[num_qubits])
+
+    qnn_1 = qnn.QNN(pqc_1, symbols=symbols_1, values=values_1)
+    qnn_2 = qnn.QNN(pqc_2, symbols=symbols_2, values=values_2)
+    actual_added = qnn_1 + qnn_2
+
+    self.assertAllEqual(tfq.from_tensor(actual_added.pqc(False))[0], pqc_1 + pqc_2)
+    self.assertAllEqual(actual_added.symbols, tf.concat([symbols_1, symbols_2], 0))
+    self.assertAllEqual(actual_added.values, tf.concat([values_1, values_2], 0))
+    
   def test_pow(self):
     """Confirms inverse works correctly."""
     actual_qnn = qnn.QNN(self.pqc)
