@@ -52,9 +52,11 @@ class QNN(tf.keras.Model):
 
     Args:
       pqc: Representation of a parameterized quantum circuit.
-      symbols: Python `list` of `sympy.Symbol`s.
-      values: 1-D `tf.Tensor` of floats which are the parameter values
-        corresponding to the symbols.
+      symbols: Optional 1-D `tf.Tensor` of strings which are the parameters of
+        the QNN.  When `None`, parameters are inferred from the given PQC.
+      values: Optional 1-D `tf.Tensor` of floats which are the parameter values
+        corresponding to the symbols.  When `None`, parameters are chosen via
+        `initializer` instead.
       initializer: A 'tf.keras.initializers.Initializer' which specifies how to
         initialize the values of the parameters in `circuit`.  This argument is
         ignored if `values` is not None.
@@ -75,11 +77,12 @@ class QNN(tf.keras.Model):
                       " Given: {}".format(pqc))
 
     if symbols is None:
-      symbols = list(sorted(tfq.util.get_circuit_symbols(pqc)))
-    self._symbols = tf.constant([str(x) for x in symbols], dtype=tf.string)
+      raw_symbols = list(sorted(tfq.util.get_circuit_symbols(pqc)))
+      symbols = tf.constant([str(x) for x in raw_symbols], dtype=tf.string)
+    self._symbols = symbols
 
     if values is None:
-      values = initializer(shape=[len(symbols)])
+      values = initializer(shape=[tf.shape(self._symbols)[0]])
     self._values = tf.Variable(initial_value=values, name=f'{self.name}_pqc_values')      
 
     self._pqc = tfq.convert_to_tensor([pqc])

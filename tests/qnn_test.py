@@ -117,6 +117,13 @@ class QNNTest(tf.test.TestCase):
             tfq.resolve_parameters(self.inverse_pqc_tfq, self.symbols,
                                    tf.expand_dims(test_qnn._values, 0))))
 
+  def test_alternative_init(self):
+    """Confirms that `symbols` and `values` get set correctly."""
+    expected_values = self.initializer(shape=[self.num_qubits])
+    actual_qnn = qnn.QNN(self.pqc, symbols=self.symbols, values=expected_values)
+    self.assertAllEqual(actual_qnn.symbols, self.symbols)
+    self.assertAllEqual(actual_qnn.values, expected_values)
+    
   def test_add(self):
     """Confirms two QNNs are added succesfully."""
     pass
