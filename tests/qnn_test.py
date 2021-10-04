@@ -149,7 +149,7 @@ class QNNTest(tf.test.TestCase):
     qnn_2 = qnn.QNN(pqc_2, symbols=symbols_2, values=values_2)
     actual_added = qnn_1 + qnn_2
 
-    self.assertAllEqual(tfq.from_tensor(actual_added.pqc(False))[0], pqc_1 + pqc_2)
+    self.assertAllEqual(tfq.from_tensor(actual_added.pqc(False))[0], tfq.from_tensor(tfq.convert_to_tensor([pqc_1 + pqc_2]))[0])
     self.assertAllEqual(actual_added.symbols, tf.concat([symbols_1, symbols_2], 0))
     self.assertAllEqual(actual_added.values, tf.concat([values_1, values_2], 0))
     
