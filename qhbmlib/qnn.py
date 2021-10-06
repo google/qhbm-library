@@ -83,7 +83,7 @@ class QNN(tf.keras.Model):
 
     if values is None:
       values = initializer(shape=[tf.shape(self._symbols)[0]])
-    self._values = tf.Variable(
+    self.values = tf.Variable(
         initial_value=values, name=f'{self.name}_pqc_values')
 
     self._pqc = tfq.convert_to_tensor([pqc])

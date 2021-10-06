@@ -166,7 +166,7 @@ class QNNTest(tf.test.TestCase):
     actual_pqc = tfq.from_tensor(inverse_qnn.pqc(resolve=True))
     expected_pqc = tfq.from_tensor(
         tfq.resolve_parameters(self.inverse_pqc_tfq, self.symbols,
-                               tf.expand_dims(actual_qnn._values, 0)))
+                               tf.expand_dims(actual_qnn.values, 0)))
     actual_inverse_pqc = tfq.from_tensor(inverse_qnn.inverse_pqc(resolve=True))
     expected_inverse_pqc = tfq.from_tensor(
         tfq.resolve_parameters(self.pqc_tfq, self.symbols,
