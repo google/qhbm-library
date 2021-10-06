@@ -49,6 +49,15 @@ class EnergyFunction(tf.keras.Model, abc.ABC):
     raise NotImplementedError()
 
   @property
+  def trainable_variables(self):
+    return super().trainable_variables
+
+  @trainable_variables.setter
+  @abc.abstractmethod
+  def trainable_variables(self, value):
+    raise NotImplementedError()
+
+  @property
   def has_operator(self):
     return False
 
@@ -59,7 +68,7 @@ class EnergyFunction(tf.keras.Model, abc.ABC):
   def operator_shards(self, qubits):
     raise NotImplementedError()
 
-  def operator_expectation(self, expectations):
+  def operator_expectation(self, expectation_shards):
     raise NotImplementedError()
 
 
@@ -78,11 +87,20 @@ class KOBE(EnergyFunction):
       combos = itertools.combinations(range(num_bits), i)
       indices_list.extend(list(combos))
     self._indices = tf.ragged.stack(indices_list)
-    self._num_variables = tf.constant(len(indices_list))
-    self._variables = self.add_weight(
-        name=f'{self.name}_variables',
-        shape=[self._num_variables],
-        initializer=initializer)
+    self._num_terms = tf.constant(len(indices_list))
+    self.kernel = self.add_weight(
+        name='kernel',
+        shape=[self._num_terms],
+        initializer=initializer,
+        trainable=True)
+
+  @property
+  def trainable_variables(self):
+    return [self.kernel]
+
+  @trainable_variables.setter
+  def trainable_variables(self, value):
+    self.kernel = value[0]
 
   @property
   def num_bits(self):
@@ -98,21 +116,21 @@ class KOBE(EnergyFunction):
 
   def copy(self):
     kobe = KOBE(self.num_bits, self.order, name=self.name)
-    kobe._variables.assign(self._variables)
+    kobe.kernel.assign(self.kernel)
     return kobe
 
   def energy(self, bitstrings):
     spins = 1 - 2 * bitstrings
     parities_t = tf.zeros(
-        [self._num_variables, tf.shape(bitstrings)[0]], dtype=tf.float32)
-    for i in tf.range(self._num_variables):
+        [self._num_terms, tf.shape(bitstrings)[0]], dtype=tf.float32)
+    for i in tf.range(self._num_terms):
       parity = tf.reduce_prod(tf.gather(spins, self._indices[i], axis=-1), -1)
       parities_t = tf.tensor_scatter_nd_update(parities_t, [[i]], [parity])
-    return tf.reduce_sum(tf.transpose(parities_t) * self._variables, -1)
+    return tf.reduce_sum(tf.transpose(parities_t) * self.kernel, -1)
 
   def operator_shards(self, qubits):
     ops = []
-    for i in range(self._num_variables):
+    for i in range(self._num_terms):
       string_factors = []
       for loc in self._indices[i]:
         string_factors.append(cirq.Z(qubits[loc]))
@@ -120,8 +138,8 @@ class KOBE(EnergyFunction):
       ops.append(cirq.PauliSum.from_pauli_strings(string))
     return ops
 
-  def operator_expectation(self, expectations):
-    return tf.reduce_sum(expectations * self._variables)
+  def operator_expectation(self, expectation_shards):
+    return tf.reduce_sum(expectation_shards * self.kernel, -1)
 
 
 class MLP(EnergyFunction):
@@ -139,6 +157,21 @@ class MLP(EnergyFunction):
   @property
   def num_bits(self):
     return self._num_bits
+
+  @property
+  def trainable_variables(self):
+    trainable_variables = []
+    for layer in self.layers:
+      trainable_variables.extend([layer.kernel, layer.bias])
+    return trainable_variables
+
+  @trainable_variables.setter
+  def trainable_variables(self, value):
+    i = 0
+    for layer in self.layers:
+      layer.kernel = value[i]
+      layer.bias = value[i + 1]
+      i += 2
 
   def copy(self):
     mlp = tf.keras.models.clone_model(self)
@@ -530,11 +563,11 @@ class EBM(tf.keras.Model):
   def energy(self, bitstrings):
     return self._energy_function.energy(bitstrings)
 
-  def operator_expectation(self, expectations):
-    return self._energy_function.operator_expectation(expectations)
-
   def operator_shards(self, qubits):
     return self._energy_function.operator_shards(qubits)
+
+  def operator_expectation(self, expectation_shards):
+    return self._energy_function.operator_expectation(expectation_shards)
 
   def sample(self, num_samples, unique=True):
     if self.is_analytic and self._energy_sampler is None:
@@ -580,10 +613,11 @@ class Bernoulli(EBM):
                name=None):
     tf.keras.Model.__init__(self, name=name)
     self._num_bits = num_bits
-    self._variables = self.add_weight(
-        name=f'{self.name}_variables',
+    self.kernel = self.add_weight(
+        name=f'kernel',
         shape=[self.num_bits],
-        initializer=initializer)
+        initializer=initializer,
+        trainable=True)
     self._is_analytic = is_analytic
     if is_analytic:
       self._all_bitstrings = tf.constant(
@@ -592,6 +626,14 @@ class Bernoulli(EBM):
   @property
   def num_bits(self):
     return self._num_bits
+
+  @property
+  def trainable_variables(self):
+    return [self.kernel]
+
+  @trainable_variables.setter
+  def trainable_variables(self, value):
+    self.kernel = value[0]
 
   @property
   def has_operator(self):
@@ -604,12 +646,12 @@ class Bernoulli(EBM):
   def copy(self):
     bernoulli = Bernoulli(
         self.num_bits, is_analytic=self.is_analytic, name=self.name)
-    bernoulli._variables.assign(self._variables)
+    bernoulli.kernel.assign(self.kernel)
     return bernoulli
 
   def energy(self, bitstrings):
     return tf.reduce_sum(
-        tf.cast(1 - 2 * bitstrings, tf.float32) * self._variables, -1)
+        tf.cast(1 - 2 * bitstrings, tf.float32) * self.kernel, -1)
 
   def operator_shards(self, qubits):
     return [
@@ -617,8 +659,8 @@ class Bernoulli(EBM):
         for i in range(self.num_bits)
     ]
 
-  def operator_expectation(self, expectations):
-    return tf.reduce_sum(expectations * self._variables)
+  def operator_expectation(self, expectation_shards):
+    return tf.reduce_sum(expectation_shards * self.kernel, -1)
 
   def sample(self, num_samples, unique=True):
     r"""Fairly samples from the EBM defined by `energy`.
@@ -630,7 +672,7 @@ class Bernoulli(EBM):
                  = \log{e^{2*theta}} = 2*theta$$
         """
     samples = tfp.distributions.Bernoulli(
-        logits=2 * self._variables, dtype=tf.int8).sample(num_samples)
+        logits=2 * self.kernel, dtype=tf.int8).sample(num_samples)
     if unique:
       return util.unique_bitstrings_with_counts(samples)
     return samples
@@ -652,4 +694,4 @@ class Bernoulli(EBM):
 
   def entropy(self):
     return tf.reduce_sum(
-        tfp.distributions.Bernoulli(logits=2 * self._variables).entropy())
+        tfp.distributions.Bernoulli(logits=2 * self.kernel).entropy())
