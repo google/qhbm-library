@@ -170,7 +170,7 @@ class QNNTest(tf.test.TestCase):
     actual_inverse_pqc = tfq.from_tensor(inverse_qnn.inverse_pqc(resolve=True))
     expected_inverse_pqc = tfq.from_tensor(
         tfq.resolve_parameters(self.pqc_tfq, self.symbols,
-                               tf.expand_dims(actual_qnn._values, 0)))
+                               tf.expand_dims(actual_qnn.values, 0)))
     self.assertEqual(actual_pqc, expected_pqc)
     self.assertEqual(actual_inverse_pqc, expected_inverse_pqc)
     # Ensure swapping circuits was actually meaningful
