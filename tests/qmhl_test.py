@@ -42,16 +42,17 @@ class QMHLTest(tf.test.TestCase):
       qubits = cirq.GridQubit.rect(1, num_qubits)
       target = test_util.get_random_qhbm(qubits, 1,
                                          "QMHLLossTest{}".format(num_qubits))
-      model = target.copy()
+      qhbm_model = target.copy()
 
       # Get the QMHL loss gradients
-      model_samples = tf.constant(1e6)
+      qhbm_model_samples = tf.constant(1e6)
       target_samples = tf.constant(1e6)
       target_circuits, target_counts = target.circuits(target_samples)
       with tf.GradientTape() as tape:
-        loss = qmhl.qmhl(model, target_circuits, target_counts)
+        loss = qmhl.qmhl(qhbm_model, target_circuits, target_counts)
       thetas_grads, phis_grads = tape.gradient(
-          loss, (model.ebm.trainable_variables, model.qnn.trainable_variables))
+          loss, (qhbm_model.ebm.trainable_variables,
+                 qhbm_model.qnn.trainable_variables))
       self.assertAllClose(loss, target.ebm.entropy(), atol=5e-3)
       self.assertAllClose(
           thetas_grads, tf.zeros(tf.shape(thetas_grads)), atol=5e-3)
@@ -93,7 +94,7 @@ class QMHLTest(tf.test.TestCase):
             minval=-q_const, maxval=q_const, seed=seed)
         test_qnn = qnn.QNN(r_circuit, qnn_init, is_analytic=True)
 
-        # Confirm model QHBM
+        # Confirm qhbm_model QHBM
         test_qhbm = qhbm.QHBM(test_ebm, test_qnn)
         test_thetas = test_qhbm.ebm.trainable_variables[0]
         test_phis = test_qhbm.qnn.trainable_variables[0]
@@ -102,7 +103,7 @@ class QMHLTest(tf.test.TestCase):
             tf.math.log(2 * tf.math.cosh(test_thetas)))
         self.assertAllClose(
             actual_log_partition, expected_log_partition, atol=ATOL, rtol=RTOL)
-        # Confirm model modular Hamiltonian for 1 qubit case
+        # Confirm qhbm_model modular Hamiltonian for 1 qubit case
         if num_qubits == 1:
           actual_dm = test_qhbm.density_matrix()
           actual_log_dm = tf.linalg.logm(actual_dm)
@@ -162,13 +163,13 @@ class QMHLTest(tf.test.TestCase):
       qubits = cirq.GridQubit.rect(1, num_qubits)
       target = test_util.get_random_qhbm(
           qubits, 1, "QMHLHypernetworkTest{}".format(num_qubits))
-      model = target.copy()
+      qhbm_model = target.copy()
 
       trainable_variables_shapes = [
-          tf.shape(var) for var in model.trainable_variables
+          tf.shape(var) for var in qhbm_model.trainable_variables
       ]
       trainable_variables_sizes = [
-          tf.size(var) for var in model.trainable_variables
+          tf.size(var) for var in qhbm_model.trainable_variables
       ]
       trainable_variables_size = tf.reduce_sum(
           tf.stack(trainable_variables_sizes))
@@ -176,14 +177,14 @@ class QMHLTest(tf.test.TestCase):
       input_size = 15
       hypernetwork = tf.keras.Sequential([
           tf.keras.layers.Dense(15, 'relu', input_shape=(input_size,)),
-          tf.keras.layers.Dense(10, 'tanh', input_shape=(input_size,)),
-          tf.keras.layers.Dense(5, 'sigmoid', input_shape=(input_size,)),
+          tf.keras.layers.Dense(10, 'tanh'),
+          tf.keras.layers.Dense(5, 'sigmoid'),
           tf.keras.layers.Dense(trainable_variables_size)
       ])
       input = tf.random.uniform([1, input_size])
 
       # Get the QMHL loss gradients
-      model_samples = tf.constant(1e6)
+      qhbm_model_samples = tf.constant(1e6)
       target_samples = tf.constant(1e6)
       target_circuits, target_counts = target.circuits(target_samples)
       with tf.GradientTape() as tape:
@@ -195,11 +196,47 @@ class QMHLTest(tf.test.TestCase):
           output_trainable_variables.append(
               tf.reshape(output[index:index + size], shape))
           index += size
-        model.trainable_variables = output_trainable_variables
-        loss = qmhl.qmhl(model, target_circuits, target_counts)
-      grads = tape.gradient(loss, hypernetwork.trainable_variables)
-      for grad in grads:
+        qhbm_model.trainable_variables = output_trainable_variables
+        loss = qmhl.qmhl(qhbm_model, target_circuits, target_counts)
+
+      grads = tape.gradient(loss, [
+          hypernetwork.trainable_variables, output,
+          qhbm_model.trainable_variables
+      ])
+      hyper_grads = grads[0]
+      output_grad = grads[1]
+      qhbm_grads = grads[2]
+
+      qhbm_grad_flat = []
+      for grad in qhbm_grads:
+        qhbm_grad_flat.append(tf.reshape(grad, [-1]))
+      qhbm_grad_flat = tf.concat(qhbm_grad_flat, 0)
+      self.assertAllEqual(qhbm_grad_flat, output_grad)
+
+      for grad in hyper_grads:
         self.assertIsNotNone(grad)
+
+      c = tf.Variable(tf.random.uniform([trainable_variables_size]))
+      input = tf.random.uniform([trainable_variables_size])
+      with tf.GradientTape() as tape:
+        output = c * input
+        index = 0
+        output_trainable_variables = []
+        for size, shape in zip(trainable_variables_sizes,
+                               trainable_variables_shapes):
+          output_trainable_variables.append(
+              tf.reshape(output[index:index + size], shape))
+          index += size
+        qhbm_model.trainable_variables = output_trainable_variables
+        loss = qmhl.qmhl(qhbm_model, target_circuits, target_counts)
+      grads = tape.gradient(loss, [c, qhbm_model.trainable_variables])
+      c_grad = grads[0]
+      qhbm_grads = grads[1]
+      qhbm_grad_flat = []
+      for grad in qhbm_grads:
+        qhbm_grad_flat.append(tf.reshape(grad, [-1]))
+      qhbm_grad_flat = tf.concat(qhbm_grad_flat, 0)
+      self.assertAllEqual(input * qhbm_grad_flat, c_grad)
 
 
 if __name__ == "__main__":

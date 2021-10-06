@@ -183,9 +183,45 @@ class VQTTest(tf.test.TestCase):
         test_qhbm.trainable_variables = output_trainable_variables
         loss = vqt.vqt(test_qhbm, tf.constant(int(5e6)), tf_ham,
                        tf.constant(1.0))
-      grads = tape.gradient(loss, test_qhbm.trainable_variables)
-      for grad in grads:
+      grads = tape.gradient(loss, [
+          hypernetwork.trainable_variables, output,
+          test_qhbm.trainable_variables
+      ])
+      hyper_grads = grads[0]
+      output_grad = grads[1]
+      qhbm_grads = grads[2]
+
+      qhbm_grad_flat = []
+      for grad in qhbm_grads:
+        qhbm_grad_flat.append(tf.reshape(grad, [-1]))
+      qhbm_grad_flat = tf.concat(qhbm_grad_flat, 0)
+      self.assertAllEqual(qhbm_grad_flat, output_grad)
+
+      for grad in hyper_grads:
         self.assertIsNotNone(grad)
+
+      c = tf.Variable(tf.random.uniform([trainable_variables_size]))
+      input = tf.random.uniform([trainable_variables_size])
+      with tf.GradientTape() as tape:
+        output = c * input
+        index = 0
+        output_trainable_variables = []
+        for size, shape in zip(trainable_variables_sizes,
+                               trainable_variables_shapes):
+          output_trainable_variables.append(
+              tf.reshape(output[index:index + size], shape))
+          index += size
+        test_qhbm.trainable_variables = output_trainable_variables
+        loss = vqt.vqt(test_qhbm, tf.constant(int(5e6)), tf_ham,
+                       tf.constant(1.0))
+      grads = tape.gradient(loss, [c, test_qhbm.trainable_variables])
+      c_grad = grads[0]
+      qhbm_grads = grads[1]
+      qhbm_grad_flat = []
+      for grad in qhbm_grads:
+        qhbm_grad_flat.append(tf.reshape(grad, [-1]))
+      qhbm_grad_flat = tf.concat(qhbm_grad_flat, 0)
+      self.assertAllEqual(input * qhbm_grad_flat, c_grad)
 
 
 if __name__ == "__main__":

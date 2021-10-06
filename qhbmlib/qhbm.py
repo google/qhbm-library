@@ -50,8 +50,8 @@ class QHBM(tf.keras.Model):
 
   @trainable_variables.setter
   def trainable_variables(self, value):
-    self.ebm.trainable_variables = value[:-1]
-    self.qnn.trainable_variables = value[-1:]
+    self.ebm.trainable_variables = value[:len(self.ebm.trainable_variables)]
+    self.qnn.trainable_variables = value[len(self.ebm.trainable_variables):]
 
   @property
   def operator_shards(self):

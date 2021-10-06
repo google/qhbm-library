@@ -55,7 +55,7 @@ def vqt(model, num_samples, hamiltonian, beta):
                 bitstrings, counts, hamiltonian, reduce=False), -1)
         beta_expectation = tf.reduce_sum(probs * beta_expectations)
       grad_qnn = tape.gradient(beta_expectation, model.qnn.trainable_variables)
-      grad_qnn = [grad_y * grad for grad in grad_qnn]
+      grad_qnn = [grad_y * g for g in grad_qnn]
 
       with tf.GradientTape() as tape:
         tape.watch(model.ebm.trainable_variables)
@@ -65,15 +65,14 @@ def vqt(model, num_samples, hamiltonian, beta):
       avg_diff = tf.reduce_sum(probs_diffs)
       grad_ebm = [
           grad_y *
-          (avg_diff *
-           tf.reduce_sum(tf.transpose(probs * tf.transpose(grad)), 0) -
-           tf.reduce_sum(tf.transpose(probs_diffs * tf.transpose(grad)), 0))
-          for grad in energy_jac
+          (avg_diff * tf.reduce_sum(tf.transpose(probs * tf.transpose(g)), 0) -
+           tf.reduce_sum(tf.transpose(probs_diffs * tf.transpose(g)), 0))
+          for g in energy_jac
       ]
       grad_qhbm = grad_ebm + grad_qnn
       if variables is None:
         return grad_qhbm
-      return grad_qhbm, [tf.zeros_like(grad) for grad in grad_qhbm]
+      return grad_qhbm, [tf.zeros_like(g) for g in grad_qhbm]
 
     return beta * expectation - entropy, grad
 
