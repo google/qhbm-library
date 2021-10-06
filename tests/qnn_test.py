@@ -110,12 +110,12 @@ class QNNTest(tf.test.TestCase):
         tfq.from_tensor(test_qnn.pqc(resolve=True)),
         tfq.from_tensor(
             tfq.resolve_parameters(self.pqc_tfq, self.symbols,
-                                   tf.expand_dims(test_qnn._values, 0))))
+                                   tf.expand_dims(test_qnn.values, 0))))
     self.assertEqual(
         tfq.from_tensor(test_qnn.inverse_pqc(resolve=True)),
         tfq.from_tensor(
             tfq.resolve_parameters(self.inverse_pqc_tfq, self.symbols,
-                                   tf.expand_dims(test_qnn._values, 0))))
+                                   tf.expand_dims(test_qnn.values, 0))))
 
   def test_alternative_init(self):
     """Confirms that `symbols` and `values` get set correctly."""
@@ -226,7 +226,7 @@ class QNNTest(tf.test.TestCase):
 
     resolved_pqc = tfq.from_tensor(
         tfq.resolve_parameters(self.pqc_tfq, self.symbols,
-                               tf.expand_dims(test_qnn._values, 0)))[0]
+                               tf.expand_dims(test_qnn.values, 0)))[0]
     bit_injectors = []
     for b in bitstrings:
       bit_injectors.append(
@@ -503,6 +503,24 @@ class QNNTest(tf.test.TestCase):
     """Confirms correct pulled back measurement."""
     #TODO(zaqqwerty)
     pass
+
+  def test_trainable_variables(self):
+    test_qnn = qnn.QNN(
+        self.pqc,
+        backend=self.backend,
+        differentiator=self.differentiator,
+        is_analytic=True,
+        name=self.name)
+
+    self.assertAllEqual(test_qnn.values, test_qnn.trainable_variables[0])
+
+    values = tf.random.uniform(tf.shape(test_qnn.trainable_variables[0]))
+    test_qnn.trainable_variables = [values]
+    self.assertAllEqual(values, test_qnn.trainable_variables[0])
+
+    values = tf.Variable(values)
+    test_qnn.trainable_variables = [values]
+    self.assertAllEqual(values, test_qnn.trainable_variables[0])
 
 
 if __name__ == "__main__":

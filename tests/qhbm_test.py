@@ -100,7 +100,7 @@ def get_basic_qhbm(is_analytic=False):
   num_bits = 3
   initial_thetas = 0.5 * tf.constant([-23, 0, 17], dtype=tf.float32)
   test_ebm = ebm.Bernoulli(num_bits, is_analytic=is_analytic)
-  test_ebm._variables.assign(initial_thetas)
+  test_ebm.kernel.assign(initial_thetas)
   initial_phis = tf.constant([1.2, -2.5])
   phis_symbols = [sympy.Symbol(s) for s in ["s_static_0", "s_static_1"]]
   u = cirq.Circuit()
@@ -109,7 +109,7 @@ def get_basic_qhbm(is_analytic=False):
     for q in qubits:
       u += cirq.X(q)**s
   test_qnn = qnn.QNN(u, is_analytic=is_analytic)
-  test_qnn._values.assign(initial_phis)
+  test_qnn.values.assign(initial_phis)
   name = "static_qhbm"
   return qhbm.QHBM(test_ebm, test_qnn, name=name)
 
@@ -178,7 +178,7 @@ class QHBMBasicFunctionTest(tf.test.TestCase):
     """Ensures pulled back bitstrings are correct."""
     test_qhbm = get_basic_qhbm()
     # This setting reduces test_qhbm.u to a bit flip on every qubit.
-    test_qhbm.qnn._values.assign([0.5, 0.5])
+    test_qhbm.qnn.values.assign([0.5, 0.5])
     circuits = tfq.convert_to_tensor([
         cirq.Circuit(
             cirq.X(test_qhbm.raw_qubits[0]), cirq.X(test_qhbm.raw_qubits[2])),
@@ -271,7 +271,7 @@ class ExactQHBMBasicFunctionTest(tf.test.TestCase):
     test_qhbm = get_exact_qhbm()
     log_partition_expect = tf.math.log(
         tf.reduce_prod(
-            [base_val(theta) for theta in test_qhbm.ebm._variables.numpy()]))
+            [base_val(theta) for theta in test_qhbm.ebm.kernel.numpy()]))
     test_log_partition = test_qhbm.log_partition_function()
     self.assertAllClose(log_partition_expect, test_log_partition, atol=ATOL)
 
@@ -279,8 +279,7 @@ class ExactQHBMBasicFunctionTest(tf.test.TestCase):
     """Confirms the entropy of the QHBM is correct."""
     test_qhbm = get_exact_qhbm()
     entropy_expect = tf.reduce_sum(
-        tfp.distributions.Bernoulli(logits=2 *
-                                    test_qhbm.ebm._variables).entropy())
+        tfp.distributions.Bernoulli(logits=2 * test_qhbm.ebm.kernel).entropy())
     test_entropy = test_qhbm.entropy()
     self.assertAllClose(entropy_expect, test_entropy, atol=ATOL)
 
@@ -302,7 +301,7 @@ class ExactQHBMBasicFunctionTest(tf.test.TestCase):
     test_qhbm = get_exact_qhbm()
     # This setting reduces test_qhbm.u to a bit flip on every qubit.
     # Thus, the list of eigenvectors should be the reverse list of basis vectors
-    test_qhbm.qnn._values.assign([0.5, 0.5])
+    test_qhbm.qnn.values.assign([0.5, 0.5])
     eig_list_expect = tf.one_hot([7 - i for i in range(8)], 8)
     this_eigvec_test = tf.transpose(test_qhbm.unitary_matrix())
     self.assertAllClose(eig_list_expect, this_eigvec_test)
@@ -319,8 +318,8 @@ class ExactQHBMBasicFunctionTest(tf.test.TestCase):
     # Check density matrix of Bell state.
     n_bits = 2
     test_ebm = ebm.Bernoulli(n_bits, is_analytic=True)
-    test_ebm._variables.assign(tf.constant([-10, -10],
-                                           dtype=tf.float32))  # pin at |00>
+    test_ebm.kernel.assign(tf.constant([-10, -10],
+                                       dtype=tf.float32))  # pin at |00>
     qubits = cirq.GridQubit.rect(1, n_bits)
     test_u = cirq.Circuit([cirq.H(qubits[0]), cirq.CNOT(qubits[0], qubits[1])])
     test_qnn = qnn.QNN(test_u, is_analytic=True)
@@ -339,6 +338,31 @@ class ExactQHBMBasicFunctionTest(tf.test.TestCase):
     test_qhbm = get_exact_qhbm()
     dm = test_qhbm.density_matrix()
     self.assertAllClose(1.0, test_qhbm.fidelity(dm), atol=ATOL)
+
+  def test_trainable_variables(self):
+    test_qhbm = get_exact_qhbm()
+
+    for i in range(len(test_qhbm.trainable_variables)):
+      if i < len(test_qhbm.ebm.trainable_variables):
+        self.assertAllEqual(test_qhbm.ebm.trainable_variables[i],
+                            test_qhbm.trainable_variables[i])
+      else:
+        self.assertAllEqual(
+            test_qhbm.qnn.trainable_variables[
+                i - len(test_qhbm.ebm.trainable_variables)],
+            test_qhbm.trainable_variables[i])
+
+    variables = [
+        tf.random.uniform(tf.shape(v)) for v in test_qhbm.trainable_variables
+    ]
+    test_qhbm.trainable_variables = variables
+    for i in range(len(test_qhbm.trainable_variables)):
+      self.assertAllEqual(variables[i], test_qhbm.trainable_variables[i])
+
+    variables = [tf.Variable(v) for v in variables]
+    test_qhbm.trainable_variables = variables
+    for i in range(len(test_qhbm.trainable_variables)):
+      self.assertAllEqual(variables[i], test_qhbm.trainable_variables[i])
 
 
 if __name__ == "__main__":

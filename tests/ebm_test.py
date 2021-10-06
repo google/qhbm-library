@@ -58,7 +58,7 @@ class BernoulliTest(tf.test.TestCase):
     self.assertAllEqual(test_b.num_bits, self.num_bits)
     self.assertTrue(test_b.has_operator)
     self.assertFalse(test_b.is_analytic)
-    self.assertAllEqual(test_b._variables, [init_const] * self.num_bits)
+    self.assertAllEqual(test_b.kernel, [init_const] * self.num_bits)
 
   def test_copy(self):
     """Test that the copy has the same values, but new variables."""
@@ -67,8 +67,8 @@ class BernoulliTest(tf.test.TestCase):
     self.assertAllEqual(test_b_copy.num_bits, test_b.num_bits)
     self.assertEqual(test_b_copy.has_operator, test_b.has_operator)
     self.assertEqual(test_b_copy.is_analytic, test_b.is_analytic)
-    self.assertAllEqual(test_b_copy._variables, test_b._variables)
-    self.assertNotEqual(id(test_b_copy._variables), id(test_b._variables))
+    self.assertAllEqual(test_b_copy.kernel, test_b.kernel)
+    self.assertNotEqual(id(test_b_copy.kernel), id(test_b.kernel))
 
   def test_energy_bernoulli(self):
     """Test Bernoulli.energy and its derivative.
@@ -80,23 +80,23 @@ class BernoulliTest(tf.test.TestCase):
     """
     test_b = ebm.Bernoulli(3, name="test")
     test_vars = tf.constant([10.0, -7.0, 1.0], dtype=tf.float32)
-    test_b._variables.assign(test_vars)
+    test_b.kernel.assign(test_vars)
     test_bitstring = tf.constant([[0, 0, 0]])
     test_spins = 1 - 2 * test_bitstring[0]
     with tf.GradientTape() as tape:
       test_energy = test_b.energy(test_bitstring)[0]
-    test_energy_grad = tape.gradient(test_energy, test_b._variables)
+    test_energy_grad = tape.gradient(test_energy, test_b.kernel)
     ref_energy = tf.reduce_sum(test_vars)
     self.assertAllClose(test_energy, ref_energy)
     self.assertAllClose(test_energy_grad, test_spins)
 
     test_vars = tf.constant([1.0, 1.7, -2.8], dtype=tf.float32)
-    test_b._variables.assign(test_vars)
+    test_b.kernel.assign(test_vars)
     test_bitstring = tf.constant([[1, 0, 1]])
     test_spins = 1 - 2 * test_bitstring[0]
     with tf.GradientTape() as tape:
       test_energy = test_b.energy(test_bitstring)[0]
-    test_energy_grad = tape.gradient(test_energy, test_b._variables)
+    test_energy_grad = tape.gradient(test_energy, test_b.kernel)
     ref_energy = -test_vars[0] + test_vars[1] - test_vars[2]
     self.assertAllClose(test_energy, ref_energy)
     self.assertAllClose(test_energy_grad, test_spins)
@@ -116,7 +116,7 @@ class BernoulliTest(tf.test.TestCase):
     test_b = ebm.Bernoulli(num_bits)
     qubits = cirq.GridQubit.rect(1, num_bits)
     # Pin at bitstring [1, 0, 1]
-    test_b._variables.assign(tf.constant([1000.0, -1000.0, 1000.0]))
+    test_b.kernel.assign(tf.constant([1000.0, -1000.0, 1000.0]))
     operators = test_b.operator_shards(qubits)
 
     # True energy
@@ -142,7 +142,7 @@ class BernoulliTest(tf.test.TestCase):
     test_b = ebm.Bernoulli(1, name="test")
 
     # For single factor Bernoulli, theta = 0 is 50% chance of 1.
-    test_b._variables.assign(tf.constant([0.0]))
+    test_b.kernel.assign(tf.constant([0.0]))
     num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
     bitstrings, counts = test_b.sample(num_bitstrings)
     # check that we got both bitstrings
@@ -154,7 +154,7 @@ class BernoulliTest(tf.test.TestCase):
     self.assertAllClose(1.0, counts[0] / counts[1], atol=1e-3)
 
     # Large value of theta pins the bit.
-    test_b._variables.assign(tf.constant([1000.0]))
+    test_b.kernel.assign(tf.constant([1000.0]))
     num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
     bitstrings, counts = test_b.sample(num_bitstrings)
     # check that we got only one bitstring
@@ -162,7 +162,7 @@ class BernoulliTest(tf.test.TestCase):
 
     # Two bit tests.
     test_b = ebm.Bernoulli(2, name="test")
-    test_b._variables.assign(tf.constant([0.0, 0.0]))
+    test_b.kernel.assign(tf.constant([0.0, 0.0]))
     num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
     bitstrings, counts = test_b.sample(num_bitstrings)
 
@@ -185,7 +185,7 @@ class BernoulliTest(tf.test.TestCase):
         [counts[i].numpy() / num_bitstrings for i in range(4)],
         atol=1e-3,
     )
-    test_b._variables.assign(tf.constant([-1000.0, 1000.0]))
+    test_b.kernel.assign(tf.constant([-1000.0, 1000.0]))
     num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
     bitstrings, counts = test_b.sample(num_bitstrings)
     # check that we only get 01.
@@ -222,9 +222,21 @@ class BernoulliTest(tf.test.TestCase):
     self.assertAllClose(1.0, tf.reduce_sum(all_probs))
     expected_entropy = -1.0 * tf.reduce_sum(all_probs * tf.math.log(all_probs))
     test_b = ebm.Bernoulli(3, name="test")
-    test_b._variables.assign(test_thetas)
+    test_b.kernel.assign(test_thetas)
     test_entropy = test_b.entropy()
     self.assertAllClose(expected_entropy, test_entropy)
+
+  def test_trainable_variables_bernoulli(self):
+    test_b = ebm.Bernoulli(self.num_bits, name="test")
+    self.assertAllEqual(test_b.kernel, test_b.trainable_variables[0])
+
+    kernel = tf.random.uniform([self.num_bits])
+    test_b.trainable_variables = [kernel]
+    self.assertAllEqual(kernel, test_b.trainable_variables[0])
+
+    kernel = tf.Variable(kernel)
+    test_b.trainable_variables = [kernel]
+    self.assertAllEqual(kernel, test_b.trainable_variables[0])
 
 
 class KOBETest(tf.test.TestCase):
@@ -245,7 +257,7 @@ class KOBETest(tf.test.TestCase):
 
     ref_indices = [[0], [1], [2], [0, 1], [0, 2], [1, 2]]
     self.assertAllClose(test_k._indices, ref_indices)
-    self.assertAllClose(test_k._variables, [init_const] * sum(
+    self.assertAllClose(test_k.kernel, [init_const] * sum(
         len(list(itertools.combinations(range(num_bits), i)))
         for i in range(1, self.order + 1)))
 
@@ -260,8 +272,8 @@ class KOBETest(tf.test.TestCase):
     self.assertEqual(test_k_copy.order, test_k.order)
     self.assertTrue(test_k_copy.has_operator, test_k.has_operator)
     self.assertAllClose(test_k_copy._indices, test_k._indices)
-    self.assertAllClose(test_k_copy._variables, test_k._variables)
-    self.assertNotEqual(id(test_k_copy._variables), id(test_k._variables))
+    self.assertAllClose(test_k_copy.kernel, test_k.kernel)
+    self.assertNotEqual(id(test_k_copy.kernel), id(test_k.kernel))
 
   def test_energy(self):
     """Test every energy on two bits."""
@@ -269,7 +281,7 @@ class KOBETest(tf.test.TestCase):
     test_thetas = tf.Variable([1.5, 2.7, -4.0])
     expected_energies = tf.constant([0.2, 2.8, 5.2, -8.2])
     test_k = ebm.KOBE(n_nodes, self.order)
-    test_k._variables.assign(test_thetas)
+    test_k.kernel.assign(test_thetas)
     all_strings = tf.constant(
         list(itertools.product([0, 1], repeat=n_nodes)), dtype=tf.int8)
     test_energies = test_k.energy(all_strings)
@@ -300,7 +312,7 @@ class KOBETest(tf.test.TestCase):
     qubits = cirq.GridQubit.rect(1, num_bits)
 
     # Pin at bitstring [1, 0, 1]
-    test_b._variables.assign(tf.constant([100.0, -200.0, 300.0, 10, -20, 30]))
+    test_b.kernel.assign(tf.constant([100.0, -200.0, 300.0, 10, -20, 30]))
     operators = test_b.operator_shards(qubits)
 
     # True energy
@@ -327,7 +339,7 @@ class KOBETest(tf.test.TestCase):
     test_k = ebm.EBM(ebm.KOBE(1, self.order), None, is_analytic=True)
     # For single factor Bernoulli, theta=0 is 50% chance of 1.
     test_thetas = tf.constant([0.0])
-    test_k._energy_function._variables.assign(test_thetas)
+    test_k._energy_function.kernel.assign(test_thetas)
     num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
     bitstrings, counts = test_k.sample(num_bitstrings)
     # check that we got both bitstrings
@@ -339,7 +351,7 @@ class KOBETest(tf.test.TestCase):
     self.assertAllClose(1.0, counts[0] / counts[1], atol=1e-3)
     # Large energy penalty pins the bit.
     test_thetas = tf.constant([100.0])
-    test_k._energy_function._variables.assign(test_thetas)
+    test_k._energy_function.kernel.assign(test_thetas)
     num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
     bitstrings, _ = test_k.sample(num_bitstrings)
     # check that we got only one bitstring
@@ -393,7 +405,7 @@ class KOBETest(tf.test.TestCase):
     )
     # Confirm correlated spins.
     test_thetas = tf.constant([100.0, 0.0, 0.0, -100.0, 0.0, 100.0])
-    test_k._energy_function._variables.assign(test_thetas)
+    test_k._energy_function.kernel.assign(test_thetas)
     num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
     bitstrings, _ = test_k.sample(num_bitstrings)
     # Confirm we only get the 110 bitstring.
@@ -427,7 +439,7 @@ class KOBETest(tf.test.TestCase):
     test_thetas = tf.Variable([1.5, 2.7, -4.0])
     expected_log_partition = tf.math.log(tf.constant(3641.8353))
     pre_k = ebm.KOBE(2, 2)
-    pre_k._variables.assign(test_thetas)
+    pre_k.kernel.assign(test_thetas)
     test_k = ebm.EBM(pre_k, None, is_analytic=True)
     test_log_partition = test_k.log_partition_function()
     self.assertAllClose(expected_log_partition, test_log_partition)
@@ -437,10 +449,49 @@ class KOBETest(tf.test.TestCase):
     test_thetas = tf.Variable([1.5, 2.7, -4.0])
     expected_entropy = tf.constant(0.00233551808)
     pre_k = ebm.KOBE(2, 2)
-    pre_k._variables.assign(test_thetas)
+    pre_k.kernel.assign(test_thetas)
     test_k = ebm.EBM(pre_k, None, is_analytic=True)
     test_entropy = test_k.entropy()
     self.assertAllClose(expected_entropy, test_entropy)
+
+  def test_trainable_variables_kobe(self):
+    num_bits = 3
+    test_k = ebm.KOBE(num_bits, self.order, name="test")
+    self.assertAllEqual(test_k.kernel, test_k.trainable_variables[0])
+
+    kernel = tf.random.uniform([num_bits])
+    test_k.trainable_variables = [kernel]
+    self.assertAllEqual(kernel, test_k.trainable_variables[0])
+
+    kernel = tf.Variable(kernel)
+    test_k.trainable_variables = [kernel]
+    self.assertAllEqual(kernel, test_k.trainable_variables[0])
+
+
+class MLPTest(tf.test.TestCase):
+  num_bits = 5
+
+  def test_trainable_variables_mlp(self):
+    test_mlp = ebm.MLP(
+        self.num_bits, [4, 3, 2], activations=['relu', 'tanh', 'sigmoid'])
+
+    i = 0
+    for layer in test_mlp.layers:
+      self.assertAllEqual(layer.kernel, test_mlp.trainable_variables[i])
+      self.assertAllEqual(layer.bias, test_mlp.trainable_variables[i + 1])
+      i += 2
+
+    variables = [
+        tf.random.uniform(tf.shape(v)) for v in test_mlp.trainable_variables
+    ]
+    test_mlp.trainable_variables = variables
+    for i in range(len(test_mlp.trainable_variables)):
+      self.assertAllEqual(variables[i], test_mlp.trainable_variables[i])
+
+    variables = [tf.Variable(v) for v in variables]
+    test_mlp.trainable_variables = variables
+    for i in range(len(test_mlp.trainable_variables)):
+      self.assertAllEqual(variables[i], test_mlp.trainable_variables[i])
 
 
 if __name__ == "__main__":
