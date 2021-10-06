@@ -371,8 +371,8 @@ def qubits_to_indices(qubits):
     qubits: Python `list` of `cirq.GridQubit`s.
   
   Returns:
-    indices: 2D `tf.Tensor` of indices, where `indices[i][0]` is the row of
-      `qubits[i]`, and `indices[i][1]` is the column of `qubits[i]`.
+    indices: `tf.Tensor` of shape [len(qubits), 2] where `indices[i][0]` and
+      `indices[i][1]` give the row of and column of `qubits[i]`, respectively.
   """
   indices = tf.constant([[q.row, q.col] for q in qubits], dtype=tf.int32)
   return indices
@@ -382,14 +382,16 @@ def qubit_sub_indices(qubits_total, qubits_sublist):
   """Returns the indices of the qubit sublist in the qubit total.
   
   Args:
-    qubits_total: 2D tensor of integers, the output of `qubits_to_indices` on
-      some list of `cirq.GridQubit`s.
-    qubits_sublist: 2D tensor of integers, the output of `qubits_to_indices` on
-      some list of `cirq.GridQubit`s.
+    qubits_total: `tf.Tensor` of shape [n, 2], the output of `qubits_to_indices`
+      on some list of `cirq.GridQubit`s.
+    qubits_sublist: `tf.Tensor` of shape [m, 2], the output of
+      `qubits_to_indices` on some list of `cirq.GridQubit`s.
 
   Returns:
-    sub_indices: 1D tensor of integers which are the indices of the sublist of
-      qubits in the total list of qubits.
+    sub_indices: `tf.Tensor` of shape [j], whose entries are the indices of the
+      sublist of qubits in total list of qubits.  When `qubits_sublist` is a
+      subset of `qubits_total`, then j == m.  More generally, j is the number of
+      qubits in `qubits_sublist` that also appear in `qubits_total`.
   """
   qubits_total_tiled = tf.tile(
       tf.expand_dims(qubits_total, 0), [tf.shape(qubits_sublist)[0], 1, 1])
