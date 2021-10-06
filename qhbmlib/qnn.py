@@ -24,7 +24,7 @@ import tensorflow_quantum as tfq
 from qhbmlib import util
 
 
-def bit_circuit(qubits, name='bit_circuit'):
+def bit_circuit(qubits, name="bit_circuit"):
   """Returns exponentiated X gate on each qubit and the exponent symbols."""
   circuit = cirq.Circuit()
   for n, q in enumerate(qubits):
@@ -39,25 +39,35 @@ class QNN(tf.keras.Model):
   def __init__(
       self,
       pqc,
+      *,
+      symbols=None,
+      values=None,
       initializer=tf.keras.initializers.RandomUniform(0, 2 * np.pi),
-      backend='noiseless',
+      backend="noiseless",
       differentiator=None,
       is_analytic=False,
       name=None,
   ):
-    """Initialize a QNN.
+    """Initializes a QNN.
+
     Args:
       pqc: Representation of a parameterized quantum circuit.
-      initializer: A 'tf.keras.initializers.Initializer' which specifies how to
-        initialize the values of the parameters in `circuit`.
+      symbols: Optional 1-D `tf.Tensor` of strings which are the parameters of
+        the QNN.  When `None`, parameters are inferred from the given PQC.
+      values: Optional 1-D `tf.Tensor` of floats which are the parameter values
+        corresponding to the symbols.  When `None`, parameters are chosen via
+        `initializer` instead.
+      initializer: A "tf.keras.initializers.Initializer" which specifies how to
+        initialize the values of the parameters in `circuit`.  This argument is
+        ignored if `values` is not None.
       backend: Optional Python `object` that specifies what backend TFQ will use
-        for operations involving this QNN. Options are {'noisy', 'noiseless'},
+        for operations involving this QNN. Options are {"noisy", "noiseless"},
         or however users may also specify a preconfigured cirq execution
         object to use instead, which must inherit `cirq.Sampler`.
       differentiator: Either None or a `tfq.differentiators.Differentiator`,
         which specifies how to take the derivative of a quantum circuit.
       is_analytic: bool flag that enables is_analytic methods. If True, then backend
-        must also be 'noiseless'.
+        must also be "noiseless".
       name: Identifier for this QNN.
     """
     super().__init__(name=name)
@@ -66,20 +76,21 @@ class QNN(tf.keras.Model):
       raise TypeError("pqc must be a cirq.Circuit object."
                       " Given: {}".format(pqc))
 
-    symbols = list(sorted(tfq.util.get_circuit_symbols(pqc)))
-    self._symbols = tf.constant([str(x) for x in symbols], dtype=tf.string)
+    if symbols is None:
+      raw_symbols = list(sorted(tfq.util.get_circuit_symbols(pqc)))
+      symbols = tf.constant([str(x) for x in raw_symbols], dtype=tf.string)
+    self._symbols = symbols
 
-    self.values = self.add_weight(
-        name=f'values',
-        shape=[len(symbols)],
-        initializer=initializer,
-        trainable=True)
+    if values is None:
+      values = initializer(shape=[tf.shape(self._symbols)[0]])
+    self.values = tf.Variable(
+        initial_value=values, name=f"{self.name}_pqc_values")
 
     self._pqc = tfq.convert_to_tensor([pqc])
     self._inverse_pqc = tfq.convert_to_tensor([pqc**-1])
 
     self._raw_qubits = sorted(pqc.all_qubits())
-    self._qubits = tf.constant([[q.row, q.col] for q in self._raw_qubits])
+    self._qubits = util.qubits_to_indices(self._raw_qubits)
 
     _bit_circuit = bit_circuit(self._raw_qubits)
     bit_symbols = list(sorted(tfq.util.get_circuit_symbols(_bit_circuit)))
@@ -88,8 +99,8 @@ class QNN(tf.keras.Model):
 
     self._differentiator = differentiator
     self._sample_layer = tfq.layers.Sample(backend=backend)
-    if backend == 'noiseless' or backend is None:
-      self._backend = 'noiseless'
+    if backend == "noiseless" or backend is None:
+      self._backend = "noiseless"
       self._is_analytic = is_analytic
       self._expectation_layer = tfq.layers.Expectation(
           backend=backend, differentiator=differentiator)
@@ -176,7 +187,7 @@ class QNN(tf.keras.Model):
     num_operators = tf.shape(operators)[0]
     tiled_values = tf.tile(tf.expand_dims(self.values, 0), [num_circuits, 1])
     tiled_operators = tf.tile(tf.expand_dims(operators, 0), [num_circuits, 1])
-    if self.backend == 'noiseless':
+    if self.backend == "noiseless":
       expectations = self._expectation_layer(
           circuits,
           symbol_names=self.symbols,
@@ -341,3 +352,38 @@ class QNN(tf.keras.Model):
     if self.is_analytic:
       return self._unitary_layer(self.pqc()).to_tensor()[0]
     raise NotImplementedError()
+
+  def __add__(self, other):
+    """Returns QNN which is the pqc of `other` appended to the pqc of `self`.
+
+    Note: the backend, differentiator, and is_analytic attributes may be
+    different between self and other. The resulting self + other uses such
+    attributes from the QNN with the larger number of qubits.
+    """
+    if len(self.raw_qubits) >= len(other.raw_qubits):
+      copy_qnn = self
+    else:
+      copy_qnn = other
+    new_pqc = tfq.append_circuit(self.pqc(False), other.pqc(False))
+    new_symbols = tf.concat([self.symbols, other.symbols], 0)
+    new_values = tf.concat([self.values, other.values], 0)
+    new_qnn = QNN(
+        tfq.from_tensor(new_pqc)[0],
+        symbols=new_symbols,
+        values=new_values,
+        backend=copy_qnn.backend,
+        differentiator=copy_qnn.differentiator,
+        is_analytic=copy_qnn.is_analytic,
+        name=f"{self.name}_plus_{other.name}")
+    return new_qnn
+
+  def __pow__(self, exponent):
+    """QNN raised to a power, only valid for exponent -1, the inverse."""
+    if exponent != -1:
+      raise ValueError("Only the inverse (exponent == -1) is supported.")
+    new_qnn = self.copy()
+    old_pqc = new_qnn.pqc(False)
+    old_inverse_pqc = new_qnn.inverse_pqc(False)
+    new_qnn._pqc = old_inverse_pqc
+    new_qnn._inverse_pqc = old_pqc
+    return new_qnn

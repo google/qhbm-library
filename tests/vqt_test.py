@@ -106,7 +106,7 @@ class VQTTest(tf.test.TestCase):
             cirq.rx(r_s)(q) for r_s, q in zip(r_symbols, qubits))
         qnn_init = tf.keras.initializers.RandomUniform(
             minval=-6.2, maxval=6.2, seed=seed)
-        test_qnn = qnn.QNN(r_circuit, qnn_init, is_analytic=True)
+        test_qnn = qnn.QNN(r_circuit, initializer=qnn_init, is_analytic=True)
 
         # VQT arguments
         test_qhbm = qhbm.QHBM(test_ebm, test_qnn)

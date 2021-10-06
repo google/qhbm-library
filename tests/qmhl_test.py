@@ -92,7 +92,7 @@ class QMHLTest(tf.test.TestCase):
             cirq.rx(r_s)(q) for r_s, q in zip(r_symbols, qubits))
         qnn_init = tf.keras.initializers.RandomUniform(
             minval=-q_const, maxval=q_const, seed=seed)
-        test_qnn = qnn.QNN(r_circuit, qnn_init, is_analytic=True)
+        test_qnn = qnn.QNN(r_circuit, initializer=qnn_init, is_analytic=True)
 
         # Confirm qhbm_model QHBM
         test_qhbm = qhbm.QHBM(test_ebm, test_qnn)

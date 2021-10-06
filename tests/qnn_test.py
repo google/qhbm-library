@@ -117,10 +117,73 @@ class QNNTest(tf.test.TestCase):
             tfq.resolve_parameters(self.inverse_pqc_tfq, self.symbols,
                                    tf.expand_dims(test_qnn.values, 0))))
 
+  def test_alternative_init(self):
+    """Confirms that `symbols` and `values` get set correctly."""
+    expected_values = self.initializer(shape=[self.num_qubits])
+    actual_qnn = qnn.QNN(self.pqc, symbols=self.symbols, values=expected_values)
+    self.assertAllEqual(actual_qnn.symbols, self.symbols)
+    self.assertAllEqual(actual_qnn.values, expected_values)
+
+  def test_add(self):
+    """Confirms two QNNs are added successfully."""
+    num_qubits = 5
+    qubits = cirq.GridQubit.rect(1, num_qubits)
+
+    pqc_1 = cirq.Circuit()
+    symbols_1_str = ["s_1_{n}" for n in range(num_qubits)]
+    symbols_1_sympy = [sympy.Symbol(s) for s in symbols_1_str]
+    symbols_1 = tf.constant(symbols_1_str)
+    for s, q in zip(symbols_1_sympy, qubits):
+      pqc_1 += cirq.rx(s)(q)
+    values_1 = self.initializer(shape=[num_qubits])
+
+    pqc_2 = cirq.Circuit()
+    symbols_2_str = ["s_2_{n}" for n in range(num_qubits)]
+    symbols_2_sympy = [sympy.Symbol(s) for s in symbols_2_str]
+    symbols_2 = tf.constant(symbols_2_str)
+    for s, q in zip(symbols_2_sympy, qubits):
+      pqc_2 += cirq.ry(s)(q)
+    values_2 = self.initializer(shape=[num_qubits])
+
+    qnn_1 = qnn.QNN(pqc_1, symbols=symbols_1, values=values_1)
+    qnn_2 = qnn.QNN(pqc_2, symbols=symbols_2, values=values_2)
+    actual_added = qnn_1 + qnn_2
+
+    self.assertAllEqual(
+        tfq.from_tensor(actual_added.pqc(False))[0],
+        tfq.from_tensor(tfq.convert_to_tensor([pqc_1 + pqc_2]))[0])
+    self.assertAllEqual(actual_added.symbols,
+                        tf.concat([symbols_1, symbols_2], 0))
+    self.assertAllEqual(actual_added.values, tf.concat([values_1, values_2], 0))
+
+  def test_pow(self):
+    """Confirms inverse works correctly."""
+    actual_qnn = qnn.QNN(self.pqc)
+    with self.assertRaisesRegex(ValueError, expected_regex="Only the inverse"):
+      _ = actual_qnn**-2
+
+    inverse_qnn = actual_qnn**-1
+    actual_pqc = tfq.from_tensor(inverse_qnn.pqc(resolve=True))
+    expected_pqc = tfq.from_tensor(
+        tfq.resolve_parameters(self.inverse_pqc_tfq, self.symbols,
+                               tf.expand_dims(actual_qnn.values, 0)))
+    actual_inverse_pqc = tfq.from_tensor(inverse_qnn.inverse_pqc(resolve=True))
+    expected_inverse_pqc = tfq.from_tensor(
+        tfq.resolve_parameters(self.pqc_tfq, self.symbols,
+                               tf.expand_dims(actual_qnn.values, 0)))
+    self.assertEqual(actual_pqc, expected_pqc)
+    self.assertEqual(actual_inverse_pqc, expected_inverse_pqc)
+    # Ensure swapping circuits was actually meaningful
+    self.assertNotEqual(actual_pqc, actual_inverse_pqc)
+
   def test_copy(self):
     """Confirms copied QNN has correct attributes."""
-    test_qnn = qnn.QNN(self.pqc, self.initializer, self.backend,
-                       self.differentiator, self.name)
+    test_qnn = qnn.QNN(
+        self.pqc,
+        initializer=self.initializer,
+        backend=self.backend,
+        differentiator=self.differentiator,
+        name=self.name)
     test_qnn_copy = test_qnn.copy()
     self.assertEqual(test_qnn_copy.name, test_qnn.name)
     self.assertAllClose(test_qnn_copy.trainable_variables,
