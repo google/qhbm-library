@@ -33,6 +33,9 @@ from tests import test_util
 ATOL = 1e-5
 GRAD_ATOL = 2e-4
 
+def _pystr(x):
+  return [str(y) for y in x]
+
 
 class BitCircuitTest(tf.test.TestCase):
   """Test bit_circuit from the qhbm library."""
@@ -52,7 +55,7 @@ class BitCircuitTest(tf.test.TestCase):
             "build_bit_test_bit_0 build_bit_test_bit_1 build_bit_test_bit_2"))
     expected_circuit = cirq.Circuit(
         [cirq.X(q)**s for q, s in zip(my_qubits, expected_symbols)])
-    self.assertAllEqual(test_symbols, expected_symbols)
+    self.assertAllEqual(_pystr(test_symbols), _pystr(expected_symbols))
     self.assertEqual(test_circuit, expected_circuit)
 
 
