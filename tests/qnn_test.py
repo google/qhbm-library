@@ -33,6 +33,7 @@ from tests import test_util
 ATOL = 1e-5
 GRAD_ATOL = 2e-4
 
+
 def _pystr(x):
   return [str(y) for y in x]
 
