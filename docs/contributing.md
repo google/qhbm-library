@@ -125,8 +125,9 @@ Edit the title of the PR to describe what the PR accomplishes. In the larger "co
 
 Request a review from one of the project maintainers. Click the gear on the right next to the "Reviewers" tab. Scroll down the list and select any of the following current project maintainers:
 - zaqqwerty
+Then you can click "Create pull request". 
 
-Then you can click "Create pull request".
+It might be that during the creation of the pull request, the "Reviewers" tab is not visible. If this is the case, click "Create pull request" and add the reviewer in the following screen. This can be done in the panel on the right-hand side. 
 
 Beyond the checks, here is what we are looking for during our review:
 
