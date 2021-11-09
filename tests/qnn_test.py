@@ -34,6 +34,10 @@ ATOL = 1e-5
 GRAD_ATOL = 2e-4
 
 
+def _pystr(x):
+  return [str(y) for y in x]
+
+
 class BitCircuitTest(tf.test.TestCase):
   """Test bit_circuit from the qhbm library."""
 
@@ -52,7 +56,7 @@ class BitCircuitTest(tf.test.TestCase):
             "build_bit_test_bit_0 build_bit_test_bit_1 build_bit_test_bit_2"))
     expected_circuit = cirq.Circuit(
         [cirq.X(q)**s for q, s in zip(my_qubits, expected_symbols)])
-    self.assertAllEqual(test_symbols, expected_symbols)
+    self.assertAllEqual(_pystr(test_symbols), _pystr(expected_symbols))
     self.assertEqual(test_circuit, expected_circuit)
 
 
@@ -110,17 +114,80 @@ class QNNTest(tf.test.TestCase):
         tfq.from_tensor(test_qnn.pqc(resolve=True)),
         tfq.from_tensor(
             tfq.resolve_parameters(self.pqc_tfq, self.symbols,
-                                   tf.expand_dims(test_qnn._values, 0))))
+                                   tf.expand_dims(test_qnn.values, 0))))
     self.assertEqual(
         tfq.from_tensor(test_qnn.inverse_pqc(resolve=True)),
         tfq.from_tensor(
             tfq.resolve_parameters(self.inverse_pqc_tfq, self.symbols,
-                                   tf.expand_dims(test_qnn._values, 0))))
+                                   tf.expand_dims(test_qnn.values, 0))))
+
+  def test_alternative_init(self):
+    """Confirms that `symbols` and `values` get set correctly."""
+    expected_values = self.initializer(shape=[self.num_qubits])
+    actual_qnn = qnn.QNN(self.pqc, symbols=self.symbols, values=expected_values)
+    self.assertAllEqual(actual_qnn.symbols, self.symbols)
+    self.assertAllEqual(actual_qnn.values, expected_values)
+
+  def test_add(self):
+    """Confirms two QNNs are added successfully."""
+    num_qubits = 5
+    qubits = cirq.GridQubit.rect(1, num_qubits)
+
+    pqc_1 = cirq.Circuit()
+    symbols_1_str = ["s_1_{n}" for n in range(num_qubits)]
+    symbols_1_sympy = [sympy.Symbol(s) for s in symbols_1_str]
+    symbols_1 = tf.constant(symbols_1_str)
+    for s, q in zip(symbols_1_sympy, qubits):
+      pqc_1 += cirq.rx(s)(q)
+    values_1 = self.initializer(shape=[num_qubits])
+
+    pqc_2 = cirq.Circuit()
+    symbols_2_str = ["s_2_{n}" for n in range(num_qubits)]
+    symbols_2_sympy = [sympy.Symbol(s) for s in symbols_2_str]
+    symbols_2 = tf.constant(symbols_2_str)
+    for s, q in zip(symbols_2_sympy, qubits):
+      pqc_2 += cirq.ry(s)(q)
+    values_2 = self.initializer(shape=[num_qubits])
+
+    qnn_1 = qnn.QNN(pqc_1, symbols=symbols_1, values=values_1)
+    qnn_2 = qnn.QNN(pqc_2, symbols=symbols_2, values=values_2)
+    actual_added = qnn_1 + qnn_2
+
+    self.assertAllEqual(
+        tfq.from_tensor(actual_added.pqc(False))[0],
+        tfq.from_tensor(tfq.convert_to_tensor([pqc_1 + pqc_2]))[0])
+    self.assertAllEqual(actual_added.symbols,
+                        tf.concat([symbols_1, symbols_2], 0))
+    self.assertAllEqual(actual_added.values, tf.concat([values_1, values_2], 0))
+
+  def test_pow(self):
+    """Confirms inverse works correctly."""
+    actual_qnn = qnn.QNN(self.pqc)
+    with self.assertRaisesRegex(ValueError, expected_regex="Only the inverse"):
+      _ = actual_qnn**-2
+
+    inverse_qnn = actual_qnn**-1
+    actual_pqc = tfq.from_tensor(inverse_qnn.pqc(resolve=True))
+    expected_pqc = tfq.from_tensor(
+        tfq.resolve_parameters(self.inverse_pqc_tfq, self.symbols,
+                               tf.expand_dims(actual_qnn.values, 0)))
+    actual_inverse_pqc = tfq.from_tensor(inverse_qnn.inverse_pqc(resolve=True))
+    expected_inverse_pqc = tfq.from_tensor(
+        tfq.resolve_parameters(self.pqc_tfq, self.symbols,
+                               tf.expand_dims(actual_qnn.values, 0)))
+    self.assertEqual(actual_pqc, expected_pqc)
+    self.assertEqual(actual_inverse_pqc, expected_inverse_pqc)
+    # Ensure swapping circuits was actually meaningful
+    self.assertNotEqual(actual_pqc, actual_inverse_pqc)
 
   def test_copy(self):
     """Confirms copied QNN has correct attributes."""
-    test_qnn = qnn.QNN(self.pqc, self.initializer, self.backend,
-                       self.differentiator, self.name)
+    test_qnn = qnn.QNN(
+        self.pqc,
+        initializer=self.initializer,
+        backend=self.backend,
+        differentiator=self.differentiator,
+        name=self.name)
     test_qnn_copy = test_qnn.copy()
     self.assertEqual(test_qnn_copy.name, test_qnn.name)
     self.assertAllClose(test_qnn_copy.trainable_variables,
@@ -163,7 +230,7 @@ class QNNTest(tf.test.TestCase):
 
     resolved_pqc = tfq.from_tensor(
         tfq.resolve_parameters(self.pqc_tfq, self.symbols,
-                               tf.expand_dims(test_qnn._values, 0)))[0]
+                               tf.expand_dims(test_qnn.values, 0)))[0]
     bit_injectors = []
     for b in bitstrings:
       bit_injectors.append(
@@ -223,6 +290,17 @@ class QNNTest(tf.test.TestCase):
     self.assertTrue(
         test_util.check_bitstring_exists(
             tf.constant([1] * self.num_qubits, dtype=tf.int8), test_samples))
+
+  def test_sample_uneven(self):
+    """Check for discrepancy in samples when count entries differ."""
+    max_counts = int(1e7)
+    counts = tf.constant([max_counts // 2, max_counts])
+    test_qnn = qnn.QNN(cirq.Circuit(cirq.H(cirq.GridQubit(0, 0))))
+    bitstrings = tf.constant([[0], [0]], dtype=tf.int8)
+    samples, samples_counts = test_qnn.sample(bitstrings, counts)
+    # QNN samples should be half 0 and half 1.
+    self.assertAllClose(
+        samples_counts[0], samples_counts[1], atol=max_counts // 1000)
 
   def test_expectation(self):
     """Confirms basic correct expectation values and derivatives.
@@ -429,6 +507,24 @@ class QNNTest(tf.test.TestCase):
     """Confirms correct pulled back measurement."""
     #TODO(zaqqwerty)
     pass
+
+  def test_trainable_variables(self):
+    test_qnn = qnn.QNN(
+        self.pqc,
+        backend=self.backend,
+        differentiator=self.differentiator,
+        is_analytic=True,
+        name=self.name)
+
+    self.assertAllEqual(test_qnn.values, test_qnn.trainable_variables[0])
+
+    values = tf.random.uniform(tf.shape(test_qnn.trainable_variables[0]))
+    test_qnn.trainable_variables = [values]
+    self.assertAllEqual(values, test_qnn.trainable_variables[0])
+
+    values = tf.Variable(values)
+    test_qnn.trainable_variables = [values]
+    self.assertAllEqual(values, test_qnn.trainable_variables[0])
 
 
 if __name__ == "__main__":

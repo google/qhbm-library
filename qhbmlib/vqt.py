@@ -17,46 +17,63 @@
 import tensorflow as tf
 
 
-def vqt(qhbm, num_samples, hamiltonian, beta):
+def vqt(model, num_samples, hamiltonian, beta):
+  """Computes the VQT loss of a given QHBM against given thermal state params.
+
+  This function is differentiable within a `tf.GradientTape` scope.
+
+  Args:
+    model: A `qhbm.QHBM` which is the model whose loss is to be calculated.
+    num_samples: A scalar `tf.Tensor` specifying the number of samples to draw
+      from the EBM of `model` when estimating the loss and its gradients.
+    hamiltonian: 1D tensor of strings with one entry, the result of calling
+      `tfq.convert_to_tensor` on a list containing one cirq.PauliSum, `[op]`.
+      Here, `op` is the Hamiltonian against which the loss is calculated.
+    beta: A scalar `tf.Tensor` which is the inverse temperature at which the
+      loss is calculated.
+
+  Returns:
+    The VQT loss.
+  """
 
   @tf.custom_gradient
-  def loss(variables):
-    bitstrings, counts = qhbm.ebm.sample(num_samples)
-    probs = tf.cast(counts, tf.float32) / tf.cast(
-        tf.reduce_sum(counts), tf.float32)
+  def loss(trainable_variables):
+    bitstrings, counts = model.ebm.sample(num_samples)
+    probs = tf.cast(counts, tf.float32) / tf.cast(num_samples, tf.float32)
     expectation = tf.squeeze(
-        qhbm.qnn.expectation(bitstrings, counts, hamiltonian))
-    if qhbm.ebm.is_analytic:
-      entropy = qhbm.entropy()
+        model.qnn.expectation(bitstrings, counts, hamiltonian), -1)
+    if model.is_analytic:
+      entropy = model.entropy()
     else:
       entropy = -tf.reduce_sum(probs * tf.math.log(probs))
 
     def grad(grad_y, variables=None):
       with tf.GradientTape() as tape:
+        tape.watch(model.qnn.trainable_variables)
         beta_expectations = beta * tf.squeeze(
-            qhbm.qnn.expectation(bitstrings, counts, hamiltonian, reduce=False),
-            -1)
+            model.qnn.expectation(
+                bitstrings, counts, hamiltonian, reduce=False), -1)
         beta_expectation = tf.reduce_sum(probs * beta_expectations)
-      grad_qnn = tape.gradient(beta_expectation, qhbm.qnn.trainable_variables)
-      grad_qnn = [grad_y * grad for grad in grad_qnn]
+      grad_qnn = tape.gradient(beta_expectation, model.qnn.trainable_variables)
+      grad_qnn = [grad_y * g for g in grad_qnn]
 
       with tf.GradientTape() as tape:
-        energies = qhbm.ebm.energy(bitstrings)
-      energy_grads = tape.jacobian(energies, qhbm.ebm.trainable_variables)
+        tape.watch(model.ebm.trainable_variables)
+        energies = model.ebm.energy(bitstrings)
+      energy_jac = tape.jacobian(energies, model.ebm.trainable_variables)
       probs_diffs = probs * (beta_expectations - energies)
       avg_diff = tf.reduce_sum(probs_diffs)
       grad_ebm = [
           grad_y *
-          (avg_diff *
-           tf.reduce_sum(tf.transpose(probs * tf.transpose(grad)), 0) -
-           tf.reduce_sum(tf.transpose(probs_diffs * tf.transpose(grad)), 0))
-          for grad in energy_grads
+          (avg_diff * tf.reduce_sum(tf.transpose(probs * tf.transpose(g)), 0) -
+           tf.reduce_sum(tf.transpose(probs_diffs * tf.transpose(g)), 0))
+          for g in energy_jac
       ]
-      grad_vars = grad_ebm + grad_qnn
+      grad_qhbm = grad_ebm + grad_qnn
       if variables is None:
-        return grad_vars
-      return grad_vars, grad_vars
+        return grad_qhbm
+      return grad_qhbm, [tf.zeros_like(g) for g in grad_qhbm]
 
     return beta * expectation - entropy, grad
 
-  return loss(qhbm.trainable_variables)
+  return loss(model.trainable_variables)
