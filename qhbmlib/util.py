@@ -404,7 +404,6 @@ def qubit_sub_indices(qubits_total, qubits_sublist):
   return sub_indices
 
 
-@tf.function
 def unique_bitstrings_with_counts(bitstrings):
   """Extract the unique bitstrings in the given bitstring tensor.
 
