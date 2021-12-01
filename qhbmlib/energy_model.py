@@ -12,17 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tools for defining energy functions."""
+"""Tools for modelling energy functions."""
 
 import abc
-import collections
-import itertools
 
-import cirq
 import tensorflow as tf
-import tensorflow_probability as tfp
-
-from qhbmlib import util
 
 
 class BitstringDistribution(tf.keras.Model, abc.ABC):
