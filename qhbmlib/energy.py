@@ -12,7 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tools defining energy functions."""
+"""Tools for defining energy functions."""
+
+import abc
+import collections
+import itertools
+
+import cirq
+import tensorflow as tf
+import tensorflow_probability as tfp
+
+from qhbmlib import util
 
 
 class BitstringDistribution(tf.keras.Model, abc.ABC):
@@ -22,9 +32,13 @@ class BitstringDistribution(tf.keras.Model, abc.ABC):
     super().__init__(name=name)
 
   @property
+  def num_bits(self):
+    return len(self.bits)
+
+  @property
   @abc.abstractmethod
   def bits(self):
-    """Integer labels for the bits on which this distribution acts."""
+    """List of integer labels for the bits on which this distribution acts."""
     raise NotImplementedError()
 
   @property
@@ -41,13 +55,38 @@ class BitstringDistribution(tf.keras.Model, abc.ABC):
     raise NotImplementedError()
 
 
-class PauliBitstringDistribution(BitstringDistribution):
-  """Augments a BitstringDistribution with a Pauli Z representation."""
+class Bernoulli(BitstringDistribution):
+  """Tensor product of coin flip distributions."""
 
-  @abc.abstractmethod
-  def operator_shards(self, qubits: list[cirq.GridQubit]) -> list[cirq.PauliString]:
-    raise NotImplementedError()
+  def __init__(self,
+               bits: list[int],
+               initializer=tf.keras.initializers.RandomUniform(),
+               name=None):
+    super().__init__(name=name)
+    self.bits = bits
+    self.kernel = self.add_weight(
+        name=f'kernel',
+        shape=[self.num_bits],
+        initializer=initializer,
+        trainable=True)
 
-  @abc.abstractmethod
-  def operator_expectation(self, expectation_shards: list[float]) -> float:
-    raise NotImplementedError()
+  @property
+  def bits(self):
+    return self.bits
+ 
+  @property
+  def trainable_variables(self):
+    return [self.kernel]
+
+  @trainable_variables.setter
+  def trainable_variables(self, value):
+    self.kernel = value[0]
+
+  def copy(self):
+    bernoulli = Bernoulli(self.bits, name=self.name)
+    bernoulli.kernel.assign(self.kernel)
+    return bernoulli
+
+  def energy(self, bitstrings):
+    return tf.reduce_sum(
+        tf.cast(1 - 2 * bitstrings, tf.float32) * self.kernel, -1)
