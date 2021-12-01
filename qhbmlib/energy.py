@@ -63,7 +63,7 @@ class Bernoulli(BitstringDistribution):
                initializer=tf.keras.initializers.RandomUniform(),
                name=None):
     super().__init__(name=name)
-    self.bits = bits
+    self._bits = bits
     self.kernel = self.add_weight(
         name=f'kernel',
         shape=[self.num_bits],
@@ -72,7 +72,7 @@ class Bernoulli(BitstringDistribution):
 
   @property
   def bits(self):
-    return self.bits
+    return self._bits
  
   @property
   def trainable_variables(self):

@@ -15,23 +15,23 @@
 """Tools for working with Modular Hamiltonians."""
 
 
-from qhbmlib import ebm
-from qhbmlib import qnn
+from qhbmlib import energy
+from qhbmlib import circuit
 
 
 class ModHam(tf.keras.Model):
   """Represents a Modular Hamiltonian."""
 
-  def __init__(self, energy_function: ebm.EnergyFunction, basis_transform: qnn.QNN):
+  def __init__(self, distribution: energy.BitstringDistribution, basis_transform: circuit.QuantumCircuit):
     if not len(basis_transform.raw_qubits) == energy_function.num_bits:
       raise ValueError("The energy function and basis transformation "
                        "must act on the same set of qubits.")
-    self.energy_function = energy_function
+    self.distribution = distribution
     self.basis_transform = basis_transform
 
   @property
   def trainable_variables(self):
-    return self.ebm.trainable_variables + self.qnn.trainable_variables
+    return self.energy_function.trainable_variables + self.basis_transform.trainable_variables
 
   @trainable_variables.setter
   def trainable_variables(self, value):
@@ -56,3 +56,6 @@ class ModHamSum(tf.keras.Model):
   def __init__(self, summands: list[ModHam]):
     self.summands = summands
 
+
+class Expectation:
+  """Manages taking expectations of circuits against modular Hamiltonians."""
