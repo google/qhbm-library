@@ -56,6 +56,4 @@ class ModHamSum(tf.keras.Model):
   def __init__(self, summands: list[ModHam]):
     self.summands = summands
 
-
-class Expectation:
-  """Manages taking expectations of circuits against modular Hamiltonians."""
+  
