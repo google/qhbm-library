@@ -15,8 +15,9 @@
 """Tools for modelling energy functions."""
 
 import abc
-from typing import List
+from typing import List, Union
 
+import cirq
 import tensorflow as tf
 
 
@@ -50,7 +51,21 @@ class BitstringDistribution(tf.keras.Model, abc.ABC):
     raise NotImplementedError()
 
 
-class Bernoulli(BitstringDistribution):
+class PauliBitstringDistribution(BitstringDistribution):
+  """Augments BitstringDistribution with a Pauli Z representation."""
+
+  @abc.abstractmethod
+  def operator_shards(self, qubits):
+    """Parameter independent Pauli Z strings to measure."""
+    raise NotImplementedError()
+
+  @abc.abstractmethod
+  def operator_expectation(self, expectation_shards):
+    """Computes the average energy given operator shard expectation values."""
+    raise NotImplementedError()
+
+
+class Bernoulli(PauliBitstringDistribution):
   """Tensor product of coin flip distributions."""
 
   def __init__(self,
@@ -96,3 +111,12 @@ class Bernoulli(BitstringDistribution):
   def energy(self, bitstrings):
     return tf.reduce_sum(
         tf.cast(1 - 2 * bitstrings, tf.float32) * self.kernel, -1)
+
+  def operator_shards(self, qubits):
+    return [
+        cirq.PauliSum.from_pauli_strings(cirq.Z(qubits[i]))
+        for i in range(self.num_bits)
+    ]
+
+  def operator_expectation(self, expectation_shards):
+    return tf.reduce_sum(expectation_shards * self.kernel, -1)

@@ -37,3 +37,18 @@ class Bernoulli(BitstringSampler):
         logits=2 * dist.kernel, dtype=tf.int8).sample(num_samples)
     return util.unique_bitstrings_with_counts(samples)
   
+
+class AnalyticSampler(BitstringSampler):
+  """Sampler which calculates all probabilities and samples as categorical."""
+
+  def __init__(self, num_bits: int):
+    """Instantiates an AnalyticSampler.
+
+    Args:
+      num_bits: number of bits on which the BitstringDistribution to be sampled
+        is supported.
+    """
+    self._all_bitstrings = tf.constant(
+      list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
+
+  def sample(
