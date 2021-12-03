@@ -15,6 +15,7 @@
 """Tools for modelling energy functions."""
 
 import abc
+from typing import List
 
 import tensorflow as tf
 
@@ -53,10 +54,21 @@ class Bernoulli(BitstringDistribution):
   """Tensor product of coin flip distributions."""
 
   def __init__(self,
-               bits: list[int],
+               bits: List[int],
                initializer=tf.keras.initializers.RandomUniform(),
                name=None):
+    """Initializes a Bernoulli distribution.
+
+    Args:
+      bits: Each entry is an index on which the distribution is supported.
+      initializer: A `tf.keras.initializers.Initializer` which specifies how to
+        initialize the values of the parameters.
+    """
     super().__init__(name=name)
+    if not isinstance(bits, list) or not all(isinstance(i, int) for i in bits):
+      raise TypeError("`bits` must be a list of integers.")
+    if len(set(bits)) != len(bits):
+      raise ValueError("All entries of `bits` must be unique.")
     self._bits = bits
     self.kernel = self.add_weight(
         name=f'kernel',
