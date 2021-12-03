@@ -90,7 +90,7 @@ class BernoulliTest(tf.test.TestCase):
     test_spins = 1 - 2 * test_bitstrings
     with tf.GradientTape() as tape:
       test_energy = test_b.energy(test_bitstrings)
-    test_energy_grad = tape.jacobian(test_energy, test_b.kernel)
+    test_energy_grad = tape.jacobian(test_energy, test_b.trainable_variables)
     ref_energy = [
       test_vars[0] + test_vars[1] + test_vars[2],
       -test_vars[0] + test_vars[1] + test_vars[2],
@@ -98,7 +98,7 @@ class BernoulliTest(tf.test.TestCase):
     self.assertAllClose(test_energy, ref_energy)
     self.assertAllClose(test_energy_grad, [test_spins])
 
-  def test_energy_bernoulli_simple(self):
+  def test_energy_bernoulli(self):
     """Test Bernoulli.energy and its derivative in all cases.
 
     For a given bitstring b, the energy is
@@ -114,12 +114,18 @@ class BernoulliTest(tf.test.TestCase):
       bits = random.sample(range(1000), num_bits)
       thetas = tf.random.uniform([num_bits], minval=-100, maxval=100)
       test_b = energy_model.Bernoulli(bits)
-      test_b.kernel.assign(thetas)      
-      with tf.GradientTape() as tape:
-        test_energy = test_b.energy(test_bitstrings)
+      test_b.kernel.assign(thetas)
 
-      ref_energy = tf.reduce_sum(tf.cast(test_spins, tf.float32) * thetas, -1)
-      self.assertAllClose(test_energy, ref_energy)
+      @tf.function
+      def special_energy(bitstrings):
+        return test_b.energy(bitstrings)
 
-      test_energy_grad = tape.jacobian(test_energy, test_b.trainable_variables)
-      self.assertAllClose(test_energy_grad, [test_spins])
+      for e_func in [test_b.energy, special_energy]:
+        with tf.GradientTape() as tape:
+          test_energy = e_func(test_bitstrings)
+
+        ref_energy = tf.reduce_sum(tf.cast(test_spins, tf.float32) * thetas, -1)
+        self.assertAllClose(test_energy, ref_energy)
+
+        test_energy_grad = tape.jacobian(test_energy, test_b.trainable_variables)
+        self.assertAllClose(test_energy_grad, [test_spins])
