@@ -22,5 +22,3 @@ from qhbmlib import qmhl
 from qhbmlib import qnn
 from qhbmlib import util
 from qhbmlib import vqt
-
-__version__ = "0.2.1"
