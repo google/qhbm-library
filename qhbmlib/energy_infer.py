@@ -29,7 +29,7 @@ class BitstringSampler(abc.ABC):
     raise NotImplementedError()
 
 
-class Bernoulli(BitstringSampler):
+class BernoulliSampler(BitstringSampler):
   """Sampler for Bernoulli distributions."""
 
   def sample(self, dist: energy_model.Bernoulli, num_samples: int):
@@ -51,4 +51,13 @@ class AnalyticSampler(BitstringSampler):
     self._all_bitstrings = tf.constant(
       list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
 
-  def sample(
+  def _energies(self, dist: energy_model.BitstringDistribution):
+    """Returns the current energy of every bitstring."""
+    return dist.energy(self._all_bitstrings)
+
+  def sample(self, dist, num_samples):
+    samples = tf.gather(
+      self._all_bitstrings,
+      tfp.distributions.Categorical(logits=-1 *
+                                    self._energies(dist)).sample(num_samples))
+    return util.unique_bitstrings_with_counts(samples)

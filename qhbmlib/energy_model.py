@@ -24,18 +24,22 @@ import tensorflow as tf
 class BitstringDistribution(tf.keras.Model, abc.ABC):
   """Class for representing a probability distribution over bitstrings."""
 
-  def __init__(self, name=None):
+  def __init__(self, bits, name=None):
     super().__init__(name=name)
+    if not isinstance(bits, list) or not all(isinstance(i, int) for i in bits):
+      raise TypeError("`bits` must be a list of integers.")
+    if len(set(bits)) != len(bits):
+      raise ValueError("All entries of `bits` must be unique.")
+    self._bits = bits
 
   @property
   def num_bits(self):
     return len(self.bits)
 
   @property
-  @abc.abstractmethod
   def bits(self):
     """List of integer labels for the bits on which this distribution acts."""
-    raise NotImplementedError()
+    return self._bits
 
   @property
   def trainable_variables(self):
@@ -49,6 +53,66 @@ class BitstringDistribution(tf.keras.Model, abc.ABC):
   @abc.abstractmethod
   def energy(self, bitstrings):
     raise NotImplementedError()
+
+
+class MLP(BitstringDistribution):
+  """Basic dense neural network energy based model."""
+
+  def __init__(self,
+               bits,
+               units,
+               activations,
+               kernel_initializer=tf.keras.initializers.RandomUniform(),
+               bias_initializer=tf.keras.initializers.Zeros(),
+               name=None):
+    """Initialize an MLP.
+
+    Args:
+      bits: Each entry is an index on which the distribution is supported.
+      kernel_initializer: A `tf.keras.initializers.Initializer` which specifies how to
+        initialize the kernels of all dense layers.
+      bias_initializer: A `tf.keras.initializers.Initializer` which specifies how to
+        initialize the biases of all dense layers.
+    """
+    super().__init__(bits, name=name)
+    self._hidden_layers = [
+        tf.keras.layers.Dense(
+          u, activation=a, kernel_initializer=kernel_initializer, bias_initializer=bias_initializer)
+        for u, a in zip(units, activations)
+    ]
+    self._energy_layer = tf.keras.layers.Dense(1)
+    self.build([1, self.num_bits])
+
+  @property
+  def trainable_variables(self):
+    trainable_variables = []
+    for layer in self.layers:
+      trainable_variables.extend([layer.kernel, layer.bias])
+    return trainable_variables
+
+  @trainable_variables.setter
+  def trainable_variables(self, value):
+    i = 0
+    for layer in self.layers:
+      layer.kernel = value[i]
+      layer.bias = value[i + 1]
+      i += 2
+
+  def copy(self):
+    mlp = tf.keras.models.clone_model(self)
+    for i in tf.range(len(mlp.trainable_variables)):
+      mlp.trainable_variables[i].assign(self.trainable_variables[i])
+    return mlp
+
+  def call(self, bitstrings):
+    x = bitstrings
+    for hidden_layer in self._hidden_layers:
+      x = hidden_layer(x)
+    x = self._energy_layer(x)
+    return tf.squeeze(x, -1)
+
+  def energy(self, bitstrings):
+    return self(bitstrings)
 
 
 class PauliBitstringDistribution(BitstringDistribution):
@@ -79,21 +143,12 @@ class Bernoulli(PauliBitstringDistribution):
       initializer: A `tf.keras.initializers.Initializer` which specifies how to
         initialize the values of the parameters.
     """
-    super().__init__(name=name)
-    if not isinstance(bits, list) or not all(isinstance(i, int) for i in bits):
-      raise TypeError("`bits` must be a list of integers.")
-    if len(set(bits)) != len(bits):
-      raise ValueError("All entries of `bits` must be unique.")
-    self._bits = bits
+    super().__init__(bits, name=name)
     self.kernel = self.add_weight(
         name=f'kernel',
         shape=[self.num_bits],
         initializer=initializer,
         trainable=True)
-
-  @property
-  def bits(self):
-    return self._bits
  
   @property
   def trainable_variables(self):
