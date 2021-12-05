@@ -16,23 +16,37 @@
 
 import abc
 
+import tensorflow as tf
+import tensorflow_probability as tfp
+
 from qhbmlib import energy_model
 from qhbmlib import util
 
 
-class BitstringSampler(abc.ABC):
+class BitstringSampler(tf.keras.Model, abc.ABC):
   """Class for sampling from BitstringDistributions."""
 
   @abc.abstractmethod
-  def sample(self, dist, num_samples):
-    """Returns `num_samples` samples from `dist`."""
+  def sample(self, dist: energy_model.BitstringDistribution, num_samples):
+    """Draw `num_samples` samples from `dist`.
+
+    Returns a pair `(bitstrings, counts)` where `bitstrings` is a 2D `tf.int8`
+    tensor of unique bitstrings, and `counts` is a 1D `tf.int32` tensor such
+    that `counts[i]` is the number of times `bitstrings[i]` was sampled.
+
+    We also have `sum(tf.shape(counts)) == num_samples`.
+    """
     raise NotImplementedError()
+
+  def call(self, dist: energy_model.BitstringDistribution, num_samples):
+    return self.sample(dist, num_samples)
 
 
 class BernoulliSampler(BitstringSampler):
   """Sampler for Bernoulli distributions."""
 
   def sample(self, dist: energy_model.Bernoulli, num_samples: int):
+    """See description in base class."""
     samples = tfp.distributions.Bernoulli(
         logits=2 * dist.kernel, dtype=tf.int8).sample(num_samples)
     return util.unique_bitstrings_with_counts(samples)

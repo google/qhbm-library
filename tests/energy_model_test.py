@@ -66,9 +66,10 @@ class BitstringDistributionTest(tf.test.TestCase):
     test_b = self.Basic(list(range(num_bits)))    
     test_bitstrings = tf.constant(
         list(itertools.product([0, 1], repeat=num_bits)))
-    actual_energy = test_b.energy(test_bitstrings)
+    actual_energy = test_b(test_bitstrings)
     expected_energy = tf.constant([1.0] * (2 ** num_bits))
     self.assertAllEqual(actual_energy, expected_energy)
+    actual_energy = test_b(test_bitstrings)
 
 
 class BernoulliTest(tf.test.TestCase):
@@ -130,9 +131,9 @@ class BernoulliTest(tf.test.TestCase):
 
     @tf.function
     def special_energy(bitstrings):
-      return test_b.energy(bitstrings)
+      return test_b(bitstrings)
 
-    for e_func in [test_b.energy, special_energy]:
+    for e_func in [test_b, special_energy]:
       with tf.GradientTape() as tape:
         actual_energy = e_func(test_bitstrings)
       actual_energy_grad = tape.jacobian(actual_energy, test_b.trainable_variables)
@@ -163,9 +164,9 @@ class BernoulliTest(tf.test.TestCase):
 
       @tf.function
       def special_energy(bitstrings):
-        return test_b.energy(bitstrings)
+        return test_b(bitstrings)
 
-      for e_func in [test_b.energy, special_energy]:
+      for e_func in [test_b, special_energy]:
         with tf.GradientTape() as tape:
           actual_energy = e_func(test_bitstrings)
 
@@ -196,7 +197,7 @@ class BernoulliTest(tf.test.TestCase):
 
     # True energy
     bitstring = tf.constant([[0, 0, 1]])  # not the pinned bitstring
-    ref_energy = test_b.energy(bitstring)[0]
+    ref_energy = test_b(bitstring)[0]
 
     # Test energy
     circuit = cirq.Circuit(
@@ -332,3 +333,7 @@ class MLPTest(tf.test.TestCase):
 
   #       actual_energy_grad = tape.jacobian(actual_energy, test_b.trainable_variables)
   #       self.assertAllClose(actual_energy_grad, [test_spins])
+
+if __name__ == "__main__":
+  print("Running energy_model_test.py ...")
+  tf.test.main()

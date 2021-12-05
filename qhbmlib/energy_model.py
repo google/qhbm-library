@@ -61,6 +61,9 @@ class BitstringDistribution(tf.keras.Model, abc.ABC):
   def energy(self, bitstrings):
     raise NotImplementedError()
 
+  def call(self, inputs):
+    return self.energy(inputs)
+
 
 class MLP(BitstringDistribution):
   """Basic dense neural network energy based model."""
