@@ -87,6 +87,7 @@ class MLP(BitstringDistribution):
         initialize the biases of all layers.
     """
     super().__init__(bits, name=name)
+    self._input_activations = activations
     self._hidden_layers = [
         tf.keras.layers.Dense(
           u, activation=a, kernel_initializer=kernel_initializer, bias_initializer=bias_initializer)
@@ -112,10 +113,12 @@ class MLP(BitstringDistribution):
       i += 2
 
   def copy(self):
-    mlp = tf.keras.models.clone_model(self)
-    for i in tf.range(len(mlp.trainable_variables)):
-      mlp.trainable_variables[i].assign(self.trainable_variables[i])
-    return mlp
+    units = [layer.units for layer in self.layers[:-1]]
+    activations = [layer.activation for layer in self.layers[:-1]]
+    new_mlp = MLP(self.bits, units, activations, name=self.name)
+    for i in tf.range(len(new_mlp.trainable_variables)):
+      new_mlp.trainable_variables[i].assign(self.trainable_variables[i])
+    return new_mlp
 
   def call(self, bitstrings):
     x = bitstrings

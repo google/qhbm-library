@@ -216,20 +216,21 @@ class BernoulliTest(tf.test.TestCase):
 class MLPTest(tf.test.TestCase):
   """Test the MLP class."""
 
-  def test_init(self):
+  def test_init_and_copy(self):
     """Test that components are initialized correctly."""
     expected_num_bits = 5
     expected_bits = [6, 17, 22, 30, 42]
-    expected_units = [2, 9]
+    units = [2, 9]
+    expected_units = [5, 2, 9, 1]
     activations = ["elu", "gelu"]
-    expected_activations = [tf.keras.activations.elu, tf.keras.activations.gelu]
+    expected_activations = [tf.keras.activations.elu, tf.keras.activations.gelu, tf.keras.activations.linear]
     kernel_init_const = 1.5
     bias_init_const = 2.7
     expected_name = "init_test"
     test_b = energy_model.MLP(
       expected_bits,
-      expected_units,
-      expected_activations,
+      units,
+      activations,
       kernel_initializer=tf.keras.initializers.Constant(kernel_init_const),
       bias_initializer=tf.keras.initializers.Constant(bias_init_const),
       name=expected_name)
@@ -237,31 +238,31 @@ class MLPTest(tf.test.TestCase):
     self.assertAllEqual(test_b.bits, expected_bits)
     self.assertEqual(test_b.name, expected_name)
 
-    # For dense layers,
-    # output = activation(dot(input, kernel) + bias)
-    self.assertAllEqual(test_b.layers[0].weights[0], tf.constant(kernel_init_const, shape=[5, 2]))
-    self.assertAllEqual(test_b.layers[0].weights[1], tf.constant(bias_init_const, shape=[2]))
-    self.assertEqual(test_b.layers[0].activation, expected_activations[0])
-    self.assertAllEqual(test_b.layers[1].weights[0], tf.constant(kernel_init_const, shape=[2, 9]))
-    self.assertAllEqual(test_b.layers[1].weights[1], tf.constant(bias_init_const, shape=[9]))
-    self.assertEqual(test_b.layers[1].activation, expected_activations[1])
+    # Note that for dense layers,
+    # output = activation(dot(input, kernel) + bias),
+    # which yields opposite shape from that expected for matmul implementation.
+    for i in range(3):
+      self.assertAllEqual(
+          test_b.layers[i].kernel,
+          tf.constant(kernel_init_const, shape=expected_units[i:i+2]))
+      self.assertAllEqual(
+          test_b.layers[i].bias,
+          tf.constant(bias_init_const, shape=expected_units[i+1]))
+      self.assertEqual(test_b.layers[i].activation, expected_activations[i])
 
-    # Final energy layer goes to a scalar
-    self.assertAllEqual(test_b.layers[2].weights[0], tf.constant(kernel_init_const, shape=[9, 1]))
-    self.assertAllEqual(test_b.layers[2].weights[1], tf.constant(bias_init_const, shape=[1]))
-    self.assertEqual(test_b.layers[2].activation, tf.keras.activations.linear)
-    
-  # def test_copy(self):
-  #   """Test that the copy has the same values, but new variables."""
-  #   expected_num_bits = 8
-  #   expected_bits = list(range(expected_num_bits))
-  #   test_b = energy_model.Bernoulli(expected_bits, name="test_copy")
-  #   test_b_copy = test_b.copy()
-  #   self.assertEqual(test_b_copy.num_bits, test_b.num_bits)
-  #   self.assertAllEqual(test_b_copy.bits, test_b.bits)
-  #   self.assertAllEqual(test_b_copy.kernel, test_b.kernel)
-  #   self.assertNotEqual(id(test_b_copy.kernel), id(test_b.kernel))
-  #   self.assertEqual(test_b_copy.name, test_b.name)
+    test_b_copy = test_b.copy()
+    self.assertEqual(test_b_copy.num_bits, test_b.num_bits)
+    self.assertAllEqual(test_b_copy.bits, test_b.bits)
+    self.assertEqual(test_b_copy.name, test_b.name)
+    for i in range(3):
+      self.assertAllEqual(test_b_copy.layers[i].kernel, test_b.layers[i].kernel)
+      self.assertNotEqual(
+          id(test_b_copy.layers[i].kernel), id(test_b.layers[i].kernel))
+      self.assertAllEqual(test_b_copy.layers[i].bias, test_b.layers[i].bias)
+      self.assertNotEqual(
+          id(test_b_copy.layers[i].bias), id(test_b.layers[i].bias))
+      self.assertEqual(
+          test_b_copy.layers[i].activation, test_b.layers[i].activation)
 
   # def test_trainable_variables_bernoulli(self):
   #   bits = [1, 3, 4, 8, 9]
