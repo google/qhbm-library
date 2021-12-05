@@ -24,7 +24,15 @@ import tensorflow as tf
 class BitstringDistribution(tf.keras.Model, abc.ABC):
   """Class for representing a probability distribution over bitstrings."""
 
-  def __init__(self, bits, name=None):
+  def __init__(self,
+               bits: List[int],
+               name: Union[None, str]=None):
+    """Initializes a BitstringDistribution.
+
+    Args:
+      bits: Labels for the bits on which this distribution is supported.
+      name: Optional name for the model.
+    """
     super().__init__(name=name)
     if not isinstance(bits, list) or not all(isinstance(i, int) for i in bits):
       raise TypeError("`bits` must be a list of integers.")
@@ -38,7 +46,6 @@ class BitstringDistribution(tf.keras.Model, abc.ABC):
 
   @property
   def bits(self):
-    """List of integer labels for the bits on which this distribution acts."""
     return self._bits
 
   @property
@@ -59,20 +66,25 @@ class MLP(BitstringDistribution):
   """Basic dense neural network energy based model."""
 
   def __init__(self,
-               bits,
-               units,
-               activations,
+               bits: List[int],
+               units: List[int],
+               activations: List[Union[None, str]],
                kernel_initializer=tf.keras.initializers.RandomUniform(),
                bias_initializer=tf.keras.initializers.Zeros(),
                name=None):
     """Initialize an MLP.
 
+    The arguments paramterize a stack of Dense layers.
+
     Args:
-      bits: Each entry is an index on which the distribution is supported.
+      bits: Labels for the bits on which this distribution is supported.
+      units: Positive integers which are the dimensions each layer's output.
+      activations: Activation functions to use at each layer. Entry of None
+        makes the corresponding layer have linear activation.
       kernel_initializer: A `tf.keras.initializers.Initializer` which specifies how to
-        initialize the kernels of all dense layers.
+        initialize the kernels of all layers.
       bias_initializer: A `tf.keras.initializers.Initializer` which specifies how to
-        initialize the biases of all dense layers.
+        initialize the biases of all layers.
     """
     super().__init__(bits, name=name)
     self._hidden_layers = [
@@ -80,7 +92,8 @@ class MLP(BitstringDistribution):
           u, activation=a, kernel_initializer=kernel_initializer, bias_initializer=bias_initializer)
         for u, a in zip(units, activations)
     ]
-    self._energy_layer = tf.keras.layers.Dense(1)
+    self._energy_layer = tf.keras.layers.Dense(
+      1, kernel_initializer=kernel_initializer, bias_initializer=bias_initializer)
     self.build([1, self.num_bits])
 
   @property

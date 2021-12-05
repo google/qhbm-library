@@ -219,9 +219,10 @@ class MLPTest(tf.test.TestCase):
   def test_init(self):
     """Test that components are initialized correctly."""
     expected_num_bits = 5
-    expected_bits = [5, 17, 22, 30, 42]
-    expected_units = [2, 4, 6, 7, 8]
-    expected_activations = ["elu", "gelu", "selu", "relu", "tanh"]
+    expected_bits = [6, 17, 22, 30, 42]
+    expected_units = [2, 9]
+    activations = ["elu", "gelu"]
+    expected_activations = [tf.keras.activations.elu, tf.keras.activations.gelu]
     kernel_init_const = 1.5
     bias_init_const = 2.7
     expected_name = "init_test"
@@ -236,6 +237,20 @@ class MLPTest(tf.test.TestCase):
     self.assertAllEqual(test_b.bits, expected_bits)
     self.assertEqual(test_b.name, expected_name)
 
+    # For dense layers,
+    # output = activation(dot(input, kernel) + bias)
+    self.assertAllEqual(test_b.layers[0].weights[0], tf.constant(kernel_init_const, shape=[5, 2]))
+    self.assertAllEqual(test_b.layers[0].weights[1], tf.constant(bias_init_const, shape=[2]))
+    self.assertEqual(test_b.layers[0].activation, expected_activations[0])
+    self.assertAllEqual(test_b.layers[1].weights[0], tf.constant(kernel_init_const, shape=[2, 9]))
+    self.assertAllEqual(test_b.layers[1].weights[1], tf.constant(bias_init_const, shape=[9]))
+    self.assertEqual(test_b.layers[1].activation, expected_activations[1])
+
+    # Final energy layer goes to a scalar
+    self.assertAllEqual(test_b.layers[2].weights[0], tf.constant(kernel_init_const, shape=[9, 1]))
+    self.assertAllEqual(test_b.layers[2].weights[1], tf.constant(bias_init_const, shape=[1]))
+    self.assertEqual(test_b.layers[2].activation, tf.keras.activations.linear)
+    
   # def test_copy(self):
   #   """Test that the copy has the same values, but new variables."""
   #   expected_num_bits = 8
