@@ -151,9 +151,10 @@ class MLPTest(tf.test.TestCase):
     num_layers = 4
     test_bitstrings = tf.constant(
         list(itertools.product([0, 1], repeat=num_bits)))
-    for _ in range(5):
+    num_tests = 5
+    for _ in range(num_tests):
       bits = random.sample(range(1000), num_bits)
-      units = random.sample(range(100), num_layers)
+      units = random.sample(range(1, 100), num_layers)
       activations = random.sample([
         "elu", "exponential", "gelu", "hard_sigmoid", "linear", "relu", "selu", "sigmoid", "softmax", "softplus", "sofsign", "swish", "tanh"], num_layers)
       kernel_init = tf.keras.initializers.RandomUniform()
@@ -269,7 +270,8 @@ class BernoulliTest(tf.test.TestCase):
     test_bitstrings = tf.constant(
         list(itertools.product([0, 1], repeat=num_bits)))
     test_spins = 1 - 2 * test_bitstrings
-    for _ in range(5):
+    num_tests = 5
+    for _ in range(num_tests):
       bits = random.sample(range(1000), num_bits)
       thetas = tf.random.uniform([num_bits], minval=-100, maxval=100)
       test_b = energy_model.Bernoulli(bits)
