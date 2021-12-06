@@ -34,7 +34,7 @@ class BitstringDistributionTest(tf.test.TestCase):
       return None
 
     @trainable_variables.setter
-    def trainable_variables(self, value):      
+    def trainable_variables(self, value):
       pass
 
     def energy(self, bitstrings):
@@ -63,11 +63,11 @@ class BitstringDistributionTest(tf.test.TestCase):
   def test_energy(self):
     """Confirms all bitstrings are accepted."""
     num_bits = 5
-    test_b = self.Basic(list(range(num_bits)))    
+    test_b = self.Basic(list(range(num_bits)))
     test_bitstrings = tf.constant(
         list(itertools.product([0, 1], repeat=num_bits)))
     actual_energy = test_b(test_bitstrings)
-    expected_energy = tf.constant([1.0] * (2 ** num_bits))
+    expected_energy = tf.constant([1.0] * (2**num_bits))
     self.assertAllEqual(actual_energy, expected_energy)
     actual_energy = test_b(test_bitstrings)
 
@@ -82,17 +82,20 @@ class MLPTest(tf.test.TestCase):
     units = [2, 9]
     expected_units = [5, 2, 9, 1]
     activations = ["elu", "gelu"]
-    expected_activations = [tf.keras.activations.elu, tf.keras.activations.gelu, tf.keras.activations.linear]
+    expected_activations = [
+        tf.keras.activations.elu, tf.keras.activations.gelu,
+        tf.keras.activations.linear
+    ]
     kernel_init_const = 1.5
     bias_init_const = 2.7
     expected_name = "init_test"
     test_mlp = energy_model.MLP(
-      expected_bits,
-      units,
-      activations,
-      kernel_initializer=tf.keras.initializers.Constant(kernel_init_const),
-      bias_initializer=tf.keras.initializers.Constant(bias_init_const),
-      name=expected_name)
+        expected_bits,
+        units,
+        activations,
+        kernel_initializer=tf.keras.initializers.Constant(kernel_init_const),
+        bias_initializer=tf.keras.initializers.Constant(bias_init_const),
+        name=expected_name)
     self.assertEqual(test_mlp.num_bits, expected_num_bits)
     self.assertAllEqual(test_mlp.bits, expected_bits)
     self.assertEqual(test_mlp.name, expected_name)
@@ -103,10 +106,10 @@ class MLPTest(tf.test.TestCase):
     for i in range(3):
       self.assertAllEqual(
           test_mlp.layers[i].kernel,
-          tf.constant(kernel_init_const, shape=expected_units[i:i+2]))
+          tf.constant(kernel_init_const, shape=expected_units[i:i + 2]))
       self.assertAllEqual(
           test_mlp.layers[i].bias,
-          tf.constant(bias_init_const, shape=expected_units[i+1]))
+          tf.constant(bias_init_const, shape=expected_units[i + 1]))
       self.assertEqual(test_mlp.layers[i].activation, expected_activations[i])
 
     test_mlp_copy = test_mlp.copy()
@@ -114,14 +117,15 @@ class MLPTest(tf.test.TestCase):
     self.assertAllEqual(test_mlp_copy.bits, test_mlp.bits)
     self.assertEqual(test_mlp_copy.name, test_mlp.name)
     for i in range(3):
-      self.assertAllEqual(test_mlp_copy.layers[i].kernel, test_mlp.layers[i].kernel)
+      self.assertAllEqual(test_mlp_copy.layers[i].kernel,
+                          test_mlp.layers[i].kernel)
       self.assertNotEqual(
           id(test_mlp_copy.layers[i].kernel), id(test_mlp.layers[i].kernel))
       self.assertAllEqual(test_mlp_copy.layers[i].bias, test_mlp.layers[i].bias)
       self.assertNotEqual(
           id(test_mlp_copy.layers[i].bias), id(test_mlp.layers[i].bias))
-      self.assertEqual(
-          test_mlp_copy.layers[i].activation, test_mlp.layers[i].activation)
+      self.assertEqual(test_mlp_copy.layers[i].activation,
+                       test_mlp.layers[i].activation)
 
   def test_trainable_variables_mlp(self):
     test_mlp = energy_model.MLP(
@@ -156,21 +160,25 @@ class MLPTest(tf.test.TestCase):
       bits = random.sample(range(1000), num_bits)
       units = random.sample(range(1, 100), num_layers)
       activations = random.sample([
-        "elu", "exponential", "gelu", "hard_sigmoid", "linear", "relu", "selu", "sigmoid", "softmax", "softplus", "sofsign", "swish", "tanh"], num_layers)
+          "elu", "exponential", "gelu", "hard_sigmoid", "linear", "relu",
+          "selu", "sigmoid", "softmax", "softplus", "sofsign", "swish", "tanh"
+      ], num_layers)
       kernel_init = tf.keras.initializers.RandomUniform()
-      bias_init = tf.keras.initializers.RandomUniform()      
-      actual_mlp = energy_model.MLP(bits, units, activations, kernel_init, bias_init)
+      bias_init = tf.keras.initializers.RandomUniform()
+      actual_mlp = energy_model.MLP(bits, units, activations, kernel_init,
+                                    bias_init)
 
       expected_layer_list = []
       for i in range(num_layers):
-        expected_layer_list.append(tf.keras.layers.Dense(units[i], activation=activations[i]))
+        expected_layer_list.append(
+            tf.keras.layers.Dense(units[i], activation=activations[i]))
       expected_layer_list.append(tf.keras.layers.Dense(1))
       expected_mlp = tf.keras.Sequential(expected_layer_list)
       _ = expected_mlp(tf.constant([[0] * num_bits], tf.int8))
       for i, layer in enumerate(expected_mlp.layers):
         layer.kernel.assign(actual_mlp.layers[i].kernel)
         layer.bias.assign(actual_mlp.layers[i].bias)
-      
+
       @tf.function
       def special_energy(bitstrings):
         return actual_mlp(bitstrings)
@@ -180,8 +188,10 @@ class MLPTest(tf.test.TestCase):
           actual_energy = e_func(test_bitstrings)
           expected_energy = tf.squeeze(expected_mlp(test_bitstrings), -1)
         self.assertAllClose(actual_energy, expected_energy)
-        actual_energy_grad = tape.jacobian(actual_energy, actual_mlp.trainable_variables)
-        expected_energy_grad = tape.jacobian(expected_energy, expected_mlp.trainable_variables)
+        actual_energy_grad = tape.jacobian(actual_energy,
+                                           actual_mlp.trainable_variables)
+        expected_energy_grad = tape.jacobian(expected_energy,
+                                             expected_mlp.trainable_variables)
         del tape
         self.assertAllClose(actual_energy_grad, expected_energy_grad)
 
@@ -196,9 +206,9 @@ class BernoulliTest(tf.test.TestCase):
     init_const = 1.5
     expected_name = "init_test"
     test_b = energy_model.Bernoulli(
-      expected_bits,
-      tf.keras.initializers.Constant(init_const),
-      name=expected_name)
+        expected_bits,
+        tf.keras.initializers.Constant(init_const),
+        name=expected_name)
     self.assertEqual(test_b.num_bits, expected_num_bits)
     self.assertAllEqual(test_b.bits, expected_bits)
     self.assertAllEqual(test_b.kernel, [init_const] * expected_num_bits)
@@ -250,11 +260,13 @@ class BernoulliTest(tf.test.TestCase):
     for e_func in [test_b, special_energy]:
       with tf.GradientTape() as tape:
         actual_energy = e_func(test_bitstrings)
-      actual_energy_grad = tape.jacobian(actual_energy, test_b.trainable_variables)
+      actual_energy_grad = tape.jacobian(actual_energy,
+                                         test_b.trainable_variables)
       expected_energy = [
-        test_vars[0] + test_vars[1] + test_vars[2],
-        -test_vars[0] + test_vars[1] + test_vars[2],
-        test_vars[0] + test_vars[1] - test_vars[2]]
+          test_vars[0] + test_vars[1] + test_vars[2],
+          -test_vars[0] + test_vars[1] + test_vars[2],
+          test_vars[0] + test_vars[1] - test_vars[2]
+      ]
       self.assertAllClose(actual_energy, expected_energy)
       self.assertAllClose(actual_energy_grad, [test_spins])
 
@@ -285,10 +297,12 @@ class BernoulliTest(tf.test.TestCase):
         with tf.GradientTape() as tape:
           actual_energy = e_func(test_bitstrings)
 
-        expected_energy = tf.reduce_sum(tf.cast(test_spins, tf.float32) * thetas, -1)
+        expected_energy = tf.reduce_sum(
+            tf.cast(test_spins, tf.float32) * thetas, -1)
         self.assertAllClose(actual_energy, expected_energy)
 
-        actual_energy_grad = tape.jacobian(actual_energy, test_b.trainable_variables)
+        actual_energy_grad = tape.jacobian(actual_energy,
+                                           test_b.trainable_variables)
         self.assertAllClose(actual_energy_grad, [test_spins])
 
   def test_operator_shards(self):

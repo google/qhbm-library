@@ -27,7 +27,7 @@ from qhbmlib import energy_model
 def check_bitstring_exists(bitstring, bitstring_list):
   """Check if the given bitstring exists in the given list."""
   return tf.math.reduce_any(
-    tf.reduce_all(tf.math.equal(bitstring, bitstring_list), 1))
+      tf.reduce_all(tf.math.equal(bitstring, bitstring_list), 1))
 
 
 class BitstringSamplerTest(tf.test.TestCase):
@@ -39,7 +39,7 @@ class BitstringSamplerTest(tf.test.TestCase):
     def sample(dist, num_samples):
       """Ignores the input distribution and returns constants."""
       return tf.constant([[1] * self.num_bits]), tf.constant([num_samples])
-  
+
   def test_init(self):
     """Confirms a dummy class instantiates correctly."""
     expected_num_bits = random.choice(range(100))
@@ -52,7 +52,8 @@ class BitstringSamplerTest(tf.test.TestCase):
     """Confirms bad inputs are caught."""
     with self.assertRaisesRegex(TypeError, expected_regex="an integer"):
       _ = self.ConstantSampler("junk")
-    with self.assertRaisesRegex(ValueError, expected_regex="a positive integer"):
+    with self.assertRaisesRegex(
+        ValueError, expected_regex="a positive integer"):
       _ = self.ConstantSampler(-5)
 
 
@@ -108,26 +109,31 @@ class BernoulliSamplerTest(tf.test.TestCase):
 
       for bitstring in itertools.product([0, 1], repeat=2):
         self.assertTrue(
-          check_bitstring_exists(tf.constant(bitstring, dtype=tf.int8), bitstrings))
+            check_bitstring_exists(
+                tf.constant(bitstring, dtype=tf.int8), bitstrings))
 
       # Check that the fraction is approximately 0.25 (equal counts)
       self.assertAllClose(
-        [0.25] * 4,
-        [counts[i].numpy() / num_samples for i in range(4)],
-        atol=1e-3,
+          [0.25] * 4,
+          [counts[i].numpy() / num_samples for i in range(4)],
+          atol=1e-3,
       )
       test_b.kernel.assign(tf.constant([-1000.0, 1000.0]))
       num_samples = tf.constant(int(1e7), dtype=tf.int32)
       bitstrings, counts = sampler(test_b, num_samples)
       # check that we only get 01.
       self.assertFalse(
-        check_bitstring_exists(tf.constant([0, 0], dtype=tf.int8), bitstrings))
+          check_bitstring_exists(
+              tf.constant([0, 0], dtype=tf.int8), bitstrings))
       self.assertTrue(
-        check_bitstring_exists(tf.constant([0, 1], dtype=tf.int8), bitstrings))
+          check_bitstring_exists(
+              tf.constant([0, 1], dtype=tf.int8), bitstrings))
       self.assertFalse(
-        check_bitstring_exists(tf.constant([1, 0], dtype=tf.int8), bitstrings))
+          check_bitstring_exists(
+              tf.constant([1, 0], dtype=tf.int8), bitstrings))
       self.assertFalse(
-        check_bitstring_exists(tf.constant([1, 1], dtype=tf.int8), bitstrings))
+          check_bitstring_exists(
+              tf.constant([1, 1], dtype=tf.int8), bitstrings))
       self.assertAllEqual(counts, [num_samples])
 
 
@@ -138,7 +144,8 @@ class AnalyticSamplerTest(tf.test.TestCase):
     """Checks that sampler is initialized correctly."""
     num_bits = random.choice(range(1, 6))
     actual_sampler = energy_infer.AnalyticSampler(num_bits)
-    self.assertAllEqual(actual_sampler._all_bitstrings, list(itertools.product([0, 1], repeat=num_bits)))
+    self.assertAllEqual(actual_sampler._all_bitstrings,
+                        list(itertools.product([0, 1], repeat=num_bits)))
 
   def test_sample_bernoulli(self):
     """Confirms that bitstrings are sampled from Bernoulli as expected."""
@@ -153,9 +160,10 @@ class AnalyticSamplerTest(tf.test.TestCase):
 
     for bitstring in itertools.product([0, 1], repeat=num_bits):
       self.assertTrue(
-        check_bitstring_exists(tf.constant(bitstring, dtype=tf.int8), bitstrings))
+          check_bitstring_exists(
+              tf.constant(bitstring, dtype=tf.int8), bitstrings))
     actual_fractions = counts / num_samples
-    expected_fractions = [1/(2**num_bits)] * 2**num_bits
+    expected_fractions = [1 / (2**num_bits)] * 2**num_bits
     self.assertAllClose(actual_fractions, expected_fractions, atol=1e-3)
 
     # Biased distribution, compare to BernoulliSampler
@@ -166,8 +174,10 @@ class AnalyticSamplerTest(tf.test.TestCase):
     test_analytic_sampler = energy_infer.AnalyticSampler(num_bits)
     bernoulli_sampler = energy_infer.BernoulliSampler(num_bits)
     num_samples = tf.constant(int(1e7), dtype=tf.int32)
-    actual_bitstrings, actual_counts = test_analytic_sampler(test_b, num_samples)
-    expected_bitstrings, expected_counts = bernoulli_sampler(test_b, num_samples)
+    actual_bitstrings, actual_counts = test_analytic_sampler(
+        test_b, num_samples)
+    expected_bitstrings, expected_counts = bernoulli_sampler(
+        test_b, num_samples)
 
     # Ensure the sampled bitstrings are the same set.
     for b in itertools.product([0, 1], repeat=num_bits):
@@ -180,7 +190,8 @@ class AnalyticSamplerTest(tf.test.TestCase):
     for i, expected_b in enumerate(expected_bitstrings):
       for j, actual_b in enumerate(actual_bitstrings):
         if tf.math.reduce_all(tf.math.equal(expected_b, actual_b)):
-          self.assertAllClose(expected_counts[i]/actual_counts[j], 1.0, atol=1e-3)
+          self.assertAllClose(
+              expected_counts[i] / actual_counts[j], 1.0, atol=1e-3)
 
   def test_sample_mlp(self):
     """Confirms that bitstrings are sampled from MLP as expected."""
@@ -190,7 +201,8 @@ class AnalyticSamplerTest(tf.test.TestCase):
     units = random.sample(range(1, 100), num_layers)
     activations = ["relu"] * num_layers
     initializer = tf.keras.initializers.Constant(0)
-    test_b = energy_model.MLP(list(range(num_bits)), units, activations, initializer, initializer)
+    test_b = energy_model.MLP(
+        list(range(num_bits)), units, activations, initializer, initializer)
 
     test_analytic_sampler = energy_infer.AnalyticSampler(num_bits)
     num_samples = tf.constant(int(1e7), dtype=tf.int32)
@@ -198,9 +210,10 @@ class AnalyticSamplerTest(tf.test.TestCase):
 
     for bitstring in itertools.product([0, 1], repeat=num_bits):
       self.assertTrue(
-        check_bitstring_exists(tf.constant(bitstring, dtype=tf.int8), bitstrings))
+          check_bitstring_exists(
+              tf.constant(bitstring, dtype=tf.int8), bitstrings))
     actual_fractions = counts / num_samples
-    expected_fractions = [1/(2**num_bits)] * 2**num_bits
+    expected_fractions = [1 / (2**num_bits)] * 2**num_bits
     self.assertAllClose(actual_fractions, expected_fractions, atol=1e-3)
 
 

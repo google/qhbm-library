@@ -28,9 +28,7 @@ from qhbmlib import util
 class BitstringSampler(tf.keras.Model, abc.ABC):
   """Class for sampling from BitstringDistributions."""
 
-  def __init__(self,
-               num_bits: int,
-               name: Union[None, str]=None):
+  def __init__(self, num_bits: int, name: Union[None, str] = None):
     """Initializes a BitstringDistribution.
 
     Args:
@@ -72,7 +70,7 @@ class BernoulliSampler(BitstringSampler):
     samples = tfp.distributions.Bernoulli(
         logits=2 * dist.kernel, dtype=tf.int8).sample(num_samples)
     return util.unique_bitstrings_with_counts(samples)
-  
+
 
 class AnalyticSampler(BitstringSampler):
   """Sampler which calculates all probabilities and samples as categorical."""
@@ -85,7 +83,7 @@ class AnalyticSampler(BitstringSampler):
     """
     super().__init__(num_bits, name=name)
     self._all_bitstrings = tf.constant(
-      list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
+        list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
 
   def _energies(self, dist: energy_model.BitstringDistribution):
     """Returns the current energy of every bitstring."""
@@ -94,7 +92,7 @@ class AnalyticSampler(BitstringSampler):
   def sample(self, dist, num_samples):
     """See base class docstring."""
     samples = tf.gather(
-      self._all_bitstrings,
-      tfp.distributions.Categorical(logits=-1 *
-                                    self._energies(dist)).sample(num_samples))
+        self._all_bitstrings,
+        tfp.distributions.Categorical(logits=-1 *
+                                      self._energies(dist)).sample(num_samples))
     return util.unique_bitstrings_with_counts(samples)

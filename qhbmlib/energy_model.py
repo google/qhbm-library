@@ -24,9 +24,7 @@ import tensorflow as tf
 class BitstringDistribution(tf.keras.Model, abc.ABC):
   """Class for representing a probability distribution over bitstrings."""
 
-  def __init__(self,
-               bits: List[int],
-               name: Union[None, str]=None):
+  def __init__(self, bits: List[int], name: Union[None, str] = None):
     """Initializes a BitstringDistribution.
 
     Args:
@@ -92,11 +90,16 @@ class MLP(BitstringDistribution):
     super().__init__(bits, name=name)
     self._hidden_layers = [
         tf.keras.layers.Dense(
-          u, activation=a, kernel_initializer=kernel_initializer, bias_initializer=bias_initializer)
+            u,
+            activation=a,
+            kernel_initializer=kernel_initializer,
+            bias_initializer=bias_initializer)
         for u, a in zip(units, activations)
     ]
     self._energy_layer = tf.keras.layers.Dense(
-      1, kernel_initializer=kernel_initializer, bias_initializer=bias_initializer)
+        1,
+        kernel_initializer=kernel_initializer,
+        bias_initializer=bias_initializer)
     self.build([1, self.num_bits])
 
   @property
@@ -164,7 +167,7 @@ class Bernoulli(PauliBitstringDistribution):
         shape=[self.num_bits],
         initializer=initializer,
         trainable=True)
- 
+
   @property
   def trainable_variables(self):
     return [self.kernel]
