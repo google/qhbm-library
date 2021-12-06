@@ -28,8 +28,16 @@ class QuantumCircuit(tf.keras.Model, abc.ABC)
 
   @property
   @abc.abstractmethod
-  def symbols_and_values(self):
-    """Pair of symbols and their values for this circuit."""
+  def symbols(self):
+    """1D `tf.Tensor` of strings which are the parameters of circuit."""
+    raise NotImplementedError()
+
+  @property
+  @abc.abstractmethod
+  def values(self):
+    """1D `tf.Tensor` of real numbers specifying the current values of the
+       circuit parameters, such that `self.values[i]` is the current value of
+       `self.symbols[i]` in `self.pqc` and `self.inverse_pqc`."""
     raise NotImplementedError()
 
   @property
@@ -105,8 +113,12 @@ class DirectQuantumCircuit(QuantumCircuit):
     return self._qubits
 
   @property
-  def symbols_and_values(self):
-    return self._symbols, self.values
+  def symbols(self):
+    return self._symbols
+
+  @property
+  def values(self):
+    return self.values
 
   @property
   def pqc(self):
@@ -126,22 +138,18 @@ class DirectQuantumCircuit(QuantumCircuit):
     self.values = value[0]
 
   def copy(self):
-    qnn = DirectQuantumCircuit(
-        tfq.from_tensor(self.pqc(resolve=False))[0],
+    new_qnn = DirectQuantumCircuit(
+        tfq.from_tensor(self.pqc)[0],
         name=self.name)
-    qnn.values.assign(self.values)
-    return qnn
+    new_qnn.values.assign(self.values)
+    return new_qnn
 
   def __add__(self, other):
     """DirectQuantumCircuit which is pqc of `other` appended to pqc of `self`"""
-    if len(self.qubits) >= len(other.qubits):
-      copy_qnn = self
-    else:
-      copy_qnn = other
     new_pqc = tfq.append_circuit(self.pqc, other.pqc)
     new_symbols = tf.concat([self.symbols, other.symbols], 0)
     new_values = tf.concat([self.values, other.values], 0)
-    new_qnn = QNN(
+    new_qnn = DirectQuantumCircuit(
         tfq.from_tensor(new_pqc)[0],
         symbols=new_symbols,
         values=new_values,
