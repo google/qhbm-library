@@ -27,6 +27,7 @@ import tensorflow_probability as tfp
 import tensorflow_quantum as tfq
 
 from qhbmlib import circuit_infer
+from qhbmlib import circuit_model
 from tests import test_util
 
 # Global tolerance, set for float32.
@@ -82,16 +83,19 @@ class ExpectationTest(tf.test.TestCase):
 
   def test_init(self):
     """Confirms Expectation is initialized correctly."""
+    expected_qubits = cirq.GridQubit.rect(1, 100)
     expected_backend = "noiseless"
     expected_differentiator = None
     expected_name = "TestOE"
     actual_exp = circuit_infer.Expectation(
-        backend=self.backend,
-        differentiator=self.differentiator,
-        name=self.name)
+        expected_qubits,
+        backend=expected_backend,
+        differentiator=expected_differentiator,
+        name=expected_name)
+    self.assertAllEqual(actual_exp.qubits, expected_qubits)
     self.assertEqual(actual_exp.name, expected_name)
     self.assertEqual(actual_exp.backend, expected_backend)
-    self.assertEqual(actual_exp.differentiation, expected_differentiator)
+    self.assertEqual(actual_exp.differentiator, expected_differentiator)
 
   def test_expectation(self):
     """Confirms basic correct expectation values and derivatives.
@@ -149,7 +153,7 @@ class ExpectationTest(tf.test.TestCase):
     bitstrings_raw = []
     for _ in range(num_bitstrings):
       bitstrings_raw.append([])
-      for _ in range(self.num_qubits):
+      for _ in range(num_qubits):
         if random.choice([True, False]):
           bitstrings_raw[-1].append(0)
         else:
@@ -167,24 +171,26 @@ class ExpectationTest(tf.test.TestCase):
     expected_z_exps_grad = []
     expected = [
       expected_x_exps,
-      expected_x_exps_grad,
       expected_y_exps,
-      expected_y_exps_grad,
       expected_z_exps,
-      expected_z_exps_grad
+    ]
+    expected_grad = [
+      expected_x_exps_grad,
+      expected_y_exps_grad,
+      expected_z_exps_grad,
     ]
     sin_pi_p = math.sin(math.pi * p_qnn.values[0])
     cos_pi_p = math.cos(math.pi * p_qnn.values[0])
     for bits in bitstrings_raw:
-      for exps in expected:
+      for exps in expected + expected_grads:
         exps.append([])
       for s in bits:
-        x_exps_true[-1].append(0)
-        x_exps_grad_true[-1].append(0)
-        y_exps_true[-1].append(-((-1.0)**s) * sin_pi_p)
-        y_exps_grad_true[-1].append(-((-1.0)**s) * math.pi * cos_pi_p)
-        z_exps_true[-1].append(((-1.0)**s) * cos_pi_p)
-        z_exps_grad_true[-1].append(-((-1.0)**s) * math.pi * sin_pi_p)
+        expected_x_exps[-1].append(0)
+        expected_x_exps_grad[-1].append(0)
+        expected_y_exps[-1].append(-((-1.0)**s) * sin_pi_p)
+        expected_y_exps_grad[-1].append(-((-1.0)**s) * math.pi * cos_pi_p)
+        expected_z_exps[-1].append(((-1.0)**s) * cos_pi_p)
+        expected_z_exps_grad[-1].append(-((-1.0)**s) * math.pi * sin_pi_p)
     e_counts = tf.cast(tf.expand_dims(counts, 1), tf.float32)
     total_counts = tf.cast(tf.reduce_sum(counts), tf.float32)
     expected_reduced = []
@@ -195,25 +201,19 @@ class ExpectationTest(tf.test.TestCase):
     x_ops = tfq.convert_to_tensor([1 * cirq.X(q) for q in self.raw_qubits])
     y_ops = tfq.convert_to_tensor([1 * cirq.Y(q) for q in self.raw_qubits])
     z_ops = tfq.convert_to_tensor([1 * cirq.Z(q) for q in self.raw_qubits])
+    all_ops = [x_ops, y_ops, z_ops]
 
     # Check with reduce True (this is the default)
     with tf.GradientTape(persistent=True) as tape:
-      x_exps_test = exp_infer.expectation(p_qnn, bitstrings, counts, x_ops)
-      y_exps_test = exp_infer.expectation(p_qnn, bitstrings, counts, y_ops)
-      z_exps_test = exp_infer.expectation(p_qnn, bitstrings, counts, z_ops)
-    x_exps_grad_test = tf.squeeze(tape.jacobian(x_exps_test, p_qnn.values))
-    y_exps_grad_test = tf.squeeze(tape.jacobian(y_exps_test, p_qnn.values))
-    z_exps_grad_test = tf.squeeze(tape.jacobian(z_exps_test, p_qnn.values))
+      actual_exps = []
+      for op in ops:
+        actual_exps.append(exp_infer.expectation(p_qnn, bitstrings, counts, op))
+    actual_exps_grad = [tf.squeeze(tape.jacobian(exps, p_qnn.values)) for exps in actual_exps]
     del (tape)
-    self.assertAllClose(x_exps_test, x_exps_true_reduced, atol=ATOL)
-    self.assertAllClose(
-        x_exps_grad_test, x_exps_grad_true_reduced, atol=GRAD_ATOL)
-    self.assertAllClose(y_exps_test, y_exps_true_reduced, atol=ATOL)
-    self.assertAllClose(
-        y_exps_grad_test, y_exps_grad_true_reduced, atol=GRAD_ATOL)
-    self.assertAllClose(z_exps_test, z_exps_true_reduced, atol=ATOL)
-    self.assertAllClose(
-        z_exps_grad_test, z_exps_grad_true_reduced, atol=GRAD_ATOL)
+    for a, e in zip(actual_exps, expected):
+      self.assertAllClose(a, e, atol=ATOL)
+    for a, e in zip(actual_exps_grad, expected_grad):
+      self.assertAllClose(a, e, atol=GRAD_ATOL)
 
     # Check with reduce False
     with tf.GradientTape(persistent=True) as tape:

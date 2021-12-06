@@ -14,7 +14,10 @@
 # ==============================================================================
 """Tools for inference on quantum circuits."""
 
+from typing import List
+
 import cirq
+import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
@@ -96,7 +99,7 @@ class Expectation(tf.keras.Model):
           circuits,
           symbol_names=symbol_names,
           symbol_values=symbol_values,
-          operators=operators
+          operators=operators,
           repetitions=repetitions,
         )
     self._expectation_function = _expectation_function
