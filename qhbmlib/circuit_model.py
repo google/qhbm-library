@@ -14,8 +14,15 @@
 # ==============================================================================
 """Tools for defining quantum circuit models."""
 
+import abc
 
-class QuantumCircuit(tf.keras.Model, abc.ABC)
+import cirq
+import numpy as np
+import tensorflow as tf
+import tensorflow_quantum as tfq
+
+
+class QuantumCircuit(tf.keras.Model, abc.ABC):
   """Class for representing quantum circuits."""
 
   def __init__(self, name=None):
@@ -64,7 +71,8 @@ class QuantumCircuit(tf.keras.Model, abc.ABC)
 
 class DirectQuantumCircuit(QuantumCircuit):
   """QuantumCircuit with direct map from model variables to circuit params."""
-    def __init__(
+
+  def __init__(
       self,
       pqc,
       *,
@@ -100,7 +108,7 @@ class DirectQuantumCircuit(QuantumCircuit):
 
     if values is None:
       values = initializer(shape=[tf.shape(self._symbols)[0]])
-    self.values = tf.Variable(
+    self._values = tf.Variable(
         initial_value=values, name=f"{self.name}_pqc_values")
 
     self._pqc = tfq.convert_to_tensor([pqc])
@@ -118,7 +126,7 @@ class DirectQuantumCircuit(QuantumCircuit):
 
   @property
   def values(self):
-    return self.values
+    return self._values
 
   @property
   def pqc(self):
@@ -130,18 +138,17 @@ class DirectQuantumCircuit(QuantumCircuit):
 
   @property
   def trainable_variables(self):
-    return super().trainable_variables
+    return [self.values]
 
   @trainable_variables.setter
-  @abc.abstractmethod
   def trainable_variables(self, value):
-    self.values = value[0]
+    self._values = value[0]
 
   def copy(self):
     new_qnn = DirectQuantumCircuit(
         tfq.from_tensor(self.pqc)[0],
         name=self.name)
-    new_qnn.values.assign(self.values)
+    new_qnn._values.assign(self.values)
     return new_qnn
 
   def __add__(self, other):

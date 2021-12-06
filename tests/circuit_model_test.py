@@ -14,20 +14,14 @@
 # ==============================================================================
 """Tests for the circuit_model module."""
 
-import random
-import itertools
-from absl import logging
-
 import cirq
 import math
 import numpy as np
 import sympy
 import tensorflow as tf
-import tensorflow_probability as tfp
 import tensorflow_quantum as tfq
 
-from qhbmlib import qnn
-from tests import test_util
+from qhbmlib import circuit_model
 
 
 def _pystr(x):
@@ -116,14 +110,10 @@ class DirectQuantumCircuitTest(tf.test.TestCase):
       _ = actual_qnn**-2
 
     inverse_qnn = actual_qnn**-1
-    actual_pqc = tfq.from_tensor(inverse_qnn.pqc(resolve=True))
-    expected_pqc = tfq.from_tensor(
-        tfq.resolve_parameters(self.inverse_pqc_tfq, self.symbols,
-                               tf.expand_dims(actual_qnn.values, 0)))
-    actual_inverse_pqc = tfq.from_tensor(inverse_qnn.inverse_pqc(resolve=True))
-    expected_inverse_pqc = tfq.from_tensor(
-        tfq.resolve_parameters(self.pqc_tfq, self.symbols,
-                               tf.expand_dims(actual_qnn.values, 0)))
+    actual_pqc = tfq.from_tensor(inverse_qnn.pqc)
+    expected_pqc = tfq.from_tensor(self.inverse_pqc_tfq)
+    actual_inverse_pqc = tfq.from_tensor(inverse_qnn.inverse_pqc)
+    expected_inverse_pqc = tfq.from_tensor(self.pqc_tfq)
     self.assertEqual(actual_pqc, expected_pqc)
     self.assertEqual(actual_inverse_pqc, expected_inverse_pqc)
     # Ensure swapping circuits was actually meaningful
@@ -153,7 +143,6 @@ class DirectQuantumCircuitTest(tf.test.TestCase):
   def test_trainable_variables(self):
     test_qnn = circuit_model.DirectQuantumCircuit(
         self.pqc,
-        is_analytic=True,
         name=self.name)
 
     self.assertAllEqual(test_qnn.values, test_qnn.trainable_variables[0])
