@@ -92,10 +92,19 @@ class QHBM(tf.keras.Model):
     """TODO: add gradient function"""
     if isinstance(operators, QHBM):
       circuits, counts = self.circuits(num_samples, resolve=False)
-      return operators.operator_expectation((circuits, counts), symbol_names=self.qnn.symbols, symbol_values=self.qnn.values, mask=mask, reduce=reduce)
+      return operators.operator_expectation((circuits, counts),
+                                            symbol_names=self.qnn.symbols,
+                                            symbol_values=self.qnn.values,
+                                            mask=mask,
+                                            reduce=reduce)
     bitstrings, counts = self.ebm.sample(num_samples)
     return self.qnn.expectation(
-        bitstrings, operators, counts=counts, symbol_names=self.qnn.symbols, symbol_values=self.qnn.values, reduce=reduce)
+        bitstrings,
+        operators,
+        counts=counts,
+        symbol_names=self.qnn.symbols,
+        symbol_values=self.qnn.values,
+        reduce=reduce)
 
   def operator_expectation(self,
                            density_operator,
@@ -119,7 +128,12 @@ class QHBM(tf.keras.Model):
 
     if self.ebm.has_operator:
       expectation_shards = self.qnn.pulled_back_expectation(
-          circuits, self.operator_shards, counts=counts, symbol_names=symbol_names, symbol_values=symbol_values, reduce=reduce)
+          circuits,
+          self.operator_shards,
+          counts=counts,
+          symbol_names=symbol_names,
+          symbol_values=symbol_values,
+          reduce=reduce)
       return self.ebm.operator_expectation(expectation_shards)
     bitstrings, counts = self.qnn.pulled_back_sample(
         circuits, counts=counts, mask=mask)

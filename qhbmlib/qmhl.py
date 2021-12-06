@@ -17,7 +17,11 @@
 import tensorflow as tf
 
 
-def qmhl(model_qhbm, target_circuits=None, target_counts=None, target_qhbm=None, num_samples=None):
+def qmhl(model_qhbm,
+         target_circuits=None,
+         target_counts=None,
+         target_qhbm=None,
+         num_samples=None):
   """Calculate the QMHL loss of the qhbm model against the target.
 
   This loss is differentiable with respect to the trainable variables of the

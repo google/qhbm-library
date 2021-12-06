@@ -298,7 +298,13 @@ class QNN(tf.keras.Model):
         expectation values.
       """
     circuits = self.circuits(bitstrings, resolve=False)
-    return self._expectation(circuits, operators, counts=counts, symbol_names=self.symbols, symbol_values=self.values, reduce=reduce)
+    return self._expectation(
+        circuits,
+        operators,
+        counts=counts,
+        symbol_names=self.symbols,
+        symbol_values=self.values,
+        reduce=reduce)
 
   def pulled_back_circuits(self, circuits, resolve=True):
     """Returns the pulled back circuits for this QNN given input quantum data.
