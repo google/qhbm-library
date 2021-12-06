@@ -90,7 +90,6 @@ class MLP(BitstringDistribution):
         initialize the biases of all layers.
     """
     super().__init__(bits, name=name)
-    self._input_activations = activations
     self._hidden_layers = [
         tf.keras.layers.Dense(
           u, activation=a, kernel_initializer=kernel_initializer, bias_initializer=bias_initializer)
@@ -123,15 +122,12 @@ class MLP(BitstringDistribution):
       new_mlp.trainable_variables[i].assign(self.trainable_variables[i])
     return new_mlp
 
-  def call(self, bitstrings):
+  def energy(self, bitstrings):
     x = bitstrings
     for hidden_layer in self._hidden_layers:
       x = hidden_layer(x)
     x = self._energy_layer(x)
     return tf.squeeze(x, -1)
-
-  def energy(self, bitstrings):
-    return self(bitstrings)
 
 
 class PauliBitstringDistribution(BitstringDistribution):
