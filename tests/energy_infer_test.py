@@ -15,6 +15,7 @@
 """Tests for the energy_infer module."""
 
 import itertools
+import random
 
 import cirq
 import tensorflow as tf
@@ -23,14 +24,38 @@ from qhbmlib import energy_infer
 from qhbmlib import energy_model
 
 
+class BitstringSamplerTest(tf.test.TestCase):
+  """Tests sampler base class."""
+
+  class ConstantSampler(energy_infer.BitstringSampler):
+    """Dummy class for testing."""
+
+    def sample(dist, num_samples):
+      """Ignores the input distribution and returns constants."""
+      return tf.constant([[1] * self.num_bits]), tf.constant([num_samples])
+  
+  def test_init(self):
+    """Confirms a dummy class instantiates correctly."""
+    expected_num_bits = random.choice(range(100))
+    expected_name = "test_constant_sampler"
+    actual_sampler = self.ConstantSampler(expected_num_bits, expected_name)
+    self.assertEqual(actual_sampler.num_bits, expected_num_bits)
+    self.assertEqual(actual_sampler.name, expected_name)
+
+  def test_init_error(self):
+    """Confirms bad inputs are caught."""
+    with self.assertRaisesRegex(TypeError, expected_regex="an integer"):
+      _ = self.ConstantSampler("junk")
+    with self.assertRaisesRegex(ValueError, expected_regex="a positive integer"):
+      _ = self.ConstantSampler(-5)
+
+
 class BernoulliSamplerTest(tf.test.TestCase):
   """Tests the BernoulliSampler class."""
 
-  num_bits = 5
-
-  def test_sampler_bernoulli(self):
+  def test_sample(self):
     """Confirm that bitstrings are sampled as expected."""
-    test_b_sampler = energy_infer.BernoulliSampler()
+    test_b_sampler = energy_infer.BernoulliSampler(1)
 
     @tf.function
     def test_sampler_traced(dist, num_samples):
@@ -62,7 +87,14 @@ class BernoulliSamplerTest(tf.test.TestCase):
       # check that we got only one bitstring
       self.assertAllEqual(bitstrings, [[1]])
 
-      # Two bit tests.
+    # Two bit tests.
+    test_b_sampler = energy_infer.BernoulliSampler(2)
+
+    @tf.function
+    def test_sampler_traced(dist, num_samples):
+      return test_b_sampler(dist, num_samples)
+
+    for sampler in [test_b_sampler, test_sampler_traced]:
       test_b = energy_model.Bernoulli([1, 2])
       test_b.kernel.assign(tf.constant([0.0, 0.0]))
       num_samples = tf.constant(int(1e7), dtype=tf.int32)
@@ -102,30 +134,23 @@ class BernoulliSamplerTest(tf.test.TestCase):
       self.assertAllEqual(counts, [num_samples])
 
 
-# class MLPTest(tf.test.TestCase):
-#   num_bits = 5
+class AnalyticSamplerTest(tf.test.TestCase):
+  """Tests the AnalyticSampler class."""
 
-#   def test_trainable_variables_mlp(self):
-#     test_mlp = ebm.MLP(
-#         self.num_bits, [4, 3, 2], activations=['relu', 'tanh', 'sigmoid'])
+  def test_init(self):
+    """Checks that sampler is initialized correctly."""
+    num_bits = random.choice(range(1, 6))
+    actual_sampler = energy_infer.AnalyticSampler(num_bits)
+    self.assertAllEqual(actual_sampler._all_bitstrings, list(itertools.product([0, 1], repeat=num_bits)))
 
-#     i = 0
-#     for layer in test_mlp.layers:
-#       self.assertAllEqual(layer.kernel, test_mlp.trainable_variables[i])
-#       self.assertAllEqual(layer.bias, test_mlp.trainable_variables[i + 1])
-#       i += 2
+  def test_sample_bernoulli(self):
+    """Confirms that bitstrings are sampled from Bernoulli as expected."""    
+    pass
 
-#     variables = [
-#         tf.random.uniform(tf.shape(v)) for v in test_mlp.trainable_variables
-#     ]
-#     test_mlp.trainable_variables = variables
-#     for i in range(len(test_mlp.trainable_variables)):
-#       self.assertAllEqual(variables[i], test_mlp.trainable_variables[i])
 
-#     variables = [tf.Variable(v) for v in variables]
-#     test_mlp.trainable_variables = variables
-#     for i in range(len(test_mlp.trainable_variables)):
-#       self.assertAllEqual(variables[i], test_mlp.trainable_variables[i])
+  def test_sample_mlp(self):
+    """Confirms that bitstrings are sampled from MLP as expected."""    
+    pass
 
 
 if __name__ == "__main__":

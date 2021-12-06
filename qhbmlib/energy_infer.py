@@ -15,6 +15,8 @@
 """Tools for inference on energy functions."""
 
 import abc
+import itertools
+from typing import List, Union
 
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -25,6 +27,26 @@ from qhbmlib import util
 
 class BitstringSampler(tf.keras.Model, abc.ABC):
   """Class for sampling from BitstringDistributions."""
+
+  def __init__(self,
+               num_bits: int,
+               name: Union[None, str]=None):
+    """Initializes a BitstringDistribution.
+
+    Args:
+      num_bits: Number of bits in drawn samples.
+      name: Optional name for the model.
+    """
+    super().__init__(name=name)
+    if not isinstance(num_bits, int):
+      raise TypeError("`num_bits` must be an integer.")
+    if num_bits < 1:
+      raise ValueError("`num_bits` must be a positive integer.")
+    self._num_bits = num_bits
+
+  @property
+  def num_bits(self):
+    return self._num_bits
 
   @abc.abstractmethod
   def sample(self, dist: energy_model.BitstringDistribution, num_samples):
@@ -46,7 +68,7 @@ class BernoulliSampler(BitstringSampler):
   """Sampler for Bernoulli distributions."""
 
   def sample(self, dist: energy_model.Bernoulli, num_samples: int):
-    """See description in base class."""
+    """See base class docstring."""
     samples = tfp.distributions.Bernoulli(
         logits=2 * dist.kernel, dtype=tf.int8).sample(num_samples)
     return util.unique_bitstrings_with_counts(samples)
@@ -55,13 +77,13 @@ class BernoulliSampler(BitstringSampler):
 class AnalyticSampler(BitstringSampler):
   """Sampler which calculates all probabilities and samples as categorical."""
 
-  def __init__(self, num_bits: int):
+  def __init__(self, num_bits, name=None):
     """Instantiates an AnalyticSampler.
 
-    Args:
-      num_bits: number of bits on which the BitstringDistribution to be sampled
-        is supported.
+    Internally, this class saves all possible bitstrings as a tensor,
+    whose energies are calculated relative to input distributions for sampling.
     """
+    super().__init__(num_bits, name=name)
     self._all_bitstrings = tf.constant(
       list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
 
@@ -70,6 +92,7 @@ class AnalyticSampler(BitstringSampler):
     return dist.energy(self._all_bitstrings)
 
   def sample(self, dist, num_samples):
+    """See base class docstring."""
     samples = tf.gather(
       self._all_bitstrings,
       tfp.distributions.Categorical(logits=-1 *
