@@ -17,7 +17,7 @@
 import tensorflow as tf
 
 
-def qmhl(qhbm_model, target_circuits, target_counts):
+def qmhl(model_qhbm, target_circuits=None, target_counts=None, target_qhbm=None, num_samples=None):
   """Calculate the QMHL loss of the qhbm model against the target.
 
   This loss is differentiable with respect to the trainable variables of the
@@ -35,45 +35,48 @@ def qmhl(qhbm_model, target_circuits, target_counts):
     loss: Quantum cross entropy between the target and model.
   """
 
+  if target_qhbm is not None and num_samples is not None:
+    target_circuits, target_counts = target_qhbm.circuits(num_samples)
+
   @tf.custom_gradient
   def loss(trainable_variables):
     # log_partition estimate
 
-    if qhbm_model.ebm.is_analytic:
-      log_partition_function = qhbm_model.log_partition_function()
+    if model_qhbm.ebm.is_analytic:
+      log_partition_function = model_qhbm.log_partition_function()
     else:
-      bitstrings, _ = qhbm_model.ebm.sample(tf.reduce_sum(target_counts))
-      energies = qhbm_model.ebm.energy(bitstrings)
+      bitstrings, _ = model_qhbm.ebm.sample(tf.reduce_sum(target_counts))
+      energies = model_qhbm.ebm.energy(bitstrings)
       log_partition_function = tf.math.reduce_logsumexp(-1 * energies)
 
     # pulled back expectation of energy operator
-    qnn_bitstrings, qnn_counts = qhbm_model.qnn.pulled_back_sample(
+    qnn_bitstrings, qnn_counts = model_qhbm.qnn.pulled_back_sample(
         target_circuits, target_counts)
     qnn_probs = tf.cast(qnn_counts, tf.float32) / tf.cast(
         tf.reduce_sum(qnn_counts), tf.float32)
-    energies = qhbm_model.ebm.energy(qnn_bitstrings)
+    energies = model_qhbm.ebm.energy(qnn_bitstrings)
     avg_energy = tf.reduce_sum(qnn_probs * energies)
 
     def grad(grad_y, variables=None):
       """Gradients are computed using estimators from the QHBM paper."""
       # Thetas derivative.
-      ebm_bitstrings, ebm_counts = qhbm_model.ebm.sample(
+      ebm_bitstrings, ebm_counts = model_qhbm.ebm.sample(
           tf.reduce_sum(target_counts))
       ebm_probs = tf.cast(ebm_counts, tf.float32) / tf.cast(
           tf.reduce_sum(ebm_counts), tf.float32)
       with tf.GradientTape() as tape:
-        tape.watch(qhbm_model.ebm.trainable_variables)
-        qnn_energies = qhbm_model.ebm.energy(qnn_bitstrings)
+        tape.watch(model_qhbm.ebm.trainable_variables)
+        qnn_energies = model_qhbm.ebm.energy(qnn_bitstrings)
       # jacobian is a list over thetas, with ith entry a tensor of shape
       # [tf.shape(qnn_energies)[0], tf.shape(thetas[i])[0]]
       qnn_energy_jac = tape.jacobian(qnn_energies,
-                                     qhbm_model.ebm.trainable_variables)
+                                     model_qhbm.ebm.trainable_variables)
 
       with tf.GradientTape() as tape:
-        tape.watch(qhbm_model.ebm.trainable_variables)
-        ebm_energies = qhbm_model.ebm.energy(ebm_bitstrings)
+        tape.watch(model_qhbm.ebm.trainable_variables)
+        ebm_energies = model_qhbm.ebm.energy(ebm_bitstrings)
       ebm_energy_jac = tape.jacobian(ebm_energies,
-                                     qhbm_model.ebm.trainable_variables)
+                                     model_qhbm.ebm.trainable_variables)
 
       # contract over bitstring weights
       grad_ebm = [
@@ -87,13 +90,13 @@ def qmhl(qhbm_model, target_circuits, target_counts):
       ]
 
       # Phis derivative.
-      if qhbm_model.ebm.has_operator:
+      if model_qhbm.ebm.has_operator:
         with tf.GradientTape() as tape:
-          tape.watch(qhbm_model.qnn.trainable_variables)
-          energy_shards = qhbm_model.qnn.pulled_back_expectation(
-              target_circuits, target_counts, qhbm_model.operator_shards)
-          energy = qhbm_model.ebm.operator_expectation(energy_shards)
-        grad_qnn = tape.gradient(energy, qhbm_model.qnn.trainable_variables)
+          tape.watch(model_qhbm.qnn.trainable_variables)
+          energy_shards = model_qhbm.qnn.pulled_back_expectation(
+              target_circuits, target_counts, model_qhbm.operator_shards)
+          energy = model_qhbm.ebm.operator_expectation(energy_shards)
+        grad_qnn = tape.gradient(energy, model_qhbm.qnn.trainable_variables)
         grad_qnn = [grad_y * g for g in grad_qnn]
       else:
         raise NotImplementedError(
@@ -105,4 +108,4 @@ def qmhl(qhbm_model, target_circuits, target_counts):
 
     return avg_energy + log_partition_function, grad
 
-  return loss(qhbm_model.trainable_variables)
+  return loss(model_qhbm.trainable_variables)

@@ -74,19 +74,61 @@ class QHBM(tf.keras.Model):
   def copy(self):
     return QHBM(self.ebm.copy(), self.qnn.copy(), name=self.name)
 
-  def circuits(self, num_samples):
-    bitstrings, counts = self.ebm.sample(num_samples)
-    circuits = self.qnn.circuits(bitstrings)
-    return circuits, counts
+  def circuits(self, num_samples, unique=True, resolve=True):
+    if unique:
+      bitstrings, counts = self.ebm.sample(num_samples, unique=unique)
+      circuits = self.qnn.circuits(bitstrings, resolve=resolve)
+      return circuits, counts
+    bitstrings = self.ebm.sample(num_samples, unique=unique)
+    circuits = self.qnn.circuits(bitstrings, resolve=resolve)
+    return circuits
 
   def sample(self, num_samples, mask=True, reduce=True, unique=True):
     bitstrings, counts = self.ebm.sample(num_samples)
     return self.qnn.sample(
-        bitstrings, counts, mask=mask, reduce=reduce, unique=unique)
+        bitstrings, counts=counts, mask=mask, reduce=reduce, unique=unique)
 
-  def expectation(self, operators, num_samples, reduce=True):
+  def expectation(self, operators, num_samples, mask=True, reduce=True):
+    """TODO: add gradient function"""
+    if isinstance(operators, QHBM):
+      circuits, counts = self.circuits(num_samples, resolve=False)
+      return operators.operator_expectation((circuits, counts), symbol_names=self.qnn.symbols, symbol_values=self.qnn.values, mask=mask, reduce=reduce)
     bitstrings, counts = self.ebm.sample(num_samples)
-    return self.qnn.expectation(bitstrings, counts, operators, reduce=reduce)
+    return self.qnn.expectation(
+        bitstrings, operators, counts=counts, symbol_names=self.qnn.symbols, symbol_values=self.qnn.values, reduce=reduce)
+
+  def operator_expectation(self,
+                           density_operator,
+                           num_samples=None,
+                           symbol_names=None,
+                           symbol_values=None,
+                           reduce=True,
+                           mask=True):
+    """TODO: add gradient function"""
+    if isinstance(density_operator, tf.string):
+      circuits = density_operator
+      counts = None
+    elif isinstance(density_operator, tuple):
+      circuits, counts = density_operator
+    elif isinstance(density_operator, QHBM):
+      circuits, counts = density_operator.circuits(num_samples, resolve=False)
+      symbol_names = density_operator.qnn.symbols
+      symbol_values = density_operator.qnn.values
+    else:
+      raise TypeError()
+
+    if self.ebm.has_operator:
+      expectation_shards = self.qnn.pulled_back_expectation(
+          circuits, self.operator_shards, counts=counts, symbol_names=symbol_names, symbol_values=symbol_values, reduce=reduce)
+      return self.ebm.operator_expectation(expectation_shards)
+    bitstrings, counts = self.qnn.pulled_back_sample(
+        circuits, counts=counts, mask=mask)
+    energies = self.ebm.energy(bitstrings)
+    if reduce:
+      probs = tf.cast(counts, tf.float32) / tf.cast(
+          tf.reduce_sum(counts), tf.float32)
+      return tf.reduce_sum(probs * energies)
+    return energies
 
   def probabilities(self):
     return self.ebm.probabilities()
@@ -111,10 +153,12 @@ class QHBM(tf.keras.Model):
 
   def fidelity(self, sigma: tf.Tensor):
     """TODO: convert to tf.keras.metric.Metric
+
     Calculate the fidelity between a QHBM and a density matrix.
         Args:
           sigma: 2-D `tf.Tensor` of dtype `complex64` representing the right
             density matrix in the fidelity calculation.
+
         Returns:
           A scalar `tf.Tensor` which is the fidelity between the density matrix
             represented by this QHBM and `sigma`.
