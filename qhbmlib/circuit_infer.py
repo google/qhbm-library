@@ -153,11 +153,8 @@ class Expectation(tf.keras.Model):
     tiled_values = tf.tile(tf.expand_dims(symbol_values, 0), [num_circuits, 1])
     tiled_operators = tf.tile(tf.expand_dims(operators, 0), [num_circuits, 1])
     expectations = self._expectation_function(
-          circuits,
-          symbol_names=symbol_names,
-          symbol_values=tiled_values,
-          operators=tiled_operators,
-          repetitions=tf.tile(tf.expand_dims(counts, 1), [1, num_operators]),
+          circuits, symbol_names, tiled_values, tiled_operators,
+          tf.tile(tf.expand_dims(counts, 1), [1, num_operators]),
     )
     if reduce:
       probs = tf.cast(counts, tf.float32) / tf.cast(
