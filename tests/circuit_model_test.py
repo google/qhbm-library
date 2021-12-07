@@ -48,16 +48,12 @@ class DirectQuantumCircuitTest(tf.test.TestCase):
 
   def test_init(self):
     """Confirms QNN is initialized correctly."""
-    actual_qnn = circuit_model.DirectQuantumCircuit(
-        self.pqc,
-        name=self.name)
+    actual_qnn = circuit_model.DirectQuantumCircuit(self.pqc, name=self.name)
     self.assertEqual(actual_qnn.name, self.name)
     self.assertAllEqual(actual_qnn.qubits, self.qubits)
     self.assertAllEqual(actual_qnn.symbols, self.symbols)
     self.assertAllEqual(
-        tfq.from_tensor(actual_qnn._pqc),
-        tfq.from_tensor(self.pqc_tfq)
-    )
+        tfq.from_tensor(actual_qnn._pqc), tfq.from_tensor(self.pqc_tfq))
     self.assertAllEqual(
         tfq.from_tensor(actual_qnn._inverse_pqc),
         tfq.from_tensor(self.inverse_pqc_tfq),
@@ -67,7 +63,7 @@ class DirectQuantumCircuitTest(tf.test.TestCase):
     """Confirms that `symbols` and `values` get set correctly."""
     expected_values = self.initializer(shape=[self.num_qubits])
     actual_qnn = circuit_model.DirectQuantumCircuit(
-      self.pqc, symbols=self.symbols, values=expected_values)
+        self.pqc, symbols=self.symbols, values=expected_values)
     self.assertAllEqual(actual_qnn.symbols, self.symbols)
     self.assertAllEqual(actual_qnn.values, expected_values)
 
@@ -92,8 +88,10 @@ class DirectQuantumCircuitTest(tf.test.TestCase):
       pqc_2 += cirq.ry(s)(q)
     values_2 = self.initializer(shape=[num_qubits])
 
-    qnn_1 = circuit_model.DirectQuantumCircuit(pqc_1, symbols=symbols_1, values=values_1)
-    qnn_2 = circuit_model.DirectQuantumCircuit(pqc_2, symbols=symbols_2, values=values_2)
+    qnn_1 = circuit_model.DirectQuantumCircuit(
+        pqc_1, symbols=symbols_1, values=values_1)
+    qnn_2 = circuit_model.DirectQuantumCircuit(
+        pqc_2, symbols=symbols_2, values=values_2)
     actual_added = qnn_1 + qnn_2
 
     self.assertAllEqual(
@@ -122,9 +120,7 @@ class DirectQuantumCircuitTest(tf.test.TestCase):
   def test_copy(self):
     """Confirms copied QNN has correct attributes."""
     test_qnn = circuit_model.DirectQuantumCircuit(
-        self.pqc,
-        initializer=self.initializer,
-        name=self.name)
+        self.pqc, initializer=self.initializer, name=self.name)
     actual_qnn_copy = test_qnn.copy()
     self.assertEqual(actual_qnn_copy.name, test_qnn.name)
     self.assertAllClose(actual_qnn_copy.trainable_variables,
@@ -141,9 +137,7 @@ class DirectQuantumCircuitTest(tf.test.TestCase):
     self.assertAllEqual(actual_qnn_copy.qubits, test_qnn.qubits)
 
   def test_trainable_variables(self):
-    test_qnn = circuit_model.DirectQuantumCircuit(
-        self.pqc,
-        name=self.name)
+    test_qnn = circuit_model.DirectQuantumCircuit(self.pqc, name=self.name)
 
     self.assertAllEqual(test_qnn.values, test_qnn.trainable_variables[0])
 

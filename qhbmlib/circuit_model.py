@@ -145,9 +145,7 @@ class DirectQuantumCircuit(QuantumCircuit):
     self._values = value[0]
 
   def copy(self):
-    new_qnn = DirectQuantumCircuit(
-        tfq.from_tensor(self.pqc)[0],
-        name=self.name)
+    new_qnn = DirectQuantumCircuit(tfq.from_tensor(self.pqc)[0], name=self.name)
     new_qnn._values.assign(self.values)
     return new_qnn
 

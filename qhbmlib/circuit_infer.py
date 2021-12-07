@@ -52,10 +52,10 @@ class BitstringInjector(tf.keras.Model):
   def call(self, bitstrings, qnn):
     return self.inject_bitstrings(bitstrings, qnn)
 
-  
+
 class Expectation(tf.keras.Model):
   """Class for taking expectation values of quantum circuits."""
-  
+
   def __init__(self,
                qubits: List[cirq.GridQubit],
                backend="noiseless",
@@ -77,31 +77,35 @@ class Expectation(tf.keras.Model):
 
     self._qubits = qubits
     self._bitstring_injector = BitstringInjector(qubits, name)
-    
+
     self._differentiator = differentiator
     if backend == "noiseless" or backend is None:
       self._backend = "noiseless"
       self._expectation_layer = tfq.layers.Expectation(
           backend=backend, differentiator=differentiator)
-      def _expectation_function(circuits, symbol_names, symbol_values, operators, _):
+
+      def _expectation_function(circuits, symbol_names, symbol_values,
+                                operators, _):
         return self._expectation_layer(
-          circuits,
-          symbol_names=symbol_names,
-          symbol_values=symbol_values,
-          operators=operators
-        )
+            circuits,
+            symbol_names=symbol_names,
+            symbol_values=symbol_values,
+            operators=operators)
     else:
       self._backend = backend
       self._expectation_layer = tfq.layers.SampledExpectation(
           backend=backend, differentiator=differentiator)
-      def _expectation_function(circuits, symbol_names, symbol_values, operators, repetitions):
+
+      def _expectation_function(circuits, symbol_names, symbol_values,
+                                operators, repetitions):
         return self._expectation_layer(
-          circuits,
-          symbol_names=symbol_names,
-          symbol_values=symbol_values,
-          operators=operators,
-          repetitions=repetitions,
+            circuits,
+            symbol_names=symbol_names,
+            symbol_values=symbol_values,
+            operators=operators,
+            repetitions=repetitions,
         )
+
     self._expectation_function = _expectation_function
 
   @property
@@ -121,7 +125,7 @@ class Expectation(tf.keras.Model):
                   initial_states: tf.Tensor,
                   counts: tf.Tensor,
                   operators: tf.Tensor,
-                  reduce: bool=True):
+                  reduce: bool = True):
     """Returns the expectation values of the operators against the QNN.
 
       Args:
@@ -153,8 +157,11 @@ class Expectation(tf.keras.Model):
     tiled_values = tf.tile(tf.expand_dims(symbol_values, 0), [num_circuits, 1])
     tiled_operators = tf.tile(tf.expand_dims(operators, 0), [num_circuits, 1])
     expectations = self._expectation_function(
-          circuits, symbol_names, tiled_values, tiled_operators,
-          tf.tile(tf.expand_dims(counts, 1), [1, num_operators]),
+        circuits,
+        symbol_names,
+        tiled_values,
+        tiled_operators,
+        tf.tile(tf.expand_dims(counts, 1), [1, num_operators]),
     )
     if reduce:
       probs = tf.cast(counts, tf.float32) / tf.cast(
@@ -162,16 +169,5 @@ class Expectation(tf.keras.Model):
       return tf.reduce_sum(tf.transpose(probs * tf.transpose(expectations)), 0)
     return expectations
 
-  def call(self,
-           qnn,
-           initial_states,
-           counts,
-           operators,
-           reduce=True):
-    return expectation(qnn,
-                       initial_states,
-                       counts,
-                       operators,
-                       reduce=reduce)
-
-
+  def call(self, qnn, initial_states, counts, operators, reduce=True):
+    return expectation(qnn, initial_states, counts, operators, reduce=reduce)
