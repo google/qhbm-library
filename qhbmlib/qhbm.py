@@ -86,7 +86,7 @@ class QHBM(tf.keras.Model):
   def sample(self, num_samples, mask=True, reduce=True, unique=True):
     bitstrings, counts = self.ebm.sample(num_samples)
     return self.qnn.sample(
-        bitstrings, counts=counts, mask=mask, reduce=reduce, unique=unique)
+        bitstrings, counts, mask=mask, reduce=reduce, unique=unique)
 
   def expectation(self, operators, num_samples, mask=True, reduce=True):
     """TODO: add gradient function"""
@@ -98,13 +98,7 @@ class QHBM(tf.keras.Model):
                                             mask=mask,
                                             reduce=reduce)
     bitstrings, counts = self.ebm.sample(num_samples)
-    return self.qnn.expectation(
-        bitstrings,
-        operators,
-        counts=counts,
-        symbol_names=self.qnn.symbols,
-        symbol_values=self.qnn.values,
-        reduce=reduce)
+    return self.qnn.expectation(bitstrings, counts, operators, reduce=reduce)
 
   def operator_expectation(self,
                            density_operator,
@@ -114,10 +108,7 @@ class QHBM(tf.keras.Model):
                            reduce=True,
                            mask=True):
     """TODO: add gradient function"""
-    if isinstance(density_operator, tf.string):
-      circuits = density_operator
-      counts = None
-    elif isinstance(density_operator, tuple):
+    if isinstance(density_operator, tuple):
       circuits, counts = density_operator
     elif isinstance(density_operator, QHBM):
       circuits, counts = density_operator.circuits(num_samples, resolve=False)
@@ -129,14 +120,14 @@ class QHBM(tf.keras.Model):
     if self.ebm.has_operator:
       expectation_shards = self.qnn.pulled_back_expectation(
           circuits,
+          counts,
           self.operator_shards,
-          counts=counts,
           symbol_names=symbol_names,
           symbol_values=symbol_values,
           reduce=reduce)
       return self.ebm.operator_expectation(expectation_shards)
     bitstrings, counts = self.qnn.pulled_back_sample(
-        circuits, counts=counts, mask=mask)
+        circuits, counts, mask=mask)
     energies = self.ebm.energy(bitstrings)
     if reduce:
       probs = tf.cast(counts, tf.float32) / tf.cast(

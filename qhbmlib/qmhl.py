@@ -39,24 +39,20 @@ def qmhl(qhbm_model, density_operator, num_samples=1000):
   @tf.custom_gradient
   def function(trainable_variables):
     # pulled back expectation of energy operator
-    if isinstance(density_operator, tf.string):
-      circuits = density_operator
-      counts = None
-    elif isinstance(density_operator, tuple):
+    if isinstance(density_operator, tuple):
       circuits, counts = density_operator
-    elif isinstance(density_operator, QHBM):
+    elif isinstance(density_operator, qhbm.QHBM):
       circuits, counts = density_operator.circuits(num_samples)
     else:
       raise TypeError()
 
-    num_samples = tf.reduce_sum(counts)
     if qhbm_model.ebm.has_operator:
       expectation_shards = qhbm_model.qnn.pulled_back_expectation(
-          circuits, self.operator_shards, counts=counts)
+          circuits, counts, qhbm_model.operator_shards)
       expectation = qhbm_model.ebm.operator_expectation(expectation_shards)
     else:
       qnn_bitstrings, qnn_counts = qhbm_model.qnn.pulled_back_sample(
-          circuits, counts=counts)
+          circuits, counts)
       energies = qhbm_model.ebm.energy(qnn_bitstrings)
       qnn_probs = tf.cast(qnn_counts, tf.float32) / tf.cast(
           tf.reduce_sum(qnn_counts), tf.float32)
@@ -66,28 +62,33 @@ def qmhl(qhbm_model, density_operator, num_samples=1000):
     if qhbm_model.ebm.is_analytic:
       log_partition_function = qhbm_model.log_partition_function()
     else:
-      bitstrings, _ = qhbm_model.ebm.sample(num_samples)
+      bitstrings, _ = qhbm_model.ebm.sample(tf.reduce_sum(counts))
       energies = qhbm_model.ebm.energy(bitstrings)
       log_partition_function = tf.math.reduce_logsumexp(-energies)
 
     def gradient(grad_y, variables=None):
       """Gradients are computed using estimators from the QHBM paper."""
-      # Thetas derivative.
-      if qhbm_model.ebm.has_operator:
-        with tf.GradientTape() as tape:
-          tape.watch(qhbm_model.ebm.trainable_variables)
+      with tf.GradientTape(persistent=True) as tape:
+        tape.watch(qhbm_model.ebm.trainable_variables)
+        if qhbm_model.ebm.has_operator:
+          tape.watch(qhbm_model.qnn.trainable_variables)
+          expectation_shards = qhbm_model.qnn.pulled_back_expectation(
+              circuits, counts, qhbm_model.operator_shards)
           expectation = qhbm_model.ebm.operator_expectation(expectation_shards)
-        qnn_energy_grad = tape.gradient(expectation,
-                                        qhbm_model.ebm.trainable_variables)
-      else:
-        with tf.GradientTape() as tape:
-          tape.watch(qhbm_model.ebm.trainable_variables)
+        else:
           energies = qhbm_model.ebm.energy(qnn_bitstrings)
           expectation = tf.reduce_sum(qnn_probs * energies)
-        qnn_energy_grad = tape.gradient(expectation,
-                                        qhbm_model.ebm.trainable_variables)
+      qnn_energy_grad = tape.gradient(expectation,
+                                      qhbm_model.ebm.trainable_variables)
+      if qhbm_model.ebm.has_operator:
+        grad_qnn = tape.gradient(expectation,
+                                 qhbm_model.qnn.trainable_variables)
+        grad_qnn = [grad_y * grad for grad in grad_qnn]
+      else:
+        raise NotImplementedError(
+            "Derivative when EBM has no operator is not yet supported.")
 
-      ebm_bitstrings, ebm_counts = qhbm_model.ebm.sample(num_samples)
+      ebm_bitstrings, ebm_counts = qhbm_model.ebm.sample(tf.reduce_sum(counts))
       ebm_probs = tf.cast(ebm_counts, tf.float32) / tf.cast(
           tf.reduce_sum(ebm_counts), tf.float32)
       with tf.GradientTape() as tape:
@@ -102,23 +103,9 @@ def qmhl(qhbm_model, density_operator, num_samples=1000):
           for qnn_grad, ebm_grad in zip(qnn_energy_grad, ebm_energy_grad)
       ]
 
-      # Phis derivative.
-      if qhbm_model.ebm.has_operator:
-        with tf.GradientTape() as tape:
-          tape.watch(qhbm_model.qnn.trainable_variables)
-          expectation_shards = qhbm_model.qnn.pulled_back_expectation(
-              circuits, qhbm_model.operator_shards, counts=counts)
-          expectation = qhbm_model.ebm.operator_expectation(expectation_shards)
-        grad_qnn = tape.gradient(expectation,
-                                 qhbm_model.qnn.trainable_variables)
-        grad_qnn = [grad_y * grad for grad in grad_qnn]
-      else:
-        raise NotImplementedError(
-            "Derivative when EBM has no operator is not yet supported.")
-
       grad_qhbm = grad_ebm + grad_qnn
       if variables:
-        return grad_qhbm, [tf.zeros_like(v) for v in variables]
+        return grad_qhbm, [tf.zeros_like(var) for var in variables]
       return grad_qhbm
 
     return expectation + log_partition_function, gradient

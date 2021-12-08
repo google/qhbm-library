@@ -49,7 +49,7 @@ class QMHLTest(tf.test.TestCase):
       target_samples = tf.constant(1e6)
       target_circuits, target_counts = target.circuits(target_samples)
       with tf.GradientTape() as tape:
-        loss = qmhl.qmhl(qhbm_model, target_circuits, target_counts)
+        loss = qmhl.qmhl(qhbm_model, (target_circuits, target_counts))
       thetas_grads, phis_grads = tape.gradient(
           loss, (qhbm_model.ebm.trainable_variables,
                  qhbm_model.qnn.trainable_variables))
@@ -139,7 +139,7 @@ class QMHLTest(tf.test.TestCase):
         target_states = tfq.convert_to_tensor(target_states_list)
 
         with tf.GradientTape() as tape:
-          actual_loss = qmhl_func(test_qhbm, target_states, target_counts)
+          actual_loss = qmhl_func(test_qhbm, (target_states, target_counts))
         # TODO(zaqqwerty): add way to use a log QHBM as observable on states
         expected_expectation = tf.reduce_sum(
             test_thetas * (2 * data_probs - 1) * tf.math.cos(alphas) *
@@ -157,6 +157,27 @@ class QMHLTest(tf.test.TestCase):
             actual_thetas_grads, expected_thetas_grads, atol=ATOL, rtol=RTOL)
         self.assertAllClose(
             actual_phis_grads, expected_phis_grads, atol=ATOL, rtol=RTOL)
+
+  def test_modular_hamiltonian(self):
+    """Confirm correct gradients and loss at the optimal settings."""
+    for num_qubits in [1, 2, 3, 4, 5]:
+      qubits = cirq.GridQubit.rect(1, num_qubits)
+      qhbm_model = test_util.get_random_qhbm(
+          qubits, 1, "QMHLLossTest{}".format(num_qubits))
+      qhbm_model_copy = qhbm_model.copy()
+
+      # Get the QMHL loss gradients
+      qhbm_model_samples = tf.constant(1e6)
+      with tf.GradientTape() as tape:
+        loss = qmhl.qmhl(
+            qhbm_model, qhbm_model_copy, num_samples=qhbm_model_samples)
+      thetas_grads, phis_grads = tape.gradient(
+          loss, (qhbm_model.ebm.trainable_variables,
+                 qhbm_model.qnn.trainable_variables))
+      self.assertAllClose(loss, qhbm_model.ebm.entropy(), atol=5e-3)
+      self.assertAllClose(
+          thetas_grads, tf.zeros(tf.shape(thetas_grads)), atol=5e-3)
+      self.assertAllClose(phis_grads, tf.zeros(tf.shape(phis_grads)), atol=5e-3)
 
   def test_hypernetwork(self):
     for num_qubits in [1, 2, 3, 4, 5]:
@@ -197,7 +218,7 @@ class QMHLTest(tf.test.TestCase):
               tf.reshape(output[index:index + size], shape))
           index += size
         qhbm_model.trainable_variables = output_trainable_variables
-        loss = qmhl.qmhl(qhbm_model, target_circuits, target_counts)
+        loss = qmhl.qmhl(qhbm_model, (target_circuits, target_counts))
 
       grads = tape.gradient(loss, [
           hypernetwork.trainable_variables, output,
@@ -228,7 +249,7 @@ class QMHLTest(tf.test.TestCase):
               tf.reshape(output[index:index + size], shape))
           index += size
         qhbm_model.trainable_variables = output_trainable_variables
-        loss = qmhl.qmhl(qhbm_model, target_circuits, target_counts)
+        loss = qmhl.qmhl(qhbm_model, (target_circuits, target_counts))
       grads = tape.gradient(loss, [c, qhbm_model.trainable_variables])
       c_grad = grads[0]
       qhbm_grads = grads[1]

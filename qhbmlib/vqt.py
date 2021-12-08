@@ -43,15 +43,22 @@ def vqt(qhbm_model, hamiltonian, beta=1.0, num_samples=1000):
     probs = tf.cast(counts, tf.float32) / tf.cast(num_samples, tf.float32)
 
     if isinstance(hamiltonian, qhbm.QHBM):
-      circuits = qhbm_model.qnn.circuits(bitstrings)
+      circuits = qhbm_model.qnn.circuits(bitstrings, resolve=False)
       if hamiltonian.ebm.has_operator:
         expectation_shards = hamiltonian.qnn.pulled_back_expectation(
-            circuits, hamiltonian.operator_shards, counts=counts)
+            circuits,
+            counts,
+            hamiltonian.operator_shards,
+            symbol_names=qhbm_model.qnn.symbols,
+            symbol_values=qhbm_model.qnn.values)
         expectation = hamiltonian.ebm.operator_expectation(expectation_shards)
       else:
-        qnn_bitstrings, qnn_counts = self.qnn.pulled_back_sample(
-            circuits, counts=counts, mask=mask)
-        energies = self.ebm.energy(qnn_bitstrings)
+        qnn_bitstrings, qnn_counts = hamiltonian.qnn.pulled_back_sample(
+            circuits,
+            counts,
+            symbol_names=qhbm_model.qnn.symbols,
+            symbol_values=qhbm_model.qnn.values)
+        energies = hamiltonian.ebm.energy(qnn_bitstrings)
         qnn_probs = tf.cast(qnn_counts, tf.float32) / tf.cast(
             tf.reduce_sum(qnn_counts), tf.float32)
         expectation = tf.reduce_sum(qnn_probs * energies)
@@ -69,16 +76,15 @@ def vqt(qhbm_model, hamiltonian, beta=1.0, num_samples=1000):
         tape.watch(qhbm_model.qnn.trainable_variables)
         if isinstance(hamiltonian, qhbm.QHBM):
           if hamiltonian.ebm.has_operator:
-            circuits = qhbm_model.qnn.circuits(bitstrings, resolve=False)
             expectation_shards = hamiltonian.qnn.pulled_back_expectation(
                 circuits,
+                counts,
                 hamiltonian.operator_shards,
-                counts=counts,
-                symbol_names=qhbm_model.symbols,
-                symbol_values=qhbm_model.values,
+                symbol_names=qhbm_model.qnn.symbols,
+                symbol_values=qhbm_model.qnn.values,
                 reduce=False)
-            beta_expectations = beta * tf.squeeze(
-                hamiltonian.ebm.operator_expectation(expectation_shards), -1)
+            beta_expectations = beta * hamiltonian.ebm.operator_expectation(
+                expectation_shards)
           else:
             raise NotImplementedError()
         else:
@@ -105,7 +111,7 @@ def vqt(qhbm_model, hamiltonian, beta=1.0, num_samples=1000):
 
       grad_qhbm = grad_ebm + grad_qnn
       if variables:
-        return grad_qhbm, [tf.zeros_like(v) for v in variables]
+        return grad_qhbm, [tf.zeros_like(var) for var in variables]
       return grad_qhbm
 
     return beta * expectation - entropy, gradient

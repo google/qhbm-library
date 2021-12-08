@@ -157,15 +157,13 @@ class QNN(tf.keras.Model):
 
   def _sample(self,
               circuits,
-              counts=None,
+              counts,
               symbol_names=None,
               symbol_values=None,
               mask=True,
               reduce=True,
               unique=True):
     """General function for sampling from circuits."""
-    if not counts:
-      counts = tf.ones(tf.shape(circuits))
     samples = self._sample_layer(
         circuits,
         symbol_names=symbol_names,
@@ -185,8 +183,8 @@ class QNN(tf.keras.Model):
 
   def _expectation(self,
                    circuits,
+                   counts,
                    operators,
-                   counts=None,
                    symbol_names=None,
                    symbol_values=None,
                    reduce=True):
@@ -196,11 +194,9 @@ class QNN(tf.keras.Model):
     Additionally, if `self.is_analytic` is false, `counts[i]` samples are drawn
     from `circuits[i]` and used to compute each expectation in `operators`.
     """
-    if not counts:
-      counts = tf.ones(tf.shape(circuits))
     num_circuits = tf.shape(circuits)[0]
     num_operators = tf.shape(operators)[0]
-    if symbol_values:
+    if symbol_values is not None:
       symbol_values = tf.tile(
           tf.expand_dims(symbol_values, 0), [num_circuits, 1])
     operators = tf.tile(tf.expand_dims(operators, 0), [num_circuits, 1])
@@ -256,12 +252,7 @@ class QNN(tf.keras.Model):
     pqcs = tf.tile(self.pqc(resolve=resolve), [num_bitstrings])
     return tfq.append_circuit(bit_circuits, pqcs)
 
-  def sample(self,
-             bitstrings,
-             counts=None,
-             mask=True,
-             reduce=True,
-             unique=True):
+  def sample(self, bitstrings, counts, mask=True, reduce=True, unique=True):
     """Returns bitstring samples from the QNN.
 
       Args:
@@ -277,9 +268,9 @@ class QNN(tf.keras.Model):
     """
     circuits = self.circuits(bitstrings)
     return self._sample(
-        circuits, counts=counts, mask=mask, reduce=reduce, unique=unique)
+        circuits, counts, mask=mask, reduce=reduce, unique=unique)
 
-  def expectation(self, bitstrings, operators, counts=None, reduce=True):
+  def expectation(self, bitstrings, counts, operators, reduce=True):
     """Returns the expectation values of the operators against the QNN.
 
       Args:
@@ -300,8 +291,8 @@ class QNN(tf.keras.Model):
     circuits = self.circuits(bitstrings, resolve=False)
     return self._expectation(
         circuits,
+        counts,
         operators,
-        counts=counts,
         symbol_names=self.symbols,
         symbol_values=self.values,
         reduce=reduce)
@@ -325,7 +316,7 @@ class QNN(tf.keras.Model):
 
   def pulled_back_sample(self,
                          circuits,
-                         counts=None,
+                         counts,
                          mask=True,
                          reduce=True,
                          unique=True):
@@ -350,16 +341,12 @@ class QNN(tf.keras.Model):
       """
     pulled_back_circuits = self.pulled_back_circuits(circuits)
     return self._sample(
-        pulled_back_circuits,
-        counts=counts,
-        mask=mask,
-        reduce=reduce,
-        unique=unique)
+        pulled_back_circuits, counts, mask=mask, reduce=reduce, unique=unique)
 
   def pulled_back_expectation(self,
                               circuits,
+                              counts,
                               operators,
-                              counts=None,
                               symbol_names=None,
                               symbol_values=None,
                               reduce=True):
@@ -382,18 +369,18 @@ class QNN(tf.keras.Model):
         expectation values.
     """
     pulled_back_circuits = self.pulled_back_circuits(circuits, resolve=False)
-    if symbol_names:
-      symbol_names = symbol_names + self.symbols
+    if symbol_names is not None:
+      symbol_names = tf.reshape(tf.stack([symbol_names, self.symbols]), [-1])
     else:
       symbol_names = self.symbols
-    if symbol_values:
+    if symbol_values is not None:
       symbol_values = tf.reshape(tf.stack([symbol_values, self.values]), [-1])
     else:
       symbol_values = self.values
     return self._expectation(
         pulled_back_circuits,
+        counts,
         operators,
-        counts=counts,
         symbol_names=symbol_names,
         symbol_values=symbol_values,
         reduce=reduce)
