@@ -25,7 +25,7 @@ class BitstringEnergy(tf.keras.layers.Layer):
 
   def __init__(self,
                bits: List[int],
-               energy_layers: List[tf.keras.layer.Layer],
+               energy_layers: List[tf.keras.layers.Layer],
                name: Union[None, str] = None):
     """Initializes a BitstringEnergy.
 
@@ -41,10 +41,9 @@ class BitstringEnergy(tf.keras.layers.Layer):
     if len(set(bits)) != len(bits):
       raise ValueError("All entries of `bits` must be unique.")
     self._bits = bits
-    if not isinstance(energy_layer, tf.keras.layers.Layer):
-      raise TypeError("`energy_layer` must be a keras layer.")
+    if not isinstance(energy_layers, list) or not all([isinstance(e, tf.keras.layers.Layer) for e in energy_layers]):
+      raise TypeError("`energy_layers` must be a list of keras layers.")
     self.energy_layers = energy_layers
-    self.flatten = tf.keras.layers.Flatten()
 
   def get_config(self):
     config = super().get_config()
@@ -69,22 +68,11 @@ class BitstringEnergy(tf.keras.layers.Layer):
   def bits(self):
     return self._bits
 
-  # def build(self, input_shape):
-  #   test_input = tf.constant(1, dtype=tf.int8, shape=input_shape)
-  #   test_output = self.energy_layer(test_input)
-  #   if not test_output.dtype == tf.float32:
-  #     raise TypeError(
-  #       "`energy_layer` must output a `tf.Tensor` of dtype `tf.float32`.")
-  #   test_shape = tf.shape(test_output)
-  #   if not len(test_shape) == 1 or not test_shape[0] == input_shape[0]:
-  #     raise ValueError(
-  #       "`energy_layer` must produce one scalar output per bitstring.")    
-
   def call(self, inputs):
     x = inputs
     for layer in self.energy_layers:
       x = layer(x)
-    return self.flatten(x)
+    return tf.squeeze(x, -1)
 
 
 # def get_mlp_bitstring_energy(

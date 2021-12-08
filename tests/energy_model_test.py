@@ -37,7 +37,7 @@ class BitstringEnergy(tf.test.TestCase):
     self.assertEqual(actual_b.num_bits, expected_num_bits)
     self.assertAllEqual(actual_b.bits, expected_bits)
     self.assertAllEqual(actual_b.energy_layers, energy_layers)
-    self.assertEqual(test_b.name, expected_name)
+    self.assertEqual(actual_b.name, expected_name)
 
   def test_init_error(self):
     """Confirms bad inputs are caught."""
@@ -47,17 +47,22 @@ class BitstringEnergy(tf.test.TestCase):
       _ = energy_model.BitstringEnergy(["junk"], [])
     with self.assertRaisesRegex(ValueError, expected_regex="must be unique"):
       _ = energy_model.BitstringEnergy([1, 1], [])
+    with self.assertRaisesRegex(TypeError, expected_regex="list of keras layers"):
+      _ = energy_model.BitstringEnergy([1, 2], "junk")
+    with self.assertRaisesRegex(TypeError, expected_regex="list of keras layers"):
+      _ = energy_model.BitstringEnergy([1, 2], ["junk"])
 
-#   def test_energy(self):
-#     """Confirms all bitstrings are accepted."""
-#     num_bits = 5
-#     test_b = self.Basic(list(range(num_bits)))
-#     test_bitstrings = tf.constant(
-#         list(itertools.product([0, 1], repeat=num_bits)))
-#     actual_energy = test_b(test_bitstrings)
-#     expected_energy = tf.constant([1.0] * (2**num_bits))
-#     self.assertAllEqual(actual_energy, expected_energy)
-#     actual_energy = test_b(test_bitstrings)
+  def test_build_and_call(self):
+    """Checks that building and calling works for a simple energy."""
+    num_bits = 5
+    energy_layers = [
+      tf.keras.layers.Dense(1, kernel_initializer=tf.keras.initializers.Constant(1))]
+    test_b = energy_model.BitstringEnergy(list(range(num_bits)), energy_layers)
+    test_bitstrings = tf.constant(
+        list(itertools.product([0, 1], repeat=num_bits)))
+    actual_energy = test_b(test_bitstrings)
+    expected_energy = tf.reduce_sum(test_bitstrings, -1)
+    self.assertAllEqual(actual_energy, expected_energy)
 
 
 # class MLPTest(tf.test.TestCase):
