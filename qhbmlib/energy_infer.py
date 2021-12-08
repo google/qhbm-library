@@ -72,6 +72,18 @@ class BernoulliSampler(BitstringSampler):
     return util.unique_bitstrings_with_counts(samples)
 
 
+class AnalyticDistribution(tfp.distributions.Distribution):
+  """Distribution which assumes we can calculate all probabilities."""
+
+  def __init__(self, e_func: energy_model.EnergyFunction):
+    """Initializes an AnalyticDistribution."""
+
+    super().__init__(num_bits, name=name)
+    self._all_bitstrings = tf.constant(
+        list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
+    
+
+
 class AnalyticSampler(BitstringSampler):
   """Sampler which calculates all probabilities and samples as categorical."""
 

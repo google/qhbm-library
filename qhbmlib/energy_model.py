@@ -14,21 +14,25 @@
 # ==============================================================================
 """Tools for modelling energy functions."""
 
-import abc
 from typing import List, Union
 
 import cirq
 import tensorflow as tf
 
 
-class BitstringDistribution(tf.keras.Model, abc.ABC):
-  """Class for representing a probability distribution over bitstrings."""
+class BitstringEnergy(tf.keras.layers.Layer):
+  """Class for representing an energy function over bitstrings."""
 
-  def __init__(self, bits: List[int], name: Union[None, str] = None):
-    """Initializes a BitstringDistribution.
+  def __init__(self,
+               bits: List[int],
+               energy_layers: List[tf.keras.layer.Layer],
+               name: Union[None, str] = None):
+    """Initializes a BitstringEnergy.
 
     Args:
       bits: Labels for the bits on which this distribution is supported.
+      energy_layers: Concatenation of these layers yields trainable map from
+        bitstrings to scalars.
       name: Optional name for the model.
     """
     super().__init__(name=name)
@@ -37,6 +41,25 @@ class BitstringDistribution(tf.keras.Model, abc.ABC):
     if len(set(bits)) != len(bits):
       raise ValueError("All entries of `bits` must be unique.")
     self._bits = bits
+    if not isinstance(energy_layer, tf.keras.layers.Layer):
+      raise TypeError("`energy_layer` must be a keras layer.")
+    self.energy_layers = energy_layers
+    self.flatten = tf.keras.layers.Flatten()
+
+  def get_config(self):
+    config = super().get_config()
+    config.update({
+        "bits": copy.deepcopy(self._bits),
+        "energy_layers": copy.deepcopy(self.energy_layers),
+    })
+    return config
+
+  @classmethod
+  def from_config(cls, config):
+    return cls(config["bits"], config["energy_layers"], config["name"])
+
+  def copy(self):
+    return BitstringEnergy.from_config(self.get_config())
 
   @property
   def num_bits(self):
@@ -46,150 +69,174 @@ class BitstringDistribution(tf.keras.Model, abc.ABC):
   def bits(self):
     return self._bits
 
-  @property
-  def trainable_variables(self):
-    return super().trainable_variables
-
-  @trainable_variables.setter
-  @abc.abstractmethod
-  def trainable_variables(self, value):
-    raise NotImplementedError()
-
-  @abc.abstractmethod
-  def energy(self, bitstrings):
-    raise NotImplementedError()
+  # def build(self, input_shape):
+  #   test_input = tf.constant(1, dtype=tf.int8, shape=input_shape)
+  #   test_output = self.energy_layer(test_input)
+  #   if not test_output.dtype == tf.float32:
+  #     raise TypeError(
+  #       "`energy_layer` must output a `tf.Tensor` of dtype `tf.float32`.")
+  #   test_shape = tf.shape(test_output)
+  #   if not len(test_shape) == 1 or not test_shape[0] == input_shape[0]:
+  #     raise ValueError(
+  #       "`energy_layer` must produce one scalar output per bitstring.")    
 
   def call(self, inputs):
-    return self.energy(inputs)
+    x = inputs
+    for layer in self.energy_layers:
+      x = layer(x)
+    return self.flatten(x)
 
 
-class MLP(BitstringDistribution):
-  """Basic dense neural network energy based model."""
-
-  def __init__(self,
-               bits: List[int],
-               units: List[int],
-               activations: List[Union[None, str]],
-               kernel_initializer=tf.keras.initializers.RandomUniform(),
-               bias_initializer=tf.keras.initializers.Zeros(),
-               name=None):
-    """Initialize an MLP.
-
-    The arguments paramterize a stack of Dense layers.
-
-    Args:
-      bits: Labels for the bits on which this distribution is supported.
-      units: Positive integers which are the dimensions each layer's output.
-      activations: Activation functions to use at each layer. Entry of None
-        makes the corresponding layer have linear activation.
-      kernel_initializer: A `tf.keras.initializers.Initializer` which specifies how to
-        initialize the kernels of all layers.
-      bias_initializer: A `tf.keras.initializers.Initializer` which specifies how to
-        initialize the biases of all layers.
-    """
-    super().__init__(bits, name=name)
-    self._hidden_layers = [
-        tf.keras.layers.Dense(
-            u,
-            activation=a,
-            kernel_initializer=kernel_initializer,
-            bias_initializer=bias_initializer)
-        for u, a in zip(units, activations)
-    ]
-    self._energy_layer = tf.keras.layers.Dense(
-        1,
-        kernel_initializer=kernel_initializer,
-        bias_initializer=bias_initializer)
-    self.build([1, self.num_bits])
-
-  @property
-  def trainable_variables(self):
-    trainable_variables = []
-    for layer in self.layers:
-      trainable_variables.extend([layer.kernel, layer.bias])
-    return trainable_variables
-
-  @trainable_variables.setter
-  def trainable_variables(self, value):
-    i = 0
-    for layer in self.layers:
-      layer.kernel = value[i]
-      layer.bias = value[i + 1]
-      i += 2
-
-  def copy(self):
-    units = [layer.units for layer in self.layers[:-1]]
-    activations = [layer.activation for layer in self.layers[:-1]]
-    new_mlp = MLP(self.bits, units, activations, name=self.name)
-    for i in tf.range(len(new_mlp.trainable_variables)):
-      new_mlp.trainable_variables[i].assign(self.trainable_variables[i])
-    return new_mlp
-
-  def energy(self, bitstrings):
-    x = bitstrings
-    for hidden_layer in self._hidden_layers:
-      x = hidden_layer(x)
-    x = self._energy_layer(x)
-    return tf.squeeze(x, -1)
+# def get_mlp_bitstring_energy(
+#     bits: List[int],
+#     units: List[int],
+#     activations: List[Union[None, str]],
+#     kernel_initializer=tf.keras.initializers.RandomUniform(),
+#     bias_initializer=tf.keras.initializers.Zeros(),
+#     name=None):
+#   self.hidden_layers = [
+#     tf.keras.layers.Dense(
+#       u,
+#       activation=a,
+#       kernel_initializer=kernel_initializer,
+#       bias_initializer=bias_initializer)
+#     for u, a in zip(units, activations)
+#   ]
+#     self._energy_layer = tf.keras.layers.Dense(
+#         1,
+#         kernel_initializer=kernel_initializer,
+#         bias_initializer=bias_initializer)
 
 
-class PauliBitstringDistribution(BitstringDistribution):
-  """Augments BitstringDistribution with a Pauli Z representation."""
+  
+#   return BitstringEnergy()
+# class MLP(BitstringEnergy):
+#   """Basic dense neural network energy based model."""
 
-  @abc.abstractmethod
-  def operator_shards(self, qubits):
-    """Parameter independent Pauli Z strings to measure."""
-    raise NotImplementedError()
+#   def __init__(self,
+#                bits: List[int],
+#                units: List[int],
+#                activations: List[Union[None, str]],
+#                kernel_initializer=tf.keras.initializers.RandomUniform(),
+#                bias_initializer=tf.keras.initializers.Zeros(),
+#                name=None):
+#     """Initialize an MLP.
 
-  @abc.abstractmethod
-  def operator_expectation(self, expectation_shards):
-    """Computes the average energy given operator shard expectation values."""
-    raise NotImplementedError()
+#     The arguments paramterize a stack of Dense layers.
+
+#     Args:
+#       bits: Labels for the bits on which this distribution is supported.
+#       units: Positive integers which are the dimensions each layer's output.
+#       activations: Activation functions to use at each layer. Entry of None
+#         makes the corresponding layer have linear activation.
+#       kernel_initializer: A `tf.keras.initializers.Initializer` which specifies how to
+#         initialize the kernels of all layers.
+#       bias_initializer: A `tf.keras.initializers.Initializer` which specifies how to
+#         initialize the biases of all layers.
+#     """
+#     super().__init__(bits, name=name)
+#     self._hidden_layers = [
+#         tf.keras.layers.Dense(
+#             u,
+#             activation=a,
+#             kernel_initializer=kernel_initializer,
+#             bias_initializer=bias_initializer)
+#         for u, a in zip(units, activations)
+#     ]
+#     self._energy_layer = tf.keras.layers.Dense(
+#         1,
+#         kernel_initializer=kernel_initializer,
+#         bias_initializer=bias_initializer)
+#     self.build([1, self.num_bits])
+
+#   @property
+#   def trainable_variables(self):
+#     trainable_variables = []
+#     for layer in self.layers:
+#       trainable_variables.extend([layer.kernel, layer.bias])
+#     return trainable_variables
+
+#   @trainable_variables.setter
+#   def trainable_variables(self, value):
+#     i = 0
+#     for layer in self.layers:
+#       layer.kernel = value[i]
+#       layer.bias = value[i + 1]
+#       i += 2
+
+#   def copy(self):
+#     units = [layer.units for layer in self.layers[:-1]]
+#     activations = [layer.activation for layer in self.layers[:-1]]
+#     new_mlp = MLP(self.bits, units, activations, name=self.name)
+#     for i in tf.range(len(new_mlp.trainable_variables)):
+#       new_mlp.trainable_variables[i].assign(self.trainable_variables[i])
+#     return new_mlp
+
+#   def energy(self, bitstrings):
+#     x = bitstrings
+#     for hidden_layer in self._hidden_layers:
+#       x = hidden_layer(x)
+#     x = self._energy_layer(x)
+#     return tf.squeeze(x, -1)
 
 
-class Bernoulli(PauliBitstringDistribution):
-  """Tensor product of coin flip distributions."""
+# class PauliBitstringEnergy(BitstringEnergy):
+#   """Augments BitstringEnergy with a Pauli Z representation."""
 
-  def __init__(self,
-               bits: List[int],
-               initializer=tf.keras.initializers.RandomUniform(),
-               name=None):
-    """Initializes a Bernoulli distribution.
+#   @abc.abstractmethod
+#   def operator_shards(self, qubits):
+#     """Parameter independent Pauli Z strings to measure."""
+#     raise NotImplementedError()
 
-    Args:
-      bits: Each entry is an index on which the distribution is supported.
-      initializer: A `tf.keras.initializers.Initializer` which specifies how to
-        initialize the values of the parameters.
-    """
-    super().__init__(bits, name=name)
-    self.kernel = self.add_weight(
-        name=f'kernel',
-        shape=[self.num_bits],
-        initializer=initializer,
-        trainable=True)
+#   @abc.abstractmethod
+#   def operator_expectation(self, expectation_shards):
+#     """Computes the average energy given operator shard expectation values."""
+#     raise NotImplementedError()
 
-  @property
-  def trainable_variables(self):
-    return [self.kernel]
 
-  @trainable_variables.setter
-  def trainable_variables(self, value):
-    self.kernel = value[0]
+# class Bernoulli(PauliBitstringDistribution):
+#   """Tensor product of coin flip distributions."""
 
-  def copy(self):
-    bernoulli = Bernoulli(self.bits, name=self.name)
-    bernoulli.kernel.assign(self.kernel)
-    return bernoulli
+#   def __init__(self,
+#                bits: List[int],
+#                initializer=tf.keras.initializers.RandomUniform(),
+#                name=None):
+#     """Initializes a Bernoulli distribution.
 
-  def energy(self, bitstrings):
-    return tf.reduce_sum(
-        tf.cast(1 - 2 * bitstrings, tf.float32) * self.kernel, -1)
+#     Args:
+#       bits: Each entry is an index on which the distribution is supported.
+#       initializer: A `tf.keras.initializers.Initializer` which specifies how to
+#         initialize the values of the parameters.
+#     """
+#     super().__init__(bits, name=name)
+#     self.kernel = self.add_weight(
+#         name=f'kernel',
+#         shape=[self.num_bits],
+#         initializer=initializer,
+#         trainable=True)
 
-  def operator_shards(self, qubits):
-    return [
-        cirq.PauliSum.from_pauli_strings(cirq.Z(qubits[i]))
-        for i in range(self.num_bits)
-    ]
+#   @property
+#   def trainable_variables(self):
+#     return [self.kernel]
 
-  def operator_expectation(self, expectation_shards):
-    return tf.reduce_sum(expectation_shards * self.kernel, -1)
+#   @trainable_variables.setter
+#   def trainable_variables(self, value):
+#     self.kernel = value[0]
+
+#   def copy(self):
+#     bernoulli = Bernoulli(self.bits, name=self.name)
+#     bernoulli.kernel.assign(self.kernel)
+#     return bernoulli
+
+#   def energy(self, bitstrings):
+#     return tf.reduce_sum(
+#         tf.cast(1 - 2 * bitstrings, tf.float32) * self.kernel, -1)
+
+#   def operator_shards(self, qubits):
+#     return [
+#         cirq.PauliSum.from_pauli_strings(cirq.Z(qubits[i]))
+#         for i in range(self.num_bits)
+#     ]
+
+#   def operator_expectation(self, expectation_shards):
+#     return tf.reduce_sum(expectation_shards * self.kernel, -1)
