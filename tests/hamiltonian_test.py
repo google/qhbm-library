@@ -19,6 +19,7 @@ import tensorflow as tf
 
 from qhbmlib import hamiltonian
 
+
 class QubitGridTest(tf.test.TestCase):
   """Test the qubit_grid function."""
 
@@ -30,6 +31,7 @@ class QubitGridTest(tf.test.TestCase):
     for test_r, test_row in enumerate(test_qubits):
       for test_c, q in enumerate(test_row):
         self.assertEqual(cirq.GridQubit(test_r, test_c), q)
+
 
 class HeisenbergTest(tf.test.TestCase):
   """Test components related to the 2D Heisenberg Hamiltonian."""
@@ -83,6 +85,7 @@ class HeisenbergTest(tf.test.TestCase):
             actual_shard += jv * pauli(q0) * pauli(q1)
           self.assertEqual(actual_shard, test_shard)
 
+
 class TFIMTest(tf.test.TestCase):
   """Test components related to the 2D Transverse Field Ising Model."""
 
@@ -133,6 +136,7 @@ class TFIMTest(tf.test.TestCase):
         for q0, q1 in vertical_qubit_pairs:
           actual_shard += cirq.Z(q0) * cirq.Z(q1)
         self.assertEqual(actual_shard, test_shard)
+
 
 if __name__ == "__main__":
   print("Running hamiltonian_test.py ...")

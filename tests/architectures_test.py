@@ -22,6 +22,7 @@ import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
+
 class RPQCTest(tf.test.TestCase, parameterized.TestCase):
   """Test RPQC functions in the architectures module."""
 
@@ -136,6 +137,7 @@ class RPQCTest(tf.test.TestCase, parameterized.TestCase):
     self.assertEqual(expected_symbols, test_symbols)
     # Confirm all symbols are unique
     self.assertEqual(len(expected_symbols), len(set(test_symbols)))
+
 
 class HEA2dTest(tf.test.TestCase):
   """Test 2D HEA functions in the architectures module."""
@@ -264,6 +266,7 @@ class HEA2dTest(tf.test.TestCase):
     self.assertEqual(circuit_expect, test_circuit)
     self.assertEqual(symbols_expect, test_symbols)
 
+
 class TrotterTest(tf.test.TestCase, parameterized.TestCase):
   """Test trotter functions in the architectures module."""
 
@@ -301,6 +304,7 @@ class TrotterTest(tf.test.TestCase, parameterized.TestCase):
         p, [hz, hx], test_name)
     self.assertEqual(expected_circuit, test_circuit)
     self.assertAllEqual(expected_symbols, test_symbols)
+
 
 class ConvolutionalTest(tf.test.TestCase, parameterized.TestCase):
   """Test convolutional functions in the architectures module."""

@@ -26,6 +26,7 @@ from tests import test_util
 # Density matrix utilities.
 # ============================================================================ #
 
+
 class PureStateTensorToDensityMatrixTest(tf.test.TestCase):
   """Test pure_state_tensor_to_density_matrix from the qhbm library."""
 
@@ -83,6 +84,7 @@ class PureStateTensorToDensityMatrixTest(tf.test.TestCase):
     )
     self.assertAllClose(test_density, ref_density)
 
+
 class CircuitsAndCountsToDensityMatrixTest(tf.test.TestCase):
   """Test circuits_and_counts_to_density_matrix from the qhbm library."""
 
@@ -98,6 +100,7 @@ class CircuitsAndCountsToDensityMatrixTest(tf.test.TestCase):
     test_density = util.circuits_and_counts_to_density_matrix(
         tfq.convert_to_tensor([id_circ]), counts)
     self.assertAllClose(test_density, expected_density)
+
 
 class FidelityTest(tf.test.TestCase):
   """Test fidelity from the qhbm library."""
@@ -126,6 +129,7 @@ class FidelityTest(tf.test.TestCase):
     test_fidelity = util.fidelity(test_dm1, test_dm2)
     ref_fidelity = 1.0
     self.assertAllClose(test_fidelity, ref_fidelity)
+
 
 class FastFidelity(tf.test.TestCase):
   """Test fidelity_eigh from the qhbm library."""
@@ -165,6 +169,7 @@ class FastFidelity(tf.test.TestCase):
     ref_fidelity = util.fidelity(test_dm1, test_dm2)
     self.assertAllClose(test_fidelity, ref_fidelity, atol=1e-4)
 
+
 class FastFidelityMixedStates(tf.test.TestCase):
 
   def test_mixed_quantum_states(self):
@@ -176,6 +181,7 @@ class FastFidelityMixedStates(tf.test.TestCase):
     test_fidelity = util.fast_fidelity(test_dm1, test_dm2)
     ref_fidelity = util.fidelity(test_dm1, test_dm2)
     self.assertAllClose(test_fidelity, ref_fidelity, atol=1e-4)
+
 
 class FastFidelityMixedStatesWithSameBasis(tf.test.TestCase):
 
@@ -189,6 +195,7 @@ class FastFidelityMixedStatesWithSameBasis(tf.test.TestCase):
     ref_fidelity = util.fidelity(test_dm1, test_dm2)
     self.assertAllClose(test_fidelity, ref_fidelity, atol=1e-4)
 
+
 class FastFidelityMixedStatesWithSameButPermutedBasis(tf.test.TestCase):
 
   def test_mixed_quantum_states_with_same_but_permuted_basis(self):
@@ -200,6 +207,7 @@ class FastFidelityMixedStatesWithSameButPermutedBasis(tf.test.TestCase):
       test_fidelity = util.fast_fidelity(test_dm1, test_dm2)
       ref_fidelity = util.fidelity(test_dm1, test_dm2)
       self.assertAllClose(test_fidelity, ref_fidelity, atol=1e-4)
+
 
 class NumpyFidelity(tf.test.TestCase):
   """Test np_fidelity from the qhbm library."""
@@ -242,6 +250,7 @@ class NumpyFidelity(tf.test.TestCase):
 
   # TODO(b/181024487)
 
+
 # class NumpyFidelityMixedStates(tf.test.TestCase):
 
 #   def test_mixed_quantum_states(self):
@@ -280,6 +289,7 @@ class NumpyFidelity(tf.test.TestCase):
 #       ref_fidelity = util.fidelity(test_dm1, test_dm2)
 #       self.assertAllClose(test_fidelity, ref_fidelity)
 
+
 class GetThermalStateTest(tf.test.TestCase):
   """Test get_thermal_state from the qhbm library."""
 
@@ -309,6 +319,7 @@ class GetThermalStateTest(tf.test.TestCase):
         direct_thermal = direct_exp / tf.linalg.trace(direct_exp)
         stable_thermal = util.get_thermal_state(beta_t, pauli_matrix)
         self.assertAllClose(direct_thermal, stable_thermal, atol=1e-10)
+
 
 class LogPartitionFunctionTest(tf.test.TestCase):
   """Test log_partition_function from the qhbm library."""
@@ -363,6 +374,7 @@ class LogPartitionFunctionTest(tf.test.TestCase):
         test_log_partition = util.log_partition_function(beta, random_h)
         self.assertAllClose(actual_log_partition, test_log_partition, 1e-10)
 
+
 class EntropyTest(tf.test.TestCase):
   """Test entropy from the qhbm library."""
 
@@ -404,9 +416,11 @@ class EntropyTest(tf.test.TestCase):
       actual_entropy = num_qubits * tf.math.log(2.0)
       self.assertAllClose(actual_entropy, test_entropy, 1e-10)
 
+
 # ============================================================================ #
 # Bitstring utilities.
 # ============================================================================ #
+
 
 class QubitToIndicesTest(tf.test.TestCase):
   """Test qubits_to_indices"""
@@ -419,6 +433,7 @@ class QubitToIndicesTest(tf.test.TestCase):
     actual_indices = util.qubits_to_indices(qubits)
     self.assertAllEqual(actual_indices, expected_indices)
 
+
 class QubitSubIndicesTest(tf.test.TestCase):
   """Test qubit_sub_indices"""
 
@@ -429,6 +444,7 @@ class QubitSubIndicesTest(tf.test.TestCase):
     expected_sub_indices = tf.constant([1, 3])
     actual_sub_indices = util.qubit_sub_indices(row_col_total, row_col_sublist)
     self.assertAllEqual(actual_sub_indices, expected_sub_indices)
+
 
 class UniqueBitstringsWithCountsTest(tf.test.TestCase):
   """Test unique_with_counts from the qhbm library."""
@@ -477,6 +493,7 @@ class UniqueBitstringsWithCountsTest(tf.test.TestCase):
     test_y, test_count = util.unique_bitstrings_with_counts(test_bitstrings)
     self.assertAllEqual(test_y, tf.constant([[1, 0, 1], [1, 1, 1], [0, 1, 1]]))
     self.assertAllEqual(test_count, tf.constant([4, 2, 2]))
+
 
 if __name__ == "__main__":
   print("Running util_test.py ...")

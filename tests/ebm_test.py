@@ -20,6 +20,7 @@ import tensorflow as tf
 
 from qhbmlib import ebm
 
+
 class ProbTest(tf.test.TestCase):
   """Test the probability<-->logit functions."""
 
@@ -42,6 +43,7 @@ class ProbTest(tf.test.TestCase):
     expected_probs = tf.math.exp(logits) / (1 + tf.math.exp(logits))
     test_probs = ebm.logit_to_probability(logits)
     self.assertAllClose(expected_probs, test_probs)
+
 
 class BernoulliTest(tf.test.TestCase):
   """Test the Bernoulli class."""
@@ -235,6 +237,7 @@ class BernoulliTest(tf.test.TestCase):
     kernel = tf.Variable(kernel)
     test_b.trainable_variables = [kernel]
     self.assertAllEqual(kernel, test_b.trainable_variables[0])
+
 
 class KOBETest(tf.test.TestCase):
   """Test the ebm.KOBE energy function."""
@@ -464,6 +467,7 @@ class KOBETest(tf.test.TestCase):
     test_k.trainable_variables = [kernel]
     self.assertAllEqual(kernel, test_k.trainable_variables[0])
 
+
 class MLPTest(tf.test.TestCase):
   num_bits = 5
 
@@ -488,6 +492,7 @@ class MLPTest(tf.test.TestCase):
     test_mlp.trainable_variables = variables
     for i in range(len(test_mlp.trainable_variables)):
       self.assertAllEqual(variables[i], test_mlp.trainable_variables[i])
+
 
 if __name__ == "__main__":
   print("Running ebm_test.py ...")

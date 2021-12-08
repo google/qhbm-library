@@ -29,6 +29,7 @@ from tests import test_util
 # Global tolerance, set for float32.
 ATOL = 1e-5
 
+
 class QHBMTest(tf.test.TestCase):
   """Tests the base QHBM class."""
 
@@ -93,6 +94,7 @@ class QHBMTest(tf.test.TestCase):
         tfq.from_tensor(test_qhbm.qnn._bit_circuit),
         tfq.from_tensor(qhbm_copy.qnn._bit_circuit))
 
+
 def get_basic_qhbm(is_analytic=False):
   """Returns a basic QHBM for testing."""
   num_bits = 3
@@ -110,6 +112,7 @@ def get_basic_qhbm(is_analytic=False):
   test_qnn.values.assign(initial_phis)
   name = "static_qhbm"
   return qhbm.QHBM(test_ebm, test_qnn, name=name)
+
 
 class QHBMBasicFunctionTest(tf.test.TestCase):
   """Test methods of the QHBM class with a simple QHBM."""
@@ -198,9 +201,11 @@ class QHBMBasicFunctionTest(tf.test.TestCase):
     self.assertAllEqual(tf.constant([0, 1, 0], dtype=tf.int8), uniques_0[0])
     self.assertAllEqual(tf.constant([1, 0, 0], dtype=tf.int8), uniques_1[0])
 
+
 def get_exact_qhbm():
   """Returns a basic ExactQHBM for testing."""
   return get_basic_qhbm(is_analytic=True)
+
 
 class ExactQHBMBasicFunctionTest(tf.test.TestCase):
   """Test methods of the exact QHBM class with a simple QHBM."""
@@ -358,6 +363,7 @@ class ExactQHBMBasicFunctionTest(tf.test.TestCase):
     test_qhbm.trainable_variables = variables
     for i in range(len(test_qhbm.trainable_variables)):
       self.assertAllEqual(variables[i], test_qhbm.trainable_variables[i])
+
 
 if __name__ == "__main__":
   print("Running qhbm_test.py ...")

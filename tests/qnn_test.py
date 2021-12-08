@@ -33,8 +33,10 @@ from tests import test_util
 ATOL = 1e-5
 GRAD_ATOL = 2e-4
 
+
 def _pystr(x):
   return [str(y) for y in x]
+
 
 class BitCircuitTest(tf.test.TestCase):
   """Test bit_circuit from the qhbm library."""
@@ -56,6 +58,7 @@ class BitCircuitTest(tf.test.TestCase):
         [cirq.X(q)**s for q, s in zip(my_qubits, expected_symbols)])
     self.assertAllEqual(_pystr(test_symbols), _pystr(expected_symbols))
     self.assertEqual(test_circuit, expected_circuit)
+
 
 class QNNTest(tf.test.TestCase):
   """Tests the QNN class."""
@@ -522,6 +525,7 @@ class QNNTest(tf.test.TestCase):
     values = tf.Variable(values)
     test_qnn.trainable_variables = [values]
     self.assertAllEqual(values, test_qnn.trainable_variables[0])
+
 
 if __name__ == "__main__":
   logging.info("Running qnn_test.py ...")
