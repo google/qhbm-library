@@ -61,15 +61,88 @@ class CheckHelpersTest(tf.test.TestCase):
       _ = energy_model.check_layers([tf.keras.layers.Dense])
 
 
+class SqueezeTest(tf.test.TestCase):
+  """Tests the Squeeze layer."""
+
+  def test_layer(self):
+    """Confirms the layer squeezes correctly."""
+    inputs = tf.constant([[[1]], [[2]]])
+    expected_axis = 1
+    expected_outputs = tf.constant([[1], [2]])
+    actual_layer = energy_model.Squeeze(expected_axis)
+    actual_outputs = actual_layer(inputs)
+    self.assertAllEqual(actual_outputs, expected_outputs)
+
+
+class SpinsFromBitstringsTest(tf.test.TestCase):
+  """Tests the SpinsFromBitstrings layer."""
+
+  def test_layer(self):
+    """Confirms the layer outputs correct spins."""
+    test_layer = energy_model.SpinsFromBitstrings()
+    test_bitstrings = tf.constant(
+      [[1, 0, 0],
+       [0, 1, 0]])
+    expected_spins = tf.constant(
+      [[-1, 1, 1],
+       [1, -1, 1]])
+    actual_spins = test_layer(test_bitstrings)
+    self.assertAllEqual(actual_spins, expected_spins)
+
+
+class VariableDotTest(tf.test.TestCase):
+  """Tests the VariableDot layer."""
+
+  def test_layer(self):
+    """Confirms the layer dots with inputs correctly."""
+    inputs_list = [[1, 5, 9]]
+    inputs = tf.constant(inputs_list, dtype=tf.float32)
+    const = 2.5
+    actual_layer = energy_model.VariableDot(3, tf.keras.initializers.Constant(const))
+    actual_outputs = actual_layer(inputs)
+    expected_outputs = tf.math.reduce_sum(inputs * const, -1)
+    print(expected_outputs)
+    self.assertAllEqual(actual_outputs, expected_outputs)
+
+    actual_layer = energy_model.VariableDot(3)
+    actual_outputs = actual_layer(inputs)
+    expected_outputs = []
+    for inner in inputs_list:
+      inner_sum = []
+      for i, k in zip(inner, actual_layer.kernel.numpy()):
+        inner_sum.append(i * k)
+      expected_outputs.append(sum(inner_sum))
+    self.assertAllClose(actual_outputs, expected_outputs)
+
+
+class ParityTest(tf.test.TestCase):
+  """Tests the Parity layer."""
+
+  def test_layer(self):
+    """Confirms the layer outputs correct parities."""
+    bitstrings = tf.constant([[1, 0, 1, 1]], dtype=tf.int8)
+    inputs = tf.constant([[-1, 1, -1, -1]])
+    bits = [1, 2, 3, 4]
+    order = 3
+    expected_outputs = tf.constant(
+      [[-1, 1, -1, -1]  # single bit parities
+       + [-1, 1, 1, -1, -1, 1]  # two bit parities
+       + [1, 1, -1, 1]])  # three bit parities
+    actual_layer = energy_model.Parity(bits, order)
+    actual_outputs = actual_layer(inputs)
+    self.assertAllEqual(actual_outputs, expected_outputs)
+
+
 class BitstringEnergyTest(tf.test.TestCase):
-  """Tests instantiations of the class."""
+  """Tests the BitstringEnergy class."""
 
   def test_init(self):
-    """Test that components are initialized correctly."""
+    """Tests that components are initialized correctly."""
     expected_num_bits = 5
     expected_bits = [5, 17, 22, 30, 42]
     expected_name = "init_test"
-    expected_energy_layers = [tf.keras.layers.Dense(1)]
+    expected_energy_layers = [
+        tf.keras.layers.Dense(1), energy_model.Squeeze(-1)]
     actual_b = energy_model.BitstringEnergy(
         expected_bits, expected_energy_layers, name=expected_name)
     self.assertEqual(actual_b.num_bits, expected_num_bits)
@@ -81,7 +154,9 @@ class BitstringEnergyTest(tf.test.TestCase):
     """Checks that building and calling works for a simple energy."""
     num_bits = 5
     energy_layers = [
-      tf.keras.layers.Dense(1, kernel_initializer=tf.keras.initializers.Constant(1))]
+      tf.keras.layers.Dense(1, kernel_initializer=tf.keras.initializers.Constant(1)),
+      energy_model.Squeeze(-1)
+    ]
     test_b = energy_model.BitstringEnergy(list(range(num_bits)), energy_layers)
     test_bitstrings = tf.constant(
         list(itertools.product([0, 1], repeat=num_bits)))
@@ -108,13 +183,12 @@ class BitstringEnergyTest(tf.test.TestCase):
         expected_layer_list.append(
             tf.keras.layers.Dense(units[i], activation=activations[i]))
       expected_layer_list.append(tf.keras.layers.Dense(1))
+      expected_layer_list.append(energy_model.Squeeze(-1))
       actual_mlp = energy_model.BitstringEnergy(bits, expected_layer_list)
 
       expected_mlp = tf.keras.Sequential(expected_layer_list)
       _ = expected_mlp(tf.constant([[0] * num_bits], tf.int8))
-      for i, layer in enumerate(expected_mlp.layers):
-        layer.kernel.assign(actual_mlp.energy_layers[i].kernel)
-        layer.bias.assign(actual_mlp.energy_layers[i].bias)
+      expected_mlp.set_weights(actual_mlp.get_weights())
 
       @tf.function
       def special_energy(bitstrings):
@@ -123,7 +197,7 @@ class BitstringEnergyTest(tf.test.TestCase):
       for e_func in [actual_mlp, special_energy]:
         with tf.GradientTape(persistent=True) as tape:
           actual_energy = e_func(test_bitstrings)
-          expected_energy = tf.squeeze(expected_mlp(test_bitstrings), -1)
+          expected_energy = expected_mlp(test_bitstrings)
         self.assertAllClose(actual_energy, expected_energy)
         actual_energy_grad = tape.jacobian(actual_energy,
                                            actual_mlp.trainable_variables)
@@ -133,162 +207,184 @@ class BitstringEnergyTest(tf.test.TestCase):
         self.assertAllClose(actual_energy_grad, expected_energy_grad)
 
 
-class SpinsFromBitstringsTest(tf.test.TestCase):
-  """Tests the SpinsFromBitstrings layer."""
+class PauliBitstringEnergyTest(tf.test.TestCase):
+  """Tests the PauliBitstringEnergy class."""
 
   def test_layer(self):
-    """Confirms the layer outputs correct spins."""
-    test_layer = energy_model.SpinsFromBitstrings()
-    test_bitstrings = tf.constant(
-      [[1, 0, 0],
-       [0, 1, 0]])
-    expected_spins = tf.constant(
-      [[-1, 1, 1],
-       [1, -1, 1]])
-    actual_spins = test_layer(test_bitstrings)
-    self.assertAllEqual(actual_spins, expected_spins)
-
-
-class PauliBitstringEnergyTest(tf.test.TestCase):
-  """Tests instantiations of the class."""
-
-  def test_init(self):
-    """Test that components are initialized correctly."""
+    """Tests initialization and calling for simple total parity."""
+    bits = [1, 5, 7]
     expected_pre_process = [energy_model.SpinsFromBitstrings()]
-    expected_post_process = []
+    expected_post_process = [tf.keras.layers.Lambda(lambda x: tf.reduce_prod(x, -1))]
+    def operator_shards_func(qubits):
+      inner_shards = [cirq.Z(q) for q in qubits]
+      shard = cirq.PauliSum(from_pauli_strings(cirq.I(qubits[0])))
+      for op in inner_shards:
+        shard *= op
+      return [shard]
+    actual_layer = energy_model.PauliBitstringEnergy(bits, expected_pre_process, expected_post_process, operator_shards_func)
+    inputs = tf.constant([[1, 1, 1, 1], [1, 1, 0, 1]])
+    actual_outputs = actual_layer(inputs)
+    expected_outputs = tf.constant([1, -1])
+    self.assertAllEqual(actual_outputs, expected_outputs)
 
-        
-# class BernoulliTest(tf.test.TestCase):
-#   """Test the Bernoulli class."""
 
-#   def test_init(self):
-#     """Test that components are initialized correctly."""
-#     expected_num_bits = 5
-#     expected_bits = [5, 17, 22, 30, 42]
-#     init_const = 1.5
-#     expected_name = "init_test"
-#     test_b = energy_model.Bernoulli(
-#         expected_bits,
-#         tf.keras.initializers.Constant(init_const),
-#         name=expected_name)
-#     self.assertEqual(test_b.num_bits, expected_num_bits)
-#     self.assertAllEqual(test_b.bits, expected_bits)
-#     self.assertAllEqual(test_b.kernel, [init_const] * expected_num_bits)
-#     self.assertEqual(test_b.name, expected_name)
+class BernoulliEnergyTest(tf.test.TestCase):
+  """Tests the BernoulliEnergy class."""
 
-#   def test_copy(self):
-#     """Test that the copy has the same values, but new variables."""
-#     expected_num_bits = 8
-#     expected_bits = list(range(expected_num_bits))
-#     test_b = energy_model.Bernoulli(expected_bits, name="test_copy")
-#     test_b_copy = test_b.copy()
-#     self.assertEqual(test_b_copy.num_bits, test_b.num_bits)
-#     self.assertAllEqual(test_b_copy.bits, test_b.bits)
-#     self.assertAllEqual(test_b_copy.kernel, test_b.kernel)
-#     self.assertNotEqual(id(test_b_copy.kernel), id(test_b.kernel))
-#     self.assertEqual(test_b_copy.name, test_b.name)
+  def test_energy_simple(self):
+    """Tests the energy and its derivative in a simple case.
 
-#   def test_trainable_variables_bernoulli(self):
-#     bits = [1, 3, 4, 8, 9]
-#     test_b = energy_model.Bernoulli(bits, name="test")
-#     self.assertAllEqual(test_b.kernel, test_b.trainable_variables[0])
+    For a given bitstring b, the energy is
+      $$E_\theta(b) = \sum_i (1-2b_i)\theta_i$$
+    Then the derivative of the energy with respect to the thetas vector is
+      $$\partial / \partial \theta E_\theta(b) = [(1-2b_i) for b_i in b]$$
+    """
+    test_b = energy_model.BernoulliEnergy([1, 2, 3])
+    test_vars = tf.constant([1.0, 1.7, -2.8], dtype=tf.float32)
+    test_b.set_weights([test_vars])
+    test_bitstrings = tf.constant([[0, 0, 0], [1, 0, 0], [0, 1, 1]])
+    test_spins = 1 - 2 * test_bitstrings
 
-#     expected_kernel = tf.random.uniform([len(bits)])
-#     test_b.trainable_variables = [expected_kernel]
-#     self.assertAllEqual(test_b.trainable_variables[0], expected_kernel)
+    @tf.function
+    def special_energy(bitstrings):
+      return test_b(bitstrings)
 
-#     expected_kernel = tf.Variable(tf.random.uniform([len(bits)]))
-#     test_b.trainable_variables = [expected_kernel]
-#     self.assertAllEqual(test_b.trainable_variables[0], expected_kernel)
+    for e_func in [test_b, special_energy]:
+      with tf.GradientTape() as tape:
+        actual_energy = e_func(test_bitstrings)
+      actual_energy_grad = tape.jacobian(actual_energy,
+                                         test_b.trainable_variables)
+      expected_energy = [
+          test_vars[0] + test_vars[1] + test_vars[2],
+          -test_vars[0] + test_vars[1] + test_vars[2],
+          test_vars[0] - test_vars[1] - test_vars[2]
+      ]
+      self.assertAllClose(actual_energy, expected_energy)
+      self.assertAllClose(actual_energy_grad, [test_spins])
 
-#   def test_energy_bernoulli_simple(self):
-#     """Test Bernoulli.energy and its derivative in a simple case.
+  def test_energy_bernoulli(self):
+    """Tests the energy and its derivative in a more complicated case.
 
-#     For a given bitstring b, the energy is
-#       $$E_\theta(b) = \sum_i (1-2b_i)\theta_i$$
-#     Then the derivative of the energy with respect to the thetas vector is
-#       $$\partial / \partial \theta E_\theta(b) = [(1-2b_i) for b_i in b]$$
-#     """
-#     test_b = energy_model.Bernoulli([1, 2, 3])
-#     test_vars = tf.constant([1.0, 1.7, -2.8], dtype=tf.float32)
-#     test_b.kernel.assign(test_vars)
-#     test_bitstrings = tf.constant([[0, 0, 0], [1, 0, 0], [0, 0, 1]])
-#     test_spins = 1 - 2 * test_bitstrings
+    For a given bitstring b, the energy is
+      $$E_\theta(b) = \sum_i (1-2b_i)\theta_i$$
+    Then the derivative of the energy with respect to the thetas vector is
+      $$\partial / \partial \theta E_\theta(b) = [(1-2b_i) for b_i in b]$$
+    """
+    num_bits = 7
+    test_bitstrings = tf.constant(
+        list(itertools.product([0, 1], repeat=num_bits)))
+    test_spins = 1 - 2 * test_bitstrings
+    num_tests = 5
+    for _ in range(num_tests):
+      bits = random.sample(range(1000), num_bits)
+      thetas = tf.random.uniform([num_bits], minval=-100, maxval=100)
+      test_b = energy_model.BernoulliEnergy(bits)
+      test_b.set_weights([thetas])
 
-#     @tf.function
-#     def special_energy(bitstrings):
-#       return test_b(bitstrings)
+      @tf.function
+      def special_energy(bitstrings):
+        return test_b(bitstrings)
 
-#     for e_func in [test_b, special_energy]:
-#       with tf.GradientTape() as tape:
-#         actual_energy = e_func(test_bitstrings)
-#       actual_energy_grad = tape.jacobian(actual_energy,
-#                                          test_b.trainable_variables)
-#       expected_energy = [
-#           test_vars[0] + test_vars[1] + test_vars[2],
-#           -test_vars[0] + test_vars[1] + test_vars[2],
-#           test_vars[0] + test_vars[1] - test_vars[2]
-#       ]
-#       self.assertAllClose(actual_energy, expected_energy)
-#       self.assertAllClose(actual_energy_grad, [test_spins])
+      for e_func in [test_b, special_energy]:
+        with tf.GradientTape() as tape:
+          actual_energy = e_func(test_bitstrings)
 
-#   def test_energy_bernoulli(self):
-#     """Test Bernoulli.energy and its derivative in all cases.
+        expected_energy = tf.reduce_sum(
+            tf.cast(test_spins, tf.float32) * thetas, -1)
+        self.assertAllClose(actual_energy, expected_energy)
 
-#     For a given bitstring b, the energy is
-#       $$E_\theta(b) = \sum_i (1-2b_i)\theta_i$$
-#     Then the derivative of the energy with respect to the thetas vector is
-#       $$\partial / \partial \theta E_\theta(b) = [(1-2b_i) for b_i in b]$$
-#     """
-#     num_bits = 9
-#     test_bitstrings = tf.constant(
-#         list(itertools.product([0, 1], repeat=num_bits)))
-#     test_spins = 1 - 2 * test_bitstrings
-#     num_tests = 5
-#     for _ in range(num_tests):
-#       bits = random.sample(range(1000), num_bits)
-#       thetas = tf.random.uniform([num_bits], minval=-100, maxval=100)
-#       test_b = energy_model.Bernoulli(bits)
-#       test_b.kernel.assign(thetas)
+        actual_energy_grad = tape.jacobian(actual_energy,
+                                           test_b.trainable_variables)
+        self.assertAllClose(actual_energy_grad, [test_spins])
 
-#       @tf.function
-#       def special_energy(bitstrings):
-#         return test_b(bitstrings)
+  def test_operator_shards(self):
+    """Confirms operators are single qubit Z only."""
+    num_bits = 10
+    test_b = energy_model.BernoulliEnergy(list(range(num_bits)))
+    qubits = cirq.GridQubit.rect(1, num_bits)
+    actual_ops = test_b.operator_shards(qubits)
+    expected_ops = [cirq.PauliSum.from_pauli_strings(cirq.Z(q)) for q in qubits]
+    self.assertAllEqual(actual_ops, expected_ops)
 
-#       for e_func in [test_b, special_energy]:
-#         with tf.GradientTape() as tape:
-#           actual_energy = e_func(test_bitstrings)
+  def test_operator_expectation(self):
+    """Tests combining expectations of operators in energy."""
+    # Build Bernoulli
+    num_bits = 3
+    test_b = energy_model.BernoulliEnergy(list(range(num_bits)))
+    qubits = cirq.GridQubit.rect(1, num_bits)
+    # Pin at bitstring [1, 0, 1]
+    test_b.set_weights([tf.constant([1000.0, -1000.0, 1000.0])])
+    operators = test_b.operator_shards(qubits)
 
-#         expected_energy = tf.reduce_sum(
-#             tf.cast(test_spins, tf.float32) * thetas, -1)
-#         self.assertAllClose(actual_energy, expected_energy)
+    # True energy
+    bitstring = tf.constant([[0, 0, 1]])  # not the pinned bitstring
+    ref_energy = test_b(bitstring)[0]
 
-#         actual_energy_grad = tape.jacobian(actual_energy,
-#                                            test_b.trainable_variables)
-#         self.assertAllClose(actual_energy_grad, [test_spins])
+    # Test energy
+    circuit = cirq.Circuit(
+        [cirq.I(qubits[0]),
+         cirq.I(qubits[1]),
+         cirq.X(qubits[2])])
+    output_state_vector = cirq.Simulator().simulate(circuit).final_state_vector
+    op_expectations = []
+    qubit_map = {q: i for i, q in enumerate(qubits)}
+    for op in operators:
+      op_expectations.append(
+          op.expectation_from_state_vector(output_state_vector, qubit_map).real)
+    test_energy = test_b.operator_expectation(op_expectations)
+    self.assertAllClose(test_energy, ref_energy, atol=1e-4)
+
+
+# class KOBETest(tf.test.TestCase):
+#   """Tests the KOBE class."""
+
+#   def test_energy(self):
+#     """Tests every energy on two bits."""
+#     bits = [0, 1]
+#     order = 2
+#     test_thetas = tf.Variable([1.5, 2.7, -4.0])
+#     expected_energies = tf.constant([0.2, 2.8, 5.2, -8.2])
+#     test_k = energy_model.KOBE(bits, order)
+#     test_k.energy_layers[2].kernel.assign(test_thetas)
+#     all_strings = tf.constant([
+#       [0, 0],
+#       [0, 1],
+#       [1, 0],
+#       [1, 1]])
+#     actual_energies = test_k(all_strings)
+#     self.assertAllClose(actual_energies, expected_energies)
 
 #   def test_operator_shards(self):
-#     """Confirm operators are single qubit Z only."""
-#     num_bits = 10
-#     test_b = energy_model.Bernoulli(list(range(num_bits)))
+#     """Confirms correct operators for a simple Boltzmann."""
+#     num_bits = 3
+#     test_k = energy_model.KOBE(list(range(num_bits)), 2)
 #     qubits = cirq.GridQubit.rect(1, num_bits)
-#     actual_ops = test_b.operator_shards(qubits)
-#     expected_ops = [cirq.PauliSum.from_pauli_strings(cirq.Z(q)) for q in qubits]
-#     self.assertAllEqual(actual_ops, expected_ops)
+#     test_ops = test_k.operator_shards(qubits)
+#     ref_ops = [
+#         cirq.Z(qubits[0]),
+#         cirq.Z(qubits[1]),
+#         cirq.Z(qubits[2]),
+#         cirq.Z(qubits[0]) * cirq.Z(qubits[1]),
+#         cirq.Z(qubits[0]) * cirq.Z(qubits[2]),
+#         cirq.Z(qubits[1]) * cirq.Z(qubits[2])
+#     ]
+#     for t_op, r_op in zip(test_ops, ref_ops):
+#       self.assertEqual(t_op, cirq.PauliSum.from_pauli_strings(r_op))
 
 #   def test_operator_expectation(self):
-#     """Test combining expectations of operators in energy."""
-#     # Build Bernoulli
+#     """Confirms the expectations combine to the correct total energy."""
+#     # Build simple Boltzmann
 #     num_bits = 3
-#     test_b = energy_model.Bernoulli(list(range(num_bits)))
+#     test_b = energy_model.KOBE(num_bits, 2)
 #     qubits = cirq.GridQubit.rect(1, num_bits)
+
 #     # Pin at bitstring [1, 0, 1]
-#     test_b.kernel.assign(tf.constant([1000.0, -1000.0, 1000.0]))
+#     test_b.set_weights([tf.constant([100.0, -200.0, 300.0, 10, -20, 30])])
 #     operators = test_b.operator_shards(qubits)
 
 #     # True energy
 #     bitstring = tf.constant([[0, 0, 1]])  # not the pinned bitstring
-#     ref_energy = test_b(bitstring)[0]
+#     ref_energy = test_b.energy(bitstring)[0]
 
 #     # Test energy
 #     circuit = cirq.Circuit(

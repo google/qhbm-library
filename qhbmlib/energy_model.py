@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tools for modelling energy functions."""
 
+import itertools
 from typing import List, Union
 
 import cirq
@@ -43,6 +44,29 @@ def check_layers(layer_list):
   if not isinstance(layer_list, list) or not all([isinstance(e, tf.keras.layers.Layer) for e in layer_list]):
     raise TypeError("must be a list of keras layers.")
   return layer_list
+
+
+class Squeeze(tf.keras.layers.Layer):
+  """Wraps tf.squeeze in a Keras Layer."""
+
+  def __init__(self, axis=None):
+    """Initializes a Squeeze layer.
+
+    Args:
+      axis: An optional list of ints. Defaults to []. If specified, only
+        squeezes the dimensions listed. The dimension index starts at 0. It is
+        an error to squeeze a dimension that is not 1. Must be in the range
+        [-rank(input), rank(input)). Must be specified if input is
+        a RaggedTensor.
+    """
+    super().__init__()
+    if axis is None:
+      axis = []
+    self._axis = axis
+
+  def call(self, inputs):
+    """Applies tf.squeeze to the inputs."""
+    return tf.squeeze(inputs, axis=self._axis)
 
 
 class SpinsFromBitstrings(tf.keras.layers.Layer):
@@ -80,13 +104,10 @@ class VariableDot(tf.keras.layers.Layer):
       shape=[input_width],
       initializer=initializer,
       trainable=True)
-    self._dot = tf.keras.layers.Dot()
 
   def call(self, inputs):
     """Returns the dot product between the inputs and this layer's variables."""
-    input_shape = tf.shape(inputs)
-    tiled = tf.tile(self.kernel, [input_shape[0], 1])
-    return self._dot([inputs, tiled])
+    return tf.reduce_sum(inputs * self.kernel, -1)
 
 
 class Parity(tf.keras.layers.Layer):
@@ -101,21 +122,33 @@ class Parity(tf.keras.layers.Layer):
     for i in range(1, order + 1):
       combos = itertools.combinations(range(len(bits)), i)
       indices_list.extend(list(combos))
-    self.indices = tf.ragged_stack(indices_list)
+    self.indices = tf.ragged.stack(indices_list)
     self.num_terms = len(indices_list)
 
   def call(self, inputs):
     """Returns a batch of parities corresponding to the input bitstrings."""
     parities_t = tf.zeros(
-        [self.num_terms, tf.shape(inputs)[0]], dtype=tf.float32)
+        [self.num_terms, tf.shape(inputs)[0]])
     for i in tf.range(self.num_terms):
       parity = tf.reduce_prod(tf.gather(inputs, self.indices[i], axis=-1), -1)
       parities_t = tf.tensor_scatter_nd_update(parities_t, [[i]], [parity])
-    return parities_t
+    return tf.transpose(parities_t)
 
-  
+
 class BitstringEnergy(tf.keras.layers.Layer):
-  """Class for representing an energy function over bitstrings."""
+  """Class for representing an energy function over bitstrings.
+
+  Keras Layer which can be interpreted as outputting an unnormalized
+  log-probability for each given bit-string x, written E(x).  Hence, this class
+  implicitly defines a probability distribution over all bit-strings given by
+  $$p(x) = \frac{\exp(-E(x))}{\sum_x \exp(-E(x))}.$$
+
+  Moving to its use in QHBMs: each bit-string can also be interpreted as
+  an index for an entry of the diagonal eigenvalue matrix in the spectral
+  representation of a density operator.  Hence, for a QHBM, inference
+  corresponds to sampling computational basis states $|x><x|$ for $x ~ p$,
+  where $p$ is the probability distribution written above.
+  """
 
   def __init__(self,
                bits: List[int],
@@ -153,7 +186,7 @@ class BitstringEnergy(tf.keras.layers.Layer):
     x = inputs
     for layer in self._energy_layers:
       x = layer(x)
-    return tf.squeeze(x, -1)
+    return x
 
 
 class PauliBitstringEnergy(BitstringEnergy):
@@ -180,7 +213,7 @@ class PauliBitstringEnergy(BitstringEnergy):
     
   def operator_shards(self, qubits):
     """Parameter independent Pauli Z strings to measure."""
-    raise self._operator_shards_func(qubits)
+    return self._operator_shards_func(qubits)
 
   def operator_expectation(self, expectation_shards):
     """Computes the average energy given operator shard expectation values."""
@@ -188,7 +221,7 @@ class PauliBitstringEnergy(BitstringEnergy):
     for layer in self._post_process:
       x = layer(x)
     return x
-  
+
 
 class BernoulliEnergy(PauliBitstringEnergy):
   """Tensor product of coin flip distributions."""
