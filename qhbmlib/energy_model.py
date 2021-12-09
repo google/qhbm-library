@@ -41,7 +41,8 @@ def check_order(order):
 
 def check_layers(layer_list):
   """Confirms the input is a valid list of keras Layers."""
-  if not isinstance(layer_list, list) or not all([isinstance(e, tf.keras.layers.Layer) for e in layer_list]):
+  if not isinstance(layer_list, list) or not all(
+      [isinstance(e, tf.keras.layers.Layer) for e in layer_list]):
     raise TypeError("must be a list of keras layers.")
   return layer_list
 
@@ -75,7 +76,7 @@ class SpinsFromBitstrings(tf.keras.layers.Layer):
   def __init__(self):
     """Initializes a SpinsFromBitstrings."""
     super().__init__(trainable=False)
-  
+
   def call(self, inputs):
     """Returns the spins corresponding to the input bitstrings.
 
@@ -100,10 +101,10 @@ class VariableDot(tf.keras.layers.Layer):
     """
     super().__init__()
     self.kernel = self.add_weight(
-      name=f'kernel',
-      shape=[input_width],
-      initializer=initializer,
-      trainable=True)
+        name=f'kernel',
+        shape=[input_width],
+        initializer=initializer,
+        trainable=True)
 
   def call(self, inputs):
     """Returns the dot product between the inputs and this layer's variables."""
@@ -127,8 +128,7 @@ class Parity(tf.keras.layers.Layer):
 
   def call(self, inputs):
     """Returns a batch of parities corresponding to the input bitstrings."""
-    parities_t = tf.zeros(
-        [self.num_terms, tf.shape(inputs)[0]])
+    parities_t = tf.zeros([self.num_terms, tf.shape(inputs)[0]])
     for i in tf.range(self.num_terms):
       parity = tf.reduce_prod(tf.gather(inputs, self.indices[i], axis=-1), -1)
       parities_t = tf.tensor_scatter_nd_update(parities_t, [[i]], [parity])
@@ -180,7 +180,7 @@ class BitstringEnergy(tf.keras.layers.Layer):
   def energy_layers(self):
     """List of keras layers which, when stacked, map bitstrings to energies."""
     return self._energy_layers
-  
+
   def call(self, inputs):
     """Returns the energies corresponding to the input bitstrings."""
     x = inputs
@@ -192,7 +192,12 @@ class BitstringEnergy(tf.keras.layers.Layer):
 class PauliBitstringEnergy(BitstringEnergy):
   """Augments BitstringEnergy with a Pauli Z representation."""
 
-  def __init__(self, bits, pre_process, post_process, operator_shards_func, name=None):
+  def __init__(self,
+               bits,
+               pre_process,
+               post_process,
+               operator_shards_func,
+               name=None):
     """Initializes a PauliBitstringEnergy.
 
     Args:
@@ -210,7 +215,7 @@ class PauliBitstringEnergy(BitstringEnergy):
     self._post_process = check_layers(post_process)
     super().__init__(bits, self._pre_process + self._post_process, name)
     self._operator_shards_func = operator_shards_func
-    
+
   def operator_shards(self, qubits):
     """Parameter independent Pauli Z strings to measure."""
     return self._operator_shards_func(qubits)
@@ -240,12 +245,12 @@ class BernoulliEnergy(PauliBitstringEnergy):
     """
     pre_process = [SpinsFromBitstrings()]
     post_process = [VariableDot(len(bits), initializer=initializer)]
+
     def operator_shards_func(qubits):
-      return [
-        cirq.PauliSum.from_pauli_strings(cirq.Z(q))
-        for q in qubits
-      ]
-    super().__init__(bits, pre_process, post_process, operator_shards_func, name)
+      return [cirq.PauliSum.from_pauli_strings(cirq.Z(q)) for q in qubits]
+
+    super().__init__(bits, pre_process, post_process, operator_shards_func,
+                     name)
 
 
 class KOBE(PauliBitstringEnergy):
@@ -267,7 +272,9 @@ class KOBE(PauliBitstringEnergy):
     """
     parity_layer = Parity(bits, order)
     pre_process = [SpinsFromBitstrings(), parity_layer]
-    post_process = [VariableDot(parity_layer.num_terms, initializer=initializer)]
+    post_process = [
+        VariableDot(parity_layer.num_terms, initializer=initializer)
+    ]
 
     def operator_shards_func(qubits):
       ops = []
@@ -279,4 +286,5 @@ class KOBE(PauliBitstringEnergy):
         ops.append(cirq.PauliSum.from_pauli_strings(string))
       return ops
 
-    super().__init__(bits, pre_process, post_process, operator_shards_func, name)
+    super().__init__(bits, pre_process, post_process, operator_shards_func,
+                     name)
