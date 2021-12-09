@@ -45,6 +45,75 @@ def check_layers(layer_list):
   return layer_list
 
 
+class SpinsFromBitstrings(tf.keras.layers.Layer):
+  """Simple layer taking bits to spins."""
+
+  def __init__(self):
+    """Initializes a SpinsFromBitstrings."""
+    super().__init__(trainable=False)
+  
+  def call(self, inputs):
+    """Returns the spins corresponding to the input bitstrings.
+
+    Note that this maps |0> -> +1 and |1> -> -1.  This is in accordance with
+    the usual interpretation of the Bloch sphere.
+    """
+    return tf.cast(1 - 2 * inputs, tf.float32)
+
+
+class VariableDot(tf.keras.layers.Layer):
+  """Utility layer for dotting input with a same-sized variable."""
+
+  def __init__(self,
+               input_width,
+               initializer=tf.keras.initializers.RandomUniform()):
+    """Initializes a VariableDot layer.
+
+    Args:
+      input_width: Size of the last dimension of input on which this layer acts.
+      initializer: A `tf.keras.initializers.Initializer` which specifies how to
+        initialize the values of the parameters.
+    """
+    super().__init__()
+    self.kernel = self.add_weight(
+      name=f'kernel',
+      shape=[input_width],
+      initializer=initializer,
+      trainable=True)
+    self._dot = tf.keras.layers.Dot()
+
+  def call(self, inputs):
+    """Returns the dot product between the inputs and this layer's variables."""
+    input_shape = tf.shape(inputs)
+    tiled = tf.tile(self.kernel, [input_shape[0], 1])
+    return self._dot([inputs, tiled])
+
+
+class Parity(tf.keras.layers.Layer):
+  """Computes the parities of input spins."""
+
+  def __init__(self, bits, order):
+    """Initializes a Parity layer."""
+    super().__init__(trainable=False)
+    bits = check_bits(bits)
+    order = check_order(order)
+    indices_list = []
+    for i in range(1, order + 1):
+      combos = itertools.combinations(range(len(bits)), i)
+      indices_list.extend(list(combos))
+    self.indices = tf.ragged_stack(indices_list)
+    self.num_terms = len(indices_list)
+
+  def call(self, inputs):
+    """Returns a batch of parities corresponding to the input bitstrings."""
+    parities_t = tf.zeros(
+        [self.num_terms, tf.shape(inputs)[0]], dtype=tf.float32)
+    for i in tf.range(self.num_terms):
+      parity = tf.reduce_prod(tf.gather(inputs, self.indices[i], axis=-1), -1)
+      parities_t = tf.tensor_scatter_nd_update(parities_t, [[i]], [parity])
+    return parities_t
+
+  
 class BitstringEnergy(tf.keras.layers.Layer):
   """Class for representing an energy function over bitstrings."""
 
@@ -119,49 +188,6 @@ class PauliBitstringEnergy(BitstringEnergy):
     for layer in self._post_process:
       x = layer(x)
     return x
-
-
-class SpinsFromBitstrings(tf.keras.layers.Layer):
-  """Simple layer taking bits to spins."""
-
-  def __init__(self):
-    """Initializes a SpinsFromBitstrings."""
-    super().__init__(trainable=False)
-  
-  def call(self, inputs):
-    """
-    Note that this maps |0> -> +1 and |1> -> -1.  This is in accordance with
-    the usual interpretation of the Bloch sphere.
-    """
-    return tf.cast(1 - 2 * inputs, tf.float32)
-
-
-class VariableDot(tf.keras.layers.Layer):
-  """Utility layer for dotting input with a same-sized variable."""
-
-  def __init__(self,
-               input_width,
-               initializer=tf.keras.initializers.RandomUniform()):
-    """Initializes a VariableDot layer.
-
-    Args:
-      input_width: Size of the last dimension of input on which this layer acts.
-      initializer: A `tf.keras.initializers.Initializer` which specifies how to
-        initialize the values of the parameters.
-    """
-    super().__init__()
-    self.kernel = self.add_weight(
-      name=f'kernel',
-      shape=[input_width],
-      initializer=initializer,
-      trainable=True)
-    self._dot = tf.keras.layers.Dot()
-
-  def call(self, inputs):
-    """Returns the dot product between the inputs and this layer's variables."""
-    input_shape = tf.shape(inputs)
-    tiled = tf.tile(self.kernel, [input_shape[0], 1])
-    return self._dot([inputs, tiled])
   
 
 class BernoulliEnergy(PauliBitstringEnergy):
@@ -187,30 +213,6 @@ class BernoulliEnergy(PauliBitstringEnergy):
         for q in qubits
       ]
     super().__init__(bits, pre_process, post_process, operator_shards_func, name)
-
-
-class Parity(tf.keras.layers.Layer):
-  """Computes the parities of input spins."""
-
-  def __init__(self, bits, order):
-    """Initializes a Parity layer."""
-    super().__init__(trainable=False)
-    bits = check_bits(bits)
-    order = check_order(order)
-    indices_list = []
-    for i in range(1, order + 1):
-      combos = itertools.combinations(range(len(bits)), i)
-      indices_list.extend(list(combos))
-    self.indices = tf.ragged_stack(indices_list)
-    self.num_terms = len(indices_list)
-
-  def call(self, inputs):
-    parities_t = tf.zeros(
-        [self.num_terms, tf.shape(inputs)[0]], dtype=tf.float32)
-    for i in tf.range(self.num_terms):
-      parity = tf.reduce_prod(tf.gather(inputs, self.indices[i], axis=-1), -1)
-      parities_t = tf.tensor_scatter_nd_update(parities_t, [[i]], [parity])
-    return parities_t
 
 
 class KOBE(PauliBitstringEnergy):
@@ -245,6 +247,3 @@ class KOBE(PauliBitstringEnergy):
       return ops
 
     super().__init__(bits, pre_process, post_process, operator_shards_func, name)
-
-
-

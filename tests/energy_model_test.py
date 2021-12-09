@@ -148,12 +148,14 @@ class SpinsFromBitstringsTest(tf.test.TestCase):
     actual_spins = test_layer(test_bitstrings)
     self.assertAllEqual(actual_spins, expected_spins)
 
-# class PauliBitstringEnergyTest(tf.test.TestCase):
-#   """Tests instantiations of the class."""
 
-#   def test_init(self):
-#     """Test that components are initialized correctly."""
-#     expected_pre_process = []
+class PauliBitstringEnergyTest(tf.test.TestCase):
+  """Tests instantiations of the class."""
+
+  def test_init(self):
+    """Test that components are initialized correctly."""
+    expected_pre_process = [energy_model.SpinsFromBitstrings()]
+    expected_post_process = []
 
         
 # class BernoulliTest(tf.test.TestCase):
