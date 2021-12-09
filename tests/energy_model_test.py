@@ -318,7 +318,7 @@ class BernoulliEnergyTest(tf.test.TestCase):
 
     # True energy
     bitstring = tf.constant([[0, 0, 1]])  # not the pinned bitstring
-    ref_energy = test_b(bitstring)[0]
+    expected_energy = test_b(bitstring)[0]
 
     # Test energy
     circuit = cirq.Circuit(
@@ -331,74 +331,74 @@ class BernoulliEnergyTest(tf.test.TestCase):
     for op in operators:
       op_expectations.append(
           op.expectation_from_state_vector(output_state_vector, qubit_map).real)
-    test_energy = test_b.operator_expectation(op_expectations)
-    self.assertAllClose(test_energy, ref_energy, atol=1e-4)
+    actual_energy = test_b.operator_expectation(op_expectations)
+    self.assertAllClose(actual_energy, expected_energy, atol=1e-4)
 
 
-# class KOBETest(tf.test.TestCase):
-#   """Tests the KOBE class."""
+class KOBETest(tf.test.TestCase):
+  """Tests the KOBE class."""
 
-#   def test_energy(self):
-#     """Tests every energy on two bits."""
-#     bits = [0, 1]
-#     order = 2
-#     test_thetas = tf.Variable([1.5, 2.7, -4.0])
-#     expected_energies = tf.constant([0.2, 2.8, 5.2, -8.2])
-#     test_k = energy_model.KOBE(bits, order)
-#     test_k.energy_layers[2].kernel.assign(test_thetas)
-#     all_strings = tf.constant([
-#       [0, 0],
-#       [0, 1],
-#       [1, 0],
-#       [1, 1]])
-#     actual_energies = test_k(all_strings)
-#     self.assertAllClose(actual_energies, expected_energies)
+  def test_energy(self):
+    """Tests every energy on two bits."""
+    bits = [0, 1]
+    order = 2
+    test_thetas = tf.Variable([1.5, 2.7, -4.0])
+    expected_energies = tf.constant([0.2, 2.8, 5.2, -8.2])
+    test_k = energy_model.KOBE(bits, order)
+    test_k.energy_layers[2].kernel.assign(test_thetas)
+    all_strings = tf.constant([
+      [0, 0],
+      [0, 1],
+      [1, 0],
+      [1, 1]])
+    actual_energies = test_k(all_strings)
+    self.assertAllClose(actual_energies, expected_energies)
 
-#   def test_operator_shards(self):
-#     """Confirms correct operators for a simple Boltzmann."""
-#     num_bits = 3
-#     test_k = energy_model.KOBE(list(range(num_bits)), 2)
-#     qubits = cirq.GridQubit.rect(1, num_bits)
-#     test_ops = test_k.operator_shards(qubits)
-#     ref_ops = [
-#         cirq.Z(qubits[0]),
-#         cirq.Z(qubits[1]),
-#         cirq.Z(qubits[2]),
-#         cirq.Z(qubits[0]) * cirq.Z(qubits[1]),
-#         cirq.Z(qubits[0]) * cirq.Z(qubits[2]),
-#         cirq.Z(qubits[1]) * cirq.Z(qubits[2])
-#     ]
-#     for t_op, r_op in zip(test_ops, ref_ops):
-#       self.assertEqual(t_op, cirq.PauliSum.from_pauli_strings(r_op))
+  def test_operator_shards(self):
+    """Confirms correct operators for a simple Boltzmann."""
+    num_bits = 3
+    test_k = energy_model.KOBE(list(range(num_bits)), 2)
+    qubits = cirq.GridQubit.rect(1, num_bits)
+    test_ops = test_k.operator_shards(qubits)
+    ref_ops = [
+        cirq.Z(qubits[0]),
+        cirq.Z(qubits[1]),
+        cirq.Z(qubits[2]),
+        cirq.Z(qubits[0]) * cirq.Z(qubits[1]),
+        cirq.Z(qubits[0]) * cirq.Z(qubits[2]),
+        cirq.Z(qubits[1]) * cirq.Z(qubits[2])
+    ]
+    for actual_op, expected_op in zip(test_ops, ref_ops):
+      self.assertEqual(actual_op, cirq.PauliSum.from_pauli_strings(expected_op))
 
-#   def test_operator_expectation(self):
-#     """Confirms the expectations combine to the correct total energy."""
-#     # Build simple Boltzmann
-#     num_bits = 3
-#     test_b = energy_model.KOBE(num_bits, 2)
-#     qubits = cirq.GridQubit.rect(1, num_bits)
+  def test_operator_expectation(self):
+    """Confirms the expectations combine to the correct total energy."""
+    # Build simple Boltzmann
+    num_bits = 3
+    test_b = energy_model.KOBE(list(range(num_bits)), 2)
+    qubits = cirq.GridQubit.rect(1, num_bits)
 
-#     # Pin at bitstring [1, 0, 1]
-#     test_b.set_weights([tf.constant([100.0, -200.0, 300.0, 10, -20, 30])])
-#     operators = test_b.operator_shards(qubits)
+    # Pin at bitstring [1, 0, 1]
+    test_b.set_weights([tf.constant([100.0, -200.0, 300.0, 10, -20, 30])])
+    operators = test_b.operator_shards(qubits)
 
-#     # True energy
-#     bitstring = tf.constant([[0, 0, 1]])  # not the pinned bitstring
-#     ref_energy = test_b.energy(bitstring)[0]
+    # True energy
+    bitstring = tf.constant([[0, 0, 1]])  # not the pinned bitstring
+    expected_energy = test_b(bitstring)[0]
 
-#     # Test energy
-#     circuit = cirq.Circuit(
-#         [cirq.I(qubits[0]),
-#          cirq.I(qubits[1]),
-#          cirq.X(qubits[2])])
-#     output_state_vector = cirq.Simulator().simulate(circuit).final_state_vector
-#     op_expectations = []
-#     qubit_map = {q: i for i, q in enumerate(qubits)}
-#     for op in operators:
-#       op_expectations.append(
-#           op.expectation_from_state_vector(output_state_vector, qubit_map).real)
-#     test_energy = test_b.operator_expectation(op_expectations)
-#     self.assertAllClose(test_energy, ref_energy, atol=1e-4)
+    # Test energy
+    circuit = cirq.Circuit(
+        [cirq.I(qubits[0]),
+         cirq.I(qubits[1]),
+         cirq.X(qubits[2])])
+    output_state_vector = cirq.Simulator().simulate(circuit).final_state_vector
+    op_expectations = []
+    qubit_map = {q: i for i, q in enumerate(qubits)}
+    for op in operators:
+      op_expectations.append(
+          op.expectation_from_state_vector(output_state_vector, qubit_map).real)
+    actual_energy = test_b.operator_expectation(op_expectations)
+    self.assertAllClose(actual_energy, expected_energy, atol=1e-4)
 
 
 if __name__ == "__main__":

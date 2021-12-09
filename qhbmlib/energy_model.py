@@ -265,9 +265,9 @@ class KOBE(PauliBitstringEnergy):
         initialize the values of the parameters.
       name: Optional name for the model.
     """
-    parity_layer = Parity(bits, order)    
+    parity_layer = Parity(bits, order)
     pre_process = [SpinsFromBitstrings(), parity_layer]
-    post_process = [VariableDot(tf.shape(parity_layer.indices)[0], initializer=initializer)]
+    post_process = [VariableDot(parity_layer.num_terms, initializer=initializer)]
 
     def operator_shards_func(qubits):
       ops = []
