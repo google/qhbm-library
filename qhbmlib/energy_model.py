@@ -38,7 +38,7 @@ def check_order(order):
   return order
 
 
-def check_layer_list(layer_list):
+def check_layers(layer_list):
   """Confirms the input is a valid list of keras Layers."""
   if not isinstance(layer_list, list) or not all([isinstance(e, tf.keras.layers.Layer) for e in layer_list]):
     raise TypeError("must be a list of keras layers.")
@@ -62,34 +62,27 @@ class BitstringEnergy(tf.keras.layers.Layer):
     """
     super().__init__(name=name)
     self._bits = check_bits(bits)
-    self.energy_layers = check_layer_list(energy_layers)
-
-  def get_config(self):
-    config = super().get_config()
-    config.update({
-        "bits": copy.deepcopy(self._bits),
-        "energy_layers": copy.deepcopy(self.energy_layers),
-    })
-    return config
-
-  @classmethod
-  def from_config(cls, config):
-    return cls(config["bits"], config["energy_layers"], config["name"])
-
-  def copy(self):
-    return BitstringEnergy.from_config(self.get_config())
+    self._energy_layers = check_layers(energy_layers)
 
   @property
   def num_bits(self):
+    """Number of bits on which this layer acts."""
     return len(self.bits)
 
   @property
   def bits(self):
+    """Labels for the bits on which this distribution is supported."""
     return self._bits
 
+  @property
+  def energy_layers(self):
+    """List of keras layers which, when stacked, map bitstrings to energies."""
+    return self._energy_layers
+  
   def call(self, inputs):
+    """Returns the energies corresponding to the input bitstrings."""
     x = inputs
-    for layer in self.energy_layers:
+    for layer in self._energy_layers:
       x = layer(x)
     return tf.squeeze(x, -1)
 
@@ -111,11 +104,11 @@ class PauliBitstringEnergy(BitstringEnergy):
         representation to feed to post_process..
       name: Optional name for the model.
     """
-    self._pre_process = check_layer_list(pre_process)
-    self._post_process = check_layer_list(post_process)
+    self._pre_process = check_layers(pre_process)
+    self._post_process = check_layers(post_process)
     super().__init__(bits, self._pre_process + self._post_process, name)
     self._operator_shards_func = operator_shards_func
-
+    
   def operator_shards(self, qubits):
     """Parameter independent Pauli Z strings to measure."""
     raise self._operator_shards_func(qubits)
@@ -135,8 +128,12 @@ class SpinsFromBitstrings(tf.keras.layers.Layer):
     """Initializes a SpinsFromBitstrings."""
     super().__init__(trainable=False)
   
-  def call(inputs):
-    tf.cast(1 - 2 * inputs, tf.float32)
+  def call(self, inputs):
+    """
+    Note that this maps |0> -> +1 and |1> -> -1.  This is in accordance with
+    the usual interpretation of the Bloch sphere.
+    """
+    return tf.cast(1 - 2 * inputs, tf.float32)
 
 
 class VariableDot(tf.keras.layers.Layer):
@@ -144,7 +141,7 @@ class VariableDot(tf.keras.layers.Layer):
 
   def __init__(self,
                input_width,
-               initializer=initializer=tf.keras.initializers.RandomUniform()):
+               initializer=tf.keras.initializers.RandomUniform()):
     """Initializes a VariableDot layer.
 
     Args:
@@ -161,6 +158,7 @@ class VariableDot(tf.keras.layers.Layer):
     self._dot = tf.keras.layers.Dot()
 
   def call(self, inputs):
+    """Returns the dot product between the inputs and this layer's variables."""
     input_shape = tf.shape(inputs)
     tiled = tf.tile(self.kernel, [input_shape[0], 1])
     return self._dot([inputs, tiled])
@@ -215,7 +213,7 @@ class Parity(tf.keras.layers.Layer):
     return parities_t
 
 
-class KOBE(PauliBitstringFunction):
+class KOBE(PauliBitstringEnergy):
   """Kth Order Binary Energy function."""
 
   def __init__(self,
