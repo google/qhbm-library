@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tools for modelling energy functions."""
 
+import abc
 import itertools
 from typing import List, Union
 
@@ -189,7 +190,7 @@ class BitstringEnergy(tf.keras.layers.Layer):
     return x
 
 
-class PauliBitstringEnergy(BitstringEnergy):
+class PauliBitstringEnergy(BitstringEnergy, abc.ABC):
   """Augments BitstringEnergy with a Pauli Z representation."""
 
   def __init__(self,
@@ -251,7 +252,7 @@ class BernoulliEnergy(PauliBitstringEnergy):
     post_process = [VariableDot(len(bits), initializer=initializer)]
     super().__init__(bits, pre_process, post_process, name)
 
-  def operator_shards_func(qubits):
+  def operator_shards(self, qubits):
     """See base class description."""
     return [cirq.PauliSum.from_pauli_strings(cirq.Z(q)) for q in qubits]
 
@@ -282,7 +283,7 @@ class KOBE(PauliBitstringEnergy):
     ]
     super().__init__(bits, pre_process, post_process, name)
 
-  def operator_shards_func(qubits):
+  def operator_shards(self, qubits):
     """See base class description."""
     ops = []
     for i in range(self._num_terms):
