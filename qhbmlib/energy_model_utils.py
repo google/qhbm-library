@@ -103,10 +103,10 @@ class VariableDot(tf.keras.layers.Layer):
   def build(self, input_shape):
     """Initializes the internal variables."""
     self.kernel = tf.Variable(
-      initial_value=self._initializer((input_shape[-1],)),
-      name='kernel',
-      trainable=True)
-    
+        initial_value=self._initializer((input_shape[-1],)),
+        name='kernel',
+        trainable=True)
+
   def call(self, inputs):
     """Returns the dot product between the inputs and this layer's variables."""
     return tf.reduce_sum(inputs * self.kernel, -1)

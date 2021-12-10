@@ -135,7 +135,7 @@ class BernoulliEnergy(BitstringEnergy, PauliMixin):
   def post_process(self):
     """See base class description."""
     return self._post_process
-    
+
   def operator_shards(self, qubits):
     """See base class description."""
     return [cirq.PauliSum.from_pauli_strings(cirq.Z(q)) for q in qubits]
@@ -162,9 +162,7 @@ class KOBE(BitstringEnergy, PauliMixin):
     self._num_terms = parity_layer.num_terms
     self._indices = parity_layer.indices
     pre_process = [energy_model_utils.SpinsFromBitstrings(), parity_layer]
-    post_process = [
-        energy_model_utils.VariableDot(initializer=initializer)
-    ]
+    post_process = [energy_model_utils.VariableDot(initializer=initializer)]
     super().__init__(bits, pre_process + post_process, name)
     self._post_process = post_process
 
@@ -172,7 +170,7 @@ class KOBE(BitstringEnergy, PauliMixin):
   def post_process(self):
     """See base class description."""
     return self._post_process
-  
+
   def operator_shards(self, qubits):
     """See base class description."""
     ops = []
