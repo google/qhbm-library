@@ -101,34 +101,6 @@ class BitstringEnergyTest(tf.test.TestCase):
         self.assertAllClose(actual_energy_grad, expected_energy_grad)
 
 
-class PauliBitstringEnergyTest(tf.test.TestCase):
-  """Tests the PauliBitstringEnergy class."""
-
-  def test_layer(self):
-    """Tests initialization and calling for simple total parity."""
-    bits = [1, 5, 7]
-
-    class MyPauliBitstringEnergy(energy_model.PauliBitstringEnergy):
-
-      def operator_shards(self, qubits):
-        inner_shards = [cirq.Z(q) for q in qubits]
-        shard = cirq.PauliSum(from_pauli_strings(cirq.I(qubits[0])))
-        for op in inner_shards:
-          shard *= op
-        return [shard]
-
-    expected_pre_process = [energy_model_utils.SpinsFromBitstrings()]
-    expected_post_process = [
-        tf.keras.layers.Lambda(lambda x: tf.reduce_prod(x, -1))
-    ]
-    actual_layer = MyPauliBitstringEnergy(bits, expected_pre_process,
-                                          expected_post_process)
-    inputs = tf.constant([[1, 1, 1, 1], [1, 1, 0, 1]])
-    actual_outputs = actual_layer(inputs)
-    expected_outputs = tf.constant([1, -1])
-    self.assertAllEqual(actual_outputs, expected_outputs)
-
-
 class BernoulliEnergyTest(tf.test.TestCase):
   """Tests the BernoulliEnergy class."""
 

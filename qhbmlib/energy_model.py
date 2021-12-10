@@ -78,23 +78,17 @@ class BitstringEnergy(tf.keras.layers.Layer):
     return x
 
 
-class PauliBitstringEnergy(BitstringEnergy, abc.ABC):
-  """Augments BitstringEnergy with a Pauli Z representation."""
+class PauliMixin(abc.ABC):
+  """Mixin class to add a Pauli Z representation to  BitstringEnergy."""
 
-  def __init__(self, bits, pre_process, post_process, name=None):
-    """Initializes a PauliBitstringEnergy.
-
-    Args:
-      bits: Labels for the bits on which this distribution is supported.
-      pre_process: List of keras layers. Concatenation of these layers yields
-        the trainable map from bitstrings to the intermediate representation.
-      post_process: List of keras layers.  Concatenation of these layers yields
-        the trainable map from the intermediate representation to scalars.
-      name: Optional name for the model.
+  @property
+  @abc.abstractmethod
+  def post_process(self):
+    """List of keras layers.  Concatenation of these layers yields
+    the trainable map from the operator shard expectations to a single scalar
+    which is the average energy.
     """
-    self._pre_process = energy_model_utils.check_layers(pre_process)
-    self._post_process = energy_model_utils.check_layers(post_process)
-    super().__init__(bits, self._pre_process + self._post_process, name)
+    raise NotImplementedError()
 
   @abc.abstractmethod
   def operator_shards(self, qubits):
@@ -112,12 +106,12 @@ class PauliBitstringEnergy(BitstringEnergy, abc.ABC):
   def operator_expectation(self, expectation_shards):
     """Computes the average energy given operator shard expectation values."""
     x = expectation_shards
-    for layer in self._post_process:
+    for layer in self.post_process:
       x = layer(x)
     return x
 
 
-class BernoulliEnergy(PauliBitstringEnergy):
+class BernoulliEnergy(BitstringEnergy, PauliMixin):
   """Tensor product of coin flip distributions."""
 
   def __init__(self,
@@ -133,15 +127,20 @@ class BernoulliEnergy(PauliBitstringEnergy):
       name: Optional name for the model.
     """
     pre_process = [energy_model_utils.SpinsFromBitstrings()]
-    post_process = [energy_model_utils.VariableDot(len(bits), initializer=initializer)]
-    super().__init__(bits, pre_process, post_process, name)
+    self._post_process = [energy_model_utils.VariableDot(len(bits), initializer=initializer)]
+    super().__init__(bits, pre_process + self.post_process, name)
 
+  @property
+  def post_process(self):
+    """See base class description."""
+    return self._post_process
+    
   def operator_shards(self, qubits):
     """See base class description."""
     return [cirq.PauliSum.from_pauli_strings(cirq.Z(q)) for q in qubits]
 
 
-class KOBE(PauliBitstringEnergy):
+class KOBE(BitstringEnergy, PauliMixin):
   """Kth Order Binary Energy function."""
 
   def __init__(self,
@@ -162,11 +161,16 @@ class KOBE(PauliBitstringEnergy):
     self._num_terms = parity_layer.num_terms
     self._indices = parity_layer.indices
     pre_process = [energy_model_utils.SpinsFromBitstrings(), parity_layer]
-    post_process = [
+    self._post_process = [
         energy_model_utils.VariableDot(parity_layer.num_terms, initializer=initializer)
     ]
-    super().__init__(bits, pre_process, post_process, name)
+    super().__init__(bits, pre_process + self.post_process, name)
 
+  @property
+  def post_process(self):
+    """See base class description."""
+    return self._post_process
+  
   def operator_shards(self, qubits):
     """See base class description."""
     ops = []
