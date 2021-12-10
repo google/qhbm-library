@@ -28,6 +28,8 @@ def _pystr(x):
   return [str(y) for y in x]
 
 
+class QuantumCircuit(t)
+
 class DirectQuantumCircuitTest(tf.test.TestCase):
   """Tests the DirectQuantumCircuit class."""
 

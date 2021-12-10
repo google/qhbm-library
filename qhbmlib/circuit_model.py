@@ -22,111 +22,65 @@ import tensorflow as tf
 import tensorflow_quantum as tfq
 
 
-class QuantumCircuit(tf.keras.Model, abc.ABC):
-  """Class for representing quantum circuits."""
-
-  def __init__(self, name=None):
-    super().__init__(name=name)
-
-  @property
-  @abc.abstractmethod
-  def qubits(self):
-    raise NotImplementedError()
-
-  @property
-  @abc.abstractmethod
-  def symbols(self):
-    """1D `tf.Tensor` of strings which are the parameters of circuit."""
-    raise NotImplementedError()
-
-  @property
-  @abc.abstractmethod
-  def values(self):
-    """1D `tf.Tensor` of real numbers specifying the current values of the
-       circuit parameters, such that `self.values[i]` is the current value of
-       `self.symbols[i]` in `self.pqc` and `self.inverse_pqc`."""
-    raise NotImplementedError()
-
-  @property
-  @abc.abstractmethod
-  def pqc(self):
-    """The symbolically parameterized circuit."""
-    raise NotImplementedError()
-
-  @property
-  @abc.abstractmethod
-  def inverse_pqc(self):
-    """The symbolically parameterized inverse circuit."""
-    raise NotImplementedError()
-
-  @property
-  def trainable_variables(self):
-    return super().trainable_variables
-
-  @trainable_variables.setter
-  @abc.abstractmethod
-  def trainable_variables(self, value):
-    raise NotImplementedError()
+def check_layers(layers):
+  """Confirms the input is a valid list of keras Layers."""
+  if not isinstance(layer_list, list) or not all(
+      [isinstance(e, tf.keras.layers.Layer) for e in layer_list]):
+    raise TypeError("must be a list of keras layers.")
+  return layer_list
 
 
-class DirectQuantumCircuit(QuantumCircuit):
-  """QuantumCircuit with direct map from model variables to circuit params."""
+def bit_circuit(qubits, name="bit_circuit"):
+  """Returns exponentiated X gate on each qubit and the exponent symbols."""
+  circuit = cirq.Circuit()
+  for n, q in enumerate(qubits):
+    bit = sympy.Symbol("{0}_bit_{1}".format(name, n))
+    circuit += cirq.X(q)**bit
+  return circuit
 
-  def __init__(
-      self,
-      pqc,
-      *,
-      symbols=None,
-      values=None,
-      initializer=tf.keras.initializers.RandomUniform(0, 2 * np.pi),
-      name=None,
-  ):
-    """Initializes a DirectQuantumCircuit.
 
-    Args:
-      pqc: Representation of a parameterized quantum circuit.
-      symbols: Optional 1-D `tf.Tensor` of strings which are the parameters of
-        the QNN.  When `None`, parameters are inferred from the given PQC.
-      values: Optional 1-D `tf.Tensor` of floats which are the parameter values
-        corresponding to the symbols.  When `None`, parameters are chosen via
-        `initializer` instead.
-      initializer: A "tf.keras.initializers.Initializer" which specifies how to
-        initialize the values of the parameters in `circuit`.  This argument is
-        ignored if `values` is not None.
-      name: Identifier for this DirectQuantumCircuit.
-    """
+class QuantumCircuit(tf.keras.layers.Layer):
+  """Class for representing a quantum circuit."""
+
+  def __init__(self, pqc, symbols, value_layers_init, value_layers):
     super().__init__(name=name)
 
     if not isinstance(pqc, cirq.Circuit):
-      raise TypeError("pqc must be a cirq.Circuit object."
-                      " Given: {}".format(pqc))
+      raise TypeError(f"pqc must be a cirq.Circuit object."
+                      " Given: {type(pqc)}")
 
-    if symbols is None:
-      raw_symbols = list(sorted(tfq.util.get_circuit_symbols(pqc)))
-      symbols = tf.constant([str(x) for x in raw_symbols], dtype=tf.string)
+    self._qubits = sorted(pqc.all_qubits())
     self._symbols = symbols
-
-    if values is None:
-      values = initializer(shape=[tf.shape(self._symbols)[0]])
-    self._values = tf.Variable(
-        initial_value=values, name=f"{self.name}_pqc_values")
-
+    self._value_layers = check_layers(value_layers)
+    self._value_layers_init = value_layers_init    
     self._pqc = tfq.convert_to_tensor([pqc])
     self._inverse_pqc = tfq.convert_to_tensor([pqc**-1])
 
-    self._qubits = sorted(pqc.all_qubits())
-
+    _bit_circuit = bit_circuit(self._raw_qubits)
+    bit_symbols = list(sorted(tfq.util.get_circuit_symbols(_bit_circuit)))
+    self._bit_symbols = tf.constant([str(x) for x in bit_symbols])
+    self._bit_circuit = tfq.convert_to_tensor([_bit_circuit])
+    
   @property
   def qubits(self):
     return self._qubits
 
   @property
   def symbols(self):
+    """1D `tf.Tensor` of strings which are the parameters of circuit."""
     return self._symbols
 
   @property
   def values(self):
-    return self._values
+    """1D `tf.Tensor` of floats specifying the current values of the parameters.
+
+    This should be structured such that `self.values[i]` is the current value of
+    `self.symbols[i]` in `self.pqc` and `self.inverse_pqc`.
+    """
+    x = self._value_layers_init
+    for layer in self._value_layers:
+      x = layer(x)
+    return x
 
   @property
   def pqc(self):
@@ -136,38 +90,49 @@ class DirectQuantumCircuit(QuantumCircuit):
   def inverse_pqc(self):
     return self._inverse_pqc
 
-  @property
-  def trainable_variables(self):
-    return [self.values]
+  def call(self, inputs):
+    """Inputs are bitstrings prepended as initial states to `self.pqc`."""
+    num_bitstrings = tf.shape(inputs)[0]
+    bit_circuits = tfq.resolve_parameters(
+        tf.tile(self._bit_circuit, [num_bitstrings]), self._bit_symbols,
+        tf.cast(inputs, tf.float32))
+    pqcs = tf.tile(self.pqc, [num_bitstrings])
+    return tfq.append_circuit(bit_circuits, pqcs)
+  
 
-  @trainable_variables.setter
-  def trainable_variables(self, value):
-    self._values = value[0]
+class DirectQuantumCircuit(QuantumCircuit):
+  """QuantumCircuit with direct map from model variables to circuit params."""
 
-  def copy(self):
-    new_qnn = DirectQuantumCircuit(tfq.from_tensor(self.pqc)[0], name=self.name)
-    new_qnn._values.assign(self.values)
-    return new_qnn
+  def __init__(
+      self,
+      pqc,
+      initializer=tf.keras.initializers.RandomUniform(0, 2 * np.pi),
+      name=None,
+  ):
+    """Initializes a DirectQuantumCircuit.
 
-  def __add__(self, other):
-    """DirectQuantumCircuit which is pqc of `other` appended to pqc of `self`"""
-    new_pqc = tfq.append_circuit(self.pqc, other.pqc)
-    new_symbols = tf.concat([self.symbols, other.symbols], 0)
-    new_values = tf.concat([self.values, other.values], 0)
-    new_qnn = DirectQuantumCircuit(
-        tfq.from_tensor(new_pqc)[0],
-        symbols=new_symbols,
-        values=new_values,
-        name=f"{self.name}_plus_{other.name}")
-    return new_qnn
+    Args:
+      pqc: Representation of a parameterized quantum circuit.
+      initializer: A "tf.keras.initializers.Initializer" which specifies how to
+        initialize the values of the parameters in `circuit`.  This argument is
+        ignored if `values` is not None.
+      name: Identifier for this DirectQuantumCircuit.
+    """
+    if symbols is None:
+      raw_symbols = list(sorted(tfq.util.get_circuit_symbols(pqc)))
+      symbols = tf.constant([str(x) for x in raw_symbols], dtype=tf.string)
+    if values is None:
+      values = initializer(shape=[tf.shape(self._symbols)[0]])
+    values = tf.Variable(
+        initial_value=values, name=f"{self.name}_pqc_values")
+    super().__init__(pqc, symbols, values, [])
 
-  def __pow__(self, exponent):
-    """QNN raised to a power, only valid for exponent -1, the inverse."""
-    if exponent != -1:
-      raise ValueError("Only the inverse (exponent == -1) is supported.")
-    new_qnn = self.copy()
-    old_pqc = new_qnn.pqc
-    old_inverse_pqc = new_qnn.inverse_pqc
-    new_qnn._pqc = old_inverse_pqc
-    new_qnn._inverse_pqc = old_pqc
-    return new_qnn
+
+class QAIA(QuantumCircuit):
+  """Quantum circuit defined by a classical energy and a Hamiltonian."""
+
+  def __init__(self,
+               classical_h_terms: List[cirq.PauliSum],
+               quantum_h_terms: List[cirq.PauliSum]):
+    """Initializes a QAIA."""
+    pass
