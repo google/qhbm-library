@@ -44,7 +44,7 @@ def bit_circuit(qubits, name="bit_circuit"):
 class QuantumCircuit(tf.keras.layers.Layer):
   """Class for representing a quantum circuit."""
 
-  def __init__(self, pqc, symbols, value_layers_init, value_layers, name=None):
+  def __init__(self, pqc, symbols, value_layers_inputs, value_layers, name=None):
     super().__init__(name=name)
 
     if not isinstance(pqc, cirq.Circuit):
@@ -60,7 +60,7 @@ class QuantumCircuit(tf.keras.layers.Layer):
     self._qubits = sorted(pqc.all_qubits())
     self._symbols = symbols
     self._value_layers = check_layers(value_layers)
-    self._value_layers_init = value_layers_init
+    self._value_layers_inputs = value_layers_inputs
 
     test_values = self.values
     values_shape = tf.shape(test_values)
@@ -94,7 +94,7 @@ class QuantumCircuit(tf.keras.layers.Layer):
     This should be structured such that `self.values[i]` is the current value of
     `self.symbols[i]` in `self.pqc` and `self.inverse_pqc`.
     """
-    x = self._value_layers_init
+    x = self._value_layers_inputs
     for layer in self._value_layers:
       x = layer(x)
     return x
@@ -115,7 +115,7 @@ class QuantumCircuit(tf.keras.layers.Layer):
         tf.cast(inputs, tf.float32))
     pqcs = tf.tile(self.pqc, [num_bitstrings])
     return tfq.append_circuit(bit_circuits, pqcs)
-  
+
 
 class DirectQuantumCircuit(QuantumCircuit):
   """QuantumCircuit with direct map from model variables to circuit params."""
@@ -130,26 +130,87 @@ class DirectQuantumCircuit(QuantumCircuit):
 
     Args:
       pqc: Representation of a parameterized quantum circuit.
-      initializer: A "tf.keras.initializers.Initializer" which specifies how to
+      initializer: A `tf.keras.initializers.Initializer` which specifies how to
         initialize the values of the parameters in `circuit`.  This argument is
         ignored if `values` is not None.
       name: Identifier for this DirectQuantumCircuit.
     """
-    if symbols is None:
-      raw_symbols = list(sorted(tfq.util.get_circuit_symbols(pqc)))
-      symbols = tf.constant([str(x) for x in raw_symbols], dtype=tf.string)
-    if values is None:
-      values = initializer(shape=[tf.shape(self._symbols)[0]])
-    values = tf.Variable(
-        initial_value=values, name=f"{self.name}_pqc_values")
+    raw_symbols = list(sorted(tfq.util.get_circuit_symbols(pqc)))
+    symbols = tf.constant([str(x) for x in raw_symbols], dtype=tf.string)
+    values = tf.Variable(initializer(shape=[len(raw_symbols)]))
     super().__init__(pqc, symbols, values, [])
+
+
+class Squeeze(tf.keras.layers.Layer):
+  """Wraps tf.squeeze in a Keras Layer."""
+
+  def __init__(self, axis=None):
+    """Initializes a Squeeze layer.
+    Args:
+      axis: An optional list of ints. Defaults to []. If specified, only
+        squeezes the dimensions listed. The dimension index starts at 0. It is
+        an error to squeeze a dimension that is not 1. Must be in the range
+        [-rank(input), rank(input)). Must be specified if input is
+        a RaggedTensor.
+    """
+    super().__init__()
+    if axis is None:
+      axis = []
+    self._axis = axis
+
+  def call(self, inputs):
+    """Applies tf.squeeze to the inputs."""
+    return tf.squeeze(inputs, axis=self._axis)
 
 
 class QAIA(QuantumCircuit):
   """Quantum circuit defined by a classical energy and a Hamiltonian."""
 
   def __init__(self,
+               quantum_h_terms: List[cirq.PauliSum],
                classical_h_terms: List[cirq.PauliSum],
-               quantum_h_terms: List[cirq.PauliSum]):
+               num_layers: int,
+               initializer=tf.keras.initializers.RandomUniform(0, 2 * np.pi),
+               name=None):
     """Initializes a QAIA."""
-    pass
+
+    quantum_symbols = []
+    classical_symbols = []
+    for j in range(num_layers):
+      quantum_symbols.append([])
+      classical_symbols.append([])
+      for k, _ in enumerate(quantum_h_terms):
+        quantum_symbols[-1].append(f"gamma_{j}_{k}")
+      for k, _ in enumerate(classical_h_terms):
+        classical_symbols[-1].append(f"eta_{j}_{k}")
+
+    pqc = cirq.Circuit()
+    flat_symbols = []
+    for q_symb, c_symb in zip(quantum_symbols, classical_symbols):
+      pqc += tfq.util.exponential(quantum_h_terms, coefficients=q_symb)
+      pqc += tfq.util.exponential(classical_h_terms, coefficients=c_symb)
+      flat_symbols.extend(q_symb + c_symb)
+    symbols = tf.constant(flat_symbols)
+
+    num_true_etas = num_layers
+    num_thetas = len(classical_h_terms)
+    num_gammas = len(quantum_h_terms) * num_layers
+
+    value_layers_inputs = [
+      tf.Variable(initializer(shape=[num_layers])),  # true etas
+      tf.Variable(initializer(shape=[len(classical_h_terms)])),  # thetas
+      tf.Variable(initializer(shape=[num_layers, len(quantum_h_terms)])),  # gammas
+    ]
+
+    def embed_params(inputs):
+      """Tiles up the variables to properly tie QAIA parameters."""
+      exp_etas = tf.expand_dims(inputs[0], -1)
+      tiled_thetas = tf.tile(inputs[1], [tf.shape(inputs[0])[0], 1])
+      classical_params = exp_etas * tiled_thetas
+      return tf.concat([classical_params, inputs[2]], 1)
+
+    value_layers = [
+      tf.keras.layers.Lambda(embed_params)
+    ]
+
+    super().__init__(pqc, symbols, value_layers_inputs, value_layers)
