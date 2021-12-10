@@ -98,7 +98,7 @@ class VariableDotTest(tf.test.TestCase):
     inputs = tf.constant(inputs_list, dtype=tf.float32)
     const = 2.5
     actual_layer = energy_model_utils.VariableDot(
-        3, tf.keras.initializers.Constant(const))
+      tf.keras.initializers.Constant(const))
     actual_outputs = actual_layer(inputs)
     expected_outputs = tf.math.reduce_sum(inputs * const, -1)
     print(expected_outputs)

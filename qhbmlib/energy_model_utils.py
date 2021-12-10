@@ -90,23 +90,23 @@ class SpinsFromBitstrings(tf.keras.layers.Layer):
 class VariableDot(tf.keras.layers.Layer):
   """Utility layer for dotting input with a same-sized variable."""
 
-  def __init__(self,
-               input_width,
-               initializer=tf.keras.initializers.RandomUniform()):
+  def __init__(self, initializer=tf.keras.initializers.RandomUniform()):
     """Initializes a VariableDot layer.
 
     Args:
-      input_width: Size of the last dimension of input on which this layer acts.
       initializer: A `tf.keras.initializers.Initializer` which specifies how to
         initialize the values of the parameters.
     """
     super().__init__()
-    self.kernel = self.add_weight(
-        name='kernel',
-        shape=[input_width],
-        initializer=initializer,
-        trainable=True)
+    self._initializer = initializer
 
+  def build(self, input_shape):
+    """Initializes the internal variables."""
+    self.kernel = tf.Variable(
+      initial_value=self._initializer((input_shape[-1],)),
+      name='kernel',
+      trainable=True)
+    
   def call(self, inputs):
     """Returns the dot product between the inputs and this layer's variables."""
     return tf.reduce_sum(inputs * self.kernel, -1)
