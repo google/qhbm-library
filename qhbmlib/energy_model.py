@@ -132,8 +132,8 @@ class BernoulliEnergy(PauliBitstringEnergy):
         initialize the values of the parameters.
       name: Optional name for the model.
     """
-    pre_process = [SpinsFromBitstrings()]
-    post_process = [VariableDot(len(bits), initializer=initializer)]
+    pre_process = [energy_model_utils.SpinsFromBitstrings()]
+    post_process = [energy_model_utils.VariableDot(len(bits), initializer=initializer)]
     super().__init__(bits, pre_process, post_process, name)
 
   def operator_shards(self, qubits):
@@ -158,12 +158,12 @@ class KOBE(PauliBitstringEnergy):
         initialize the values of the parameters.
       name: Optional name for the model.
     """
-    parity_layer = Parity(bits, order)
+    parity_layer = energy_model_utils.Parity(bits, order)
     self._num_terms = parity_layer.num_terms
     self._indices = parity_layer.indices
-    pre_process = [SpinsFromBitstrings(), parity_layer]
+    pre_process = [energy_model_utils.SpinsFromBitstrings(), parity_layer]
     post_process = [
-        VariableDot(parity_layer.num_terms, initializer=initializer)
+        energy_model_utils.VariableDot(parity_layer.num_terms, initializer=initializer)
     ]
     super().__init__(bits, pre_process, post_process, name)
 

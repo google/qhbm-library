@@ -21,115 +21,7 @@ import cirq
 import tensorflow as tf
 
 from qhbmlib import energy_model
-
-
-class CheckHelpersTest(tf.test.TestCase):
-  """Tests the input check functions."""
-
-  def test_check_bits(self):
-    """Confirms bad inputs are caught and good inputs pass through."""
-    expected_bits = [1, 6, 222, 13223]
-    actual_bits = energy_model.check_bits(expected_bits)
-    self.assertAllEqual(actual_bits, expected_bits)
-    with self.assertRaisesRegex(TypeError, expected_regex="a list of integers"):
-      _ = energy_model.check_bits(90)
-    with self.assertRaisesRegex(TypeError, expected_regex="a list of integers"):
-      _ = energy_model.check_bits(["junk"])
-    with self.assertRaisesRegex(ValueError, expected_regex="must be unique"):
-      _ = energy_model.check_bits([1, 1])
-
-  def test_check_order(self):
-    """Confirms bad inputs are caught and good inputs pass through."""
-    expected_order = 5
-    actual_order = energy_model.check_order(expected_order)
-    self.assertEqual(actual_order, expected_order)
-    with self.assertRaisesRegex(TypeError, expected_regex="must be an integer"):
-      _ = energy_model.check_order("junk")
-    with self.assertRaisesRegex(ValueError, expected_regex="greater than zero"):
-      _ = energy_model.check_order(0)
-
-  def test_check_layers(self):
-    """Confirms bad inputs are caught and good inputs pass through."""
-    expected_layers = [tf.keras.layers.Dense(5)]
-    actual_layers = energy_model.check_layers(expected_layers)
-    self.assertTrue(id(actual_layers[0]), id(expected_layers[0]))
-    with self.assertRaisesRegex(
-        TypeError, expected_regex="list of keras layers"):
-      _ = energy_model.check_layers("junk")
-    with self.assertRaisesRegex(
-        TypeError, expected_regex="list of keras layers"):
-      _ = energy_model.check_layers(["junk"])
-    with self.assertRaisesRegex(
-        TypeError, expected_regex="list of keras layers"):
-      _ = energy_model.check_layers([tf.keras.layers.Dense])
-
-
-class SqueezeTest(tf.test.TestCase):
-  """Tests the Squeeze layer."""
-
-  def test_layer(self):
-    """Confirms the layer squeezes correctly."""
-    inputs = tf.constant([[[1]], [[2]]])
-    expected_axis = 1
-    expected_outputs = tf.constant([[1], [2]])
-    actual_layer = energy_model.Squeeze(expected_axis)
-    actual_outputs = actual_layer(inputs)
-    self.assertAllEqual(actual_outputs, expected_outputs)
-
-
-class SpinsFromBitstringsTest(tf.test.TestCase):
-  """Tests the SpinsFromBitstrings layer."""
-
-  def test_layer(self):
-    """Confirms the layer outputs correct spins."""
-    test_layer = energy_model.SpinsFromBitstrings()
-    test_bitstrings = tf.constant([[1, 0, 0], [0, 1, 0]])
-    expected_spins = tf.constant([[-1, 1, 1], [1, -1, 1]])
-    actual_spins = test_layer(test_bitstrings)
-    self.assertAllEqual(actual_spins, expected_spins)
-
-
-class VariableDotTest(tf.test.TestCase):
-  """Tests the VariableDot layer."""
-
-  def test_layer(self):
-    """Confirms the layer dots with inputs correctly."""
-    inputs_list = [[1, 5, 9]]
-    inputs = tf.constant(inputs_list, dtype=tf.float32)
-    const = 2.5
-    actual_layer = energy_model.VariableDot(
-        3, tf.keras.initializers.Constant(const))
-    actual_outputs = actual_layer(inputs)
-    expected_outputs = tf.math.reduce_sum(inputs * const, -1)
-    print(expected_outputs)
-    self.assertAllEqual(actual_outputs, expected_outputs)
-
-    actual_layer = energy_model.VariableDot(3)
-    actual_outputs = actual_layer(inputs)
-    expected_outputs = []
-    for inner in inputs_list:
-      inner_sum = []
-      for i, k in zip(inner, actual_layer.kernel.numpy()):
-        inner_sum.append(i * k)
-      expected_outputs.append(sum(inner_sum))
-    self.assertAllClose(actual_outputs, expected_outputs)
-
-
-class ParityTest(tf.test.TestCase):
-  """Tests the Parity layer."""
-
-  def test_layer(self):
-    """Confirms the layer outputs correct parities."""
-    bitstrings = tf.constant([[1, 0, 1, 1]], dtype=tf.int8)
-    inputs = tf.constant([[-1, 1, -1, -1]])
-    bits = [1, 2, 3, 4]
-    order = 3
-    expected_outputs = tf.constant([[-1, 1, -1, -1]  # single bit parities
-                                    + [-1, 1, 1, -1, -1, 1]  # two bit parities
-                                    + [1, 1, -1, 1]])  # three bit parities
-    actual_layer = energy_model.Parity(bits, order)
-    actual_outputs = actual_layer(inputs)
-    self.assertAllEqual(actual_outputs, expected_outputs)
+from qhbmlib import energy_model_utils
 
 
 class BitstringEnergyTest(tf.test.TestCase):
@@ -142,7 +34,7 @@ class BitstringEnergyTest(tf.test.TestCase):
     expected_name = "init_test"
     expected_energy_layers = [
         tf.keras.layers.Dense(1),
-        energy_model.Squeeze(-1)
+        energy_model_utils.Squeeze(-1)
     ]
     actual_b = energy_model.BitstringEnergy(
         expected_bits, expected_energy_layers, name=expected_name)
@@ -157,7 +49,7 @@ class BitstringEnergyTest(tf.test.TestCase):
     energy_layers = [
         tf.keras.layers.Dense(
             1, kernel_initializer=tf.keras.initializers.Constant(1)),
-        energy_model.Squeeze(-1)
+        energy_model_utils.Squeeze(-1)
     ]
     test_b = energy_model.BitstringEnergy(list(range(num_bits)), energy_layers)
     test_bitstrings = tf.constant(
@@ -172,7 +64,7 @@ class BitstringEnergyTest(tf.test.TestCase):
     num_layers = 4
     test_bitstrings = tf.constant(
         list(itertools.product([0, 1], repeat=num_bits)))
-    num_tests = 5
+    num_tests = 3
     for _ in range(num_tests):
       bits = random.sample(range(1000), num_bits)
       units = random.sample(range(1, 100), num_layers)
@@ -185,7 +77,7 @@ class BitstringEnergyTest(tf.test.TestCase):
         expected_layer_list.append(
             tf.keras.layers.Dense(units[i], activation=activations[i]))
       expected_layer_list.append(tf.keras.layers.Dense(1))
-      expected_layer_list.append(energy_model.Squeeze(-1))
+      expected_layer_list.append(energy_model_utils.Squeeze(-1))
       actual_mlp = energy_model.BitstringEnergy(bits, expected_layer_list)
 
       expected_mlp = tf.keras.Sequential(expected_layer_list)
@@ -225,7 +117,7 @@ class PauliBitstringEnergyTest(tf.test.TestCase):
           shard *= op
         return [shard]
 
-    expected_pre_process = [energy_model.SpinsFromBitstrings()]
+    expected_pre_process = [energy_model_utils.SpinsFromBitstrings()]
     expected_post_process = [
         tf.keras.layers.Lambda(lambda x: tf.reduce_prod(x, -1))
     ]
