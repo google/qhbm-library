@@ -217,6 +217,7 @@ class PauliBitstringEnergyTest(tf.test.TestCase):
     bits = [1, 5, 7]
 
     class MyPauliBitstringEnergy(energy_model.PauliBitstringEnergy):
+
       def operator_shards(self, qubits):
         inner_shards = [cirq.Z(q) for q in qubits]
         shard = cirq.PauliSum(from_pauli_strings(cirq.I(qubits[0])))

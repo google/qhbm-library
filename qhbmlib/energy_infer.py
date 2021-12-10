@@ -24,7 +24,6 @@ import tensorflow as tf
 from qhbmlib import energy_model
 
 
-
 class AnalyticInferenceLayer(tf.keras.layers.Layer):
   """Sampler which calculates all probabilities and samples as categorical."""
 
@@ -37,9 +36,8 @@ class AnalyticInferenceLayer(tf.keras.layers.Layer):
     super().__init__(name=name)
     self._energy = energy
     self._sampler = tfp.layers.DistributionLambda(
-        make_distribution_fn=lambda t: tfd.Categorical(logits=-1 * t)
-    )
-  
+        make_distribution_fn=lambda t: tfd.Categorical(logits=-1 * t))
+
   def call(self, inputs):
     x = tf.squeeze(self._bit_string_energy(inputs))
     return self._partition_estimator(x)

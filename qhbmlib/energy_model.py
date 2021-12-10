@@ -81,11 +81,7 @@ class BitstringEnergy(tf.keras.layers.Layer):
 class PauliBitstringEnergy(BitstringEnergy, abc.ABC):
   """Augments BitstringEnergy with a Pauli Z representation."""
 
-  def __init__(self,
-               bits,
-               pre_process,
-               post_process,
-               name=None):
+  def __init__(self, bits, pre_process, post_process, name=None):
     """Initializes a PauliBitstringEnergy.
 
     Args:
@@ -181,4 +177,3 @@ class KOBE(PauliBitstringEnergy):
         string = cirq.PauliString(string_factors)
       ops.append(cirq.PauliSum.from_pauli_strings(string))
     return ops
-
