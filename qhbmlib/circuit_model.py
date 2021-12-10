@@ -15,19 +15,21 @@
 """Tools for defining quantum circuit models."""
 
 import abc
+from typing import List
 
 import cirq
 import numpy as np
+import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
 
 def check_layers(layers):
   """Confirms the input is a valid list of keras Layers."""
-  if not isinstance(layer_list, list) or not all(
-      [isinstance(e, tf.keras.layers.Layer) for e in layer_list]):
+  if not isinstance(layers, list) or not all(
+      [isinstance(e, tf.keras.layers.Layer) for e in layers]):
     raise TypeError("must be a list of keras layers.")
-  return layer_list
+  return layers
 
 
 def bit_circuit(qubits, name="bit_circuit"):
@@ -42,21 +44,36 @@ def bit_circuit(qubits, name="bit_circuit"):
 class QuantumCircuit(tf.keras.layers.Layer):
   """Class for representing a quantum circuit."""
 
-  def __init__(self, pqc, symbols, value_layers_init, value_layers):
+  def __init__(self, pqc, symbols, value_layers_init, value_layers, name=None):
     super().__init__(name=name)
 
     if not isinstance(pqc, cirq.Circuit):
       raise TypeError(f"pqc must be a cirq.Circuit object."
                       " Given: {type(pqc)}")
 
+    if set(tfq.util.get_circuit_symbols(pqc)) != {
+        s.decode("utf-8") for s in symbols.numpy()
+    }:
+      raise ValueError(
+        "`pqc` must contain exactly the parameters in `symbols`."
+      )
     self._qubits = sorted(pqc.all_qubits())
     self._symbols = symbols
     self._value_layers = check_layers(value_layers)
-    self._value_layers_init = value_layers_init    
+    self._value_layers_init = value_layers_init
+
+    test_values = self.values
+    values_shape = tf.shape(test_values)
+    symbols_shape = tf.shape(self.symbols)
+    if not all(values_shape == symbols_shape):
+      raise ValueError(
+        "value calculation must yield one value for every symbol."
+        f" Got {values_shape} and {symbols_shape}.")
+
     self._pqc = tfq.convert_to_tensor([pqc])
     self._inverse_pqc = tfq.convert_to_tensor([pqc**-1])
 
-    _bit_circuit = bit_circuit(self._raw_qubits)
+    _bit_circuit = bit_circuit(self.qubits)
     bit_symbols = list(sorted(tfq.util.get_circuit_symbols(_bit_circuit)))
     self._bit_symbols = tf.constant([str(x) for x in bit_symbols])
     self._bit_circuit = tfq.convert_to_tensor([_bit_circuit])
