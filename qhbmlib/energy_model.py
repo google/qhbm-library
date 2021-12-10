@@ -196,7 +196,6 @@ class PauliBitstringEnergy(BitstringEnergy):
                bits,
                pre_process,
                post_process,
-               operator_shards_func,
                name=None):
     """Initializes a PauliBitstringEnergy.
 
@@ -206,19 +205,24 @@ class PauliBitstringEnergy(BitstringEnergy):
         the trainable map from bitstrings to the intermediate representation.
       post_process: List of keras layers.  Concatenation of these layers yields
         the trainable map from the intermediate representation to scalars.
-      operator_shards_func: Callable which, given a list of qubits, returns
-        PauliSum objects whose expectation values are the intermediate
-        representation to feed to post_process..
       name: Optional name for the model.
     """
     self._pre_process = check_layers(pre_process)
     self._post_process = check_layers(post_process)
     super().__init__(bits, self._pre_process + self._post_process, name)
-    self._operator_shards_func = operator_shards_func
 
+  @abc.abstractmethod
   def operator_shards(self, qubits):
-    """Parameter independent Pauli Z strings to measure."""
-    return self._operator_shards_func(qubits)
+    """Parameter independent Pauli Z strings to measure.
+
+    Args:
+      qubits: List of cirq.GridQubits. objects to measure.
+    
+    Returns:
+      List of PauliSum objects whose expectation values are fed to
+        `operator_expectation` to compute average energy.
+    """
+    raise NotImplementedError()
 
   def operator_expectation(self, expectation_shards):
     """Computes the average energy given operator shard expectation values."""
@@ -245,12 +249,11 @@ class BernoulliEnergy(PauliBitstringEnergy):
     """
     pre_process = [SpinsFromBitstrings()]
     post_process = [VariableDot(len(bits), initializer=initializer)]
+    super().__init__(bits, pre_process, post_process, name)
 
-    def operator_shards_func(qubits):
-      return [cirq.PauliSum.from_pauli_strings(cirq.Z(q)) for q in qubits]
-
-    super().__init__(bits, pre_process, post_process, operator_shards_func,
-                     name)
+  def operator_shards_func(qubits):
+    """See base class description."""
+    return [cirq.PauliSum.from_pauli_strings(cirq.Z(q)) for q in qubits]
 
 
 class KOBE(PauliBitstringEnergy):
@@ -271,20 +274,22 @@ class KOBE(PauliBitstringEnergy):
       name: Optional name for the model.
     """
     parity_layer = Parity(bits, order)
+    self._num_terms = parity_layer.num_terms
+    self._indices = parity_layer.indices
     pre_process = [SpinsFromBitstrings(), parity_layer]
     post_process = [
         VariableDot(parity_layer.num_terms, initializer=initializer)
     ]
+    super().__init__(bits, pre_process, post_process, name)
 
-    def operator_shards_func(qubits):
-      ops = []
-      for i in range(parity_layer.num_terms):
-        string_factors = []
-        for loc in parity_layer.indices[i]:
-          string_factors.append(cirq.Z(qubits[loc]))
+  def operator_shards_func(qubits):
+    """See base class description."""
+    ops = []
+    for i in range(self._num_terms):
+      string_factors = []
+      for loc in self._indices[i]:
+        string_factors.append(cirq.Z(qubits[loc]))
         string = cirq.PauliString(string_factors)
-        ops.append(cirq.PauliSum.from_pauli_strings(string))
-      return ops
+      ops.append(cirq.PauliSum.from_pauli_strings(string))
+    return ops
 
-    super().__init__(bits, pre_process, post_process, operator_shards_func,
-                     name)
