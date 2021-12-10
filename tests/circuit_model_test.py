@@ -14,6 +14,8 @@
 # ==============================================================================
 """Tests for the circuit_model module."""
 
+import itertools
+
 import cirq
 import math
 import numpy as np
@@ -53,8 +55,8 @@ class BitCircuitTest(tf.test.TestCase):
 class QuantumCircuitTest(tf.test.TestCase):
   """Tests the QuantumCircuit class."""
 
-  def test_init(self):
-    """Tests that components are initialized correctly."""
+  def test_init_and_call(self):
+    """Tests initialization and correct outputs on call."""
     num_qubits = 5
     raw_symbols = [sympy.Symbol("s0"), sympy.Symbol("s1")]
     expected_symbols = tf.constant([str(s) for s in raw_symbols])
@@ -81,6 +83,17 @@ class QuantumCircuitTest(tf.test.TestCase):
     self.assertAllEqual(tfq.from_tensor(actual_layer.pqc), tfq.from_tensor(expected_pqc))
     self.assertAllEqual(tfq.from_tensor(actual_layer.inverse_pqc), tfq.from_tensor(expected_inverse_pqc))
     self.assertEqual(actual_layer.name, expected_name)
+
+    bitstrings = 2 * list(itertools.product([0, 1], repeat=num_qubits))
+    inputs = tf.constant(bitstrings, dtype=tf.int8)
+    bit_injectors = []
+    for b in bitstrings:
+      bit_injectors.append(
+          cirq.Circuit(cirq.X(q)**b_i for q, b_i in zip(expected_qubits, b)))
+    combined = [b + pqc for b in bit_injectors]
+    expected_outputs = tfq.convert_to_tensor(combined)
+    actual_outputs = actual_layer(inputs)
+    self.assertAllEqual(tfq.from_tensor(actual_outputs), tfq.from_tensor(expected_outputs))
 
 
 if __name__ == "__main__":
