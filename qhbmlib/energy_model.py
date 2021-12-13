@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tools for modelling energy functions."""
+"""Tools for modeling energy functions."""
 
 import abc
 import itertools
@@ -112,7 +112,11 @@ class PauliMixin(abc.ABC):
 
 
 class BernoulliEnergy(BitstringEnergy, PauliMixin):
-  """Tensor product of coin flip distributions."""
+  """Tensor product of coin flip distributions.
+
+  Note that we parameterize using the energy of a spin in a magnetic field,
+  which is offset from the log probability of a typical Bernoulli.
+  """
 
   def __init__(self,
                bits: List[int],
@@ -130,6 +134,18 @@ class BernoulliEnergy(BitstringEnergy, PauliMixin):
     post_process = [energy_model_utils.VariableDot(initializer=initializer)]
     super().__init__(bits, pre_process + post_process, name)
     self._post_process = post_process
+
+  @property
+  def logits(self):
+    r"""Returns the current logits of the distribution.
+
+    For our Bernoulli distribution, let $p$ be the probability of bit being `1`.
+    In this case, we have $p = \frac{e^{theta}}{{e^{theta}+e^{-theta}}}$.
+    Therefore, each independent logit is:
+    $$logit = \log\frac{p}{1-p} = \log\frac{e^{theta}}{e^{-theta}}
+            = \log{e^{2*theta}} = 2*theta$$
+    """
+    return 2 * self.post_process[0].kernel
 
   @property
   def post_process(self):
