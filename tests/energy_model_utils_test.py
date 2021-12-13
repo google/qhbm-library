@@ -130,3 +130,8 @@ class ParityTest(tf.test.TestCase):
     actual_layer = energy_model_utils.Parity(bits, order)
     actual_outputs = actual_layer(inputs)
     self.assertAllEqual(actual_outputs, expected_outputs)
+
+
+if __name__ == "__main__":
+  print("Running energy_model_utils_test.py ...")
+  tf.test.main()

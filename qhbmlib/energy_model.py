@@ -181,7 +181,7 @@ class KOBE(BitstringEnergy, PauliMixin):
     post_process = [energy_model_utils.VariableDot(initializer=initializer)]
     super().__init__(bits, pre_process + post_process, name)
     self._post_process = post_process
-
+    
   @property
   def post_process(self):
     """See base class description."""

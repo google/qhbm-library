@@ -16,16 +16,15 @@
 
 import abc
 import itertools
-from typing import List, Union
 
-import cirq
 import tensorflow as tf
 import tensorflow_probability as tfp
+from tensorflow_probability import distributions as tfd
 
 from qhbmlib import energy_model
 
 
-class BitstringDistribution(tfd.Distribution):
+class BitstringDistribution(tfd.Distribution, abc.ABC):
   """Class for inference on BitstringEnergy.
 
   In contrast to implementations of `tfd.Distribution` in TFP, child classes

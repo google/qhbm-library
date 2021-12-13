@@ -103,7 +103,7 @@ class BitstringEnergyTest(tf.test.TestCase):
 
 class BernoulliEnergyTest(tf.test.TestCase):
   """Tests the BernoulliEnergy class."""
-
+  
   def test_energy_simple(self):
     """Tests the energy and its derivative in a simple case.
 
