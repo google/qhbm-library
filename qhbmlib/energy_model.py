@@ -67,7 +67,11 @@ class BitstringEnergy(tf.keras.layers.Layer):
 
   @property
   def energy_layers(self):
-    """List of keras layers which, when stacked, map bitstrings to energies."""
+    """List of keras layers which, when stacked, map bitstrings to energies.
+
+    This list of layers is where the caller would access model weights to be
+    updated from a secondary model or hypernetwork.
+    """
     return self._energy_layers
 
   def call(self, inputs):
