@@ -118,6 +118,9 @@ class BernoulliEnergyTest(tf.test.TestCase):
     test_b.set_weights([test_vars])
     test_bitstrings = tf.constant([[0, 0, 0], [1, 0, 0], [0, 1, 1]])
     test_spins = 1 - 2 * test_bitstrings
+    expected_logits = 2 * test_vars
+    actual_logits = test_b.logits
+    self.assertAllClose(actual_logits, expected_logits)
 
     @tf.function
     def special_energy(bitstrings):

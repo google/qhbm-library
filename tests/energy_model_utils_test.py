@@ -103,10 +103,16 @@ class ParityTest(tf.test.TestCase):
     inputs = tf.constant([[-1, 1, -1, -1]])
     bits = [1, 2, 3, 4]
     order = 3
+    actual_layer = energy_model_utils.Parity(bits, order)
+
+    expected_indices = [[0], [1], [2], [3], [0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3], [0, 1, 2], [0, 1, 3], [0, 2, 3], [1, 2, 3]]
+    expected_num_terms = 14
+    self.assertAllEqual(actual_layer.indices, expected_indices)
+    self.assertAllEqual(actual_layer.num_terms, expected_num_terms)
+
     expected_outputs = tf.constant([[-1, 1, -1, -1]  # single bit parities
                                     + [-1, 1, 1, -1, -1, 1]  # two bit parities
                                     + [1, 1, -1, 1]])  # three bit parities
-    actual_layer = energy_model_utils.Parity(bits, order)
     actual_outputs = actual_layer(inputs)
     self.assertAllEqual(actual_outputs, expected_outputs)
 
