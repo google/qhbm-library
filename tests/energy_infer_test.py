@@ -147,25 +147,29 @@ class AnalyticDistributionTest(tf.test.TestCase):
   #       check_bitstring_exists(
   #           tf.constant([1, 1, 1], dtype=tf.int8), bitstrings))
 
-  # def test_log_partition_boltzmann(self):
-  #   """Confirm correct value of the log partition function."""
-  #   test_thetas = tf.Variable([1.5, 2.7, -4.0])
-  #   expected_log_partition = tf.math.log(tf.constant(3641.8353))
-  #   pre_k = ebm.KOBE(2, 2)
-  #   pre_k.kernel.assign(test_thetas)
-  #   test_k = ebm.EBM(pre_k, None, is_analytic=True)
-  #   test_log_partition = test_k.log_partition_function()
-  #   self.assertAllClose(expected_log_partition, test_log_partition)
+  def test_log_partition(self):
+    """Confirms correct value of the log partition function."""
+    test_thetas = tf.constant([1.5, 2.7, -4.0])
+    expected_log_partition = tf.math.log(tf.constant(3641.8353))
 
-  # def test_entropy_boltzmann(self):
-  #   """Confirm correct value of the entropy function."""
-  #   test_thetas = tf.Variable([1.5, 2.7, -4.0])
-  #   expected_entropy = tf.constant(0.00233551808)
-  #   pre_k = ebm.KOBE(2, 2)
-  #   pre_k.kernel.assign(test_thetas)
-  #   test_k = ebm.EBM(pre_k, None, is_analytic=True)
-  #   test_entropy = test_k.entropy()
-  #   self.assertAllClose(expected_entropy, test_entropy)
+    energy = energy_model.KOBE([0, 1], 2)
+    actual_dist = energy_infer.AnalyticDistribution(energy)
+    _ = energy(tf.constant([[0, 0]]))  # initialize variables
+    energy.set_weights([test_thetas])
+    actual_log_partition = actual_dist.log_partition()
+    self.assertAllClose(actual_log_partition, expected_log_partition)
+
+  def test_entropy(self):
+    """Confirms correct value of the entropy function."""
+    test_thetas = tf.constant([1.5, 2.7, -4.0])
+    expected_entropy = tf.constant(0.00233551808)
+
+    energy = energy_model.KOBE([0, 1], 2)
+    actual_dist = energy_infer.AnalyticDistribution(energy)
+    _ = energy(tf.constant([[0, 0]]))  # initialize variables
+    energy.set_weights([test_thetas])
+    actual_entropy = actual_dist.entropy()
+    self.assertAllClose(actual_entropy, expected_entropy)
 
 
 # class BernoulliDistributionTest(tf.test.TestCase):
