@@ -46,14 +46,14 @@ class BitstringEnergy(tf.keras.layers.Layer):
     """Initializes a BitstringEnergy.
 
     Args:
-      bits: Labels for the bits on which this distribution is supported.
+      bits: Unique labels for the bits on which this distribution is supported.
       energy_layers: Concatenation of these layers yields trainable map from
         bitstrings to scalars.
       name: Optional name for the model.
     """
     super().__init__(name=name)
     self._bits = energy_model_utils.check_bits(bits)
-    self._energy_layers = energy_model_utils.check_layers(energy_layers)
+    self._energy_layers = energy_layers
 
   @property
   def num_bits(self):
@@ -95,7 +95,7 @@ class PauliMixin(abc.ABC):
     raise NotImplementedError()
 
   @abc.abstractmethod
-  def operator_shards(self, qubits):
+  def operator_shards(self, qubits: List[cirq.GridQubit]):
     """Parameter independent Pauli Z strings to measure.
 
     Args:
@@ -107,7 +107,7 @@ class PauliMixin(abc.ABC):
     """
     raise NotImplementedError()
 
-  def operator_expectation(self, expectation_shards):
+  def operator_expectation(self, expectation_shards: tf.Tensor):
     """Computes the average energy given operator shard expectation values."""
     x = expectation_shards
     for layer in self.post_process:
@@ -124,12 +124,13 @@ class BernoulliEnergy(BitstringEnergy, PauliMixin):
 
   def __init__(self,
                bits: List[int],
-               initializer=tf.keras.initializers.RandomUniform(),
-               name=None):
+               initializer: tf.keras.initializers.Initializer = tf.keras
+               .initializers.RandomUniform(),
+               name: Union[None, str] = None):
     """Initializes a BernoulliEnergy.
-    
+
     Args:
-      bits: Each entry is an index on which the distribution is supported.
+      bits: Unique labels for the bits on which this distribution is supported.
       initializer: A `tf.keras.initializers.Initializer` which specifies how to
         initialize the values of the parameters.
       name: Optional name for the model.
@@ -167,15 +168,15 @@ class KOBE(BitstringEnergy, PauliMixin):
   def __init__(self,
                bits: List[int],
                order: int,
-               initializer=tf.keras.initializers.RandomUniform(),
-               name=None):
+               initializer: tf.keras.initializers.Initializer = tf.keras
+               .initializers.RandomUniform(),
+               name: Union[None, str] = None):
     """Initializes a KOBE.
 
     Args:
       bits: Each entry is an index on which the distribution is supported.
       order: The order of the KOBE.
-      initializer: A `tf.keras.initializers.Initializer` which specifies how to
-        initialize the values of the parameters.
+      initializer: Specifies how to initialize the values of the parameters.
       name: Optional name for the model.
     """
     parity_layer = energy_model_utils.Parity(bits, order)
@@ -185,13 +186,13 @@ class KOBE(BitstringEnergy, PauliMixin):
     post_process = [energy_model_utils.VariableDot(initializer=initializer)]
     super().__init__(bits, pre_process + post_process, name)
     self._post_process = post_process
-    
+
   @property
   def post_process(self):
     """See base class description."""
     return self._post_process
 
-  def operator_shards(self, qubits):
+  def operator_shards(self, qubits: List[cirq.GridQubit]):
     """See base class description."""
     ops = []
     for i in range(self._num_terms):

@@ -78,16 +78,16 @@ class AnalyticDistribution(BitstringDistribution):
     """
     super().__init__(energy, name=name)
     self._all_bitstrings = tf.constant(
-      list(itertools.product([0, 1], repeat=self.energy.num_bits)),
-      dtype=tf.int8)
+        list(itertools.product([0, 1], repeat=self.energy.num_bits)),
+        dtype=tf.int8)
     test_validity = self.inner_distribution(validate_args=True)
-    del(test_validity)
+    del (test_validity)
 
   @property
   def inner_distribution(self, validate_args=False):
     """Returns a Categorical distribution."""
-    return tfp.distributions.Categorical(logits=-1 * self.all_energies,
-                                         validate_args=validate_args)
+    return tfp.distributions.Categorical(
+        logits=-1 * self.all_energies, validate_args=validate_args)
 
   @property
   def all_bitstrings(self):
@@ -125,15 +125,13 @@ class BernoulliDistribution(BitstringDistribution):
     """
     super().__init__(energy, name=name)
     test_validity = self.inner_distribution(validate_args=True)
-    del(test_validity)
+    del (test_validity)
 
   @property
   def inner_distribution(self, validate_args=False):
     """Returns a Bernoulli distribution."""
     return tfp.distributions.Bernoulli(
-      logits=self.energy.logits,
-      validate_args=validate_args,
-      dtype=tf.int8)
+        logits=self.energy.logits, validate_args=validate_args, dtype=tf.int8)
 
   def _sample_n(self, n):
     """Returns `n` samples from the distribution defined by `self.energy`."""
@@ -148,7 +146,8 @@ class BernoulliDistribution(BitstringDistribution):
     the sum of the individual spin log partition functions.
     """
     thetas = 0.5 * self.energy.logits
-    single_log_partitions = tf.math.log(tf.math.exp(thetas) + tf.math.exp(-1.0 * thetas))
+    single_log_partitions = tf.math.log(
+        tf.math.exp(thetas) + tf.math.exp(-1.0 * thetas))
     return tf.math.reduce_sum(single_log_partitions)
 
   def _entropy(self):

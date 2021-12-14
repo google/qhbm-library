@@ -169,7 +169,7 @@ class AnalyticDistributionTest(tf.test.TestCase):
     test_entropy = test_k.entropy()
     self.assertAllClose(expected_entropy, test_entropy)
 
-  
+
 class BernoulliDistributionTest(tf.test.TestCase):
   """Tests the BernoulliDistribution class."""
 

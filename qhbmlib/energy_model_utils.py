@@ -24,8 +24,6 @@ import tensorflow as tf
 
 def check_bits(bits):
   """Confirms the input is a valid bit index list."""
-  if not isinstance(bits, list) or not all(isinstance(i, int) for i in bits):
-    raise TypeError("`bits` must be a list of integers.")
   if len(set(bits)) != len(bits):
     raise ValueError("All entries of `bits` must be unique.")
   return bits
@@ -38,14 +36,6 @@ def check_order(order):
   if order <= 0:
     raise ValueError("`order` must be greater than zero.")
   return order
-
-
-def check_layers(layer_list):
-  """Confirms the input is a valid list of keras Layers."""
-  if not isinstance(layer_list, list) or not all(
-      [isinstance(e, tf.keras.layers.Layer) for e in layer_list]):
-    raise TypeError("must be a list of keras layers.")
-  return layer_list
 
 
 class Squeeze(tf.keras.layers.Layer):
@@ -90,7 +80,9 @@ class SpinsFromBitstrings(tf.keras.layers.Layer):
 class VariableDot(tf.keras.layers.Layer):
   """Utility layer for dotting input with a same-sized variable."""
 
-  def __init__(self, initializer=tf.keras.initializers.RandomUniform()):
+  def __init__(self,
+               initializer: tf.keras.initializers.Initializer = tf.keras
+               .initializers.RandomUniform()):
     """Initializes a VariableDot layer.
 
     Args:
@@ -115,7 +107,7 @@ class VariableDot(tf.keras.layers.Layer):
 class Parity(tf.keras.layers.Layer):
   """Computes the parities of input spins."""
 
-  def __init__(self, bits, order):
+  def __init__(self, bits: List[int], order: int):
     """Initializes a Parity layer."""
     super().__init__(trainable=False)
     bits = check_bits(bits)

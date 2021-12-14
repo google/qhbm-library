@@ -31,10 +31,6 @@ class CheckHelpersTest(tf.test.TestCase):
     expected_bits = [1, 6, 222, 13223]
     actual_bits = energy_model_utils.check_bits(expected_bits)
     self.assertAllEqual(actual_bits, expected_bits)
-    with self.assertRaisesRegex(TypeError, expected_regex="a list of integers"):
-      _ = energy_model_utils.check_bits(90)
-    with self.assertRaisesRegex(TypeError, expected_regex="a list of integers"):
-      _ = energy_model_utils.check_bits(["junk"])
     with self.assertRaisesRegex(ValueError, expected_regex="must be unique"):
       _ = energy_model_utils.check_bits([1, 1])
 
@@ -43,25 +39,8 @@ class CheckHelpersTest(tf.test.TestCase):
     expected_order = 5
     actual_order = energy_model_utils.check_order(expected_order)
     self.assertEqual(actual_order, expected_order)
-    with self.assertRaisesRegex(TypeError, expected_regex="must be an integer"):
-      _ = energy_model_utils.check_order("junk")
     with self.assertRaisesRegex(ValueError, expected_regex="greater than zero"):
       _ = energy_model_utils.check_order(0)
-
-  def test_check_layers(self):
-    """Confirms bad inputs are caught and good inputs pass through."""
-    expected_layers = [tf.keras.layers.Dense(5)]
-    actual_layers = energy_model_utils.check_layers(expected_layers)
-    self.assertTrue(id(actual_layers[0]), id(expected_layers[0]))
-    with self.assertRaisesRegex(
-        TypeError, expected_regex="list of keras layers"):
-      _ = energy_model_utils.check_layers("junk")
-    with self.assertRaisesRegex(
-        TypeError, expected_regex="list of keras layers"):
-      _ = energy_model_utils.check_layers(["junk"])
-    with self.assertRaisesRegex(
-        TypeError, expected_regex="list of keras layers"):
-      _ = energy_model_utils.check_layers([tf.keras.layers.Dense])
 
 
 class SqueezeTest(tf.test.TestCase):
