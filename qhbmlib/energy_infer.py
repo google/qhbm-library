@@ -40,11 +40,18 @@ class BitstringDistribution(tfd.Distribution, abc.ABC):
       name: Optional python `str` name prefixed to Ops created by this class.
         Default: subclass name.
     """
-    super().__init__(name=name)
+    super().__init__(
+      dtype=tf.int8,
+      reparameterization_type=tfd.NOT_REPARAMETERIZED,
+      validate_args=False,
+      allow_nan_stats=False,
+      parameters=None,
+      graph_parents=None,
+      name=name)
     self.energy = energy
 
   @abc.abstractmethod
-  def _sample_n(self, n):
+  def _sample_n(self, n, seed=None, **kwargs):
     """Returns `n` samples approximately drawn from the EBM corresponding to
     `self.energy`."""
     raise NotImplementedError()
@@ -80,11 +87,10 @@ class AnalyticDistribution(BitstringDistribution):
     self._all_bitstrings = tf.constant(
         list(itertools.product([0, 1], repeat=self.energy.num_bits)),
         dtype=tf.int8)
-    test_validity = self.inner_distribution(validate_args=True)
+    test_validity = self.get_inner_distribution(validate_args=True)
     del (test_validity)
 
-  @property
-  def inner_distribution(self, validate_args=False):
+  def get_inner_distribution(self, validate_args=False):
     """Returns a Categorical distribution."""
     return tfp.distributions.Categorical(
         logits=-1 * self.all_energies, validate_args=validate_args)
@@ -92,15 +98,16 @@ class AnalyticDistribution(BitstringDistribution):
   @property
   def all_bitstrings(self):
     """Returns every bitstring."""
+    return self._all_bitstrings
 
   @property
   def all_energies(self):
     """Returns the energy of every bitstring."""
     return self.energy(self.all_bitstrings)
 
-  def _sample_n(self, n):
+  def _sample_n(self, n, seed=None, **kwargs):
     """Returns `n` samples from the distribution defined by `self.energy`."""
-    return tf.gather(self.all_bitstrings, self.inner_distribution.sample(n))
+    return tf.gather(self.all_bitstrings, self.get_inner_distribution().sample(n, seed=seed))
 
   def log_partition(self):
     """Returns the exact log partition function."""
@@ -108,7 +115,7 @@ class AnalyticDistribution(BitstringDistribution):
 
   def _entropy(self):
     """Returns the exact entropy."""
-    return self.inner_distribution.entropy()
+    return self.get_inner_distribution().entropy()
 
 
 class BernoulliDistribution(BitstringDistribution):
@@ -133,9 +140,9 @@ class BernoulliDistribution(BitstringDistribution):
     return tfp.distributions.Bernoulli(
         logits=self.energy.logits, validate_args=validate_args, dtype=tf.int8)
 
-  def _sample_n(self, n):
+  def _sample_n(self, n, seed=None, **kwargs):
     """Returns `n` samples from the distribution defined by `self.energy`."""
-    return self.inner_distribution.sample(n)
+    return self.inner_distribution.sample(n, seed=seed)
 
   def log_partition(self):
     r"""Returns the exact log partition function.
