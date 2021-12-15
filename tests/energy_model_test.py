@@ -105,7 +105,7 @@ class BernoulliEnergyTest(tf.test.TestCase):
   """Tests the BernoulliEnergy class."""
 
   def test_energy_simple(self):
-    """Tests the energy and its derivative in a simple case.
+    r"""Tests the energy and its derivative in a simple case.
 
     For a given bitstring b, the energy is
       $$E_\theta(b) = \sum_i (1-2b_i)\theta_i$$
@@ -114,7 +114,6 @@ class BernoulliEnergyTest(tf.test.TestCase):
     """
     test_b = energy_model.BernoulliEnergy([1, 2, 3])
     test_vars = tf.constant([1.0, 1.7, -2.8], dtype=tf.float32)
-    _ = test_b(tf.constant([[0, 0, 0]]))
     test_b.set_weights([test_vars])
     test_bitstrings = tf.constant([[0, 0, 0], [1, 0, 0], [0, 1, 1]])
     test_spins = 1 - 2 * test_bitstrings
@@ -140,7 +139,7 @@ class BernoulliEnergyTest(tf.test.TestCase):
       self.assertAllClose(actual_energy_grad, [test_spins])
 
   def test_energy_bernoulli(self):
-    """Tests the energy and its derivative in a more complicated case.
+    r"""Tests the energy and its derivative in a more complicated case.
 
     For a given bitstring b, the energy is
       $$E_\theta(b) = \sum_i (1-2b_i)\theta_i$$
@@ -156,7 +155,6 @@ class BernoulliEnergyTest(tf.test.TestCase):
       bits = random.sample(range(1000), num_bits)
       thetas = tf.random.uniform([num_bits], minval=-100, maxval=100)
       test_b = energy_model.BernoulliEnergy(bits)
-      _ = test_b(test_bitstrings)
       test_b.set_weights([thetas])
 
       @tf.function
@@ -190,7 +188,6 @@ class BernoulliEnergyTest(tf.test.TestCase):
     num_bits = 3
     test_b = energy_model.BernoulliEnergy(list(range(num_bits)))
     qubits = cirq.GridQubit.rect(1, num_bits)
-    _ = test_b(tf.constant([[0] * num_bits]))
     # Pin at bitstring [1, 0, 1]
     test_b.set_weights([tf.constant([1000.0, -1000.0, 1000.0])])
     operators = test_b.operator_shards(qubits)
@@ -225,7 +222,6 @@ class KOBETest(tf.test.TestCase):
     expected_energies = tf.constant([0.2, 2.8, 5.2, -8.2])
     test_k = energy_model.KOBE(bits, order)
     all_strings = tf.constant([[0, 0], [0, 1], [1, 0], [1, 1]])
-    _ = test_k(all_strings)
     test_k.set_weights([test_thetas])
     actual_energies = test_k(all_strings)
     self.assertAllClose(actual_energies, expected_energies)
@@ -253,7 +249,6 @@ class KOBETest(tf.test.TestCase):
     num_bits = 3
     test_b = energy_model.KOBE(list(range(num_bits)), 2)
     qubits = cirq.GridQubit.rect(1, num_bits)
-    _ = test_b(tf.constant([[0, 0, 0]]))
 
     # Pin at bitstring [1, 0, 1]
     test_b.set_weights([tf.constant([100.0, -200.0, 300.0, 10, -20, 30])])

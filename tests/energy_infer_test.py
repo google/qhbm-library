@@ -27,13 +27,13 @@ class AnalyticDistributionTest(tf.test.TestCase):
   """Tests the AnalyticDistribution class."""
 
   def test_init(self):
-    """Confirm internal values are set correctly."""
+    """Confirms internal values are set correctly."""
     bits = [0, 1, 3]
     order = 2
-    test_k = energy_model.KOBE(bits, order)
+    expected_energy = energy_model.KOBE(bits, order)
     expected_name = "test_analytic_dist_name"
-    actual_dist = energy_infer.AnalyticDistribution(test_k, expected_name)
-    self.assertEqual(actual_dist.energy, test_k)
+    actual_dist = energy_infer.AnalyticDistribution(expected_energy, expected_name)
+    self.assertEqual(actual_dist.energy, expected_energy)
     self.assertEqual(actual_dist.name, expected_name)
 
     expected_bitstrings = tf.constant(
@@ -47,16 +47,15 @@ class AnalyticDistributionTest(tf.test.TestCase):
        [1, 1, 1]], dtype=tf.int8)
     self.assertAllEqual(actual_dist.all_bitstrings, expected_bitstrings)
 
-    expected_energies = test_k(expected_bitstrings)
+    expected_energies = expected_energy(expected_bitstrings)
     self.assertAllClose(actual_dist.all_energies, expected_energies)
 
-  def test_sampler(self):
-    """Confirm bitstrings are sampled as expected."""
+  def test_sample(self):
+    """Confirms bitstrings are sampled as expected."""
     n_samples = 1e7
 
     # Single bit test.
     one_bit_energy = energy_model.KOBE([0], 1)
-    _ = one_bit_energy(tf.constant([[0]]))
     actual_dist = energy_infer.AnalyticDistribution(one_bit_energy)
     # For single factor Bernoulli, theta=0 is 50% chance of 1.
     one_bit_energy.set_weights([tf.constant([0.0])])
@@ -76,76 +75,49 @@ class AnalyticDistributionTest(tf.test.TestCase):
     self.assertFalse(test_util.check_bitstring_exists(tf.constant([0], dtype=tf.int8), samples))
     self.assertTrue(test_util.check_bitstring_exists(tf.constant([1], dtype=tf.int8), samples))
 
-  #   # Three bit tests.
-  #   # First a uniform sampling test.
-  #   three_bit_energy = energy_model.KOBE([0, 1, 2], 3, tf.keras.initializers.Constant(0.0))
-  #   actual_dist = energy_infer.AnalyticDistribution(three_bit_energy)
-  #   bitstrings, counts = test_k.sample(num_bitstrings)
+    # Three bit tests.
+    # First a uniform sampling test.
+    three_bit_energy = energy_model.KOBE([0, 1, 2], 3, tf.keras.initializers.Constant(0.0))
+    actual_dist = energy_infer.AnalyticDistribution(three_bit_energy)
+    samples = actual_dist.sample(n_samples)
 
-  #   def check_bitstring_exists(bitstring, bitstring_list):
-  #     return tf.math.reduce_any(
-  #         tf.reduce_all(tf.math.equal(bitstring, bitstring_list), 1))
+    for b in [[0, 0, 0],
+              [0, 0, 1],
+              [0, 1, 0],
+              [0, 1, 1],
+              [1, 0, 0],
+              [1, 0, 1],
+              [1, 1, 0],
+              [1, 1, 1]]:
+      b_tf = tf.constant([b], dtype=tf.int8)
+      self.assertTrue(test_util.check_bitstring_exists(b_tf, samples))
 
-  #   self.assertTrue(
-  #       check_bitstring_exists(
-  #           tf.constant([0, 0, 0], dtype=tf.int8), bitstrings))
-  #   self.assertTrue(
-  #       check_bitstring_exists(
-  #           tf.constant([0, 0, 1], dtype=tf.int8), bitstrings))
-  #   self.assertTrue(
-  #       check_bitstring_exists(
-  #           tf.constant([0, 1, 0], dtype=tf.int8), bitstrings))
-  #   self.assertTrue(
-  #       check_bitstring_exists(
-  #           tf.constant([0, 1, 1], dtype=tf.int8), bitstrings))
-  #   self.assertTrue(
-  #       check_bitstring_exists(
-  #           tf.constant([1, 0, 0], dtype=tf.int8), bitstrings))
-  #   self.assertTrue(
-  #       check_bitstring_exists(
-  #           tf.constant([1, 0, 1], dtype=tf.int8), bitstrings))
-  #   self.assertTrue(
-  #       check_bitstring_exists(
-  #           tf.constant([1, 1, 0], dtype=tf.int8), bitstrings))
-  #   self.assertTrue(
-  #       check_bitstring_exists(
-  #           tf.constant([1, 1, 1], dtype=tf.int8), bitstrings))
-  #   # Check that the fraction is approximately 0.125 (equal counts)
-  #   self.assertAllClose(
-  #       [0.125] * 8,
-  #       [counts[i].numpy() / num_bitstrings for i in range(8)],
-  #       atol=1e-3,
-  #   )
-  #   # Confirm correlated spins.
-  #   test_thetas = tf.constant([100.0, 0.0, 0.0, -100.0, 0.0, 100.0])
-  #   test_k._energy_function.kernel.assign(test_thetas)
-  #   num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
-  #   bitstrings, _ = test_k.sample(num_bitstrings)
-  #   # Confirm we only get the 110 bitstring.
-  #   self.assertFalse(
-  #       check_bitstring_exists(
-  #           tf.constant([0, 0, 0], dtype=tf.int8), bitstrings))
-  #   self.assertFalse(
-  #       check_bitstring_exists(
-  #           tf.constant([0, 0, 1], dtype=tf.int8), bitstrings))
-  #   self.assertFalse(
-  #       check_bitstring_exists(
-  #           tf.constant([0, 1, 0], dtype=tf.int8), bitstrings))
-  #   self.assertFalse(
-  #       check_bitstring_exists(
-  #           tf.constant([0, 1, 1], dtype=tf.int8), bitstrings))
-  #   self.assertFalse(
-  #       check_bitstring_exists(
-  #           tf.constant([1, 0, 0], dtype=tf.int8), bitstrings))
-  #   self.assertFalse(
-  #       check_bitstring_exists(
-  #           tf.constant([1, 0, 1], dtype=tf.int8), bitstrings))
-  #   self.assertTrue(
-  #       check_bitstring_exists(
-  #           tf.constant([1, 1, 0], dtype=tf.int8), bitstrings))
-  #   self.assertFalse(
-  #       check_bitstring_exists(
-  #           tf.constant([1, 1, 1], dtype=tf.int8), bitstrings))
+    _, counts = util.unique_bitstrings_with_counts(samples)
+    # Check that the fraction is approximately 0.125 (equal counts)
+    self.assertAllClose(
+        [0.125] * 8,
+        tf.cast(counts, tf.float32) / tf.cast(n_samples, tf.float32),
+        atol=1e-3,
+    )
+
+    # Confirm correlated spins.
+    three_bit_energy.set_weights([tf.constant([100.0, 0.0, 0.0, -100.0, 0.0, 100.0, 0.0])])
+    samples = actual_dist.sample(n_samples)
+    # Confirm we only get the 110 bitstring.
+    
+    self.assertTrue(
+        test_util.check_bitstring_exists(
+            tf.constant([1, 1, 0], dtype=tf.int8), samples))
+    for b in [[0, 0, 0],
+              [0, 0, 1],
+              [0, 1, 0],
+              [0, 1, 1],
+              [1, 0, 0],
+              [1, 0, 1],
+              # [1, 1, 0],
+              [1, 1, 1]]:
+      b_tf = tf.constant([b], dtype=tf.int8)
+      self.assertFalse(test_util.check_bitstring_exists(b_tf, samples))
 
   def test_log_partition(self):
     """Confirms correct value of the log partition function."""
@@ -154,7 +126,6 @@ class AnalyticDistributionTest(tf.test.TestCase):
 
     energy = energy_model.KOBE([0, 1], 2)
     actual_dist = energy_infer.AnalyticDistribution(energy)
-    _ = energy(tf.constant([[0, 0]]))  # initialize variables
     energy.set_weights([test_thetas])
     actual_log_partition = actual_dist.log_partition()
     self.assertAllClose(actual_log_partition, expected_log_partition)
@@ -166,125 +137,126 @@ class AnalyticDistributionTest(tf.test.TestCase):
 
     energy = energy_model.KOBE([0, 1], 2)
     actual_dist = energy_infer.AnalyticDistribution(energy)
-    _ = energy(tf.constant([[0, 0]]))  # initialize variables
     energy.set_weights([test_thetas])
     actual_entropy = actual_dist.entropy()
     self.assertAllClose(actual_entropy, expected_entropy)
 
 
-# class BernoulliDistributionTest(tf.test.TestCase):
-#   """Tests the BernoulliDistribution class."""
+class BernoulliDistributionTest(tf.test.TestCase):
+  """Tests the BernoulliDistribution class."""
 
-#   num_bits = 5
+  def test_init(self):
+    """Tests that components are initialized correctly."""
+    bits = [0, 1, 3]
+    expected_energy = energy_model.BernoulliEnergy(bits)
+    expected_name = "test_analytic_dist_name"
+    actual_dist = energy_infer.BernoulliDistribution(expected_energy, expected_name)
+    self.assertEqual(actual_dist.energy, expected_energy)
+    self.assertEqual(actual_dist.name, expected_name)
 
-#   def test_init(self):
-#     """Test that components are initialized correctly."""
-#     init_const = 1.5
-#     test_b = ebm.Bernoulli(self.num_bits,
-#                            tf.keras.initializers.Constant(init_const))
-#     self.assertAllEqual(test_b.num_bits, self.num_bits)
-#     self.assertTrue(test_b.has_operator)
-#     self.assertFalse(test_b.is_analytic)
-#     self.assertAllEqual(test_b.kernel, [init_const] * self.num_bits)
+  def test_sample(self):
+    """Confirms that bitstrings are sampled as expected."""
+    n_samples = 1e7
+    energy = energy_model.BernoulliEnergy([1])
+    actual_dist = energy_infer.BernoulliDistribution(energy)
 
-#   def test_copy(self):
-#     """Test that the copy has the same values, but new variables."""
-#     test_b = ebm.Bernoulli(self.num_bits)
-#     test_b_copy = test_b.copy()
-#     self.assertAllEqual(test_b_copy.num_bits, test_b.num_bits)
-#     self.assertEqual(test_b_copy.has_operator, test_b.has_operator)
-#     self.assertEqual(test_b_copy.is_analytic, test_b.is_analytic)
-#     self.assertAllEqual(test_b_copy.kernel, test_b.kernel)
-#     self.assertNotEqual(id(test_b_copy.kernel), id(test_b.kernel))
+    # For single factor Bernoulli, theta = 0 is 50% chance of 1.
+    energy.set_weights([tf.constant([0.0])])
+    samples = actual_dist.sample(n_samples)
+    # check that we got both bitstrings
+    self.assertTrue(test_util.check_bitstring_exists(tf.constant([0], dtype=tf.int8), samples))
+    self.assertTrue(test_util.check_bitstring_exists(tf.constant([1], dtype=tf.int8), samples))
+    # Check that the fraction is approximately 0.5 (equal counts)
+    _, counts = util.unique_bitstrings_with_counts(samples)
+    self.assertAllClose(1.0, counts[0] / counts[1], atol=1e-3)
 
-#   def test_sampler_bernoulli(self):
-#     """Confirm that bitstrings are sampled as expected."""
-#     test_b = ebm.Bernoulli(1, name="test")
+    # Large value of theta pins the bit.
+    energy.set_weights([tf.constant([1000.0])])
+    samples = actual_dist.sample(n_samples)
+    # check that we got only one bitstring
+    bitstrings, _ = util.unique_bitstrings_with_counts(samples)
+    self.assertAllEqual(bitstrings, [[1]])
 
-#     # For single factor Bernoulli, theta = 0 is 50% chance of 1.
-#     test_b.kernel.assign(tf.constant([0.0]))
-#     num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
-#     bitstrings, counts = test_b.sample(num_bitstrings)
-#     # check that we got both bitstrings
-#     self.assertTrue(
-#         tf.reduce_any(tf.equal(tf.constant([0], dtype=tf.int8), bitstrings)))
-#     self.assertTrue(
-#         tf.reduce_any(tf.equal(tf.constant([1], dtype=tf.int8), bitstrings)))
-#     # Check that the fraction is approximately 0.5 (equal counts)
-#     self.assertAllClose(1.0, counts[0] / counts[1], atol=1e-3)
+    # Two bit tests.
+    energy = energy_model.BernoulliEnergy([0, 1], tf.keras.initializers.Constant(0.0))
+    actual_dist = energy_infer.BernoulliDistribution(energy)
+    samples = actual_dist.sample(n_samples)
+    for b in [[0, 0],
+              [0, 1],
+              [1, 0],
+              [1, 1]]:
+      b_tf = tf.constant([b], dtype=tf.int8)
+      self.assertTrue(test_util.check_bitstring_exists(b_tf, samples))
+    # Check that the fraction is approximately 0.25 (equal counts)
+    _, counts = util.unique_bitstrings_with_counts(samples)
+    self.assertAllClose(
+        [0.25] * 4,
+        tf.cast(counts, tf.float32) / tf.cast(n_samples, tf.float32),
+        atol=1e-3,
+    )
 
-#     # Large value of theta pins the bit.
-#     test_b.kernel.assign(tf.constant([1000.0]))
-#     num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
-#     bitstrings, counts = test_b.sample(num_bitstrings)
-#     # check that we got only one bitstring
-#     self.assertAllEqual(bitstrings, [[1]])
+    # Test one pinned, one free bit
+    energy.set_weights([tf.constant([-1000.0, 0.0])])
+    samples = actual_dist.sample(n_samples)
+    # check that we get 00 and 01.
+    for b in [[0, 0],
+              [0, 1]]:
+      b_tf = tf.constant([b], dtype=tf.int8)
+      self.assertTrue(test_util.check_bitstring_exists(b_tf, samples))
+    for b in [[1, 0],
+              [1, 1]]:
+      b_tf = tf.constant([b], dtype=tf.int8)
+      self.assertFalse(test_util.check_bitstring_exists(b_tf, samples))
+    _, counts = util.unique_bitstrings_with_counts(samples)
+    self.assertAllClose(counts, [n_samples / 2] * 2, atol=n_samples / 1000)
 
-#     # Two bit tests.
-#     test_b = ebm.Bernoulli(2, name="test")
-#     test_b.kernel.assign(tf.constant([0.0, 0.0]))
-#     num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
-#     bitstrings, counts = test_b.sample(num_bitstrings)
+  def test_log_partition(self):
+    """Confirms correct value of the log partition function."""
+    all_bitstrings = tf.constant(
+      [[0, 0, 0],
+       [0, 0, 1],
+       [0, 1, 0],
+       [0, 1, 1],
+       [1, 0, 0],
+       [1, 0, 1],
+       [1, 1, 0],
+       [1, 1, 1]], dtype=tf.int8)
+    energy = energy_model.BernoulliEnergy([5, 6, 7])
+    actual_dist = energy_infer.BernoulliDistribution(energy)
+    expected_log_partition = tf.reduce_logsumexp(-1.0 * energy(all_bitstrings))
+    actual_log_partition = actual_dist.log_partition()
+    self.assertAllClose(actual_log_partition, expected_log_partition)
 
-#     def check_bitstring_exists(bitstring, bitstring_list):
-#       return tf.math.reduce_any(
-#           tf.reduce_all(tf.math.equal(bitstring, bitstring_list), 1))
+  def test_entropy(self):
+    r"""Confirms that the entropy is S(p) = -\sum_x p(x)\ln(p(x)).
 
-#     self.assertTrue(
-#         check_bitstring_exists(tf.constant([0, 0], dtype=tf.int8), bitstrings))
-#     self.assertTrue(
-#         check_bitstring_exists(tf.constant([0, 1], dtype=tf.int8), bitstrings))
-#     self.assertTrue(
-#         check_bitstring_exists(tf.constant([1, 0], dtype=tf.int8), bitstrings))
-#     self.assertTrue(
-#         check_bitstring_exists(tf.constant([1, 1], dtype=tf.int8), bitstrings))
+    For logit $\eta$ and probability of 1 $p$, we have
+    $\eta = \log(p / 1-p)$, so $p = \frac{e^{\eta}}{1 + e^{\eta}}$.
+    """
+    test_thetas = tf.constant([-1.5, 0.6, 2.1])
+    logits = 2 * test_thetas
+    num = tf.math.exp(logits)
+    denom = 1 + num
+    test_probs = (num / denom).numpy()
+    all_probs = tf.constant([
+        (1 - test_probs[0]) * (1 - test_probs[1]) * (1 - test_probs[2]),
+        (1 - test_probs[0]) * (1 - test_probs[1]) * (test_probs[2]),
+        (1 - test_probs[0]) * (test_probs[1]) * (1 - test_probs[2]),
+        (1 - test_probs[0]) * (test_probs[1]) * (test_probs[2]),
+        (test_probs[0]) * (1 - test_probs[1]) * (1 - test_probs[2]),
+        (test_probs[0]) * (1 - test_probs[1]) * (test_probs[2]),
+        (test_probs[0]) * (test_probs[1]) * (1 - test_probs[2]),
+        (test_probs[0]) * (test_probs[1]) * (test_probs[2]),
+    ])
+    # probabilities sum to 1
+    self.assertAllClose(1.0, tf.reduce_sum(all_probs))
+    expected_entropy = -1.0 * tf.reduce_sum(all_probs * tf.math.log(all_probs))
 
-#     # Check that the fraction is approximately 0.25 (equal counts)
-#     self.assertAllClose(
-#         [0.25] * 4,
-#         [counts[i].numpy() / num_bitstrings for i in range(4)],
-#         atol=1e-3,
-#     )
-#     test_b.kernel.assign(tf.constant([-1000.0, 1000.0]))
-#     num_bitstrings = tf.constant(int(1e7), dtype=tf.int32)
-#     bitstrings, counts = test_b.sample(num_bitstrings)
-#     # check that we only get 01.
-#     self.assertFalse(
-#         check_bitstring_exists(tf.constant([0, 0], dtype=tf.int8), bitstrings))
-#     self.assertTrue(
-#         check_bitstring_exists(tf.constant([0, 1], dtype=tf.int8), bitstrings))
-#     self.assertFalse(
-#         check_bitstring_exists(tf.constant([1, 0], dtype=tf.int8), bitstrings))
-#     self.assertFalse(
-#         check_bitstring_exists(tf.constant([1, 1], dtype=tf.int8), bitstrings))
-#     self.assertAllEqual(counts, [num_bitstrings])
-
-#   def test_log_partition_bernoulli(self):
-#     # TODO
-#     pass
-
-#   def test_entropy_bernoulli(self):
-#     """Confirm that the entropy conforms to S(p) = -sum_x p(x)ln(p(x))"""
-#     test_thetas = tf.constant([-1.5, 0.6, 2.1])
-#     # logits = 2 * thetas
-#     test_probs = ebm.logit_to_probability(2 * test_thetas).numpy()
-#     all_probs = tf.constant([
-#         (1 - test_probs[0]) * (1 - test_probs[1]) * (1 - test_probs[2]),
-#         (1 - test_probs[0]) * (1 - test_probs[1]) * (test_probs[2]),
-#         (1 - test_probs[0]) * (test_probs[1]) * (1 - test_probs[2]),
-#         (1 - test_probs[0]) * (test_probs[1]) * (test_probs[2]),
-#         (test_probs[0]) * (1 - test_probs[1]) * (1 - test_probs[2]),
-#         (test_probs[0]) * (1 - test_probs[1]) * (test_probs[2]),
-#         (test_probs[0]) * (test_probs[1]) * (1 - test_probs[2]),
-#         (test_probs[0]) * (test_probs[1]) * (test_probs[2]),
-#     ])
-#     # probabilities sum to 1
-#     self.assertAllClose(1.0, tf.reduce_sum(all_probs))
-#     expected_entropy = -1.0 * tf.reduce_sum(all_probs * tf.math.log(all_probs))
-#     test_b = ebm.Bernoulli(3, name="test")
-#     test_b.kernel.assign(test_thetas)
-#     test_entropy = test_b.entropy()
-#     self.assertAllClose(expected_entropy, test_entropy)
+    energy = energy_model.BernoulliEnergy([0, 1, 2])
+    actual_dist = energy_infer.BernoulliDistribution(energy)
+    energy.set_weights([test_thetas])
+    actual_entropy = actual_dist.entropy()
+    self.assertAllClose(actual_entropy, expected_entropy)
 
 
 if __name__ == "__main__":

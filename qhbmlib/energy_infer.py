@@ -87,10 +87,10 @@ class AnalyticDistribution(BitstringDistribution):
     self._all_bitstrings = tf.constant(
         list(itertools.product([0, 1], repeat=self.energy.num_bits)),
         dtype=tf.int8)
-    test_validity = self.get_inner_distribution(validate_args=True)
+    test_validity = self._inner_distribution(validate_args=True)
     del (test_validity)
 
-  def get_inner_distribution(self, validate_args=False):
+  def _inner_distribution(self, validate_args=False):
     """Returns a Categorical distribution."""
     return tfp.distributions.Categorical(
         logits=-1 * self.all_energies, validate_args=validate_args)
@@ -107,7 +107,7 @@ class AnalyticDistribution(BitstringDistribution):
 
   def _sample_n(self, n, seed=None, **kwargs):
     """Returns `n` samples from the distribution defined by `self.energy`."""
-    return tf.gather(self.all_bitstrings, self.get_inner_distribution().sample(n, seed=seed))
+    return tf.gather(self.all_bitstrings, self._inner_distribution().sample(n, seed=seed))
 
   def log_partition(self):
     """Returns the exact log partition function."""
@@ -115,7 +115,7 @@ class AnalyticDistribution(BitstringDistribution):
 
   def _entropy(self):
     """Returns the exact entropy."""
-    return self.get_inner_distribution().entropy()
+    return self._inner_distribution().entropy()
 
 
 class BernoulliDistribution(BitstringDistribution):
@@ -131,18 +131,17 @@ class BernoulliDistribution(BitstringDistribution):
         Default: subclass name.
     """
     super().__init__(energy, name=name)
-    test_validity = self.inner_distribution(validate_args=True)
+    test_validity = self._inner_distribution(validate_args=True)
     del (test_validity)
 
-  @property
-  def inner_distribution(self, validate_args=False):
+  def _inner_distribution(self, validate_args=False):
     """Returns a Bernoulli distribution."""
     return tfp.distributions.Bernoulli(
         logits=self.energy.logits, validate_args=validate_args, dtype=tf.int8)
 
   def _sample_n(self, n, seed=None, **kwargs):
     """Returns `n` samples from the distribution defined by `self.energy`."""
-    return self.inner_distribution.sample(n, seed=seed)
+    return self._inner_distribution().sample(n, seed=seed)
 
   def log_partition(self):
     r"""Returns the exact log partition function.
@@ -158,5 +157,9 @@ class BernoulliDistribution(BitstringDistribution):
     return tf.math.reduce_sum(single_log_partitions)
 
   def _entropy(self):
-    """Returns the exact entropy."""
-    return self.inner_distribution.entropy()
+    """Returns the exact entropy.
+
+    The total entropy of a set of spins is the sum of each individual spin's
+    entropies.
+    """
+    return tf.reduce_sum(self._inner_distribution().entropy())
