@@ -41,13 +41,13 @@ class BitstringDistribution(tfd.Distribution, abc.ABC):
         Default: subclass name.
     """
     super().__init__(
-      dtype=tf.int8,
-      reparameterization_type=tfd.NOT_REPARAMETERIZED,
-      validate_args=False,
-      allow_nan_stats=False,
-      parameters=None,
-      graph_parents=None,
-      name=name)
+        dtype=tf.int8,
+        reparameterization_type=tfd.NOT_REPARAMETERIZED,
+        validate_args=False,
+        allow_nan_stats=False,
+        parameters=None,
+        graph_parents=None,
+        name=name)
     self.energy = energy
 
   @abc.abstractmethod
@@ -107,7 +107,8 @@ class AnalyticDistribution(BitstringDistribution):
 
   def _sample_n(self, n, seed=None, **kwargs):
     """Returns `n` samples from the distribution defined by `self.energy`."""
-    return tf.gather(self.all_bitstrings, self._inner_distribution().sample(n, seed=seed))
+    return tf.gather(self.all_bitstrings,
+                     self._inner_distribution().sample(n, seed=seed))
 
   def log_partition(self):
     """Returns the exact log partition function."""

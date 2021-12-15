@@ -32,19 +32,15 @@ class AnalyticDistributionTest(tf.test.TestCase):
     order = 2
     expected_energy = energy_model.KOBE(bits, order)
     expected_name = "test_analytic_dist_name"
-    actual_dist = energy_infer.AnalyticDistribution(expected_energy, expected_name)
+    actual_dist = energy_infer.AnalyticDistribution(expected_energy,
+                                                    expected_name)
     self.assertEqual(actual_dist.energy, expected_energy)
     self.assertEqual(actual_dist.name, expected_name)
 
     expected_bitstrings = tf.constant(
-      [[0, 0, 0],
-       [0, 0, 1],
-       [0, 1, 0],
-       [0, 1, 1],
-       [1, 0, 0],
-       [1, 0, 1],
-       [1, 1, 0],
-       [1, 1, 1]], dtype=tf.int8)
+        [[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1], [1, 0, 0], [1, 0, 1],
+         [1, 1, 0], [1, 1, 1]],
+        dtype=tf.int8)
     self.assertAllEqual(actual_dist.all_bitstrings, expected_bitstrings)
 
     expected_energies = expected_energy(expected_bitstrings)
@@ -62,8 +58,12 @@ class AnalyticDistributionTest(tf.test.TestCase):
 
     samples = actual_dist.sample(n_samples)
     # check that we got both bitstrings
-    self.assertTrue(test_util.check_bitstring_exists(tf.constant([0], dtype=tf.int8), samples))
-    self.assertTrue(test_util.check_bitstring_exists(tf.constant([1], dtype=tf.int8), samples))
+    self.assertTrue(
+        test_util.check_bitstring_exists(
+            tf.constant([0], dtype=tf.int8), samples))
+    self.assertTrue(
+        test_util.check_bitstring_exists(
+            tf.constant([1], dtype=tf.int8), samples))
     # Check that the fraction is approximately 0.5 (equal counts)
     _, counts = util.unique_bitstrings_with_counts(samples)
     self.assertAllClose(1.0, counts[0] / counts[1], atol=1e-3)
@@ -72,23 +72,22 @@ class AnalyticDistributionTest(tf.test.TestCase):
     one_bit_energy.set_weights([tf.constant([100.0])])
     samples = actual_dist.sample(n_samples)
     # check that we got only one bitstring
-    self.assertFalse(test_util.check_bitstring_exists(tf.constant([0], dtype=tf.int8), samples))
-    self.assertTrue(test_util.check_bitstring_exists(tf.constant([1], dtype=tf.int8), samples))
+    self.assertFalse(
+        test_util.check_bitstring_exists(
+            tf.constant([0], dtype=tf.int8), samples))
+    self.assertTrue(
+        test_util.check_bitstring_exists(
+            tf.constant([1], dtype=tf.int8), samples))
 
     # Three bit tests.
     # First a uniform sampling test.
-    three_bit_energy = energy_model.KOBE([0, 1, 2], 3, tf.keras.initializers.Constant(0.0))
+    three_bit_energy = energy_model.KOBE([0, 1, 2], 3,
+                                         tf.keras.initializers.Constant(0.0))
     actual_dist = energy_infer.AnalyticDistribution(three_bit_energy)
     samples = actual_dist.sample(n_samples)
 
-    for b in [[0, 0, 0],
-              [0, 0, 1],
-              [0, 1, 0],
-              [0, 1, 1],
-              [1, 0, 0],
-              [1, 0, 1],
-              [1, 1, 0],
-              [1, 1, 1]]:
+    for b in [[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1], [1, 0, 0], [1, 0, 1],
+              [1, 1, 0], [1, 1, 1]]:
       b_tf = tf.constant([b], dtype=tf.int8)
       self.assertTrue(test_util.check_bitstring_exists(b_tf, samples))
 
@@ -101,21 +100,24 @@ class AnalyticDistributionTest(tf.test.TestCase):
     )
 
     # Confirm correlated spins.
-    three_bit_energy.set_weights([tf.constant([100.0, 0.0, 0.0, -100.0, 0.0, 100.0, 0.0])])
+    three_bit_energy.set_weights(
+        [tf.constant([100.0, 0.0, 0.0, -100.0, 0.0, 100.0, 0.0])])
     samples = actual_dist.sample(n_samples)
     # Confirm we only get the 110 bitstring.
-    
+
     self.assertTrue(
         test_util.check_bitstring_exists(
             tf.constant([1, 1, 0], dtype=tf.int8), samples))
-    for b in [[0, 0, 0],
-              [0, 0, 1],
-              [0, 1, 0],
-              [0, 1, 1],
-              [1, 0, 0],
-              [1, 0, 1],
-              # [1, 1, 0],
-              [1, 1, 1]]:
+    for b in [
+        [0, 0, 0],
+        [0, 0, 1],
+        [0, 1, 0],
+        [0, 1, 1],
+        [1, 0, 0],
+        [1, 0, 1],
+        # [1, 1, 0],
+        [1, 1, 1]
+    ]:
       b_tf = tf.constant([b], dtype=tf.int8)
       self.assertFalse(test_util.check_bitstring_exists(b_tf, samples))
 
@@ -150,7 +152,8 @@ class BernoulliDistributionTest(tf.test.TestCase):
     bits = [0, 1, 3]
     expected_energy = energy_model.BernoulliEnergy(bits)
     expected_name = "test_analytic_dist_name"
-    actual_dist = energy_infer.BernoulliDistribution(expected_energy, expected_name)
+    actual_dist = energy_infer.BernoulliDistribution(expected_energy,
+                                                     expected_name)
     self.assertEqual(actual_dist.energy, expected_energy)
     self.assertEqual(actual_dist.name, expected_name)
 
@@ -164,8 +167,12 @@ class BernoulliDistributionTest(tf.test.TestCase):
     energy.set_weights([tf.constant([0.0])])
     samples = actual_dist.sample(n_samples)
     # check that we got both bitstrings
-    self.assertTrue(test_util.check_bitstring_exists(tf.constant([0], dtype=tf.int8), samples))
-    self.assertTrue(test_util.check_bitstring_exists(tf.constant([1], dtype=tf.int8), samples))
+    self.assertTrue(
+        test_util.check_bitstring_exists(
+            tf.constant([0], dtype=tf.int8), samples))
+    self.assertTrue(
+        test_util.check_bitstring_exists(
+            tf.constant([1], dtype=tf.int8), samples))
     # Check that the fraction is approximately 0.5 (equal counts)
     _, counts = util.unique_bitstrings_with_counts(samples)
     self.assertAllClose(1.0, counts[0] / counts[1], atol=1e-3)
@@ -178,13 +185,11 @@ class BernoulliDistributionTest(tf.test.TestCase):
     self.assertAllEqual(bitstrings, [[1]])
 
     # Two bit tests.
-    energy = energy_model.BernoulliEnergy([0, 1], tf.keras.initializers.Constant(0.0))
+    energy = energy_model.BernoulliEnergy([0, 1],
+                                          tf.keras.initializers.Constant(0.0))
     actual_dist = energy_infer.BernoulliDistribution(energy)
     samples = actual_dist.sample(n_samples)
-    for b in [[0, 0],
-              [0, 1],
-              [1, 0],
-              [1, 1]]:
+    for b in [[0, 0], [0, 1], [1, 0], [1, 1]]:
       b_tf = tf.constant([b], dtype=tf.int8)
       self.assertTrue(test_util.check_bitstring_exists(b_tf, samples))
     # Check that the fraction is approximately 0.25 (equal counts)
@@ -199,12 +204,10 @@ class BernoulliDistributionTest(tf.test.TestCase):
     energy.set_weights([tf.constant([-1000.0, 0.0])])
     samples = actual_dist.sample(n_samples)
     # check that we get 00 and 01.
-    for b in [[0, 0],
-              [0, 1]]:
+    for b in [[0, 0], [0, 1]]:
       b_tf = tf.constant([b], dtype=tf.int8)
       self.assertTrue(test_util.check_bitstring_exists(b_tf, samples))
-    for b in [[1, 0],
-              [1, 1]]:
+    for b in [[1, 0], [1, 1]]:
       b_tf = tf.constant([b], dtype=tf.int8)
       self.assertFalse(test_util.check_bitstring_exists(b_tf, samples))
     _, counts = util.unique_bitstrings_with_counts(samples)
@@ -212,15 +215,9 @@ class BernoulliDistributionTest(tf.test.TestCase):
 
   def test_log_partition(self):
     """Confirms correct value of the log partition function."""
-    all_bitstrings = tf.constant(
-      [[0, 0, 0],
-       [0, 0, 1],
-       [0, 1, 0],
-       [0, 1, 1],
-       [1, 0, 0],
-       [1, 0, 1],
-       [1, 1, 0],
-       [1, 1, 1]], dtype=tf.int8)
+    all_bitstrings = tf.constant([[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1],
+                                  [1, 0, 0], [1, 0, 1], [1, 1, 0], [1, 1, 1]],
+                                 dtype=tf.int8)
     energy = energy_model.BernoulliEnergy([5, 6, 7])
     actual_dist = energy_infer.BernoulliDistribution(energy)
     expected_log_partition = tf.reduce_logsumexp(-1.0 * energy(all_bitstrings))
