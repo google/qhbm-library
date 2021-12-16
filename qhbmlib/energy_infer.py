@@ -68,6 +68,7 @@ class InferenceLayer(tf.keras.layers.Layer, abc.ABC):
     """Returns an estimate of the entropy."""
     raise NotImplementedError()
 
+  @abc.abstractmethod
   def log_partition(self):
     """Returns an estimate of the log partition function."""
     raise NotImplementedError()
@@ -119,8 +120,6 @@ class AnalyticInferenceLayer(InferenceLayer):
   def sample(self, n):
     """See base class docstring"""
     return tf.gather(self.all_bitstrings, self._current_dist.sample(n))
-
-    return self._current_dist.sample(n)
 
   def entropy(self):
     """See base class docstring"""
