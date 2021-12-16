@@ -124,6 +124,7 @@ class AnalyticInferenceLayer(InferenceLayer):
 
   def log_partition(self):
     """See base class docstring"""
+    # TODO(#115)
     return tf.reduce_logsumexp(self._current_dist.logits_parameter())
 
   def call(self, inputs):

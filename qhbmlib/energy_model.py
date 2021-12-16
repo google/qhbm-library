@@ -53,7 +53,6 @@ class BitstringEnergy(tf.keras.layers.Layer):
     super().__init__(name=name)
     self._bits = energy_model_utils.check_bits(bits)
     self._energy_layers = energy_layers
-    _ = self(tf.constant([[0] * self.num_bits], dtype=tf.int8))
 
   @property
   def num_bits(self):

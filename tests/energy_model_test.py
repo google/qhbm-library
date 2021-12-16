@@ -81,7 +81,9 @@ class BitstringEnergyTest(tf.test.TestCase):
       actual_mlp = energy_model.BitstringEnergy(bits, expected_layer_list)
 
       expected_mlp = tf.keras.Sequential(expected_layer_list)
-      _ = expected_mlp(tf.constant([[0] * num_bits], tf.int8))
+      init_inputs = tf.constant([[0] * num_bits], tf.int8)
+      _ = expected_mlp(init_inputs)
+      _ = actual_mlp(init_inputs)
       expected_mlp.set_weights(actual_mlp.get_weights())
 
       @tf.function
@@ -114,6 +116,7 @@ class BernoulliEnergyTest(tf.test.TestCase):
     """
     test_b = energy_model.BernoulliEnergy([1, 2, 3])
     test_vars = tf.constant([1.0, 1.7, -2.8], dtype=tf.float32)
+    _ = test_b(tf.constant([[0] * 3]))
     test_b.set_weights([test_vars])
     test_bitstrings = tf.constant([[0, 0, 0], [1, 0, 0], [0, 1, 1]])
     test_spins = 1 - 2 * test_bitstrings
@@ -155,6 +158,7 @@ class BernoulliEnergyTest(tf.test.TestCase):
       bits = random.sample(range(1000), num_bits)
       thetas = tf.random.uniform([num_bits], minval=-100, maxval=100)
       test_b = energy_model.BernoulliEnergy(bits)
+      _ = test_b(tf.constant([[0] * num_bits]))
       test_b.set_weights([thetas])
 
       @tf.function
@@ -187,6 +191,7 @@ class BernoulliEnergyTest(tf.test.TestCase):
     # Build Bernoulli
     num_bits = 3
     test_b = energy_model.BernoulliEnergy(list(range(num_bits)))
+    _ = test_b(tf.constant([[0] * num_bits]))
     qubits = cirq.GridQubit.rect(1, num_bits)
     # Pin at bitstring [1, 0, 1]
     test_b.set_weights([tf.constant([1000.0, -1000.0, 1000.0])])
@@ -221,6 +226,7 @@ class KOBETest(tf.test.TestCase):
     test_thetas = tf.constant([1.5, 2.7, -4.0])
     expected_energies = tf.constant([0.2, 2.8, 5.2, -8.2])
     test_k = energy_model.KOBE(bits, order)
+    _ = test_k(tf.constant([[0] * 2]))
     all_strings = tf.constant([[0, 0], [0, 1], [1, 0], [1, 1]])
     test_k.set_weights([test_thetas])
     actual_energies = test_k(all_strings)
@@ -230,6 +236,7 @@ class KOBETest(tf.test.TestCase):
     """Confirms correct operators for a simple Boltzmann."""
     num_bits = 3
     test_k = energy_model.KOBE(list(range(num_bits)), 2)
+    _ = test_k(tf.constant([[0] * num_bits]))
     qubits = cirq.GridQubit.rect(1, num_bits)
     test_ops = test_k.operator_shards(qubits)
     ref_ops = [
@@ -248,6 +255,7 @@ class KOBETest(tf.test.TestCase):
     # Build simple Boltzmann
     num_bits = 3
     test_b = energy_model.KOBE(list(range(num_bits)), 2)
+    _ = test_b(tf.constant([[0] * num_bits]))
     qubits = cirq.GridQubit.rect(1, num_bits)
 
     # Pin at bitstring [1, 0, 1]
