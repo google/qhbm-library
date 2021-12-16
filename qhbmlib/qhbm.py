@@ -72,7 +72,7 @@ class QHBM(tf.keras.Model):
     return self.ebm.is_analytic and self.qnn.is_analytic
 
   def copy(self):
-    return QHBM(self.ebm.copy(), self.qnn.copy(), name=self.name)
+    return QHBM(self.ebm.copy(), self.qnn.copy(), name=f'{self.name}_copy')
 
   def circuits(self, num_samples, unique=True, resolve=True):
     if unique:

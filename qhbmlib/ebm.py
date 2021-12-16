@@ -547,6 +547,14 @@ class EBM(tf.keras.Model):
   def is_analytic(self):
     return self._is_analytic
 
+  @property
+  def trainable_variables(self):
+    return self._energy_function.trainable_variables
+
+  @trainable_variables.setter
+  def trainable_variables(self, value):
+    self._energy_function.trainable_variables = value
+
   def copy(self):
     if self._energy_sampler is not None:
       energy_sampler = self._energy_sampler.copy()
@@ -558,7 +566,7 @@ class EBM(tf.keras.Model):
         energy_function,
         energy_sampler,
         is_analytic=self.is_analytic,
-        name=self.name)
+        name=f'{self.name}_copy')
 
   def energy(self, bitstrings):
     return self._energy_function.energy(bitstrings)
@@ -588,7 +596,7 @@ class EBM(tf.keras.Model):
 
   def probabilities(self):
     if self.is_analytic:
-      return tf.exp(-self.ebm.energies()) / tf.exp(
+      return tf.exp(-self.energies()) / tf.exp(
           self.log_partition_function())
     raise NotImplementedError()
 
@@ -645,7 +653,7 @@ class Bernoulli(EBM):
 
   def copy(self):
     bernoulli = Bernoulli(
-        self.num_bits, is_analytic=self.is_analytic, name=self.name)
+        self.num_bits, is_analytic=self.is_analytic, name=f'{self.name}_copy')
     bernoulli.kernel.assign(self.kernel)
     return bernoulli
 

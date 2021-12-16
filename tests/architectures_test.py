@@ -12,311 +12,511 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests of the architectures module."""
-import random
+"""Selection of quantum circuits architectures used in defining QHBMs."""
 
-from absl.testing import parameterized
+import bisect
+
 import cirq
-from qhbmlib import architectures
 import sympy
-import tensorflow as tf
 import tensorflow_quantum as tfq
 
+from qhbmlib import ebm
 
-class RPQCTest(tf.test.TestCase, parameterized.TestCase):
-  """Test RPQC functions in the architectures module."""
-
-  def test_get_xz_rotation(self):
-    """Confirm an XZ rotation is returned."""
-    q = cirq.GridQubit(7, 9)
-    a, b = sympy.symbols("a b")
-    expected_circuit = cirq.Circuit(cirq.X(q)**a, cirq.Z(q)**b)
-    test_circuit = architectures.get_xz_rotation(q, a, b)
-    self.assertEqual(expected_circuit, test_circuit)
-
-  def test_get_cz_exp(self):
-    """Confirm an exponentiated CNOT is returned."""
-    q0 = cirq.GridQubit(4, 1)
-    q1 = cirq.GridQubit(2, 5)
-    a = sympy.Symbol("a")
-    expected_circuit = cirq.Circuit(cirq.CZ(q0, q1)**a)
-    test_circuit = architectures.get_cz_exp(q0, q1, a)
-    self.assertEqual(expected_circuit, test_circuit)
-
-  def test_get_xz_rotation_layer(self):
-    """Confirm an XZ rotation on every qubit is returned."""
-    qubits = cirq.GridQubit.rect(1, 2)
-    layer_num = 3
-    name = "test_rot"
-    expected_symbols = []
-    expected_circuit = cirq.Circuit()
-    for n, q in enumerate(qubits):
-      expected_symbols.append(
-          sympy.Symbol("sx_{0}_{1}_{2}".format(name, layer_num, n)))
-      expected_circuit += cirq.Circuit(cirq.X(q)**expected_symbols[-1])
-      expected_symbols.append(
-          sympy.Symbol("sz_{0}_{1}_{2}".format(name, layer_num, n)))
-      expected_circuit += cirq.Circuit(cirq.Z(q)**expected_symbols[-1])
-    test_circuit, test_symbols = architectures.get_xz_rotation_layer(
-        qubits, layer_num, name)
-    self.assertEqual(expected_circuit, test_circuit)
-    self.assertEqual(expected_symbols, test_symbols)
-    # Confirm all symbols are unique
-    self.assertEqual(len(expected_symbols), len(set(test_symbols)))
-
-  @parameterized.parameters([{"n_qubits": 11}, {"n_qubits": 12}])
-  def test_get_cz_exp_layer(self, n_qubits):
-    """Confirm an exponentiated CZ on every qubit is returned."""
-    qubits = cirq.GridQubit.rect(1, n_qubits)
-    layer_num = 0
-    name = "test_cz"
-    expected_symbols = []
-    expected_circuit = cirq.Circuit()
-    for n, (q0, q1) in enumerate(zip(qubits, qubits[1:])):
-      if n % 2 == 0:
-        expected_symbols.append(
-            sympy.Symbol("sc_{0}_{1}_{2}".format(name, layer_num, n)))
-        expected_circuit += cirq.Circuit(cirq.CZ(q0, q1)**expected_symbols[-1])
-    for n, (q0, q1) in enumerate(zip(qubits, qubits[1:])):
-      if n % 2 == 1:
-        expected_symbols.append(
-            sympy.Symbol("sc_{0}_{1}_{2}".format(name, layer_num, n)))
-        expected_circuit += cirq.Circuit(cirq.CZ(q0, q1)**expected_symbols[-1])
-    test_circuit, test_symbols = architectures.get_cz_exp_layer(
-        qubits, layer_num, name)
-    self.assertEqual(expected_circuit, test_circuit)
-    self.assertEqual(expected_symbols, test_symbols)
-    # Confirm all symbols are unique
-    self.assertEqual(len(expected_symbols), len(set(test_symbols)))
-
-  @parameterized.parameters([{"n_qubits": 11}, {"n_qubits": 12}])
-  def test_get_hardware_efficient_model_unitary(self, n_qubits):
-    """Confirm a multi-layered circuit is returned."""
-    qubits = cirq.GridQubit.rect(1, n_qubits)
-    name = "test_hardware_efficient_model"
-    expected_symbols = []
-    expected_circuit = cirq.Circuit()
-    this_circuit, this_symbols = architectures.get_xz_rotation_layer(
-        qubits, 0, name)
-    expected_symbols += this_symbols
-    expected_circuit += this_circuit
-    this_circuit, this_symbols = architectures.get_cz_exp_layer(qubits, 0, name)
-    expected_symbols += this_symbols
-    expected_circuit += this_circuit
-    this_circuit, this_symbols = architectures.get_xz_rotation_layer(
-        qubits, 1, name)
-    expected_symbols += this_symbols
-    expected_circuit += this_circuit
-    this_circuit, this_symbols = architectures.get_cz_exp_layer(qubits, 1, name)
-    expected_symbols += this_symbols
-    expected_circuit += this_circuit
-    test_circuit, test_symbols = architectures.get_hardware_efficient_model_unitary(
-        qubits, 2, name)
-    self.assertEqual(expected_circuit, test_circuit)
-    self.assertEqual(expected_symbols, test_symbols)
-    # Confirm all symbols are unique
-    self.assertEqual(len(expected_symbols), len(set(test_symbols)))
-
-  def test_get_hardware_efficient_model_unitary_1q(self):
-    """Confirm the correct model is returned when there is only one qubit."""
-    qubits = [cirq.GridQubit(2, 3)]
-    name = "test_harware_efficient_model_1q"
-    expected_symbols = []
-    expected_circuit = cirq.Circuit()
-    this_circuit, this_symbols = architectures.get_xz_rotation_layer(
-        qubits, 0, name)
-    expected_symbols += this_symbols
-    expected_circuit += this_circuit
-    this_circuit, this_symbols = architectures.get_xz_rotation_layer(
-        qubits, 1, name)
-    expected_symbols += this_symbols
-    expected_circuit += this_circuit
-    test_circuit, test_symbols = architectures.get_hardware_efficient_model_unitary(
-        qubits, 2, name)
-    self.assertEqual(expected_circuit, test_circuit)
-    self.assertEqual(expected_symbols, test_symbols)
-    # Confirm all symbols are unique
-    self.assertEqual(len(expected_symbols), len(set(test_symbols)))
+# ============================================================================ #
+# HEA components.
+# ============================================================================ #
 
 
-class HEA2dTest(tf.test.TestCase):
-  """Test 2D HEA functions in the architectures module."""
-
-  def test_get_2d_xz_rotation_layer(self):
-    """Confirms the xz rotations are correct on a 2x3 grid."""
-    rows = 2
-    cols = 3
-    name = "test_xz"
-    layer_num = 7
-    circuit_expect = cirq.Circuit()
-    symbols_expect = []
-    for r in range(rows):
-      for c in range(cols):
-        q = cirq.GridQubit(r, c)
-        s = sympy.Symbol(f"sx_{name}_{layer_num}_{r}_{c}")
-        x_gate = cirq.X(q)**s
-        symbols_expect.append(s)
-        s = sympy.Symbol(f"sz_{name}_{layer_num}_{r}_{c}")
-        z_gate = cirq.Z(q)**s
-        symbols_expect.append(s)
-        circuit_expect += cirq.Circuit(x_gate, z_gate)
-    test_circuit, test_symbols = architectures.get_2d_xz_rotation_layer(
-        rows, cols, layer_num, name)
-    self.assertEqual(circuit_expect, test_circuit)
-    self.assertEqual(symbols_expect, test_symbols)
-
-  def test_get_2d_xz_rotation_layer_small(self):
-    """Confirms the xz rotation layer on one qubit is just a single xz."""
-    name = "test_small_xz"
-    layer_num = 29
-    circuit_expect = cirq.Circuit()
-    symbols_expect = []
-    q = cirq.GridQubit(0, 0)
-    s = sympy.Symbol(f"sx_{name}_{layer_num}_{0}_{0}")
-    x_gate = cirq.X(q)**s
-    symbols_expect.append(s)
-    s = sympy.Symbol(f"sz_{name}_{layer_num}_{0}_{0}")
-    z_gate = cirq.Z(q)**s
-    symbols_expect.append(s)
-    circuit_expect += cirq.Circuit(x_gate, z_gate)
-    test_circuit, test_symbols = architectures.get_2d_xz_rotation_layer(
-        1, 1, layer_num, name)
-    self.assertEqual(circuit_expect, test_circuit)
-    self.assertEqual(symbols_expect, test_symbols)
-
-  def test_get_2d_cz_exp_layer(self):
-    """Confirms the cz exponentials are correct on a 2x3 grid."""
-    name = "test_cz"
-    layer_num = 19
-    circuit_expect = cirq.Circuit()
-    symbols_expect = []
-
-    # Apply horizontal bonds
-    s = sympy.Symbol(f"scz_{name}_{layer_num}_row{0}_{0}_{1}")
-    circuit_expect += cirq.Circuit(
-        cirq.CZPowGate(exponent=s)(cirq.GridQubit(0, 0), cirq.GridQubit(0, 1)))
-    symbols_expect.append(s)
-    s = sympy.Symbol(f"scz_{name}_{layer_num}_row{0}_{1}_{2}")
-    circuit_expect += cirq.Circuit(
-        cirq.CZPowGate(exponent=s)(cirq.GridQubit(0, 1), cirq.GridQubit(0, 2)))
-    symbols_expect.append(s)
-    s = sympy.Symbol(f"scz_{name}_{layer_num}_row{1}_{0}_{1}")
-    circuit_expect += cirq.Circuit(
-        cirq.CZPowGate(exponent=s)(cirq.GridQubit(1, 0), cirq.GridQubit(1, 1)))
-    symbols_expect.append(s)
-    s = sympy.Symbol(f"scz_{name}_{layer_num}_row{1}_{1}_{2}")
-    circuit_expect += cirq.Circuit(
-        cirq.CZPowGate(exponent=s)(cirq.GridQubit(1, 1), cirq.GridQubit(1, 2)))
-    symbols_expect.append(s)
-
-    # Apply vertical bonds
-    s = sympy.Symbol(f"scz_{name}_{layer_num}_col{0}_{0}_{1}")
-    circuit_expect += cirq.Circuit(
-        cirq.CZPowGate(exponent=s)(cirq.GridQubit(0, 0), cirq.GridQubit(1, 0)))
-    symbols_expect.append(s)
-    s = sympy.Symbol(f"scz_{name}_{layer_num}_col{1}_{0}_{1}")
-    circuit_expect += cirq.Circuit(
-        cirq.CZPowGate(exponent=s)(cirq.GridQubit(0, 1), cirq.GridQubit(1, 1)))
-    symbols_expect.append(s)
-    s = sympy.Symbol(f"scz_{name}_{layer_num}_col{2}_{0}_{1}")
-    circuit_expect += cirq.Circuit(
-        cirq.CZPowGate(exponent=s)(cirq.GridQubit(0, 2), cirq.GridQubit(1, 2)))
-    symbols_expect.append(s)
-
-    test_circuit, test_symbols = architectures.get_2d_cz_exp_layer(
-        2, 3, layer_num, name)
-    self.assertEqual(circuit_expect, test_circuit)
-    self.assertEqual(symbols_expect, test_symbols)
-
-  def test_get_2d_cz_exp_layer_empty(self):
-    """On single qubit, no gates should be returned."""
-    test_circuit, test_symbols = architectures.get_2d_cz_exp_layer(1, 1, 1, "")
-    self.assertEqual(cirq.Circuit(), test_circuit)
-    self.assertEqual([], test_symbols)
-
-  def test_get_2d_cz_exp_layer_small(self):
-    """Tests on 2 qubits."""
-    name = "small"
-    layer_num = 51
-    s = sympy.Symbol(f"scz_{name}_{layer_num}_row{0}_{0}_{1}")
-    circuit_expect = cirq.Circuit(
-        cirq.CZPowGate(exponent=s)(cirq.GridQubit(0, 0), cirq.GridQubit(0, 1)))
-    symbols_expect = [s]
-    test_circuit, test_symbols = architectures.get_2d_cz_exp_layer(
-        1, 2, layer_num, name)
-    self.assertEqual(circuit_expect, test_circuit)
-    self.assertEqual(symbols_expect, test_symbols)
-
-  def test_get_2d_hea(self):
-    """Confirms the hea is correct on a 2x3 grid."""
-    num_layers = 2
-    name = "test_hea"
-    circuit_expect = cirq.Circuit()
-    symbols_expect = []
-    for layer in range(num_layers):
-      xz_circuit, xz_symbols = architectures.get_2d_xz_rotation_layer(
-          2, 3, layer, name)
-      cz_circuit, cz_symbols = architectures.get_2d_cz_exp_layer(
-          2, 3, layer, name)
-      circuit_expect += xz_circuit
-      symbols_expect += xz_symbols
-      circuit_expect += cz_circuit
-      symbols_expect += cz_symbols
-    test_circuit, test_symbols = architectures.get_2d_hea(2, 3, 2, name)
-    self.assertEqual(circuit_expect, test_circuit)
-    self.assertEqual(symbols_expect, test_symbols)
+def get_xz_rotation(q, a, b):
+  """Two-axis single qubit rotation."""
+  return cirq.Circuit(cirq.X(q)**a, cirq.Z(q)**b)
 
 
-class TrotterTest(tf.test.TestCase, parameterized.TestCase):
-  """Test trotter functions in the architectures module."""
-
-  def test_get_trotter_model_unitary(self):
-    """Confirm correct trotter unitary and parameters are returned."""
-    n_qubits = 4
-    qubits = cirq.GridQubit.rect(1, n_qubits)
-    p = 7
-    hz = cirq.PauliSum()
-    hx = cirq.PauliSum()
-    test_name = "test_trotter"
-    for q in qubits:
-      hz += cirq.PauliString(random.uniform(-4.5, 4.5), cirq.Z(q))
-      hx += cirq.PauliString(cirq.X(q))
-    for q0, q1 in zip(qubits[:-1], qubits[1:]):
-      hz += cirq.PauliString(random.uniform(-4.5, 4.5), cirq.Z(q0), cirq.Z(q1))
-    gammas = [
-        sympy.Symbol("phi_test_trotter_L{}_H0".format(j)) for j in range(p)
-    ]
-    betas = [
-        sympy.Symbol("phi_test_trotter_L{}_H1".format(j)) for j in range(p)
-    ]
-    expected_symbols = []
-    for g, b in zip(gammas, betas):
-      expected_symbols += [g, b]
-    expected_circuit = cirq.Circuit()
-    x_circuit = cirq.PauliSum()
-    for q in qubits:
-      x_circuit += cirq.X(q)
-    for j in range(p):
-      expected_circuit += tfq.util.exponential([hz], coefficients=[gammas[j]])
-      expected_circuit += tfq.util.exponential([x_circuit],
-                                               coefficients=[betas[j]])
-    test_circuit, test_symbols = architectures.get_trotter_model_unitary(
-        p, [hz, hx], test_name)
-    self.assertEqual(expected_circuit, test_circuit)
-    self.assertAllEqual(expected_symbols, test_symbols)
+def get_xyz_rotation(q, a, b, c):
+  """General single qubit rotation."""
+  return cirq.Circuit(cirq.X(q)**a, cirq.Y(q)**b, cirq.Z(q)**c)
 
 
-class ConvolutionalTest(tf.test.TestCase, parameterized.TestCase):
-  """Test convolutional functions in the architectures module."""
+def get_cz_exp(q0, q1, a):
+  """Exponent of entangling CZ gate."""
+  return cirq.Circuit(cirq.CZPowGate(exponent=a)(q0, q1))
 
-  def test_one_qubit_unitary(self):
-    pass
 
-  def test_two_qubit_unitary(self):
-    pass
+def get_zz_exp(q0, q1, a):
+  """Exponent of entangling ZZ gate."""
+  return cirq.Circuit(cirq.ZZPowGate(exponent=a)(q0, q1))
 
-  def test_two_qubit_pool(self):
-    pass
 
-  def test_get_convolutional_model_unitary(self):
-    pass
+def get_cnot_exp(q0, q1, a):
+  """Exponent of entangling CNot gate."""
+  return cirq.Circuit(cirq.CNotPowGate(exponent=a)(q0, q1))
+
+
+def get_xz_rotation_layer(qubits, layer_num, name):
+  """Apply two-axis single qubit rotations to all the given qubits."""
+  layer_symbols = []
+  circuit = cirq.Circuit()
+  for n, q in enumerate(qubits):
+    sx, sz = sympy.symbols("sx_{0}_{1}_{2} sz_{0}_{1}_{2}".format(
+        name, layer_num, n))
+    layer_symbols += [sx, sz]
+    circuit += get_xz_rotation(q, sx, sz)
+  return circuit, layer_symbols
+
+
+def get_cz_exp_layer(qubits, layer_num, name):
+  """Apply parameterized CZ gates to all pairs of nearest-neighbor qubits."""
+  layer_symbols = []
+  circuit = cirq.Circuit()
+  for n, (q0, q1) in enumerate(zip(qubits[::2], qubits[1::2])):
+    a = sympy.symbols("sc_{0}_{1}_{2}".format(name, layer_num, 2 * n))
+    layer_symbols += [a]
+    circuit += get_cz_exp(q0, q1, a)
+  shifted_qubits = qubits[1::]
+  for n, (q0, q1) in enumerate(zip(shifted_qubits[::2], shifted_qubits[1::2])):
+    a = sympy.symbols("sc_{0}_{1}_{2}".format(name, layer_num, 2 * n + 1))
+    layer_symbols += [a]
+    circuit += get_cz_exp(q0, q1, a)
+  return circuit, layer_symbols
+
+
+def get_hardware_efficient_model_unitary(qubits, num_layers, name):
+  """Build our full parameterized model unitary."""
+  circuit = cirq.Circuit()
+  all_symbols = []
+  for layer_num in range(num_layers):
+    new_circ, new_symb = get_xz_rotation_layer(qubits, layer_num, name)
+    circuit += new_circ
+    all_symbols += new_symb
+    if len(qubits) > 1:
+      new_circ, new_symb = get_cz_exp_layer(qubits, layer_num, name)
+      circuit += new_circ
+      all_symbols += new_symb
+  return circuit, all_symbols
+
+
+def get_cnot_exp_layer(qubits, layer_num, name):
+  """Apply CNot gates to all pairs of nearest-neighbor qubits."""
+  layer_symbols = []
+  circuit = cirq.Circuit()
+  for n, (q0, q1) in enumerate(zip(qubits[::2], qubits[1::2])):
+    a = sympy.symbols("sc_{0}_{1}_{2}".format(name, layer_num, 2 * n))
+    layer_symbols += [a]
+    circuit += get_cnot_exp(q0, q1, a)
+  shifted_qubits = qubits[1::]
+  for n, (q0, q1) in enumerate(zip(shifted_qubits[::2], shifted_qubits[1::2])):
+    a = sympy.symbols("sc_{0}_{1}_{2}".format(name, layer_num, 2 * n + 1))
+    layer_symbols += [a]
+    circuit += get_cnot_exp(q0, q1, a)
+  return circuit, layer_symbols
+
+
+def hea_1d_cnot(qubits, num_layers, name):
+  """Build our full parameterized model unitary."""
+  circuit = cirq.Circuit()
+  all_symbols = []
+  for layer_num in range(num_layers):
+    new_circ, new_symb = get_xz_rotation_layer(qubits, layer_num, name)
+    circuit += new_circ
+    all_symbols += new_symb
+    if len(qubits) > 1:
+      new_circ, new_symb = get_cnot_exp_layer(qubits, layer_num, name)
+      circuit += new_circ
+      all_symbols += new_symb
+  return circuit, all_symbols
+
+
+def get_zz_exp_layer(qubits, layer_num, name):
+  """Apply ZZ gates to all pairs of nearest-neighbor qubits."""
+  layer_symbols = []
+  circuit = cirq.Circuit()
+  for n, (q0, q1) in enumerate(zip(qubits[::2], qubits[1::2])):
+    a = sympy.symbols("sc_{0}_{1}_{2}".format(name, layer_num, 2 * n))
+    layer_symbols += [a]
+    circuit += get_zz_exp(q0, q1, a)
+  shifted_qubits = qubits[1::]
+  for n, (q0, q1) in enumerate(zip(shifted_qubits[::2], shifted_qubits[1::2])):
+    a = sympy.symbols("sc_{0}_{1}_{2}".format(name, layer_num, 2 * n + 1))
+    layer_symbols += [a]
+    circuit += get_zz_exp(q0, q1, a)
+  return circuit, layer_symbols
+
+
+def hea_1d_zz(qubits, num_layers, name):
+  """Build our full parameterized model unitary."""
+  circuit = cirq.Circuit()
+  all_symbols = []
+  for layer_num in range(num_layers):
+    new_circ, new_symb = get_xz_rotation_layer(qubits, layer_num, name)
+    circuit += new_circ
+    all_symbols += new_symb
+    if len(qubits) > 1:
+      new_circ, new_symb = get_zz_exp_layer(qubits, layer_num, name)
+      circuit += new_circ
+      all_symbols += new_symb
+  return circuit, all_symbols
+
+
+# ============================================================================ #
+# 2D HEA.
+# ============================================================================ #
+
+
+def get_2d_xz_rotation_layer(rows, cols, layer_num, name):
+  """Apply single qubit rotations on a grid of qubits."""
+  layer_symbols = []
+  circuit = cirq.Circuit()
+  for r in range(rows):
+    for c in range(cols):
+      sx = sympy.Symbol(f"sx_{name}_{layer_num}_{r}_{c}")
+      sz = sympy.Symbol(f"sz_{name}_{layer_num}_{r}_{c}")
+      layer_symbols += [sx, sz]
+      circuit += get_xz_rotation(cirq.GridQubit(r, c), sx, sz)
+  return circuit, layer_symbols
+
+
+def get_2d_cz_exp_layer(rows, cols, layer_num, name):
+  """Apply CZ gates to all pairs of nearest-neighbor qubits on a grid."""
+  layer_symbols = []
+  circuit = cirq.Circuit()
+  # Apply horizontal bonds
+  for r in range(rows):
+    for par in [0, 1]:
+      for q_c_0, q_c_1 in zip(range(par, cols, 2), range(par + 1, cols, 2)):
+        scz = sympy.Symbol(f"scz_{name}_{layer_num}_row{r}_{q_c_0}_{q_c_1}")
+        layer_symbols += [scz]
+        circuit += get_cz_exp(
+            cirq.GridQubit(r, q_c_0), cirq.GridQubit(r, q_c_1), scz)
+  # Apply vertical bonds
+  for c in range(cols):
+    for par in [0, 1]:
+      for q_r_0, q_r_1 in zip(range(par, rows, 2), range(par + 1, rows, 2)):
+        scz = sympy.Symbol(f"scz_{name}_{layer_num}_col{c}_{q_r_0}_{q_r_1}")
+        layer_symbols += [scz]
+        circuit += get_cz_exp(
+            cirq.GridQubit(q_r_0, c), cirq.GridQubit(q_r_1, c), scz)
+  return circuit, layer_symbols
+
+
+def get_2d_hea(rows, cols, num_layers, name):
+  """Build a 2D HEA ansatz.
+
+    Args:
+      rows: int specifying the number of rows in the ansatz.
+      cols: int specifying the number of columns in the ansatz.
+      num_layers: int specifying how many layers of 2D HEA to apply.
+      name: string which will be included in the parameters of the ansatz.
+
+    Returns:
+      circuit: `cirq.Circuit` which is the ansatz.
+      symbols: list of `sympy.Symbol`s which are the parameters of the model.
+    """
+  symbols = []
+  circuit = cirq.Circuit()
+  for layer in range(num_layers):
+    xz_circuit, xz_symbols = get_2d_xz_rotation_layer(rows, cols, layer, name)
+    circuit += xz_circuit
+    symbols += xz_symbols
+    cz_circuit, cz_symbols = get_2d_cz_exp_layer(rows, cols, layer, name)
+    circuit += cz_circuit
+    symbols += cz_symbols
+  return circuit, symbols
+
+
+def get_2d_xyz_rotation_layer(rows, cols, layer_num, name):
+  """Apply single qubit rotations on a grid of qubits."""
+  layer_symbols = []
+  circuit = cirq.Circuit()
+  for r in range(rows):
+    for c in range(cols):
+      sx = sympy.Symbol(f"sx_{name}_{layer_num}_{r}_{c}")
+      sy = sympy.Symbol(f"sy_{name}_{layer_num}_{r}_{c}")
+      sz = sympy.Symbol(f"sz_{name}_{layer_num}_{r}_{c}")
+      layer_symbols += [sx, sy, sz]
+      circuit += get_xyz_rotation(cirq.GridQubit(r, c), sx, sy, sz)
+  return circuit, layer_symbols
+
+
+def get_2d_hea_y(rows, cols, num_layers, name):
+  """Build a 2D HEA ansatz.
+
+    Args:
+      rows: int specifying the number of rows in the ansatz.
+      cols: int specifying the number of columns in the ansatz.
+      num_layers: int specifying how many layers of 2D HEA to apply.
+      name: string which will be included in the parameters of the ansatz.
+
+    Returns:
+      circuit: `cirq.Circuit` which is the ansatz.
+      symbols: list of `sympy.Symbol`s which are the parameters of the model.
+    """
+  symbols = []
+  circuit = cirq.Circuit()
+  for layer in range(num_layers):
+    xyz_circuit, xyz_symbols = get_2d_xyz_rotation_layer(
+        rows, cols, layer, name)
+    circuit += xyz_circuit
+    symbols += xyz_symbols
+    cz_circuit, cz_symbols = get_2d_cz_exp_layer(rows, cols, layer, name)
+    circuit += cz_circuit
+    symbols += cz_symbols
+  return circuit, symbols
+
+
+def get_2d_cnot_exp_layer(rows, cols, layer_num, name):
+  """Apply CNot gates to all pairs of nearest-neighbor qubits on a grid."""
+  layer_symbols = []
+  circuit = cirq.Circuit()
+  # Apply horizontal bonds
+  for r in range(rows):
+    for par in [0, 1]:
+      for q_c_0, q_c_1 in zip(range(par, cols, 2), range(par + 1, cols, 2)):
+        scnot = sympy.Symbol(f"scnot_{name}_{layer_num}_row{r}_{q_c_0}_{q_c_1}")
+        layer_symbols += [scnot]
+        circuit += get_cnot_exp(
+            cirq.GridQubit(r, q_c_0), cirq.GridQubit(r, q_c_1), scnot)
+  # Apply vertical bonds
+  for c in range(cols):
+    for par in [0, 1]:
+      for q_r_0, q_r_1 in zip(range(par, rows, 2), range(par + 1, rows, 2)):
+        scnot = sympy.Symbol(f"scnot_{name}_{layer_num}_col{c}_{q_r_0}_{q_r_1}")
+        layer_symbols += [scnot]
+        circuit += get_cnot_exp(
+            cirq.GridQubit(q_r_0, c), cirq.GridQubit(q_r_1, c), scnot)
+  return circuit, layer_symbols
+
+
+def get_2d_hea_cnot(rows, cols, num_layers, name):
+  """Build a 2D HEA ansatz.
+
+    Args:
+      rows: int specifying the number of rows in the ansatz.
+      cols: int specifying the number of columns in the ansatz.
+      num_layers: int specifying how many layers of 2D HEA to apply.
+      name: string which will be included in the parameters of the ansatz.
+
+    Returns:
+      circuit: `cirq.Circuit` which is the ansatz.
+      symbols: list of `sympy.Symbol`s which are the parameters of the model.
+    """
+  symbols = []
+  circuit = cirq.Circuit()
+  for layer in range(num_layers):
+    xz_circuit, xz_symbols = get_2d_xz_rotation_layer(rows, cols, layer, name)
+    circuit += xz_circuit
+    symbols += xz_symbols
+    cnot_circuit, cnot_symbols = get_2d_cnot_exp_layer(rows, cols, layer, name)
+    circuit += cnot_circuit
+    symbols += cnot_symbols
+  return circuit, symbols
+
+
+# ============================================================================ #
+# Trotter components.
+# ============================================================================ #
+
+
+def get_trotter_model_unitary(p, h_list, name):
+  """Get a trotterized ansatz.
+
+    Args:
+      p: integer representing the number of QAOA steps.
+      h_list: List of `cirq.PauliSum`s representing the Hamiltonians to
+        exponentiate to build the circuit.
+      name: string used to make symbols unique to this call.
+
+    Returns:
+      circuit: `cirq.Circuit` representing the parameterized QAOA ansatz.
+      all_symbols: Python `list` of `sympy.Symbol`s containing all the
+          parameters of the circuit.
+    """
+  circuit = cirq.Circuit()
+  all_symbols = []
+  for j in range(p):
+    for n, h in enumerate(h_list):
+      new_symb = sympy.Symbol("phi_{0}_L{1}_H{2}".format(name, j, n))
+      circuit += tfq.util.exponential([h], coefficients=[new_symb])
+      all_symbols.append(new_symb)
+  return circuit, all_symbols
+
+
+# ============================================================================ #
+# QNHF components.
+# ============================================================================ #
+
+
+def get_general_trotter_unitary(symbol_array, h_list):
+  """
+    Args:
+      symbol_array: 2-D array (list of lists) of `sympy.Symbol`s to use when
+        exponentiating the Hamiltonians.  The first index is the trotter layer,
+        the second index is corresponding Hamiltonian in `h_list`.
+      h_list: List of `cirq.PauliSum`s representing all the Hamiltonians to
+        exponentiate in a single trotter step.
+
+    Returns:
+      circuit: `cirq.Circuit` representing the parameterized trotter ansatz.
+    """
+  if len(symbol_array[0]) != len(h_list):
+    raise ValueError(
+        "Must have the same number of symbols as Hamiltonians in each layer.")
+  circuit = cirq.Circuit()
+  for s_layer in symbol_array:
+    for n, h in enumerate(h_list):
+      circuit += tfq.util.exponential([h], coefficients=[s_layer[n]])
+  return circuit
+
+
+def get_qnhf_symbols(p, n_bits, n_h, max_k, name):
+  """Get all the symbols used by QNHF QHBMs.
+
+    Args:
+      p: the number of trotter steps.
+      n_bits: the number of bits in the discrete sample space.
+      max_k: the maximum locality of interactions in the classical model.
+      n_h: the number of non-classical hamiltonian terms.
+      name: string appended to symbols to uniqueify across QHBMs.
+
+    Returns:
+      eta_theta_symbols: 2-D array of `sympy.Symbol`s, where the first index is
+      the
+        trotter step and the second index is the particular symbol at that
+        layer.
+      phis_symbols: 2-D array of `sympy.Symbol`s, where the first index is the
+        trotter step and the second index is the hamiltonian term at that layer.
+    """
+  eta_theta_symbols = []
+  phis_symbols = []
+  num_thetas_per_layer = ebm.get_klocal_energy_function_num_values(
+      n_bits, max_k)
+  for t_step in range(p):
+    eta_theta_symbols.append([])
+    for j in range(num_thetas_per_layer):
+      eta_theta_symbols[-1].append(
+          sympy.Symbol("eta_L{1}_theta_T{2}_{0}".format(name, t_step, j)))
+    phis_symbols.append([])
+    for m in range(n_h):
+      phis_symbols[-1].append(
+          sympy.Symbol("phi_L{1}_H{2}_{0}".format(name, t_step, m)))
+  return eta_theta_symbols, phis_symbols
+
+
+def get_qnhf_diagonal_operators(qubits, max_k):
+  diag_op_list = []
+  for k in range(1, max_k + 1):
+    index_list = ebm.get_parity_index_list(len(qubits), k)
+    for this_index_list in index_list:
+      this_z_list = [cirq.Z(qubits[i]) for i in this_index_list]
+      diag_op_list.append(
+          cirq.PauliSum.from_pauli_strings(cirq.PauliString(*this_z_list)))
+  return diag_op_list
+
+
+def get_qnhf_model_unitary(p, qubits, max_k, h_list, name):
+  """Get the QNHF unitary corresponding to the given Hamiltonians.
+
+    Args:
+      p: the number of trotter steps.
+      qubits: list of `cirq.GridQubit`s on which to build KOBE.
+      max_k: the maximum locality of interactions in the classical model.
+      h_list: list of `cirq.PauliSum`s representing the hamiltonian terms.
+      name: string appended to symbols to uniqueify across QHBMs.
+
+    Returns:
+      circuit: `cirq.Circuit` representing the QNHF ansatz.
+    """
+  eta_theta_symbols, phis_symbols = get_qnhf_symbols(p, len(qubits),
+                                                     len(h_list), max_k, name)
+  total_symbols = []
+  for t_layer, p_layer in zip(eta_theta_symbols, phis_symbols):
+    total_symbols.append(t_layer + p_layer)
+  classical_h_list = get_qnhf_diagonal_operators(qubits, max_k)
+  total_h_list = classical_h_list + h_list
+  return get_general_trotter_unitary(total_symbols, total_h_list)
+
+
+# ============================================================================ #
+# Convolutional components.
+# ============================================================================ #
+
+
+def qubits_to_grid(qubits):
+  qubit_grid = []
+  for q in qubits:
+    if q.row > len(qubit_grid) - 1:
+      qubit_grid.append([])
+    bisect.insort(qubit_grid[q.row], q)
+  return qubit_grid
+
+
+def one_qubit_unitary(q, symbols):
+  """Make a Cirq circuit for an arbitrary one qubit unitary."""
+  return cirq.Circuit(
+      cirq.X(q)**symbols[0],
+      cirq.Y(q)**symbols[1],
+      cirq.Z(q)**symbols[2])
+
+
+def two_qubit_unitary(q0, q1, symbols):
+  """Make a Cirq circuit for an arbitrary two qubit unitary."""
+  circuit = cirq.Circuit()
+  circuit += one_qubit_unitary(q0, symbols[0:3])
+  circuit += one_qubit_unitary(q1, symbols[3:6])
+  circuit += [cirq.ZZ(q0, q1)**symbols[6]]
+  circuit += [cirq.YY(q0, q1)**symbols[7]]
+  circuit += [cirq.XX(q0, q1)**symbols[8]]
+  circuit += one_qubit_unitary(q0, symbols[9:12])
+  circuit += one_qubit_unitary(q1, symbols[12:])
+  return circuit
+
+
+def two_qubit_pool(source_qubit, sink_qubit, symbols):
+  """Make a Cirq circuit to do a parameterized 'pooling' operation, which
+
+    attempts to reduce entanglement down from two qubits to just one.
+  """
+  pool_circuit = cirq.Circuit()
+  sink_basis_selector = one_qubit_unitary(sink_qubit, symbols[0:3])
+  source_basis_selector = one_qubit_unitary(source_qubit, symbols[3:6])
+  pool_circuit.append(sink_basis_selector)
+  pool_circuit.append(source_basis_selector)
+  pool_circuit.append(cirq.CNOT(control=source_qubit, target=sink_qubit))
+  pool_circuit.append(sink_basis_selector**-1)
+  return pool_circuit
+
+
+# TODO(#19)
+# def quantum_convolutional_layer(qubits, layer_num, name):
+#     """Assumes the qubits are arranged on a grid."""
+#     qubit_grid = qubits_to_grid(qubits)
+#     layer_symbols = []
+#     circuit = cirq.Circuit()
+#     tied_2q_symbols = [
+#         sympy.Symbol("s_conv_I{0}_L{1}_N{2}".format(name, layer_num, s_num))
+#         for s_num in range(15)
+#     ]
+#     # Apply horizontal bonds
+#     for r in qubit_grid:
+#         r_clipped = r[1:]
+#         for alt_r in [r, r_clipped]:
+#             for q0, q1 in zip(alt_r[::2], alt_r[1::2]):
+#                 circuit += two_qubit_unitary(q0, q1, tied_2q_symbols)
+#     # Apply vertical bonds
+#     grid_clipped = qubit_grid[1:]
+#     for r0, r1 in zip(qubit_grid[::2], qubit_grid[1::2]):
+#         for q0, q1 in zip(r0, r1):
+#             circuit += two_qubit_unitary(q0, q1, tied_2q_symbols)
+#     for r0, r1 in zip(grid_clipped[::2], grid_clipped[1::2]):
+#         for q0, q1 in zip(r0, r1):
+#             circuit += two_qubit_unitary(q0, q1, tied_2q_symbols)
+#     return circuit, tied_2q_symbols
+
+# def quantum_pool_layer(qubits, layer_num, name, direction_flag):
+#     """Assumes the qubits are arranged on a grid."""
+#     qubit_grid = qubits_to_grid(qubits)
+#     layer_symbols = []
+#     circuit = cirq.Circuit()
+#     tied_pool_symbols = [
+#         sympy.Symbol("s_pool_I{0}_L{1}_N{2}".format(name, layer_num, s_num))
+#         for s_num in range(6)
+#     ]

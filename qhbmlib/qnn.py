@@ -151,7 +151,7 @@ class QNN(tf.keras.Model):
         backend=self.backend,
         differentiator=self.differentiator,
         is_analytic=self.is_analytic,
-        name=self.name)
+        name=f'{self.name}_copy')
     qnn.values.assign(self.values)
     return qnn
 
