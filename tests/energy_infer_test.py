@@ -33,7 +33,7 @@ class AnalyticInferenceLayerTest(tf.test.TestCase):
     expected_energy = energy_model.KOBE(bits, order)
     expected_name = "test_analytic_dist_name"
     actual_dist = energy_infer.AnalyticInferenceLayer(expected_energy,
-                                                    expected_name)
+                                                      expected_name)
     self.assertEqual(actual_dist.energy, expected_energy)
     self.assertEqual(actual_dist.name, expected_name)
 
@@ -160,7 +160,7 @@ class BernoulliInferenceLayerTest(tf.test.TestCase):
     expected_energy = energy_model.BernoulliEnergy(bits)
     expected_name = "test_analytic_dist_name"
     actual_dist = energy_infer.BernoulliInferenceLayer(expected_energy,
-                                                     expected_name)
+                                                       expected_name)
     self.assertEqual(actual_dist.energy, expected_energy)
     self.assertEqual(actual_dist.name, expected_name)
 

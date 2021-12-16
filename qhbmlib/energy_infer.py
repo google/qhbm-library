@@ -30,7 +30,7 @@ class InferenceLayer(tf.keras.layers.Layer, abc.ABC):
 
   def __init__(self,
                energy: energy_model.BitstringEnergy,
-               name: Union[None, str]=None):
+               name: Union[None, str] = None):
     """Initializes an InferenceLayer.
 
     Args:
@@ -54,7 +54,7 @@ class InferenceLayer(tf.keras.layers.Layer, abc.ABC):
     `self.energy` is updated.
     """
     raise NotImplementedError()
-  
+
   @abc.abstractmethod
   def sample(self, n):
     """Returns samples from the EBM corresponding to `self.energy`.
@@ -72,13 +72,13 @@ class InferenceLayer(tf.keras.layers.Layer, abc.ABC):
     """Returns an estimate of the log partition function."""
     raise NotImplementedError()
 
-  
+
 class AnalyticInferenceLayer(InferenceLayer):
   """Uses an explicit categorical distribution to implement parent functions."""
 
   def __init__(self,
                energy: energy_model.BitstringEnergy,
-               name: Union[None, str]=None):
+               name: Union[None, str] = None):
     """Initializes an AnalyticInferenceLayer.
 
     Internally, this class saves all possible bitstrings as a tensor, whose
@@ -111,15 +111,15 @@ class AnalyticInferenceLayer(InferenceLayer):
   def infer(self):
     """See base class docstring."""
     all_bitstrings = tf.constant(
-        list(itertools.product([0, 1], repeat=self.energy.num_bits)), dtype=tf.int8)
+        list(itertools.product([0, 1], repeat=self.energy.num_bits)),
+        dtype=tf.int8)
     x = tf.squeeze(self._energy(all_bitstrings))
     self._current_dist = self._dist_realization(x)
 
   def sample(self, n):
     """See base class docstring"""
-    return tf.gather(self.all_bitstrings,
-                     self._current_dist.sample(n))
-    
+    return tf.gather(self.all_bitstrings, self._current_dist.sample(n))
+
     return self._current_dist.sample(n)
 
   def entropy(self):
@@ -144,7 +144,7 @@ class BernoulliInferenceLayer(InferenceLayer):
 
   def __init__(self,
                energy: energy_model.BitstringEnergy,
-               name: Union[None, str]=None):
+               name: Union[None, str] = None):
     """Initializes a BernoulliInferenceLayer.
 
     Args:
@@ -154,7 +154,7 @@ class BernoulliInferenceLayer(InferenceLayer):
     """
     super().__init__(energy, name=name)
     self._dist_realization = tfp.layers.DistributionLambda(
-      make_distribution_fn=lambda t: tfd.Bernoulli(logits=t, dtype=tf.int8))
+        make_distribution_fn=lambda t: tfd.Bernoulli(logits=t, dtype=tf.int8))
     self._current_dist = None
 
   def infer(self):
