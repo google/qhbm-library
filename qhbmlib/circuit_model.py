@@ -15,7 +15,7 @@
 """Tools for defining quantum circuit models."""
 
 import abc
-from typing import List
+from typing import List, Union
 
 import cirq
 import numpy as np
@@ -24,15 +24,7 @@ import tensorflow as tf
 import tensorflow_quantum as tfq
 
 
-def check_layers(layers):
-  """Confirms the input is a valid list of keras Layers."""
-  if not isinstance(layers, list) or not all(
-      [isinstance(e, tf.keras.layers.Layer) for e in layers]):
-    raise TypeError("must be a list of keras layers.")
-  return layers
-
-
-def bit_circuit(qubits, name="bit_circuit"):
+def bit_circuit(qubits: List[cirq.GridQubit], name="bit_circuit"):
   """Returns exponentiated X gate on each qubit and the exponent symbols."""
   circuit = cirq.Circuit()
   for n, q in enumerate(qubits):
@@ -44,7 +36,12 @@ def bit_circuit(qubits, name="bit_circuit"):
 class QuantumCircuit(tf.keras.layers.Layer):
   """Class for representing a quantum circuit."""
 
-  def __init__(self, pqc, symbols, value_layers_inputs, value_layers, name=None):
+  def __init__(self,
+               pqc: cirq.Circuit,
+               symbols: tf.Tensor,
+               value_layers_inputs: Union[tf.Variable, List[tf.Variable]],
+               value_layers: List[tf.keras.layers.Layer],
+               name: Union[None, str]=None):
     super().__init__(name=name)
 
     if not isinstance(pqc, cirq.Circuit):
@@ -59,7 +56,7 @@ class QuantumCircuit(tf.keras.layers.Layer):
       )
     self._qubits = sorted(pqc.all_qubits())
     self._symbols = symbols
-    self._value_layers = check_layers(value_layers)
+    self._value_layers = value_layers
     self._value_layers_inputs = value_layers_inputs
 
     test_values = self.values
@@ -122,9 +119,9 @@ class DirectQuantumCircuit(QuantumCircuit):
 
   def __init__(
       self,
-      pqc,
-      initializer=tf.keras.initializers.RandomUniform(0, 2 * np.pi),
-      name=None,
+      pqc: cirq.Circuit,
+      initializer: tf.keras.initializers.Initializer=tf.keras.initializers.RandomUniform(0, 2 * np.pi),
+      name: Union[None, str]=None,
   ):
     """Initializes a DirectQuantumCircuit.
 
