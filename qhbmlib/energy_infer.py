@@ -24,6 +24,47 @@ from tensorflow_probability import distributions as tfd
 from qhbmlib import energy_model
 
 
+class AnalyticInferenceLayer(tf.keras.layers.Layer):
+  """Sampler which calculates all probabilities and samples as categorical.
+  Compares very abstractly to e.g. tfp.mcmc.HamiltonianMonteCarlo which
+  constructs an inference object.
+  """
+
+  def __init__(self, energy: energy_model.BitstringEnergy, name=None):
+    """Instantiates an AnalyticInference object.
+
+    Internally, this class saves all possible bitstrings as a tensor,
+    whose energies are calculated relative to input distributions for sampling.
+    """
+    super().__init__(name=name)
+    self._energy = energy
+    self._dist_realization = tfp.layers.DistributionLambda(
+        make_distribution_fn=lambda t: tfd.Categorical(logits=-1 * t)
+    )
+
+  def infer(self):
+    """Do the work to ready this layer for use."""
+    all_bitstrings = tf.constant(
+      list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
+    x = tf.squeeze(self._energy(all_bitstrings))
+    self._current_dist = self._dist_realization(x)
+
+  def sample(n_samples):
+    self._current_dist(n_samples)
+
+  def entropy(self):
+    self._current_dist.entropy()
+
+  def log_partition(self):
+    return tf.reduce_logsumexp(self._current_dist.logits_parameter())
+    
+  def call(self, inputs=None):
+    if inputs is None:
+      return self._current_dist
+    else:
+      return self.sample(inputs)
+
+
 class BitstringDistribution(tfd.Distribution, abc.ABC):
   """Class for inference on BitstringEnergy.
 
