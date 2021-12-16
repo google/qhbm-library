@@ -14,7 +14,6 @@
 # ==============================================================================
 """Tools for defining quantum circuit models."""
 
-import abc
 from typing import List, Union
 
 import cirq
@@ -23,14 +22,7 @@ import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-
-def bit_circuit(qubits: List[cirq.GridQubit], name="bit_circuit"):
-  """Returns exponentiated X gate on each qubit and the exponent symbols."""
-  circuit = cirq.Circuit()
-  for n, q in enumerate(qubits):
-    bit = sympy.Symbol("{0}_bit_{1}".format(name, n))
-    circuit += cirq.X(q)**bit
-  return circuit
+from qhbmlib import circuit_model_utils
 
 
 class QuantumCircuit(tf.keras.layers.Layer):
@@ -41,19 +33,17 @@ class QuantumCircuit(tf.keras.layers.Layer):
                symbols: tf.Tensor,
                value_layers_inputs: Union[tf.Variable, List[tf.Variable]],
                value_layers: List[tf.keras.layers.Layer],
-               name: Union[None, str]=None):
+               name: Union[None, str] = None):
     super().__init__(name=name)
 
     if not isinstance(pqc, cirq.Circuit):
-      raise TypeError(f"pqc must be a cirq.Circuit object."
-                      " Given: {type(pqc)}")
+      raise TypeError(f"pqc must be a cirq.Circuit, given: {type(pqc)}")
 
     if set(tfq.util.get_circuit_symbols(pqc)) != {
         s.decode("utf-8") for s in symbols.numpy()
     }:
       raise ValueError(
-        "`pqc` must contain exactly the parameters in `symbols`."
-      )
+          "`pqc` must contain exactly the parameters in `symbols`.")
     self._qubits = sorted(pqc.all_qubits())
     self._symbols = symbols
     self._value_layers = value_layers
@@ -64,17 +54,17 @@ class QuantumCircuit(tf.keras.layers.Layer):
     symbols_shape = tf.shape(self.symbols)
     if not all(values_shape == symbols_shape):
       raise ValueError(
-        "value calculation must yield one value for every symbol."
-        f" Got {values_shape} and {symbols_shape}.")
+          "value calculation must yield one value for every symbol."
+          f" Got {values_shape} and {symbols_shape}.")
 
     self._pqc = tfq.convert_to_tensor([pqc])
     self._inverse_pqc = tfq.convert_to_tensor([pqc**-1])
 
-    _bit_circuit = bit_circuit(self.qubits)
-    bit_symbols = list(sorted(tfq.util.get_circuit_symbols(_bit_circuit)))
+    raw_bit_circuit = circuit_model_utils.bit_circuit(self.qubits)
+    bit_symbols = list(sorted(tfq.util.get_circuit_symbols(raw_bit_circuit)))
     self._bit_symbols = tf.constant([str(x) for x in bit_symbols])
-    self._bit_circuit = tfq.convert_to_tensor([_bit_circuit])
-    
+    self._bit_circuit = tfq.convert_to_tensor([raw_bit_circuit])
+
   @property
   def qubits(self):
     return self._qubits
@@ -120,8 +110,9 @@ class DirectQuantumCircuit(QuantumCircuit):
   def __init__(
       self,
       pqc: cirq.Circuit,
-      initializer: tf.keras.initializers.Initializer=tf.keras.initializers.RandomUniform(0, 2 * np.pi),
-      name: Union[None, str]=None,
+      initializer: tf.keras.initializers.Initializer = tf.keras.initializers
+      .RandomUniform(0, 2 * np.pi),
+      name: Union[None, str] = None,
   ):
     """Initializes a DirectQuantumCircuit.
 
@@ -189,14 +180,11 @@ class QAIA(QuantumCircuit):
       flat_symbols.extend(q_symb + c_symb)
     symbols = tf.constant(flat_symbols)
 
-    num_true_etas = num_layers
-    num_thetas = len(classical_h_terms)
-    num_gammas = len(quantum_h_terms) * num_layers
-
     value_layers_inputs = [
-      tf.Variable(initializer(shape=[num_layers])),  # true etas
-      tf.Variable(initializer(shape=[len(classical_h_terms)])),  # thetas
-      tf.Variable(initializer(shape=[num_layers, len(quantum_h_terms)])),  # gammas
+        tf.Variable(initializer(shape=[num_layers])),  # true etas
+        tf.Variable(initializer(shape=[len(classical_h_terms)])),  # thetas
+        tf.Variable(
+            initializer(shape=[num_layers, len(quantum_h_terms)])),  # gammas
     ]
 
     def embed_params(inputs):
@@ -206,8 +194,6 @@ class QAIA(QuantumCircuit):
       classical_params = exp_etas * tiled_thetas
       return tf.concat([classical_params, inputs[2]], 1)
 
-    value_layers = [
-      tf.keras.layers.Lambda(embed_params)
-    ]
+    value_layers = [tf.keras.layers.Lambda(embed_params)]
 
     super().__init__(pqc, symbols, value_layers_inputs, value_layers)
