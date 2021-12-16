@@ -37,8 +37,10 @@ def qmhl(qhbm_model, target_circuits, target_counts):
 
   @tf.custom_gradient
   def loss(trainable_variables):
-    # We use `model.qnn.trainable_variables instead`
+    # We use `qhbm_model.ebm.trainable_variables` and
+    # `qhbm_model.qnn.trainable_variables` instead
     del trainable_variables
+
     # log_partition estimate
 
     if qhbm_model.ebm.is_analytic:
