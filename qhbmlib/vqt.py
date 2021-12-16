@@ -38,6 +38,9 @@ def vqt(model, num_samples, hamiltonian, beta):
 
   @tf.custom_gradient
   def loss(trainable_variables):
+    # We use `model.qnn.trainable_variables` / `model.ebm.trainable_variables`
+    # instead
+    del trainable_variables
     bitstrings, counts = model.ebm.sample(num_samples)
     probs = tf.cast(counts, tf.float32) / tf.cast(num_samples, tf.float32)
     expectation = tf.squeeze(
