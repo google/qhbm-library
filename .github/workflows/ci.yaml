@@ -3,10 +3,10 @@ name: Continuous Integration
 on: [ pull_request ]
 
 jobs:
-  test:
-    name: Checks
+  lint:
+    name: Lint check
     runs-on: ubuntu-latest
-    timeout-minutes: 30  # min
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
@@ -18,9 +18,37 @@ jobs:
           python -m pip install --upgrade pip
           pip install --user poetry
           poetry install
+      - name: Run Linter
+        run: ./scripts/check_lint.sh
+
+  format:
+    name: Formatting check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+          architecture: 'x64'
       - name: Check format
+        run: ./scripts/check_format.sh
+
+  test:
+    name: Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+          architecture: 'x64'
+      - name: Install dependencies
         run: |
-          ./scripts/check_format.sh
+          python -m pip install --upgrade pip
+          pip install --user poetry
+          poetry install
       - name: Run tests
         run: |
           poetry run pytest .
