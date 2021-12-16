@@ -40,7 +40,7 @@ jobs:
         run: ./scripts/check_format.sh
 
   test:
-    name: Checks
+    name: Unit tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
