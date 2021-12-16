@@ -15,7 +15,6 @@
 """Tools for modeling energy functions."""
 
 import abc
-import itertools
 from typing import List, Union
 
 import cirq

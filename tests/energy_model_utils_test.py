@@ -14,10 +14,6 @@
 # ==============================================================================
 """Tests for the energy_model_utils module."""
 
-import itertools
-import random
-
-import cirq
 import tensorflow as tf
 
 from qhbmlib import energy_model_utils
@@ -99,7 +95,6 @@ class ParityTest(tf.test.TestCase):
 
   def test_layer(self):
     """Confirms the layer outputs correct parities."""
-    bitstrings = tf.constant([[1, 0, 1, 1]], dtype=tf.int8)
     inputs = tf.constant([[-1, 1, -1, -1]])
     bits = [1, 2, 3, 4]
     order = 3

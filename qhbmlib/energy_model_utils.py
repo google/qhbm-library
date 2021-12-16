@@ -14,22 +14,20 @@
 # ==============================================================================
 """Utilities for the energy_model module."""
 
-import abc
 import itertools
-from typing import List, Union
+from typing import List
 
-import cirq
 import tensorflow as tf
 
 
-def check_bits(bits):
+def check_bits(bits: List[int]) -> List[int]:
   """Confirms the input is a valid bit index list."""
   if len(set(bits)) != len(bits):
     raise ValueError("All entries of `bits` must be unique.")
   return bits
 
 
-def check_order(order):
+def check_order(order: int) -> int:
   """Confirms the input is a valid parity order."""
   if not isinstance(order, int):
     raise TypeError("`order` must be an integer.")
@@ -96,7 +94,7 @@ class VariableDot(tf.keras.layers.Layer):
     """Initializes the internal variables."""
     self.kernel = tf.Variable(
         initial_value=self._initializer((input_shape[-1],)),
-        name='kernel',
+        name="kernel",
         trainable=True)
 
   def call(self, inputs):

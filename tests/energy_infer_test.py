@@ -156,9 +156,9 @@ class AnalyticInferenceLayerTest(tf.test.TestCase):
     one_bit_energy = energy_model.KOBE([0], 1,
                                        tf.keras.initializers.Constant(0.0))
     actual_layer = energy_infer.AnalyticInferenceLayer(one_bit_energy)
-    self.assertTrue(actual_layer._current_dist is None)
+    self.assertIsNone(actual_layer._current_dist)
     actual_dist = actual_layer(None)
-    self.assertTrue(isinstance(actual_dist, tfp.distributions.Categorical))
+    self.assertIsInstance(actual_dist, tfp.distributions.Categorical)
 
     n_samples = 1e7
     samples = actual_layer(n_samples)
@@ -296,9 +296,9 @@ class BernoulliInferenceLayerTest(tf.test.TestCase):
     energy = energy_model.BernoulliEnergy([1],
                                           tf.keras.initializers.Constant(0.0))
     actual_layer = energy_infer.BernoulliInferenceLayer(energy)
-    self.assertTrue(actual_layer._current_dist is None)
+    self.assertIsNone(actual_layer._current_dist)
     actual_dist = actual_layer(None)
-    self.assertTrue(isinstance(actual_dist, tfp.distributions.Bernoulli))
+    self.assertIsInstance(actual_dist, tfp.distributions.Bernoulli)
 
     # For single factor Bernoulli, theta = 0 is 50% chance of 1.
     n_samples = 1e7
