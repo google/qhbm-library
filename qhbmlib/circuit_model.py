@@ -36,9 +36,6 @@ class QuantumCircuit(tf.keras.layers.Layer):
                name: Union[None, str] = None):
     super().__init__(name=name)
 
-    if not isinstance(pqc, cirq.Circuit):
-      raise TypeError(f"pqc must be a cirq.Circuit, given: {type(pqc)}")
-
     if set(tfq.util.get_circuit_symbols(pqc)) != {
         s.decode("utf-8") for s in symbols.numpy()
     }:
@@ -48,14 +45,6 @@ class QuantumCircuit(tf.keras.layers.Layer):
     self._symbols = symbols
     self._value_layers = value_layers
     self._value_layers_inputs = value_layers_inputs
-
-    test_values = self.values
-    values_shape = tf.shape(test_values)
-    symbols_shape = tf.shape(self.symbols)
-    if not all(values_shape == symbols_shape):
-      raise ValueError(
-          "value calculation must yield one value for every symbol."
-          f" Got {values_shape} and {symbols_shape}.")
 
     self._pqc = tfq.convert_to_tensor([pqc])
     self._inverse_pqc = tfq.convert_to_tensor([pqc**-1])
