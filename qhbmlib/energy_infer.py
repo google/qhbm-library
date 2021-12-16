@@ -91,24 +91,40 @@ class AnalyticInferenceLayer(InferenceLayer):
       name: Optional name for the model.
     """
     super().__init__(energy, name=name)
+    self._all_bitstrings = tf.constant(
+        list(itertools.product([0, 1], repeat=self.energy.num_bits)),
+        dtype=tf.int8)
     self._dist_realization = tfp.layers.DistributionLambda(
         make_distribution_fn=lambda t: tfd.Categorical(logits=-1 * t))
     self._current_dist = None
 
+  @property
+  def all_bitstrings(self):
+    """Returns every bitstring."""
+    return self._all_bitstrings
+
+  @property
+  def all_energies(self):
+    """Returns the energy of every bitstring."""
+    return self.energy(self.all_bitstrings)
+
   def infer(self):
     """See base class docstring."""
     all_bitstrings = tf.constant(
-        list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
+        list(itertools.product([0, 1], repeat=self.energy.num_bits)), dtype=tf.int8)
     x = tf.squeeze(self._energy(all_bitstrings))
     self._current_dist = self._dist_realization(x)
 
   def sample(self, n):
     """See base class docstring"""
-    self._current_dist.sample(n)
+    return tf.gather(self.all_bitstrings,
+                     self._current_dist.sample(n))
+    
+    return self._current_dist.sample(n)
 
   def entropy(self):
     """See base class docstring"""
-    self._current_dist.entropy()
+    return self._current_dist.entropy()
 
   def log_partition(self):
     """See base class docstring"""
@@ -138,7 +154,7 @@ class BernoulliInferenceLayer(InferenceLayer):
     """
     super().__init__(energy, name=name)
     self._dist_realization = tfp.layers.DistributionLambda(
-      make_distribution_fn=lambda t: tfd.Bernoulli(logits=t))
+      make_distribution_fn=lambda t: tfd.Bernoulli(logits=t, dtype=tf.int8))
     self._current_dist = None
 
   def infer(self):
@@ -147,15 +163,28 @@ class BernoulliInferenceLayer(InferenceLayer):
 
   def sample(self, n):
     """See base class docstring"""
-    self._current_dist.sample(n)
+    return self._current_dist.sample(n)
 
   def entropy(self):
-    """See base class docstring"""
-    self._current_dist.entropy()
+    """Returns the exact entropy.
+
+    The total entropy of a set of spins is the sum of each individual spin's
+    entropies.
+    """
+    return tf.reduce_sum(self._current_dist.entropy())
 
   def log_partition(self):
-    """See base class docstring"""
-    return tf.reduce_logsumexp(self._current_dist.logits_parameter())
+    r"""Returns the exact log partition function.
+
+    For a single spin of energy $\theta$, the partition function is
+    $$Z_\theta = \exp(\theta) + \exp(-\theta).$$
+    Since each spin is independent, the total log partition function is
+    the sum of the individual spin log partition functions.
+    """
+    thetas = 0.5 * self.energy.logits
+    single_log_partitions = tf.math.log(
+        tf.math.exp(thetas) + tf.math.exp(-1.0 * thetas))
+    return tf.math.reduce_sum(single_log_partitions)
 
   def call(self, inputs=None):
     if self._current_dist is None:

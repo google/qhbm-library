@@ -23,8 +23,8 @@ from qhbmlib import util
 from tests import test_util
 
 
-class AnalyticDistributionTest(tf.test.TestCase):
-  """Tests the AnalyticDistribution class."""
+class AnalyticInferenceLayerTest(tf.test.TestCase):
+  """Tests the AnalyticInferenceLayer class."""
 
   def test_init(self):
     """Confirms internal values are set correctly."""
@@ -32,7 +32,7 @@ class AnalyticDistributionTest(tf.test.TestCase):
     order = 2
     expected_energy = energy_model.KOBE(bits, order)
     expected_name = "test_analytic_dist_name"
-    actual_dist = energy_infer.AnalyticDistribution(expected_energy,
+    actual_dist = energy_infer.AnalyticInferenceLayer(expected_energy,
                                                     expected_name)
     self.assertEqual(actual_dist.energy, expected_energy)
     self.assertEqual(actual_dist.name, expected_name)
@@ -52,10 +52,12 @@ class AnalyticDistributionTest(tf.test.TestCase):
 
     # Single bit test.
     one_bit_energy = energy_model.KOBE([0], 1)
-    actual_dist = energy_infer.AnalyticDistribution(one_bit_energy)
+    actual_dist = energy_infer.AnalyticInferenceLayer(one_bit_energy)
     # For single factor Bernoulli, theta=0 is 50% chance of 1.
     one_bit_energy.set_weights([tf.constant([0.0])])
 
+    # TODO(#115)
+    actual_dist.infer()
     samples = actual_dist.sample(n_samples)
     # check that we got both bitstrings
     self.assertTrue(
@@ -70,6 +72,7 @@ class AnalyticDistributionTest(tf.test.TestCase):
 
     # Large energy penalty pins the bit.
     one_bit_energy.set_weights([tf.constant([100.0])])
+    actual_dist.infer()
     samples = actual_dist.sample(n_samples)
     # check that we got only one bitstring
     self.assertFalse(
@@ -83,7 +86,8 @@ class AnalyticDistributionTest(tf.test.TestCase):
     # First a uniform sampling test.
     three_bit_energy = energy_model.KOBE([0, 1, 2], 3,
                                          tf.keras.initializers.Constant(0.0))
-    actual_dist = energy_infer.AnalyticDistribution(three_bit_energy)
+    actual_dist = energy_infer.AnalyticInferenceLayer(three_bit_energy)
+    actual_dist.infer()
     samples = actual_dist.sample(n_samples)
 
     for b in [[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1], [1, 0, 0], [1, 0, 1],
@@ -102,6 +106,7 @@ class AnalyticDistributionTest(tf.test.TestCase):
     # Confirm correlated spins.
     three_bit_energy.set_weights(
         [tf.constant([100.0, 0.0, 0.0, -100.0, 0.0, 100.0, 0.0])])
+    actual_dist.infer()
     samples = actual_dist.sample(n_samples)
     # Confirm we only get the 110 bitstring.
 
@@ -127,8 +132,9 @@ class AnalyticDistributionTest(tf.test.TestCase):
     expected_log_partition = tf.math.log(tf.constant(3641.8353))
 
     energy = energy_model.KOBE([0, 1], 2)
-    actual_dist = energy_infer.AnalyticDistribution(energy)
+    actual_dist = energy_infer.AnalyticInferenceLayer(energy)
     energy.set_weights([test_thetas])
+    actual_dist.infer()
     actual_log_partition = actual_dist.log_partition()
     self.assertAllClose(actual_log_partition, expected_log_partition)
 
@@ -138,21 +144,22 @@ class AnalyticDistributionTest(tf.test.TestCase):
     expected_entropy = tf.constant(0.00233551808)
 
     energy = energy_model.KOBE([0, 1], 2)
-    actual_dist = energy_infer.AnalyticDistribution(energy)
+    actual_dist = energy_infer.AnalyticInferenceLayer(energy)
     energy.set_weights([test_thetas])
+    actual_dist.infer()
     actual_entropy = actual_dist.entropy()
     self.assertAllClose(actual_entropy, expected_entropy)
 
 
-class BernoulliDistributionTest(tf.test.TestCase):
-  """Tests the BernoulliDistribution class."""
+class BernoulliInferenceLayerTest(tf.test.TestCase):
+  """Tests the BernoulliInferenceLayer class."""
 
   def test_init(self):
     """Tests that components are initialized correctly."""
     bits = [0, 1, 3]
     expected_energy = energy_model.BernoulliEnergy(bits)
     expected_name = "test_analytic_dist_name"
-    actual_dist = energy_infer.BernoulliDistribution(expected_energy,
+    actual_dist = energy_infer.BernoulliInferenceLayer(expected_energy,
                                                      expected_name)
     self.assertEqual(actual_dist.energy, expected_energy)
     self.assertEqual(actual_dist.name, expected_name)
@@ -161,10 +168,11 @@ class BernoulliDistributionTest(tf.test.TestCase):
     """Confirms that bitstrings are sampled as expected."""
     n_samples = 1e7
     energy = energy_model.BernoulliEnergy([1])
-    actual_dist = energy_infer.BernoulliDistribution(energy)
+    actual_dist = energy_infer.BernoulliInferenceLayer(energy)
 
     # For single factor Bernoulli, theta = 0 is 50% chance of 1.
     energy.set_weights([tf.constant([0.0])])
+    actual_dist.infer()
     samples = actual_dist.sample(n_samples)
     # check that we got both bitstrings
     self.assertTrue(
@@ -179,6 +187,7 @@ class BernoulliDistributionTest(tf.test.TestCase):
 
     # Large value of theta pins the bit.
     energy.set_weights([tf.constant([1000.0])])
+    actual_dist.infer()
     samples = actual_dist.sample(n_samples)
     # check that we got only one bitstring
     bitstrings, _ = util.unique_bitstrings_with_counts(samples)
@@ -187,7 +196,8 @@ class BernoulliDistributionTest(tf.test.TestCase):
     # Two bit tests.
     energy = energy_model.BernoulliEnergy([0, 1],
                                           tf.keras.initializers.Constant(0.0))
-    actual_dist = energy_infer.BernoulliDistribution(energy)
+    actual_dist = energy_infer.BernoulliInferenceLayer(energy)
+    actual_dist.infer()
     samples = actual_dist.sample(n_samples)
     for b in [[0, 0], [0, 1], [1, 0], [1, 1]]:
       b_tf = tf.constant([b], dtype=tf.int8)
@@ -202,6 +212,7 @@ class BernoulliDistributionTest(tf.test.TestCase):
 
     # Test one pinned, one free bit
     energy.set_weights([tf.constant([-1000.0, 0.0])])
+    actual_dist.infer()
     samples = actual_dist.sample(n_samples)
     # check that we get 00 and 01.
     for b in [[0, 0], [0, 1]]:
@@ -219,7 +230,8 @@ class BernoulliDistributionTest(tf.test.TestCase):
                                   [1, 0, 0], [1, 0, 1], [1, 1, 0], [1, 1, 1]],
                                  dtype=tf.int8)
     energy = energy_model.BernoulliEnergy([5, 6, 7])
-    actual_dist = energy_infer.BernoulliDistribution(energy)
+    actual_dist = energy_infer.BernoulliInferenceLayer(energy)
+    actual_dist.infer()
     expected_log_partition = tf.reduce_logsumexp(-1.0 * energy(all_bitstrings))
     actual_log_partition = actual_dist.log_partition()
     self.assertAllClose(actual_log_partition, expected_log_partition)
@@ -250,8 +262,9 @@ class BernoulliDistributionTest(tf.test.TestCase):
     expected_entropy = -1.0 * tf.reduce_sum(all_probs * tf.math.log(all_probs))
 
     energy = energy_model.BernoulliEnergy([0, 1, 2])
-    actual_dist = energy_infer.BernoulliDistribution(energy)
+    actual_dist = energy_infer.BernoulliInferenceLayer(energy)
     energy.set_weights([test_thetas])
+    actual_dist.infer()
     actual_entropy = actual_dist.entropy()
     self.assertAllClose(actual_entropy, expected_entropy)
 
