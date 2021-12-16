@@ -16,6 +16,7 @@
 
 import abc
 import itertools
+from typing import Union
 
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -24,183 +25,142 @@ from tensorflow_probability import distributions as tfd
 from qhbmlib import energy_model
 
 
-class AnalyticInferenceLayer(tf.keras.layers.Layer):
-  """Sampler which calculates all probabilities and samples as categorical.
-  Compares very abstractly to e.g. tfp.mcmc.HamiltonianMonteCarlo which
-  constructs an inference object.
-  """
+class InferenceLayer(tf.keras.layers.Layer, abc.ABC):
+  """Sets the methods required for inference on BitstringEnergy objects."""
 
-  def __init__(self, energy: energy_model.BitstringEnergy, name=None):
-    """Instantiates an AnalyticInference object.
+  def __init__(self,
+               energy: energy_model.BitstringEnergy,
+               name: Union[None, str]=None):
+    """Initializes an InferenceLayer.
 
-    Internally, this class saves all possible bitstrings as a tensor,
-    whose energies are calculated relative to input distributions for sampling.
+    Args:
+      energy: The parameterized energy function which defines this distribution
+        via the equations of an energy based model.
+      name: Optional name for the model.
     """
     super().__init__(name=name)
     self._energy = energy
+
+  @property
+  def energy(self):
+    """The energy model on which this layer performs inference."""
+    return self._energy
+
+  @abc.abstractmethod
+  def infer(self):
+    """Do the work to ready this layer for use.
+
+    This should be called each time the underlying model in
+    `self.energy` is updated.
+    """
+    raise NotImplementedError()
+  
+  @abc.abstractmethod
+  def sample(self, n):
+    """Returns samples from the EBM corresponding to `self.energy`.
+
+    This can be an approximate sampling.
+    """
+    raise NotImplementedError()
+
+  @abc.abstractmethod
+  def entropy(self):
+    """Returns an estimate of the entropy."""
+    raise NotImplementedError()
+
+  def log_partition(self):
+    """Returns an estimate of the log partition function."""
+    raise NotImplementedError()
+
+  
+class AnalyticInferenceLayer(InferenceLayer):
+  """Uses an explicit categorical distribution to implement parent functions."""
+
+  def __init__(self,
+               energy: energy_model.BitstringEnergy,
+               name: Union[None, str]=None):
+    """Initializes an AnalyticInferenceLayer.
+
+    Internally, this class saves all possible bitstrings as a tensor, whose
+    energies are calculated relative to an input energy function for sampling
+    and other inference tasks.
+
+    Args:
+      energy: The parameterized energy function which defines this distribution
+        via the equations of an energy based model.
+      name: Optional name for the model.
+    """
+    super().__init__(energy, name=name)
     self._dist_realization = tfp.layers.DistributionLambda(
         make_distribution_fn=lambda t: tfd.Categorical(logits=-1 * t))
+    self._current_dist = None
 
   def infer(self):
-    """Do the work to ready this layer for use."""
+    """See base class docstring."""
     all_bitstrings = tf.constant(
         list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
     x = tf.squeeze(self._energy(all_bitstrings))
     self._current_dist = self._dist_realization(x)
 
-  def sample(self, n_samples):
-    self._current_dist(n_samples)
+  def sample(self, n):
+    """See base class docstring"""
+    self._current_dist.sample(n)
 
   def entropy(self):
+    """See base class docstring"""
     self._current_dist.entropy()
 
   def log_partition(self):
+    """See base class docstring"""
     return tf.reduce_logsumexp(self._current_dist.logits_parameter())
 
   def call(self, inputs=None):
+    if self._current_dist is None:
+      self.infer()
     if inputs is None:
       return self._current_dist
     else:
       return self.sample(inputs)
 
 
-class BitstringDistribution(tfd.Distribution, abc.ABC):
-  """Class for inference on BitstringEnergy.
+class BernoulliInferenceLayer(InferenceLayer):
+  """Manages inference for a Bernoulli defined by spin energies."""
 
-  In contrast to implementations of `tfd.Distribution` in TFP, child classes
-  are free define approximate or inefficient implementations of class methods.
-  """
-
-  def __init__(self, energy: energy_model.BitstringEnergy, name=None):
-    """Initializes a BitstringDistribution.
+  def __init__(self,
+               energy: energy_model.BitstringEnergy,
+               name: Union[None, str]=None):
+    """Initializes a BernoulliInferenceLayer.
 
     Args:
       energy: The parameterized energy function which defines this distribution
         via the equations of an energy based model.
-      name: Optional python `str` name prefixed to Ops created by this class.
-        Default: subclass name.
-    """
-    super().__init__(
-        dtype=tf.int8,
-        reparameterization_type=tfd.NOT_REPARAMETERIZED,
-        validate_args=False,
-        allow_nan_stats=False,
-        parameters=None,
-        graph_parents=None,
-        name=name)
-    self.energy = energy
-
-  @abc.abstractmethod
-  def _sample_n(self, n, seed=None, **kwargs):
-    """Returns `n` samples approximately drawn from the EBM corresponding to
-    `self.energy`."""
-    raise NotImplementedError()
-
-  @abc.abstractmethod
-  def log_partition(self):
-    """Returns an estimate of the log partition function."""
-    raise NotImplementedError()
-
-  @abc.abstractmethod
-  def _entropy(self):
-    """Returns an estimate of the entropy."""
-    raise NotImplementedError()
-
-
-class AnalyticDistribution(BitstringDistribution):
-  """Uses an explicit categorical distribution to implement parent functions."""
-
-  def __init__(self, energy: energy_model.BitstringEnergy, name=None):
-    """Instantiates an AnalyticDistribution.
-
-    Internally, this class saves all possible bitstrings as a tensor,
-    whose energies are calculated relative to input distributions for sampling
-    and other inference tasks.  Thus this distribution is limited to energy functions on
-
-    Args:
-      energy: The parameterized energy function which defines this distribution
-        via the equations of an energy based model.
-      name: Optional python `str` name prefixed to Ops created by this class.
-        Default: subclass name.
+      name: Optional name for the model.
     """
     super().__init__(energy, name=name)
-    self._all_bitstrings = tf.constant(
-        list(itertools.product([0, 1], repeat=self.energy.num_bits)),
-        dtype=tf.int8)
-    test_validity = self._inner_distribution(validate_args=True)
-    del (test_validity)
+    self._dist_realization = tfp.layers.DistributionLambda(
+      make_distribution_fn=lambda t: tfd.Bernoulli(logits=t))
+    self._current_dist = None
 
-  def _inner_distribution(self, validate_args=False):
-    """Returns a Categorical distribution."""
-    return tfp.distributions.Categorical(
-        logits=-1 * self.all_energies, validate_args=validate_args)
+  def infer(self):
+    """See base class docstring."""
+    self._current_dist = self._dist_realization(self.energy.logits)
 
-  @property
-  def all_bitstrings(self):
-    """Returns every bitstring."""
-    return self._all_bitstrings
+  def sample(self, n):
+    """See base class docstring"""
+    self._current_dist.sample(n)
 
-  @property
-  def all_energies(self):
-    """Returns the energy of every bitstring."""
-    return self.energy(self.all_bitstrings)
-
-  def _sample_n(self, n, seed=None, **kwargs):
-    """Returns `n` samples from the distribution defined by `self.energy`."""
-    return tf.gather(self.all_bitstrings,
-                     self._inner_distribution().sample(n, seed=seed))
+  def entropy(self):
+    """See base class docstring"""
+    self._current_dist.entropy()
 
   def log_partition(self):
-    """Returns the exact log partition function."""
-    return tf.reduce_logsumexp(-1 * self.all_energies)
+    """See base class docstring"""
+    return tf.reduce_logsumexp(self._current_dist.logits_parameter())
 
-  def _entropy(self):
-    """Returns the exact entropy."""
-    return self._inner_distribution().entropy()
-
-
-class BernoulliDistribution(BitstringDistribution):
-  """Distribution for a Bernoulli defined by spin energies."""
-
-  def __init__(self, energy: energy_model.BernoulliEnergy, name=None):
-    """Initializes a BernoulliDistribution.
-
-    Args:
-      energy: The parameterized energy function which defines this distribution
-        via the equations of an energy based model.
-      name: Optional python `str` name prefixed to Ops created by this class.
-        Default: subclass name.
-    """
-    super().__init__(energy, name=name)
-    test_validity = self._inner_distribution(validate_args=True)
-    del (test_validity)
-
-  def _inner_distribution(self, validate_args=False):
-    """Returns a Bernoulli distribution."""
-    return tfp.distributions.Bernoulli(
-        logits=self.energy.logits, validate_args=validate_args, dtype=tf.int8)
-
-  def _sample_n(self, n, seed=None, **kwargs):
-    """Returns `n` samples from the distribution defined by `self.energy`."""
-    return self._inner_distribution().sample(n, seed=seed)
-
-  def log_partition(self):
-    r"""Returns the exact log partition function.
-
-    For a single spin of energy $\theta$, the partition function is
-    $$Z_\theta = \exp(\theta) + \exp(-\theta).$$
-    Since each spin is independent, the total log partition function is
-    the sum of the individual spin log partition functions.
-    """
-    thetas = 0.5 * self.energy.logits
-    single_log_partitions = tf.math.log(
-        tf.math.exp(thetas) + tf.math.exp(-1.0 * thetas))
-    return tf.math.reduce_sum(single_log_partitions)
-
-  def _entropy(self):
-    """Returns the exact entropy.
-
-    The total entropy of a set of spins is the sum of each individual spin's
-    entropies.
-    """
-    return tf.reduce_sum(self._inner_distribution().entropy())
+  def call(self, inputs=None):
+    if self._current_dist is None:
+      self.infer()
+    if inputs is None:
+      return self._current_dist
+    else:
+      return self.sample(inputs)
