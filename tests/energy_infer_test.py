@@ -34,7 +34,7 @@ class AnalyticInferenceLayerTest(tf.test.TestCase):
     expected_energy = energy_model.KOBE(bits, order)
     expected_name = "test_analytic_dist_name"
     actual_layer = energy_infer.AnalyticInferenceLayer(expected_energy,
-                                                      expected_name)
+                                                       expected_name)
     self.assertEqual(actual_layer.energy, expected_energy)
     self.assertEqual(actual_layer.name, expected_name)
 
@@ -153,7 +153,8 @@ class AnalyticInferenceLayerTest(tf.test.TestCase):
 
   def test_call(self):
     """Confirms that call behaves correctly."""
-    one_bit_energy = energy_model.KOBE([0], 1, tf.keras.initializers.Constant(0.0))
+    one_bit_energy = energy_model.KOBE([0], 1,
+                                       tf.keras.initializers.Constant(0.0))
     actual_layer = energy_infer.AnalyticInferenceLayer(one_bit_energy)
     self.assertTrue(actual_layer._current_dist is None)
     actual_dist = actual_layer(None)
@@ -182,7 +183,7 @@ class BernoulliInferenceLayerTest(tf.test.TestCase):
     expected_energy = energy_model.BernoulliEnergy(bits)
     expected_name = "test_analytic_dist_name"
     actual_layer = energy_infer.BernoulliInferenceLayer(expected_energy,
-                                                       expected_name)
+                                                        expected_name)
     self.assertEqual(actual_layer.energy, expected_energy)
     self.assertEqual(actual_layer.name, expected_name)
 
@@ -292,7 +293,8 @@ class BernoulliInferenceLayerTest(tf.test.TestCase):
 
   def test_call(self):
     """Confirms that calling the layer works correctly."""
-    energy = energy_model.BernoulliEnergy([1], tf.keras.initializers.Constant(0.0))
+    energy = energy_model.BernoulliEnergy([1],
+                                          tf.keras.initializers.Constant(0.0))
     actual_layer = energy_infer.BernoulliInferenceLayer(energy)
     self.assertTrue(actual_layer._current_dist is None)
     actual_dist = actual_layer(None)
