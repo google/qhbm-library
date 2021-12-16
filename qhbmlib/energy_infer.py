@@ -111,10 +111,7 @@ class AnalyticInferenceLayer(InferenceLayer):
 
   def infer(self):
     """See base class docstring."""
-    all_bitstrings = tf.constant(
-        list(itertools.product([0, 1], repeat=self.energy.num_bits)),
-        dtype=tf.int8)
-    x = tf.squeeze(self._energy(all_bitstrings))
+    x = tf.squeeze(self.all_energies)
     self._current_dist = self._dist_realization(x)
 
   def sample(self, n):
