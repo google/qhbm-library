@@ -73,6 +73,18 @@ class InferenceLayer(tf.keras.layers.Layer, abc.ABC):
     """Returns an estimate of the log partition function."""
     raise NotImplementedError()
 
+  def build(self, unused):
+    """Builds the internal energy function.
+
+    The input shape is unused because it is known to be `[]`, since calls are
+    given a scalar, the number of samples to draw from the distribution.
+    """
+    self.energy.build([None, self.energy.num_bits])
+  
+  def call(self, inputs):
+    """Returns the number of samples specified in the inputs."""
+    return self.sample(inputs)
+
 
 class AnalyticInferenceLayer(InferenceLayer):
   """Uses an explicit categorical distribution to implement parent functions."""

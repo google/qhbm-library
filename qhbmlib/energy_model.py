@@ -73,6 +73,12 @@ class BitstringEnergy(tf.keras.layers.Layer):
     """
     return self._energy_layers
 
+  def build(self, input_shape):
+    """Builds all the internal layers."""
+    x = input_shape
+    for layer in self._energy_layers:
+      x = layer.compute_output_shape(x)
+
   def call(self, inputs):
     """Returns the energies corresponding to the input bitstrings."""
     x = inputs
