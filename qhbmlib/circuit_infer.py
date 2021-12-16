@@ -14,7 +14,7 @@
 # ==============================================================================
 """Tools for inference on quantum circuits."""
 
-from typing import List
+from typing import List, Union
 
 import cirq
 import sympy
@@ -24,63 +24,27 @@ import tensorflow_quantum as tfq
 from qhbmlib import circuit_model
 
 
-class BitstringInjector(tf.keras.Model):
-  """Class for combining bitstrings and quantum circuits."""
-
-  def __init__(self, qubits, name="bit_circuit"):
-    """Initializes a BitstringInjector."""
-    super().__init__(name=name)
-    self.qubits = qubits
-    circuit = cirq.Circuit()
-    symbols = []
-    for n, q in enumerate(qubits):
-      bit = sympy.Symbol("{0}_bit_{1}".format(name, n))
-      circuit += cirq.X(q)**bit
-      symbols.append(bit)
-    self.bit_circuit = tfq.convert_to_tensor([circuit])
-    self.bit_symbols = tf.constant([str(x) for x in symbols])
-
-  def inject_bitstrings(self, bitstrings, qnn: circuit_model.QuantumCircuit):
-    """Returns circuits which are the qnn appended to bitstring injections."""
-    num_bitstrings = tf.shape(bitstrings)[0]
-    bit_circuits = tfq.resolve_parameters(
-        tf.tile(self.bit_circuit, [num_bitstrings]), self.bit_symbols,
-        tf.cast(bitstrings, tf.float32))
-    pqcs = tf.tile(qnn.pqc, [num_bitstrings])
-    return tfq.append_circuit(bit_circuits, pqcs)
-
-  def call(self, bitstrings, qnn):
-    return self.inject_bitstrings(bitstrings, qnn)
-
-
-class Expectation(tf.keras.Model):
-  """Class for taking expectation values of quantum circuits."""
+class QuantumInferenceLayer(tf.keras.layers.Layer):
+  """Methods for inference on QuantumCircuit objecst."""
 
   def __init__(self,
-               qubits: List[cirq.GridQubit],
-               backend="noiseless",
-               differentiator=None,
-               name=None):
-    """Initialize an instance of Expectation.
+               qnn: circuit_model.QuantumCircuit,
+               backend: Union[str, cirq.Sampler]="noiseless",
+               differentiator: Union[None, tfq.differentiators.Differentiator]=None,
+               name: Union[None, str]=None):
+    """Initialize a QuantumInferenceLayer.
 
     Args:
-      qubits: The qubits on which this class makes inferences.
-      backend: Optional Python `object` that specifies what backend TFQ will use
-        to compute expectation values. Options are {"noisy", "noiseless"}.
-        Users may also specify a preconfigured cirq execution
-        object to use instead, which must inherit `cirq.Sampler`.
-      differentiator: Either None or a `tfq.differentiators.Differentiator`,
-        which specifies how to take the derivative of a quantum circuit.
+      qnn: The parameterized quantum circuit on which to do inference.
+      backend: Specifies what backend TFQ will use to compute expectation
+        values. `str` options are {"noisy", "noiseless"}; users may also specify
+        a preconfigured cirq execution object to use instead.
+      differentiator: Specifies how to take the derivative of a quantum circuit.
       name: Identifier for this inference engine.
     """
-    super().__init__(name=name)
-
-    self._qubits = qubits
-    self._bitstring_injector = BitstringInjector(qubits, name)
-
+    self.qnn = 
     self._differentiator = differentiator
-    if backend == "noiseless" or backend is None:
-      self._backend = "noiseless"
+    if backend == "noiseless":
       self._expectation_layer = tfq.layers.Expectation(
           backend=backend, differentiator=differentiator)
 
@@ -109,10 +73,6 @@ class Expectation(tf.keras.Model):
     self._expectation_function = _expectation_function
 
   @property
-  def qubits(self):
-    return self._qubits
-
-  @property
   def backend(self):
     return self._backend
 
@@ -121,7 +81,6 @@ class Expectation(tf.keras.Model):
     return self._differentiator
 
   def expectation(self,
-                  qnn: circuit_model.QuantumCircuit,
                   initial_states: tf.Tensor,
                   counts: tf.Tensor,
                   operators: tf.Tensor,
@@ -129,11 +88,6 @@ class Expectation(tf.keras.Model):
     """Returns the expectation values of the operators against the QNN.
 
       Args:
-        qnn: Unitary to feed forward.
-        operators: `tf.Tensor` of strings with shape [n_ops], result of calling
-          `tfq.convert_to_tensor` on a list of cirq.PauliSum, `[op1, op2, ...]`.
-          Will be tiled to measure `<op_j>_(qnn)|initial_states[i]>`
-          for each i and j.
         initial_states: Shape [batch_size, num_qubits] of dtype `tf.int8`.
           These are the initial states of each qubit in the circuit.
         counts: Shape [batch_size] of dtype `tf.int32` such that `counts[i]` is
@@ -141,6 +95,10 @@ class Expectation(tf.keras.Model):
           Additionally, if `self.backend != "noiseless", `counts[i]` samples
           are drawn from `(qnn)|initial_states[i]>` and used to compute
           the the corresponding expectation.
+        operators: `tf.Tensor` of strings with shape [n_ops], result of calling
+          `tfq.convert_to_tensor` on a list of cirq.PauliSum, `[op1, op2, ...]`.
+          Will be tiled to measure `<op_j>_(self.qnn)|initial_states[i]>`
+          for each i and j.
         reduce: bool flag for whether or not to average over i.
 
       Returns:
@@ -149,9 +107,9 @@ class Expectation(tf.keras.Model):
         Else, a `tf.Tensor` with shape [batch_size, n_ops] whose entries are the
         unaveraged expectation values of each `operator` against each `circuit`.
       """
-    circuits = self._bitstring_injector(initial_states, qnn)
-    symbol_names = qnn.symbols
-    symbol_values = qnn.values
+    circuits = self.qnn(initial_states)
+    symbol_names = self.qnn.symbols
+    symbol_values = self.qnn.values
     num_circuits = tf.shape(circuits)[0]
     num_operators = tf.shape(operators)[0]
     tiled_values = tf.tile(tf.expand_dims(symbol_values, 0), [num_circuits, 1])
@@ -169,5 +127,33 @@ class Expectation(tf.keras.Model):
       return tf.reduce_sum(tf.transpose(probs * tf.transpose(expectations)), 0)
     return expectations
 
-  def call(self, qnn, initial_states, counts, operators, reduce=True):
-    return expectation(qnn, initial_states, counts, operators, reduce=reduce)
+  def sample(self, initial_states, counts, reduce=True):
+    """Returns bitstring samples from the QNN.
+
+      Args:
+        initial_states: Shape [batch_size, num_qubits] of dtype `tf.int8`.
+          These are the initial states of each qubit in the circuit.
+        counts: Shape [batch_size] of dtype `tf.int32` such that `counts[i]` is
+          the number of samples to draw from `self.pqc|initial_states[i]>`.
+
+      Returns:
+        ragged_samples: `tf.RaggedTensor` of DType `tf.int8` structured such
+          that `ragged_samples[i]` contains `counts[i]` bitstrings drawn from
+          `(self.qnn)|initial_states[i]>`.
+    """
+    circuits = self.qnn(initial_states)
+    return self._sample_function(
+        circuits, counts, mask=mask, reduce=reduce, unique=unique)
+    samples = self._sample_layer(
+        circuits, repetitions=tf.expand_dims(tf.math.reduce_max(counts), 0))
+    num_samples_mask = tf.cast((tf.ragged.range(counts) + 1).to_tensor(),
+                               tf.bool)
+    num_samples_mask = tf.map_fn(tf.random.shuffle, num_samples_mask)
+    samples = tf.ragged.boolean_mask(samples, num_samples_mask)
+    if reduce:
+      return samples.values.to_tensor()
+    return samples
+  
+  def call(self, initial_states, counts, operators, reduce=True):
+    return expectation(initial_states, counts, operators, reduce=reduce)
+
