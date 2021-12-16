@@ -14,8 +14,6 @@
 # ==============================================================================
 """Implementation of general QHBMs in TFQ."""
 
-from typing import Any, List
-
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
