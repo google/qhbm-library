@@ -39,13 +39,12 @@ class AnalyticInferenceLayer(tf.keras.layers.Layer):
     super().__init__(name=name)
     self._energy = energy
     self._dist_realization = tfp.layers.DistributionLambda(
-        make_distribution_fn=lambda t: tfd.Categorical(logits=-1 * t)
-    )
+        make_distribution_fn=lambda t: tfd.Categorical(logits=-1 * t))
 
   def infer(self):
     """Do the work to ready this layer for use."""
     all_bitstrings = tf.constant(
-      list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
+        list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
     x = tf.squeeze(self._energy(all_bitstrings))
     self._current_dist = self._dist_realization(x)
 
@@ -57,7 +56,7 @@ class AnalyticInferenceLayer(tf.keras.layers.Layer):
 
   def log_partition(self):
     return tf.reduce_logsumexp(self._current_dist.logits_parameter())
-    
+
   def call(self, inputs=None):
     if inputs is None:
       return self._current_dist
