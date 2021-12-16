@@ -130,7 +130,7 @@ class AnalyticInferenceLayer(InferenceLayer):
     """See base class docstring"""
     return tf.reduce_logsumexp(self._current_dist.logits_parameter())
 
-  def call(self, inputs=None):
+  def call(self, inputs):
     if self._current_dist is None:
       self.infer()
     if inputs is None:
@@ -186,7 +186,7 @@ class BernoulliInferenceLayer(InferenceLayer):
         tf.math.exp(thetas) + tf.math.exp(-1.0 * thetas))
     return tf.math.reduce_sum(single_log_partitions)
 
-  def call(self, inputs=None):
+  def call(self, inputs):
     if self._current_dist is None:
       self.infer()
     if inputs is None:
