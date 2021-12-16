@@ -80,7 +80,7 @@ class InferenceLayer(tf.keras.layers.Layer, abc.ABC):
     given a scalar, the number of samples to draw from the distribution.
     """
     self.energy.build([None, self.energy.num_bits])
-  
+
   def call(self, inputs):
     """Returns the number of samples specified in the inputs."""
     return self.sample(inputs)
