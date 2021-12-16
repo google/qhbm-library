@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tools for inference on energy functions."""
+"""Tools for inference on energy functions represented by a BitstringEnergy."""
 
 import abc
 import itertools
