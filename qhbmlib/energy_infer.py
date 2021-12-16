@@ -49,7 +49,7 @@ class AnalyticInferenceLayer(tf.keras.layers.Layer):
     x = tf.squeeze(self._energy(all_bitstrings))
     self._current_dist = self._dist_realization(x)
 
-  def sample(n_samples):
+  def sample(self, n_samples):
     self._current_dist(n_samples)
 
   def entropy(self):
