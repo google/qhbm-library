@@ -64,6 +64,15 @@ class QuantumCircuit(tf.keras.layers.Layer):
     return self._symbols
 
   @property
+  def value_layers(self):
+    """List of Keras layers which calculate the current parameter values.
+
+    This list of layers is where the caller would access model weights to be
+    updated from a secondary model or hypernetwork.
+    """
+  return self._value_layers
+  
+  @property
   def values(self):
     """1D `tf.Tensor` of floats specifying the current values of the parameters.
 
@@ -83,6 +92,16 @@ class QuantumCircuit(tf.keras.layers.Layer):
   def inverse_pqc(self):
     return self._inverse_pqc
 
+  def build(self, unused):
+    """Builds the layers which calculate the values.
+
+    The input shape is unused because it is known to be the shape of
+    `self._value_layers_inputs`.
+    """
+    x = [tf.shape(t) for t in self._value_layers_inputs]
+    for layer in self._energy_layers:
+      x = layer.compute_output_shape(x)
+  
   def call(self, inputs):
     """Inputs are bitstrings prepended as initial states to `self.pqc`."""
     num_bitstrings = tf.shape(inputs)[0]
@@ -116,28 +135,6 @@ class DirectQuantumCircuit(QuantumCircuit):
     symbols = tf.constant([str(x) for x in raw_symbols], dtype=tf.string)
     values = tf.Variable(initializer(shape=[len(raw_symbols)]))
     super().__init__(pqc, symbols, values, [])
-
-
-class Squeeze(tf.keras.layers.Layer):
-  """Wraps tf.squeeze in a Keras Layer."""
-
-  def __init__(self, axis=None):
-    """Initializes a Squeeze layer.
-    Args:
-      axis: An optional list of ints. Defaults to []. If specified, only
-        squeezes the dimensions listed. The dimension index starts at 0. It is
-        an error to squeeze a dimension that is not 1. Must be in the range
-        [-rank(input), rank(input)). Must be specified if input is
-        a RaggedTensor.
-    """
-    super().__init__()
-    if axis is None:
-      axis = []
-    self._axis = axis
-
-  def call(self, inputs):
-    """Applies tf.squeeze to the inputs."""
-    return tf.squeeze(inputs, axis=self._axis)
 
 
 class QAIA(QuantumCircuit):
