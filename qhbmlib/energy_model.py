@@ -1,4 +1,3 @@
-# pylint: skip-file
 # Copyright 2021 The QHBM Library Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -106,7 +105,7 @@ class PauliMixin(abc.ABC):
 
     Args:
       qubits: List of cirq.GridQubits. objects to measure.
-    
+
     Returns:
       List of PauliSum objects whose expectation values are fed to
         `operator_expectation` to compute average energy.
