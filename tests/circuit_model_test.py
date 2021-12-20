@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for the circuit_model module."""
 
+import absl
 import itertools
 import random
 
@@ -44,7 +45,8 @@ class QuantumCircuitTest(tf.test.TestCase):
     expected_pqc = tfq.convert_to_tensor([pqc])
     expected_inverse_pqc = tfq.convert_to_tensor([inverse_pqc])
     expected_name = "TestOE"
-    initial_values = tf.Variable(tf.random.uniform([1, 42]))
+    init_val_const = tf.random.uniform([1, 42], dtype=tf.float32)
+    initial_values = tf.Variable(init_val_const)
     value_layer_0 = tf.keras.layers.Dense(5)
     value_layer_1 = tf.keras.layers.Dense(len(raw_symbols))
     value_layer_2 = tf.keras.layers.Lambda(lambda x: tf.squeeze(x, 0))
@@ -110,19 +112,19 @@ class DirectQuantumCircuitTest(tf.test.TestCase):
         tfq.from_tensor(tfq.convert_to_tensor([expected_pqc**-1])))
 
 
-class DirectQuantumCircuitTest(tf.test.TestCase):
+class QAIATest(tf.test.TestCase):
   """Tests the DirectQuantumCircuit class."""
 
   def test_init(self):
     """Tests initialization."""
     num_qubits = 3
-    qubits = cirq.GridQubit.rect(1, num_qubits)
+    expected_qubits = cirq.GridQubit.rect(1, num_qubits)
     classical_h_terms = [
-        cirq.Z(q0) * cirq.Z(q1) for q0, q1 in zip(qubits, qubits[1:])
+        cirq.Z(q0) * cirq.Z(q1) for q0, q1 in zip(expected_qubits, expected_qubits[1:])
     ]
     x_terms = cirq.PauliSum()
     y_terms = cirq.PauliSum()
-    for q in qubits:
+    for q in expected_qubits:
       x_terms += cirq.X(q)
       y_terms += cirq.Y(q)
     quantum_h_terms = [x_terms, y_terms]
@@ -146,11 +148,11 @@ class DirectQuantumCircuitTest(tf.test.TestCase):
     expected_value_layers_inputs = [
         tf.Variable([eta_const] * num_layers),
         tf.Variable([theta_const] * len(classical_h_terms)),
-        tf.Variable([gamma_const] * len(quantum_h_terms) * num_layers)
+        tf.Variable([[gamma_const] * len(quantum_h_terms)] * num_layers)
     ]
-    expected_symbol_values = tf.constant(
-        [eta_const * theta_const] * num_layers * len(classical_h_terms) +
-        [gamma_const] * num_layers * len(quantum_h_terms))
+    expected_symbol_values = [
+      ([eta_const * theta_const] * len(classical_h_terms)) +
+      ([gamma_const] * len(quantum_h_terms))] * num_layers
     actual_qnn = circuit_model.QAIA(quantum_h_terms, classical_h_terms,
                                     num_layers)
     self.assertAllEqual(actual_qnn.qubits, expected_qubits)
@@ -165,13 +167,13 @@ class DirectQuantumCircuitTest(tf.test.TestCase):
     actual_qnn.value_layers_inputs[0].assign([eta_const] * num_layers)
     actual_qnn.value_layers_inputs[1].assign([theta_const] *
                                              len(classical_h_terms))
-    actual_qnn.value_layers_inputs[2].assign([gamma_const] *
-                                             len(quantum_h_terms) * num_layers)
+    actual_qnn.value_layers_inputs[2].assign([[gamma_const] *
+                                             len(quantum_h_terms)] * num_layers)
     self.assertAllClose(actual_qnn.value_layers_inputs,
                         expected_value_layers_inputs)
     self.assertAllClose(actual_qnn.symbol_values, expected_symbol_values)
 
 
 if __name__ == "__main__":
-  logging.info("Running circuit_model_test.py ...")
+  absl.logging.info("Running circuit_model_test.py ...")
   tf.test.main()

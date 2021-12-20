@@ -18,7 +18,6 @@ from typing import List, Union
 
 import cirq
 import numpy as np
-import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
@@ -116,12 +115,13 @@ class QuantumCircuit(tf.keras.layers.Layer):
     """Inverse of `self.pqc`."""
     return self._inverse_pqc
 
-  def build(self, unused):
+  def build(self, input_shape):
     """Builds the layers which calculate the values.
 
-    The input shape is unused because it is known to be the shape of
+    `input_shape` is unused because it is known to be the shape of
     `self._value_layers_inputs`.
     """
+    del input_shape
     if isinstance(self.value_layers_inputs, list):
       x = [tf.shape(t) for t in self._value_layers_inputs]
     else:
@@ -180,7 +180,7 @@ class QAIA(QuantumCircuit):
 
     The ansatz is QAOA-like, with the exponential of the EBM ansatz in place
     of the usual "problem Hamiltonian". Mathematically, it is represented as:
-    
+
     $$\prod_{\ell=1}^P \left[
         \left(
           \prod_{\bm{b} \in \mathcal{B}_K}
@@ -235,8 +235,8 @@ class QAIA(QuantumCircuit):
 
     def embed_params(inputs):
       """Tiles up the variables to properly tie QAIA parameters."""
-      exp_etas = tf.expand_dims(inputs[0], -1)
-      tiled_thetas = tf.tile(inputs[1], [tf.shape(inputs[0])[0], 1])
+      exp_etas = tf.expand_dims(inputs[0], 1)
+      tiled_thetas = tf.tile(tf.expand_dims(inputs[1], 0), [tf.shape(inputs[0])[0], 1])
       classical_params = exp_etas * tiled_thetas
       return tf.concat([classical_params, inputs[2]], 1)
 

@@ -14,10 +14,9 @@
 # ==============================================================================
 """Tools for inference on quantum circuits represented by QuantumCircuit."""
 
-from typing import List, Union
+from typing import Union
 
 import cirq
-import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
@@ -43,7 +42,6 @@ class QuantumInference(tf.keras.layers.Layer):
       differentiator: Specifies how to take the derivative of a quantum circuit.
       name: Identifier for this inference engine.
     """
-    super().__init__(name=name)
     self.qnn = qnn
     self._differentiator = differentiator
     self._backend = backend
@@ -72,8 +70,8 @@ class QuantumInference(tf.keras.layers.Layer):
             operators=operators,
             repetitions=repetitions,
         )
-
     self._expectation_function = _expectation_function
+    super().__init__(name=name)
 
   @property
   def backend(self):
@@ -157,6 +155,3 @@ class QuantumInference(tf.keras.layers.Layer):
     num_samples_mask = tf.map_fn(tf.random.shuffle, num_samples_mask)
     samples = tf.ragged.boolean_mask(samples, num_samples_mask)
     return samples
-
-  def call(self, initial_states, counts, operators, reduce=True):
-    return expectation(initial_states, counts, operators, reduce=reduce)
