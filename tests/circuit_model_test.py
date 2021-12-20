@@ -15,6 +15,7 @@
 """Tests for the circuit_model module."""
 
 import itertools
+import random
 
 import cirq
 import numpy as np
@@ -62,6 +63,7 @@ class QuantumCircuitTest(tf.test.TestCase):
         tfq.from_tensor(expected_inverse_pqc))
     self.assertEqual(actual_layer.name, expected_name)
 
+    # test call
     bitstrings = 2 * list(itertools.product([0, 1], repeat=num_qubits))
     inputs = tf.constant(bitstrings, dtype=tf.int8)
     bit_injectors = []
@@ -73,6 +75,33 @@ class QuantumCircuitTest(tf.test.TestCase):
     actual_outputs = actual_layer(inputs)
     self.assertAllEqual(
         tfq.from_tensor(actual_outputs), tfq.from_tensor(expected_outputs))
+
+
+class DirectQuantumCircuitTest(tf.test.TestCase):
+  """Tests the DirectQuantumCircuit class."""
+
+  def test_init(self):
+    """Tests initialization."""
+    raw_symbol_names = ["test_symbol", "s_2222", "where"]
+    expected_symbol_names = tf.constant(sorted(raw_symbol_names))
+    symbols = [sympy.Symbol(s) for s in raw_symbol_names]
+    num_qubits = 5
+    expected_qubits = cirq.GridQubit.rect(num_qubits, 1)
+    expected_pqc = cirq.Circuit()
+    for q in expected_qubits:
+      for s in symbols:
+        random_gate = random.choice([cirq.X, cirq.Y, cirq.Z])
+        expected_pqc += random_gate(q) ** s
+    init_const = random.uniform(-1, 1)
+    expected_value_layers_inputs = [init_const] * len(raw_symbol_names)
+    actual_qnn = circuit_model.DirectQuantumCircuit(expected_pqc, initializer=tf.keras.initializers.Constant(init_const))    
+    self.assertAllEqual(actual_qnn.qubits, expected_qubits)
+    self.assertAllEqual(actual_qnn.symbol_names, expected_symbol_names)
+    self.assertAllClose(actual_qnn.value_layers_inputs, expected_value_layers_inputs)
+    self.assertEqual(actual_qnn.value_layers, [])
+    self.assertAllClose(actual_qnn.symbol_values, expected_value_layers_inputs)
+    self.assertAllEqual(tfq.from_tensor(actual_qnn.pqc), tfq.from_tensor(tfq.convert_to_tensor([expected_pqc])))
+    self.assertAllEqual(tfq.from_tensor(actual_qnn.inverse_pqc), tfq.from_tensor(tfq.convert_to_tensor([expected_pqc ** -1])))
 
 
 if __name__ == "__main__":

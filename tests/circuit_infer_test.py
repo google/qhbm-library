@@ -197,6 +197,70 @@ class QuantumInferenceTest(tf.test.TestCase):
     for a, e in zip(actual_exps_grad, expected_grad):
       self.assertAllClose(a, e, atol=GRAD_ATOL)
 
+  def test_sample_basic(self):
+    """Confirms correct sampling from identity, bit flip, and GHZ QNNs."""
+    num_qubits = 5
+    raw_qubits = cirq.GridQubit.rect(1, num_qubits)
+    bitstrings = tf.constant(
+        list(itertools.product([0, 1], repeat=num_qubits)), dtype=tf.int8)
+    counts = tf.random.uniform([tf.shape(bitstrings)[0]],
+                               minval=10,
+                               maxval=100,
+                               dtype=tf.int32)
+
+    ident_qnn = circuit_model.DirectQuantumCircuit(
+        cirq.Circuit(cirq.I(q) for q in raw_qubits), name="identity")
+    ident_infer = circuit_infer.QuantumInference(ident_qnn)
+    test_samples = ident_infer.sample(bitstrings, counts)
+    for i, (b, c) in enumerate(zip(bitstrings, counts)):
+      self.assertEqual(tf.shape(test_samples[i].to_tensor())[0], c)
+      for j in range(c):
+        self.assertAllEqual(test_samples[i][j], b)
+
+    flip_qnn = circuit_model.DirectQuantumCircuit(
+        cirq.Circuit(cirq.X(q) for q in raw_qubits), name="flip")
+    flip_infer = circuit_infer.QuantumInference(flip_qnn)
+    test_samples = flip_infer.sample(bitstrings, counts)
+    for i, (b, c) in enumerate(zip(bitstrings, counts)):
+      self.assertEqual(tf.shape(test_samples[i].to_tensor())[0], c)
+      for j in range(c):
+        self.assertAllEqual(
+            test_samples[i][j],
+            tf.cast(tf.math.logical_not(tf.cast(b, tf.bool)), tf.int8))
+
+    ghz_param = sympy.Symbol("ghz")
+    ghz_circuit = cirq.Circuit(cirq.X(
+        raw_qubits[0])**ghz_param) + cirq.Circuit(
+            cirq.CNOT(q0, q1)
+            for q0, q1 in zip(raw_qubits, raw_qubits[1:]))
+    ghz_qnn = circuit_model.DirectQuantumCircuit(
+        ghz_circuit,
+        initializer=tf.keras.initializers.Constant(value=0.5),
+        name="ghz")
+    ghz_infer = circuit_infer.QuantumInference(ghz_qnn)
+    test_samples = ghz_infer.sample(
+        tf.expand_dims(tf.constant([0] * num_qubits, dtype=tf.int8), 0),
+        tf.expand_dims(counts[0], 0))[0].to_tensor()
+    # Both |0...0> and |1...1> should be among the measured bitstrings
+    self.assertTrue(
+        test_util.check_bitstring_exists(
+            tf.constant([0] * num_qubits, dtype=tf.int8), test_samples))
+    self.assertTrue(
+        test_util.check_bitstring_exists(
+            tf.constant([1] * num_qubits, dtype=tf.int8), test_samples))
+
+  def test_sample_uneven(self):
+    """Check for discrepancy in samples when count entries differ."""
+    max_counts = int(1e7)
+    counts = tf.constant([max_counts // 2, max_counts])
+    test_qnn = circuit_model.DirectQuantumCircuit(cirq.Circuit(cirq.H(cirq.GridQubit(0, 0))))
+    test_infer = circuit_infer.QuantumInference(test_qnn)
+    bitstrings = tf.constant([[0], [0]], dtype=tf.int8)
+    samples, samples_counts = test_infer.sample(bitstrings, counts)
+    # QNN samples should be half 0 and half 1.
+    self.assertAllClose(
+        samples_counts[0], samples_counts[1], atol=max_counts // 1000)
+
 
 if __name__ == "__main__":
   logging.info("Running circuit_infer_test.py ...")

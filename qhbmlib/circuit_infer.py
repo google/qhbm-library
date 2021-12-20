@@ -47,6 +47,7 @@ class QuantumInference(tf.keras.layers.Layer):
     self.qnn = qnn
     self._differentiator = differentiator
     self._backend = backend
+    self._sample_layer = tfq.layers.Sample(backend=backend)
     if backend == "noiseless":
       self._expectation_layer = tfq.layers.Expectation(
           backend=backend, differentiator=differentiator)
@@ -127,7 +128,7 @@ class QuantumInference(tf.keras.layers.Layer):
       return tf.reduce_sum(tf.transpose(probs * tf.transpose(expectations)), 0)
     return expectations
 
-  def sample(self, initial_states, counts, reduce=True):
+  def sample(self, initial_states, counts):
     """Returns bitstring samples from the QNN.
 
       Args:
@@ -142,16 +143,18 @@ class QuantumInference(tf.keras.layers.Layer):
           `(self.qnn)|initial_states[i]>`.
     """
     circuits = self.qnn(initial_states)
-    return self._sample_function(
-        circuits, counts, mask=mask, reduce=reduce, unique=unique)
+    num_circuits = tf.shape(circuits)[0]
+    tiled_values = tf.tile(
+        tf.expand_dims(self.qnn.symbol_values, 0), [num_circuits, 1])
     samples = self._sample_layer(
-        circuits, repetitions=tf.expand_dims(tf.math.reduce_max(counts), 0))
+        circuits,
+        symbol_names=self.qnn.symbol_names,
+        symbol_values=tiled_values,
+        repetitions=tf.expand_dims(tf.math.reduce_max(counts), 0))
     num_samples_mask = tf.cast((tf.ragged.range(counts) + 1).to_tensor(),
                                tf.bool)
     num_samples_mask = tf.map_fn(tf.random.shuffle, num_samples_mask)
     samples = tf.ragged.boolean_mask(samples, num_samples_mask)
-    if reduce:
-      return samples.values.to_tensor()
     return samples
 
   def call(self, initial_states, counts, operators, reduce=True):
