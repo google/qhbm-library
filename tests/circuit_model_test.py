@@ -104,6 +104,55 @@ class DirectQuantumCircuitTest(tf.test.TestCase):
     self.assertAllEqual(tfq.from_tensor(actual_qnn.inverse_pqc), tfq.from_tensor(tfq.convert_to_tensor([expected_pqc ** -1])))
 
 
+class DirectQuantumCircuitTest(tf.test.TestCase):
+  """Tests the DirectQuantumCircuit class."""
+
+  def test_init(self):
+    """Tests initialization."""
+    num_qubits = 3
+    qubits = cirq.GridQubit.rect(1, num_qubits)
+    classical_h_terms = [cirq.Z(q0) * cirq.Z(q1) for q0, q1 in zip(qubits, qubits[1:])]
+    x_terms = cirq.PauliSum()
+    y_terms = cirq.PauliSum()
+    for q in qubits:
+      x_terms += cirq.X(q)
+      y_terms += cirq.Y(q)
+    quantum_h_terms = [x_terms, y_terms]
+
+    num_layers = 2
+    expected_symbol_names = []
+    expected_pqc = cirq.Circuit()
+    for p in range(num_layers):
+      for k, q in enumerate(quantum_h_terms):
+        symbol_name = f"gamma_{p}_{k}"
+        expected_symbol_names.append(symbol_name)
+        expected_pqc += tfq.util.exponential([q], [symbol_name])
+      for k, c in enumerate(classical_h_terms):
+        symbol_name = f"eta_{p}_{k}"
+        expected_symbol_names.append(symbol_name)
+        expected_pqc += tfq.util.exponential([c], [symbol_name])
+
+    eta_const = random.uniform(-1, 1)
+    theta_const = random.uniform(-1, 1)
+    gamma_const = random.uniform(-1, 1)
+    expected_value_layers_inputs = [
+      tf.Variable([eta_const] * num_layers),
+      tf.Variable([theta_const] * len(classical_h_terms)),
+      tf.Variable([gamma_const] * len(quantum_h_terms) * num_layers)
+    ]
+    expected_symbol_values = tf.constant([eta_const * theta_const] * num_layers * len(classical_h_terms) + [gamma_const] * num_layers * len(quantum_h_terms))
+    actual_qnn = circuit_model.QAIA(quantum_h_terms, classical_h_terms, num_layers)
+    self.assertAllEqual(actual_qnn.qubits, expected_qubits)
+    self.assertAllEqual(actual_qnn.symbol_names, expected_symbol_names)
+    self.assertAllEqual(tfq.from_tensor(actual_qnn.pqc), tfq.from_tensor(tfq.convert_to_tensor([expected_pqc])))
+    self.assertAllEqual(tfq.from_tensor(actual_qnn.inverse_pqc), tfq.from_tensor(tfq.convert_to_tensor([expected_pqc ** -1])))
+
+    actual_qnn.value_layers_inputs[0].assign([eta_const] * num_layers)
+    actual_qnn.value_layers_inputs[1].assign([theta_const] * len(classical_h_terms))
+    actual_qnn.value_layers_inputs[2].assign([gamma_const] * len(quantum_h_terms) * num_layers)
+    self.assertAllClose(actual_qnn.value_layers_inputs, expected_value_layers_inputs)
+    self.assertAllClose(actual_qnn.symbol_values, expected_symbol_values)
+
 if __name__ == "__main__":
   logging.info("Running circuit_model_test.py ...")
   tf.test.main()
