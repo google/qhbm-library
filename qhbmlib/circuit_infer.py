@@ -24,7 +24,7 @@ import tensorflow_quantum as tfq
 from qhbmlib import circuit_model
 
 
-class QuantumInferenceLayer(tf.keras.layers.Layer):
+class QuantumInference(tf.keras.layers.Layer):
   """Methods for inference on QuantumCircuit objects."""
 
   def __init__(self,
@@ -33,7 +33,7 @@ class QuantumInferenceLayer(tf.keras.layers.Layer):
                differentiator: Union[None,
                                      tfq.differentiators.Differentiator] = None,
                name: Union[None, str] = None):
-    """Initialize a QuantumInferenceLayer.
+    """Initialize a QuantumInference layer.
 
     Args:
       qnn: The parameterized quantum circuit on which to do inference.
@@ -43,8 +43,10 @@ class QuantumInferenceLayer(tf.keras.layers.Layer):
       differentiator: Specifies how to take the derivative of a quantum circuit.
       name: Identifier for this inference engine.
     """
+    super().__init__(name=name)
     self.qnn = qnn
     self._differentiator = differentiator
+    self._backend = backend
     if backend == "noiseless":
       self._expectation_layer = tfq.layers.Expectation(
           backend=backend, differentiator=differentiator)
@@ -57,7 +59,6 @@ class QuantumInferenceLayer(tf.keras.layers.Layer):
             symbol_values=symbol_values,
             operators=operators)
     else:
-      self._backend = backend
       self._expectation_layer = tfq.layers.SampledExpectation(
           backend=backend, differentiator=differentiator)
 
@@ -70,7 +71,6 @@ class QuantumInferenceLayer(tf.keras.layers.Layer):
             operators=operators,
             repetitions=repetitions,
         )
-
     self._expectation_function = _expectation_function
 
   @property

@@ -35,78 +35,29 @@ ATOL = 1e-5
 GRAD_ATOL = 2e-4
 
 
-class BitstringInjectorTest(tf.test.TestCase):
-  """Tests BitstringInjector."""
+class QuantumInferenceTest(tf.test.TestCase):
+  """Tests the QuantumInference class."""
 
   def test_init(self):
-    """Confirm correct bit injector circuit creation."""
-    expected_qubits = [
-        cirq.GridQubit(0, 2),
-        cirq.GridQubit(1, 4),
-        cirq.GridQubit(2, 2)
-    ]
-    expected_name = "build_bit_test"
-    actual_bit_injector = circuit_infer.BitstringInjector(
-        expected_qubits, expected_name)
-    raw_symbols = [
-        "build_bit_test_bit_0", "build_bit_test_bit_1", "build_bit_test_bit_2"
-    ]
-    expected_symbols = tf.constant(raw_symbols)
-    expected_circuit = tfq.convert_to_tensor([
-        cirq.Circuit([
-            cirq.X(q)**sympy.Symbol(s)
-            for q, s in zip(expected_qubits, raw_symbols)
-        ])
-    ])
-    self.assertAllEqual(actual_bit_injector.qubits, expected_qubits)
-    self.assertAllEqual(actual_bit_injector.bit_symbols, expected_symbols)
-    self.assertEqual(
-        tfq.from_tensor(actual_bit_injector.bit_circuit),
-        tfq.from_tensor(expected_circuit))
-
-  def test_inject_bitstrings(self):
-    """Confirms correct combination of bits and circuits."""
-    num_qubits = 5
-    qubits = cirq.GridQubit.rect(1, num_qubits)
-    actual_bit_injector = circuit_infer.BitstringInjector(qubits)
-
-    test_pqcs, _ = tfq.util.random_circuit_resolver_batch(qubits, 1)
-    test_qnn = circuit_model.DirectQuantumCircuit(test_pqcs[0])
-
-    bitstrings = 2 * list(itertools.product([0, 1], repeat=num_qubits))
-    bit_injectors = []
-    for b in bitstrings:
-      bit_injectors.append(
-          cirq.Circuit(cirq.X(q)**b_i for q, b_i in zip(qubits, b)))
-    expected_circuits = tfq.convert_to_tensor(
-        [b + test_pqcs[0] for b in bit_injectors])
-
-    actual_circuits = actual_bit_injector(bitstrings, test_qnn)
-    self.assertAllEqual(
-        tfq.from_tensor(actual_circuits), tfq.from_tensor(expected_circuits))
-
-
-class ExpectationTest(tf.test.TestCase):
-  """Tests the Expectation class."""
-
-  def test_init(self):
-    """Confirms Expectation is initialized correctly."""
-    expected_qubits = cirq.GridQubit.rect(1, 100)
+    """Confirms QuantumInference is initialized correctly."""
+    qubits = cirq.GridQubit.rect(1, 100)
+    pqc = cirq.Circuit(cirq.X(q) ** sympy.Symbol(f"s_{n}") for n, q in enumerate(qubits))
+    expected_qnn = circuit_model.DirectQuantumCircuit(pqc)
     expected_backend = "noiseless"
     expected_differentiator = None
     expected_name = "TestOE"
-    actual_exp = circuit_infer.Expectation(
-        expected_qubits,
+    actual_exp = circuit_infer.QuantumInference(
+        expected_qnn,
         backend=expected_backend,
         differentiator=expected_differentiator,
         name=expected_name)
-    self.assertAllEqual(actual_exp.qubits, expected_qubits)
+    self.assertEqual(actual_exp.qnn, expected_qnn)
     self.assertEqual(actual_exp.name, expected_name)
     self.assertEqual(actual_exp.backend, expected_backend)
     self.assertEqual(actual_exp.differentiator, expected_differentiator)
 
   def test_expectation(self):
-    """Confirms basic correct expectation values and derivatives.
+    r"""Confirms basic correct expectation values and derivatives.
 
     Consider a circuit where each qubit has a gate X^p. Diagonalization of X is
         |0 1|   |-1 1||-1 0||-1/2 1/2|
@@ -143,11 +94,10 @@ class ExpectationTest(tf.test.TestCase):
     d/dp <s|(X^p)^dagger Y X^p|s> = -(-1)^s pi cos(pi * p)
     d/dp <s|(X^p)^dagger Z X^p|s> = -(-1)^s pi sin(pi * p)
     """
-    num_qubits = 5
-    qubits = cirq.GridQubit.rect(1, num_qubits)
-    exp_infer = circuit_infer.Expectation(qubits)
 
     # Build QNN representing X^p|s>
+    num_qubits = 5
+    qubits = cirq.GridQubit.rect(1, num_qubits)
     p_param = sympy.Symbol("p")
     p_circuit = cirq.Circuit(cirq.X(q)**p_param for q in qubits)
     p_qnn = circuit_model.DirectQuantumCircuit(
@@ -155,6 +105,9 @@ class ExpectationTest(tf.test.TestCase):
         initializer=tf.keras.initializers.RandomUniform(
             minval=-5.0, maxval=5.0),
         name="p_qnn")
+
+    # Build inference object
+    exp_infer = circuit_infer.QuantumInference(p_qnn)
 
     # Choose some bitstrings.
     num_bitstrings = 10
@@ -187,8 +140,8 @@ class ExpectationTest(tf.test.TestCase):
         expected_y_exps_grad,
         expected_z_exps_grad,
     ]
-    sin_pi_p = math.sin(math.pi * p_qnn.values[0])
-    cos_pi_p = math.cos(math.pi * p_qnn.values[0])
+    sin_pi_p = math.sin(math.pi * p_qnn.symbol_values[0])
+    cos_pi_p = math.cos(math.pi * p_qnn.symbol_values[0])
     for bits in bitstrings_raw:
       for exps in expected + expected_grad:
         exps.append([])
@@ -219,9 +172,9 @@ class ExpectationTest(tf.test.TestCase):
     with tf.GradientTape(persistent=True) as tape:
       actual_exps = []
       for op in all_ops:
-        actual_exps.append(exp_infer.expectation(p_qnn, bitstrings, counts, op))
+        actual_exps.append(exp_infer.expectation(bitstrings, counts, op))
     actual_exps_grad = [
-        tf.squeeze(tape.jacobian(exps, p_qnn.values)) for exps in actual_exps
+        tf.squeeze(tape.jacobian(exps, p_qnn.trainable_variables)) for exps in actual_exps
     ]
     del (tape)
     for a, e in zip(actual_exps, expected_reduced):
@@ -234,9 +187,9 @@ class ExpectationTest(tf.test.TestCase):
       actual_exps = []
       for op in all_ops:
         actual_exps.append(
-            exp_infer.expectation(p_qnn, bitstrings, counts, op, reduce=False))
+            exp_infer.expectation(bitstrings, counts, op, reduce=False))
     actual_exps_grad = [
-        tf.squeeze(tape.jacobian(exps, p_qnn.values)) for exps in actual_exps
+        tf.squeeze(tape.jacobian(exps, p_qnn.trainable_variables)) for exps in actual_exps
     ]
     del (tape)
     for a, e in zip(actual_exps, expected):
