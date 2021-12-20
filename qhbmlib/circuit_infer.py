@@ -72,6 +72,7 @@ class QuantumInference(tf.keras.layers.Layer):
             operators=operators,
             repetitions=repetitions,
         )
+
     self._expectation_function = _expectation_function
 
   @property

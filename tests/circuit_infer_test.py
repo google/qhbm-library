@@ -41,7 +41,8 @@ class QuantumInferenceTest(tf.test.TestCase):
   def test_init(self):
     """Confirms QuantumInference is initialized correctly."""
     qubits = cirq.GridQubit.rect(1, 100)
-    pqc = cirq.Circuit(cirq.X(q) ** sympy.Symbol(f"s_{n}") for n, q in enumerate(qubits))
+    pqc = cirq.Circuit(
+        cirq.X(q)**sympy.Symbol(f"s_{n}") for n, q in enumerate(qubits))
     expected_qnn = circuit_model.DirectQuantumCircuit(pqc)
     expected_backend = "noiseless"
     expected_differentiator = None
@@ -174,7 +175,8 @@ class QuantumInferenceTest(tf.test.TestCase):
       for op in all_ops:
         actual_exps.append(exp_infer.expectation(bitstrings, counts, op))
     actual_exps_grad = [
-        tf.squeeze(tape.jacobian(exps, p_qnn.trainable_variables)) for exps in actual_exps
+        tf.squeeze(tape.jacobian(exps, p_qnn.trainable_variables))
+        for exps in actual_exps
     ]
     del (tape)
     for a, e in zip(actual_exps, expected_reduced):
@@ -189,7 +191,8 @@ class QuantumInferenceTest(tf.test.TestCase):
         actual_exps.append(
             exp_infer.expectation(bitstrings, counts, op, reduce=False))
     actual_exps_grad = [
-        tf.squeeze(tape.jacobian(exps, p_qnn.trainable_variables)) for exps in actual_exps
+        tf.squeeze(tape.jacobian(exps, p_qnn.trainable_variables))
+        for exps in actual_exps
     ]
     del (tape)
     for a, e in zip(actual_exps, expected):
@@ -229,10 +232,8 @@ class QuantumInferenceTest(tf.test.TestCase):
             tf.cast(tf.math.logical_not(tf.cast(b, tf.bool)), tf.int8))
 
     ghz_param = sympy.Symbol("ghz")
-    ghz_circuit = cirq.Circuit(cirq.X(
-        raw_qubits[0])**ghz_param) + cirq.Circuit(
-            cirq.CNOT(q0, q1)
-            for q0, q1 in zip(raw_qubits, raw_qubits[1:]))
+    ghz_circuit = cirq.Circuit(cirq.X(raw_qubits[0])**ghz_param) + cirq.Circuit(
+        cirq.CNOT(q0, q1) for q0, q1 in zip(raw_qubits, raw_qubits[1:]))
     ghz_qnn = circuit_model.DirectQuantumCircuit(
         ghz_circuit,
         initializer=tf.keras.initializers.Constant(value=0.5),
@@ -253,7 +254,8 @@ class QuantumInferenceTest(tf.test.TestCase):
     """Check for discrepancy in samples when count entries differ."""
     max_counts = int(1e7)
     counts = tf.constant([max_counts // 2, max_counts])
-    test_qnn = circuit_model.DirectQuantumCircuit(cirq.Circuit(cirq.H(cirq.GridQubit(0, 0))))
+    test_qnn = circuit_model.DirectQuantumCircuit(
+        cirq.Circuit(cirq.H(cirq.GridQubit(0, 0))))
     test_infer = circuit_infer.QuantumInference(test_qnn)
     bitstrings = tf.constant([[0], [0]], dtype=tf.int8)
     samples, samples_counts = test_infer.sample(bitstrings, counts)
