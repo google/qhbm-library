@@ -1,4 +1,3 @@
-# pylint: skip-file
 # Copyright 2021 The QHBM Library Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -38,6 +37,10 @@ def qmhl(qhbm_model, target_circuits, target_counts):
 
   @tf.custom_gradient
   def loss(trainable_variables):
+    # We use `qhbm_model.ebm.trainable_variables` and
+    # `qhbm_model.qnn.trainable_variables` instead
+    del trainable_variables
+
     # log_partition estimate
 
     if qhbm_model.ebm.is_analytic:
