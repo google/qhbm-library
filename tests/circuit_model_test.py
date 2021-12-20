@@ -19,7 +19,6 @@ import itertools
 import random
 
 import cirq
-import numpy as np
 import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
@@ -120,7 +119,8 @@ class QAIATest(tf.test.TestCase):
     num_qubits = 3
     expected_qubits = cirq.GridQubit.rect(1, num_qubits)
     classical_h_terms = [
-        cirq.Z(q0) * cirq.Z(q1) for q0, q1 in zip(expected_qubits, expected_qubits[1:])
+        cirq.Z(q0) * cirq.Z(q1)
+        for q0, q1 in zip(expected_qubits, expected_qubits[1:])
     ]
     x_terms = cirq.PauliSum()
     y_terms = cirq.PauliSum()
@@ -151,8 +151,9 @@ class QAIATest(tf.test.TestCase):
         tf.Variable([[gamma_const] * len(quantum_h_terms)] * num_layers)
     ]
     expected_symbol_values = [
-      ([eta_const * theta_const] * len(classical_h_terms)) +
-      ([gamma_const] * len(quantum_h_terms))] * num_layers
+        ([eta_const * theta_const] * len(classical_h_terms)) +
+        ([gamma_const] * len(quantum_h_terms))
+    ] * num_layers
     actual_qnn = circuit_model.QAIA(quantum_h_terms, classical_h_terms,
                                     num_layers)
     self.assertAllEqual(actual_qnn.qubits, expected_qubits)
@@ -167,8 +168,8 @@ class QAIATest(tf.test.TestCase):
     actual_qnn.value_layers_inputs[0].assign([eta_const] * num_layers)
     actual_qnn.value_layers_inputs[1].assign([theta_const] *
                                              len(classical_h_terms))
-    actual_qnn.value_layers_inputs[2].assign([[gamma_const] *
-                                             len(quantum_h_terms)] * num_layers)
+    actual_qnn.value_layers_inputs[2].assign(
+        [[gamma_const] * len(quantum_h_terms)] * num_layers)
     self.assertAllClose(actual_qnn.value_layers_inputs,
                         expected_value_layers_inputs)
     self.assertAllClose(actual_qnn.symbol_values, expected_symbol_values)

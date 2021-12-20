@@ -20,10 +20,8 @@ from absl import logging
 
 import cirq
 import math
-import numpy as np
 import sympy
 import tensorflow as tf
-import tensorflow_probability as tfp
 import tensorflow_quantum as tfq
 
 from qhbmlib import circuit_infer
@@ -121,8 +119,7 @@ class QuantumInferenceTest(tf.test.TestCase):
         else:
           bitstrings_raw[-1].append(1)
     bitstrings = tf.constant(bitstrings_raw, dtype=tf.int8)
-    counts = tf.random.uniform(
-        shape=[num_bitstrings], minval=1, maxval=1000, dtype=tf.int32)
+    counts = tf.random.uniform([num_bitstrings], 1, 1000, tf.int32)
 
     # Get true expectation values based on the bitstrings.
     expected_x_exps = []
@@ -178,7 +175,7 @@ class QuantumInferenceTest(tf.test.TestCase):
         tf.squeeze(tape.jacobian(exps, p_qnn.trainable_variables))
         for exps in actual_exps
     ]
-    del (tape)
+    del tape
     for a, e in zip(actual_exps, expected_reduced):
       self.assertAllClose(a, e, atol=ATOL)
     for a, e in zip(actual_exps_grad, expected_grad_reduced):
@@ -194,7 +191,7 @@ class QuantumInferenceTest(tf.test.TestCase):
         tf.squeeze(tape.jacobian(exps, p_qnn.trainable_variables))
         for exps in actual_exps
     ]
-    del (tape)
+    del tape
     for a, e in zip(actual_exps, expected):
       self.assertAllClose(a, e, atol=ATOL)
     for a, e in zip(actual_exps_grad, expected_grad):
@@ -206,10 +203,7 @@ class QuantumInferenceTest(tf.test.TestCase):
     raw_qubits = cirq.GridQubit.rect(1, num_qubits)
     bitstrings = tf.constant(
         list(itertools.product([0, 1], repeat=num_qubits)), dtype=tf.int8)
-    counts = tf.random.uniform([tf.shape(bitstrings)[0]],
-                               minval=10,
-                               maxval=100,
-                               dtype=tf.int32)
+    counts = tf.random.uniform([tf.shape(bitstrings)[0]], 10, 100, tf.int32)
 
     ident_qnn = circuit_model.DirectQuantumCircuit(
         cirq.Circuit(cirq.I(q) for q in raw_qubits), name="identity")
@@ -258,7 +252,7 @@ class QuantumInferenceTest(tf.test.TestCase):
         cirq.Circuit(cirq.H(cirq.GridQubit(0, 0))))
     test_infer = circuit_infer.QuantumInference(test_qnn)
     bitstrings = tf.constant([[0], [0]], dtype=tf.int8)
-    samples, samples_counts = test_infer.sample(bitstrings, counts)
+    _, samples_counts = test_infer.sample(bitstrings, counts)
     # QNN samples should be half 0 and half 1.
     self.assertAllClose(
         samples_counts[0], samples_counts[1], atol=max_counts // 1000)

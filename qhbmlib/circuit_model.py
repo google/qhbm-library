@@ -236,7 +236,8 @@ class QAIA(QuantumCircuit):
     def embed_params(inputs):
       """Tiles up the variables to properly tie QAIA parameters."""
       exp_etas = tf.expand_dims(inputs[0], 1)
-      tiled_thetas = tf.tile(tf.expand_dims(inputs[1], 0), [tf.shape(inputs[0])[0], 1])
+      tiled_thetas = tf.tile(
+          tf.expand_dims(inputs[1], 0), [tf.shape(inputs[0])[0], 1])
       classical_params = exp_etas * tiled_thetas
       return tf.concat([classical_params, inputs[2]], 1)
 
