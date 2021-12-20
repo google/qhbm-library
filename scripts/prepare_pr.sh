@@ -17,4 +17,9 @@
 poetry run yapf --in-place --recursive qhbmlib/
 poetry run yapf --in-place --recursive tests/
 ./scripts/check_lint.sh
+retval=$?
+if [ "$retval" == 1 ]
+then
+  exit 1
+fi
 poetry run pytest --cov .

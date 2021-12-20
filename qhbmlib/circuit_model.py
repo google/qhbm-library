@@ -61,17 +61,19 @@ class QuantumCircuit(tf.keras.layers.Layer):
     self._inverse_pqc = tfq.convert_to_tensor([pqc**-1])
 
     raw_bit_circuit = circuit_model_utils.bit_circuit(self.qubits)
-    bit_symbol_names = list(sorted(tfq.util.get_circuit_symbols(raw_bit_circuit)))
+    bit_symbol_names = list(
+        sorted(tfq.util.get_circuit_symbols(raw_bit_circuit)))
     self._bit_symbol_names = tf.constant([str(x) for x in bit_symbol_names])
     self._bit_circuit = tfq.convert_to_tensor([raw_bit_circuit])
 
   @property
   def qubits(self):
+    """Sorted list of the qubits on which this circuit acts."""
     return self._qubits
 
   @property
   def symbol_names(self):
-    """1D `tf.Tensor` of strings which are the free parameters of the circuit"""
+    """1D tensor of strings which are the free parameters of the circuit."""
     return self._symbol_names
 
   @property
@@ -90,14 +92,14 @@ class QuantumCircuit(tf.keras.layers.Layer):
     This property (and `value_layers_inputs`) is where the caller would access
     model weights to be updated from a secondary model or hypernetwork.
     """
-  return self._value_layers
+    return self._value_layers
 
   @property
   def symbol_values(self):
     """1D `tf.Tensor` of floats specifying the current values of the parameters.
 
-    This should be structured such that `self.values[i]` is the current value of
-    `self.symbol_names[i]` in `self.pqc` and `self.inverse_pqc`.
+    This should be structured such that `self.symbol_values[i]` is the current
+    value of `self.symbol_names[i]` in `self.pqc` and `self.inverse_pqc`.
     """
     x = self._value_layers_inputs
     for layer in self._value_layers:
@@ -106,10 +108,12 @@ class QuantumCircuit(tf.keras.layers.Layer):
 
   @property
   def pqc(self):
+    """TFQ tensor representation of the parameterized unitary circuit."""
     return self._pqc
 
   @property
   def inverse_pqc(self):
+    """Inverse of `self.pqc`."""
     return self._inverse_pqc
 
   def build(self, unused):
@@ -118,8 +122,11 @@ class QuantumCircuit(tf.keras.layers.Layer):
     The input shape is unused because it is known to be the shape of
     `self._value_layers_inputs`.
     """
-    x = [tf.shape(t) for t in self._value_layers_inputs]
-    for layer in self._energy_layers:
+    if isinstance(self.value_layers_inputs, list):
+      x = [tf.shape(t) for t in self._value_layers_inputs]
+    else:
+      x = tf.shape(self.value_layers_inputs)
+    for layer in self._value_layers:
       x = layer.compute_output_shape(x)
 
   def call(self, inputs):
@@ -151,7 +158,8 @@ class DirectQuantumCircuit(QuantumCircuit):
       name: Optional name for the model.
     """
     raw_symbol_names = list(sorted(tfq.util.get_circuit_symbols(pqc)))
-    symbol_names = tf.constant([str(x) for x in raw_symbol_names], dtype=tf.string)
+    symbol_names = tf.constant([str(x) for x in raw_symbol_names],
+                               dtype=tf.string)
     values = tf.Variable(initializer(shape=[len(raw_symbol_names)]))
     super().__init__(pqc, symbol_names, values, [])
 

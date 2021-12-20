@@ -32,7 +32,7 @@ class QuantumCircuitTest(tf.test.TestCase):
     """Tests initialization and correct outputs on call."""
     num_qubits = 5
     raw_symbols = [sympy.Symbol("s0"), sympy.Symbol("s1")]
-    expected_symbols = tf.constant([str(s) for s in raw_symbols])
+    expected_symbol_names = tf.constant([str(s) for s in raw_symbols])
     expected_qubits = cirq.GridQubit.rect(1, num_qubits)
     pqc = cirq.Circuit()
     for s in raw_symbols:
@@ -43,18 +43,18 @@ class QuantumCircuitTest(tf.test.TestCase):
     expected_pqc = tfq.convert_to_tensor([pqc])
     expected_inverse_pqc = tfq.convert_to_tensor([inverse_pqc])
     expected_name = "TestOE"
-    initial_values = tf.random.uniform([1, 42])
+    initial_values = tf.Variable(tf.random.uniform([1, 42]))
     value_layer_0 = tf.keras.layers.Dense(5)
     value_layer_1 = tf.keras.layers.Dense(len(raw_symbols))
     value_layer_2 = tf.keras.layers.Lambda(lambda x: tf.squeeze(x, 0))
-    expected_values = value_layer_2(
+    expected_symbol_values = value_layer_2(
         value_layer_1(value_layer_0(initial_values)))
     actual_layer = circuit_model.QuantumCircuit(
-        pqc, expected_symbols, initial_values,
+        pqc, expected_symbol_names, initial_values,
         [value_layer_0, value_layer_1, value_layer_2], expected_name)
     self.assertAllEqual(actual_layer.qubits, expected_qubits)
-    self.assertAllEqual(actual_layer.symbols, expected_symbols)
-    self.assertAllEqual(actual_layer.values, expected_values)
+    self.assertAllEqual(actual_layer.symbol_names, expected_symbol_names)
+    self.assertAllEqual(actual_layer.symbol_values, expected_symbol_values)
     self.assertAllEqual(
         tfq.from_tensor(actual_layer.pqc), tfq.from_tensor(expected_pqc))
     self.assertAllEqual(

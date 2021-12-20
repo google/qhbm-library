@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tools for inference on quantum circuits."""
+"""Tools for inference on quantum circuits represented by QuantumCircuit."""
 
 from typing import List, Union
 
@@ -25,13 +25,14 @@ from qhbmlib import circuit_model
 
 
 class QuantumInferenceLayer(tf.keras.layers.Layer):
-  """Methods for inference on QuantumCircuit objecst."""
+  """Methods for inference on QuantumCircuit objects."""
 
   def __init__(self,
                qnn: circuit_model.QuantumCircuit,
-               backend: Union[str, cirq.Sampler]="noiseless",
-               differentiator: Union[None, tfq.differentiators.Differentiator]=None,
-               name: Union[None, str]=None):
+               backend: Union[str, cirq.Sampler] = "noiseless",
+               differentiator: Union[None,
+                                     tfq.differentiators.Differentiator] = None,
+               name: Union[None, str] = None):
     """Initialize a QuantumInferenceLayer.
 
     Args:
@@ -42,7 +43,7 @@ class QuantumInferenceLayer(tf.keras.layers.Layer):
       differentiator: Specifies how to take the derivative of a quantum circuit.
       name: Identifier for this inference engine.
     """
-    self.qnn = 
+    self.qnn = qnn
     self._differentiator = differentiator
     if backend == "noiseless":
       self._expectation_layer = tfq.layers.Expectation(
@@ -108,15 +109,14 @@ class QuantumInferenceLayer(tf.keras.layers.Layer):
         unaveraged expectation values of each `operator` against each `circuit`.
       """
     circuits = self.qnn(initial_states)
-    symbol_names = self.qnn.symbols
-    symbol_values = self.qnn.values
     num_circuits = tf.shape(circuits)[0]
     num_operators = tf.shape(operators)[0]
-    tiled_values = tf.tile(tf.expand_dims(symbol_values, 0), [num_circuits, 1])
+    tiled_values = tf.tile(
+        tf.expand_dims(self.qnn.symbol_values, 0), [num_circuits, 1])
     tiled_operators = tf.tile(tf.expand_dims(operators, 0), [num_circuits, 1])
     expectations = self._expectation_function(
         circuits,
-        symbol_names,
+        self.qnn.symbol_names,
         tiled_values,
         tiled_operators,
         tf.tile(tf.expand_dims(counts, 1), [1, num_operators]),
@@ -153,7 +153,6 @@ class QuantumInferenceLayer(tf.keras.layers.Layer):
     if reduce:
       return samples.values.to_tensor()
     return samples
-  
+
   def call(self, initial_states, counts, operators, reduce=True):
     return expectation(initial_states, counts, operators, reduce=reduce)
-
