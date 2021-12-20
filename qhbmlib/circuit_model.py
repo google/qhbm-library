@@ -30,19 +30,30 @@ class QuantumCircuit(tf.keras.layers.Layer):
 
   def __init__(self,
                pqc: cirq.Circuit,
-               symbols: tf.Tensor,
+               symbol_names: tf.Tensor,
                value_layers_inputs: Union[tf.Variable, List[tf.Variable]],
                value_layers: List[tf.keras.layers.Layer],
                name: Union[None, str] = None):
+    """Initializes a QuantumCircuit.
+
+    Args:
+      pqc: Representation of a parameterized quantum circuit.
+      symbol_names: Strings which are used to specify the order in which the
+        values in `self.symbol_values` should be placed inside of the circuit.
+      value_layers_inputs: Inputs to the `value_layers` argument.
+      value_layers: Concatenation of these layers yields trainable map from
+        `value_layers_inputs` to the values to substitute into the circuit.
+      name: Optional name for the model.
+    """
     super().__init__(name=name)
 
     if set(tfq.util.get_circuit_symbols(pqc)) != {
-        s.decode("utf-8") for s in symbols.numpy()
+        s.decode("utf-8") for s in symbol_names.numpy()
     }:
       raise ValueError(
-          "`pqc` must contain exactly the parameters in `symbols`.")
+          "`pqc` must contain exactly the parameters in `symbol_names`.")
     self._qubits = sorted(pqc.all_qubits())
-    self._symbols = symbols
+    self._symbol_names = symbol_names
     self._value_layers = value_layers
     self._value_layers_inputs = value_layers_inputs
 
@@ -50,8 +61,8 @@ class QuantumCircuit(tf.keras.layers.Layer):
     self._inverse_pqc = tfq.convert_to_tensor([pqc**-1])
 
     raw_bit_circuit = circuit_model_utils.bit_circuit(self.qubits)
-    bit_symbols = list(sorted(tfq.util.get_circuit_symbols(raw_bit_circuit)))
-    self._bit_symbols = tf.constant([str(x) for x in bit_symbols])
+    bit_symbol_names = list(sorted(tfq.util.get_circuit_symbols(raw_bit_circuit)))
+    self._bit_symbol_names = tf.constant([str(x) for x in bit_symbol_names])
     self._bit_circuit = tfq.convert_to_tensor([raw_bit_circuit])
 
   @property
@@ -59,25 +70,34 @@ class QuantumCircuit(tf.keras.layers.Layer):
     return self._qubits
 
   @property
-  def symbols(self):
-    """1D `tf.Tensor` of strings which are the parameters of circuit."""
-    return self._symbols
+  def symbol_names(self):
+    """1D `tf.Tensor` of strings which are the free parameters of the circuit"""
+    return self._symbol_names
+
+  @property
+  def value_layers_inputs(self):
+    """Variable or list of variables which are inputs to `value_layers`.
+
+    This property (and `value_layers`) is where the caller would access model
+    weights to be updated from a secondary model or hypernetwork.
+    """
+    return self._value_layers_inputs
 
   @property
   def value_layers(self):
     """List of Keras layers which calculate the current parameter values.
 
-    This list of layers is where the caller would access model weights to be
-    updated from a secondary model or hypernetwork.
+    This property (and `value_layers_inputs`) is where the caller would access
+    model weights to be updated from a secondary model or hypernetwork.
     """
   return self._value_layers
-  
+
   @property
-  def values(self):
+  def symbol_values(self):
     """1D `tf.Tensor` of floats specifying the current values of the parameters.
 
     This should be structured such that `self.values[i]` is the current value of
-    `self.symbols[i]` in `self.pqc` and `self.inverse_pqc`.
+    `self.symbol_names[i]` in `self.pqc` and `self.inverse_pqc`.
     """
     x = self._value_layers_inputs
     for layer in self._value_layers:
@@ -101,12 +121,12 @@ class QuantumCircuit(tf.keras.layers.Layer):
     x = [tf.shape(t) for t in self._value_layers_inputs]
     for layer in self._energy_layers:
       x = layer.compute_output_shape(x)
-  
+
   def call(self, inputs):
     """Inputs are bitstrings prepended as initial states to `self.pqc`."""
     num_bitstrings = tf.shape(inputs)[0]
     bit_circuits = tfq.resolve_parameters(
-        tf.tile(self._bit_circuit, [num_bitstrings]), self._bit_symbols,
+        tf.tile(self._bit_circuit, [num_bitstrings]), self._bit_symbol_names,
         tf.cast(inputs, tf.float32))
     pqcs = tf.tile(self.pqc, [num_bitstrings])
     return tfq.append_circuit(bit_circuits, pqcs)
@@ -127,18 +147,20 @@ class DirectQuantumCircuit(QuantumCircuit):
     Args:
       pqc: Representation of a parameterized quantum circuit.
       initializer: A `tf.keras.initializers.Initializer` which specifies how to
-        initialize the values of the parameters in `circuit`.  This argument is
-        ignored if `values` is not None.
-      name: Identifier for this DirectQuantumCircuit.
+        initialize the values of the parameters in `circuit`.
+      name: Optional name for the model.
     """
-    raw_symbols = list(sorted(tfq.util.get_circuit_symbols(pqc)))
-    symbols = tf.constant([str(x) for x in raw_symbols], dtype=tf.string)
-    values = tf.Variable(initializer(shape=[len(raw_symbols)]))
-    super().__init__(pqc, symbols, values, [])
+    raw_symbol_names = list(sorted(tfq.util.get_circuit_symbols(pqc)))
+    symbol_names = tf.constant([str(x) for x in raw_symbol_names], dtype=tf.string)
+    values = tf.Variable(initializer(shape=[len(raw_symbol_names)]))
+    super().__init__(pqc, symbol_names, values, [])
 
 
 class QAIA(QuantumCircuit):
-  """Quantum circuit defined by a classical energy and a Hamiltonian."""
+  """Quantum circuit defined by a classical energy and a Hamiltonian.
+
+  This circuit model is intended for use with VQT.
+  """
 
   def __init__(self,
                quantum_h_terms: List[cirq.PauliSum],
@@ -146,8 +168,38 @@ class QAIA(QuantumCircuit):
                num_layers: int,
                initializer=tf.keras.initializers.RandomUniform(0, 2 * np.pi),
                name=None):
-    """Initializes a QAIA."""
+    r"""Initializes a QAIA.
 
+    The ansatz is QAOA-like, with the exponential of the EBM ansatz in place
+    of the usual "problem Hamiltonian". Mathematically, it is represented as:
+    
+    $$\prod_{\ell=1}^P \left[
+        \left(
+          \prod_{\bm{b} \in \mathcal{B}_K}
+            e^{i\eta_\ell \theta_{\bm{b}}\bm{\hat{Z}}^{\bm{b}}}
+        \right)\left(
+          \prod_{r\in \mathcal{I}}
+            e^{i\gamma_{r\ell}\hat{H}_r}
+        \right)
+      \right],$$
+
+    where $\hat{H}_r$ is `quantum_h_terms`, $\bm{\hat{Z}}^{\bm{b}}$ is
+    `classical_h_terms`, and $P$ is `num_layers`.
+
+    # TODO(#119): add link to new version of the paper.
+    For further discussion, see the section "Physics-Inspired Architecture:
+    Quantum Adiabatic-Inspired Ansatz" in the QHBM paper.
+
+    Args:
+      quantum_h_terms: Non-commuting terms of the target thermal state
+        assumed in the QAIA ansatz.
+      classical_h_terms: Hamiltonian representation of the EBM chosen to model
+        the target thermal state.
+      num_layers: How many layers of the ansatz to apply.
+      initializer: A `tf.keras.initializers.Initializer` which specifies how to
+        initialize the values of the parameters in `circuit`.
+      name: Optional name for the model.
+    """
     quantum_symbols = []
     classical_symbols = []
     for j in range(num_layers):
@@ -164,7 +216,7 @@ class QAIA(QuantumCircuit):
       pqc += tfq.util.exponential(quantum_h_terms, coefficients=q_symb)
       pqc += tfq.util.exponential(classical_h_terms, coefficients=c_symb)
       flat_symbols.extend(q_symb + c_symb)
-    symbols = tf.constant(flat_symbols)
+    symbol_names = tf.constant(flat_symbols)
 
     value_layers_inputs = [
         tf.Variable(initializer(shape=[num_layers])),  # true etas
@@ -182,4 +234,4 @@ class QAIA(QuantumCircuit):
 
     value_layers = [tf.keras.layers.Lambda(embed_params)]
 
-    super().__init__(pqc, symbols, value_layers_inputs, value_layers)
+    super().__init__(pqc, symbol_names, value_layers_inputs, value_layers)
