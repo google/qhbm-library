@@ -30,56 +30,66 @@ from qhbmlib import utils
 class QuantumCircuitTest(tf.test.TestCase):
   """Tests the QuantumCircuit class."""
 
-  def test_init_and_call(self):
-    """Tests initialization and correct outputs on call."""
-    num_qubits = 5
+  def setUp(self):
+    """Initializes test objects."""
+    super().setUp()
+    self.num_qubits = 5
+    self.expected_qubits = cirq.GridQubit.rect(1, self.num_qubits)
     raw_symbols = [sympy.Symbol("s0"), sympy.Symbol("s1")]
-    expected_symbol_names = tf.constant([str(s) for s in raw_symbols])
-    expected_qubits = cirq.GridQubit.rect(1, num_qubits)
+    self.expected_symbol_names = tf.constant([str(s) for s in raw_symbols])
     pqc = cirq.Circuit()
     for s in raw_symbols:
-      for q in expected_qubits:
+      for q in self.expected_qubits:
         pqc += cirq.X(q)**s
         pqc += cirq.Z(q)**s
     inverse_pqc = pqc**-1
-    expected_pqc = tfq.convert_to_tensor([pqc])
-    expected_inverse_pqc = tfq.convert_to_tensor([inverse_pqc])
-    expected_name = "TestOE"
+    self.expected_pqc = tfq.convert_to_tensor([pqc])
+    self.expected_inverse_pqc = tfq.convert_to_tensor([inverse_pqc])
     init_val_const = tf.random.uniform([1, 42], dtype=tf.float32)
-    expected_value_layers_inputs = tf.Variable(init_val_const)
+    self.expected_value_layers_inputs = tf.Variable(init_val_const)
     value_layer_0 = tf.keras.layers.Dense(5)
     value_layer_1 = tf.keras.layers.Dense(len(raw_symbols))
     value_layer_2 = utils.Squeeze(0)
-    expected_value_layers = [value_layer_0, value_layer_1, value_layer_2]
-    expected_symbol_values = value_layer_2(
-        value_layer_1(value_layer_0(expected_value_layers_inputs)))
-    actual_layer = circuit_model.QuantumCircuit(pqc, expected_symbol_names,
-                                                expected_value_layers_inputs,
-                                                expected_value_layers,
-                                                expected_name)
-    self.assertAllEqual(actual_layer.qubits, expected_qubits)
-    self.assertAllEqual(actual_layer.symbol_names, expected_symbol_names)
-    self.assertAllEqual(actual_layer.value_layers_inputs,
-                        expected_value_layers_inputs)
-    self.assertAllEqual(actual_layer.value_layers, expected_value_layers)
-    self.assertAllEqual(actual_layer.symbol_values, expected_symbol_values)
-    self.assertAllEqual(
-        tfq.from_tensor(actual_layer.pqc), tfq.from_tensor(expected_pqc))
-    self.assertAllEqual(
-        tfq.from_tensor(actual_layer.inverse_pqc),
-        tfq.from_tensor(expected_inverse_pqc))
-    self.assertEqual(actual_layer.name, expected_name)
+    self.expected_value_layers = [value_layer_0, value_layer_1, value_layer_2]
+    self.expected_symbol_values = value_layer_2(
+        value_layer_1(value_layer_0(self.expected_value_layers_inputs)))
+    self.expected_name = "TestOE"
+    self.actual_layer = circuit_model.QuantumCircuit(
+        pqc, self.expected_symbol_names, self.expected_value_layers_inputs,
+        self.expected_value_layers, self.expected_name)
 
-    # test call
-    bitstrings = 2 * list(itertools.product([0, 1], repeat=num_qubits))
+  def test_init_and_call(self):
+    """Tests initialization."""
+    self.assertAllEqual(self.actual_layer.qubits, self.expected_qubits)
+    self.assertAllEqual(self.actual_layer.symbol_names,
+                        self.expected_symbol_names)
+    self.assertAllEqual(self.actual_layer.value_layers_inputs,
+                        self.expected_value_layers_inputs)
+    self.assertAllEqual(self.actual_layer.value_layers,
+                        self.expected_value_layers)
+    self.assertAllEqual(self.actual_layer.symbol_values,
+                        self.expected_symbol_values)
+    self.assertAllEqual(
+        tfq.from_tensor(self.actual_layer.pqc),
+        tfq.from_tensor(self.expected_pqc))
+    self.assertAllEqual(
+        tfq.from_tensor(self.actual_layer.inverse_pqc),
+        tfq.from_tensor(self.expected_inverse_pqc))
+    self.assertEqual(self.actual_layer.name, self.expected_name)
+
+  def test_call(self):
+    """Confirms calling on bitstrings yields correct circuits."""
+    bitstrings = tf.random.shuffle(
+        list(itertools.product([0, 1], repeat=self.num_qubits)))
     inputs = tf.constant(bitstrings, dtype=tf.int8)
     bit_injectors = []
     for b in bitstrings:
       bit_injectors.append(
-          cirq.Circuit(cirq.X(q)**b_i for q, b_i in zip(expected_qubits, b)))
-    combined = [b + pqc for b in bit_injectors]
+          cirq.Circuit(
+              cirq.X(q)**b_i for q, b_i in zip(self.expected_qubits, b)))
+    combined = [b + self.pqc for b in bit_injectors]
     expected_outputs = tfq.convert_to_tensor(combined)
-    actual_outputs = actual_layer(inputs)
+    actual_outputs = self.actual_layer(inputs)
     self.assertAllEqual(
         tfq.from_tensor(actual_outputs), tfq.from_tensor(expected_outputs))
 

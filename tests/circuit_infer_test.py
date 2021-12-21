@@ -37,6 +37,7 @@ class QuantumInferenceTest(tf.test.TestCase):
   """Tests the QuantumInference class."""
 
   def setUp(self):
+    """Initializes test objects."""
     super().setUp()
 
     # Build QNN representing X^p|s>
