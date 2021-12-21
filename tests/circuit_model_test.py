@@ -37,13 +37,13 @@ class QuantumCircuitTest(tf.test.TestCase):
     self.expected_qubits = cirq.GridQubit.rect(1, self.num_qubits)
     raw_symbols = [sympy.Symbol("s0"), sympy.Symbol("s1")]
     self.expected_symbol_names = tf.constant([str(s) for s in raw_symbols])
-    pqc = cirq.Circuit()
+    self.raw_pqc = cirq.Circuit()
     for s in raw_symbols:
       for q in self.expected_qubits:
-        pqc += cirq.X(q)**s
-        pqc += cirq.Z(q)**s
-    inverse_pqc = pqc**-1
-    self.expected_pqc = tfq.convert_to_tensor([pqc])
+        self.raw_pqc += cirq.X(q)**s
+        self.raw_pqc += cirq.Z(q)**s
+    inverse_pqc = self.raw_pqc**-1
+    self.expected_pqc = tfq.convert_to_tensor([self.raw_pqc])
     self.expected_inverse_pqc = tfq.convert_to_tensor([inverse_pqc])
     init_val_const = tf.random.uniform([1, 42], dtype=tf.float32)
     self.expected_value_layers_inputs = tf.Variable(init_val_const)
@@ -55,8 +55,9 @@ class QuantumCircuitTest(tf.test.TestCase):
         value_layer_1(value_layer_0(self.expected_value_layers_inputs)))
     self.expected_name = "TestOE"
     self.actual_layer = circuit_model.QuantumCircuit(
-        pqc, self.expected_symbol_names, self.expected_value_layers_inputs,
-        self.expected_value_layers, self.expected_name)
+        self.raw_pqc, self.expected_symbol_names,
+        self.expected_value_layers_inputs, self.expected_value_layers,
+        self.expected_name)
 
   def test_init_and_call(self):
     """Tests initialization."""
@@ -79,15 +80,15 @@ class QuantumCircuitTest(tf.test.TestCase):
 
   def test_call(self):
     """Confirms calling on bitstrings yields correct circuits."""
-    bitstrings = tf.random.shuffle(
-        list(itertools.product([0, 1], repeat=self.num_qubits)))
-    inputs = tf.constant(bitstrings, dtype=tf.int8)
+    inputs = tf.cast(
+        tf.random.shuffle(
+            list(itertools.product([0, 1], repeat=self.num_qubits))), tf.int8)
     bit_injectors = []
-    for b in bitstrings:
+    for b in inputs.numpy().tolist():
       bit_injectors.append(
           cirq.Circuit(
               cirq.X(q)**b_i for q, b_i in zip(self.expected_qubits, b)))
-    combined = [b + self.pqc for b in bit_injectors]
+    combined = [b + self.raw_pqc for b in bit_injectors]
     expected_outputs = tfq.convert_to_tensor(combined)
     actual_outputs = self.actual_layer(inputs)
     self.assertAllEqual(
