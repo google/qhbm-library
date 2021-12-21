@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tools for defining quantum circuit models."""
 
+import absl
 from typing import List, Union
 
 import cirq
@@ -49,8 +50,9 @@ class QuantumCircuit(tf.keras.layers.Layer):
     if set(tfq.util.get_circuit_symbols(pqc)) != {
         s.decode("utf-8") for s in symbol_names.numpy()
     }:
-      raise ValueError(
-          "`pqc` must contain exactly the parameters in `symbol_names`.")
+      absl.logging.warning(
+        "Argument `pqc` does not have exactly the same parameters as" 
+        "`symbol_names`, indicating unused `self.symbol_values` outputs.")
     self._qubits = sorted(pqc.all_qubits())
     self._symbol_names = symbol_names
     self._value_layers = value_layers
