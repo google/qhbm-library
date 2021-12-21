@@ -1,4 +1,3 @@
-# pylint: skip-file
 # Copyright 2021 The QHBM Library Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -84,8 +83,8 @@ class BitstringEnergyTest(tf.test.TestCase):
       expected_mlp.set_weights(actual_mlp.get_weights())
 
       @tf.function
-      def special_energy(bitstrings):
-        return actual_mlp(bitstrings)
+      def special_energy(bitstrings, mlp=actual_mlp):
+        return mlp(bitstrings)
 
       for e_func in [actual_mlp, special_energy]:
         with tf.GradientTape(persistent=True) as tape:
@@ -153,14 +152,14 @@ class BernoulliEnergyTest(tf.test.TestCase):
     num_tests = 5
     for _ in range(num_tests):
       bits = random.sample(range(1000), num_bits)
-      thetas = tf.random.uniform([num_bits], minval=-100, maxval=100)
+      thetas = tf.random.uniform([num_bits], -100, 100, tf.float32)
       test_b = energy_model.BernoulliEnergy(bits)
       test_b.build([None, num_bits])
       test_b.set_weights([thetas])
 
       @tf.function
-      def special_energy(bitstrings):
-        return test_b(bitstrings)
+      def special_energy(bitstrings, bernoulli=test_b):
+        return bernoulli(bitstrings)
 
       for e_func in [test_b, special_energy]:
         with tf.GradientTape() as tape:

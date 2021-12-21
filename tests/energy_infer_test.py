@@ -1,4 +1,3 @@
-# pylint: skip-file
 # Copyright 2021 The QHBM Library Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -160,7 +159,7 @@ class AnalyticInferenceLayerTest(tf.test.TestCase):
     one_bit_energy = energy_model.KOBE([0], 1,
                                        tf.keras.initializers.Constant(0.0))
     actual_layer = energy_infer.AnalyticInferenceLayer(one_bit_energy)
-    self.assertIsNone(actual_layer._current_dist)
+    self.assertIsNone(actual_layer.current_dist)
     actual_dist = actual_layer(None)
     self.assertIsInstance(actual_dist, tfp.distributions.Categorical)
 
@@ -305,7 +304,7 @@ class BernoulliInferenceLayerTest(tf.test.TestCase):
                                           tf.keras.initializers.Constant(0.0))
     actual_layer = energy_infer.BernoulliInferenceLayer(energy)
     actual_layer.build([])
-    self.assertIsNone(actual_layer._current_dist)
+    self.assertIsNone(actual_layer.current_dist)
     actual_dist = actual_layer(None)
     self.assertIsInstance(actual_dist, tfp.distributions.Bernoulli)
 

@@ -1,4 +1,3 @@
-# pylint: skip-file
 # Copyright 2021 The QHBM Library Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -74,12 +73,13 @@ class InferenceLayer(tf.keras.layers.Layer, abc.ABC):
     """Returns an estimate of the log partition function."""
     raise NotImplementedError()
 
-  def build(self, unused):
+  def build(self, input_shape):
     """Builds the internal energy function.
 
-    The input shape is unused because it is known to be `[]`, since calls are
+    `input_shape` is unused because it is known to be `[]`, since calls are
     given a scalar, the number of samples to draw from the distribution.
     """
+    del input_shape
     self.energy.build([None, self.energy.num_bits])
 
   def call(self, inputs):
@@ -122,6 +122,11 @@ class AnalyticInferenceLayer(InferenceLayer):
     """Returns the energy of every bitstring."""
     return self.energy(self.all_bitstrings)
 
+  @property
+  def current_dist(self):
+    """Bernoulli distribution set during last call to `self.infer`."""
+    return self._current_dist
+
   def infer(self):
     """See base class docstring."""
     x = tf.squeeze(self.all_energies)
@@ -129,7 +134,7 @@ class AnalyticInferenceLayer(InferenceLayer):
 
   def sample(self, n):
     """See base class docstring"""
-    return tf.gather(self.all_bitstrings, self._current_dist.sample(n))
+    return tf.gather(self.all_bitstrings, self._current_dist.sample(n), axis=0)
 
   def entropy(self):
     """See base class docstring"""
@@ -166,6 +171,11 @@ class BernoulliInferenceLayer(InferenceLayer):
     self._dist_realization = tfp.layers.DistributionLambda(
         make_distribution_fn=lambda t: tfd.Bernoulli(logits=t, dtype=tf.int8))
     self._current_dist = None
+
+  @property
+  def current_dist(self):
+    """Categorical distribution set during last call to `self.infer`."""
+    return self._current_dist
 
   def infer(self):
     """See base class docstring."""
