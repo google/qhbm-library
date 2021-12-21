@@ -51,8 +51,8 @@ class QuantumCircuit(tf.keras.layers.Layer):
         s.decode("utf-8") for s in symbol_names.numpy()
     }:
       absl.logging.warning(
-        "Argument `pqc` does not have exactly the same parameters as" 
-        "`symbol_names`, indicating unused `self.symbol_values` outputs.")
+          "Argument `pqc` does not have exactly the same parameters as"
+          "`symbol_names`, indicating unused `self.symbol_values` outputs.")
     self._qubits = sorted(pqc.all_qubits())
     self._symbol_names = symbol_names
     self._value_layers = value_layers
