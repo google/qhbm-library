@@ -14,7 +14,6 @@
 # ==============================================================================
 """Tests for the circuit_infer module."""
 
-import random
 import itertools
 from absl import logging
 
@@ -22,6 +21,7 @@ import cirq
 import math
 import sympy
 import tensorflow as tf
+import tensorflow_probability as tfp
 import tensorflow_quantum as tfq
 
 from qhbmlib import circuit_infer
@@ -35,6 +35,20 @@ GRAD_ATOL = 2e-4
 
 class QuantumInferenceTest(tf.test.TestCase):
   """Tests the QuantumInference class."""
+
+  def setUp(self):
+    super().setUp()
+
+    # Build QNN representing X^p|s>
+    self.num_qubits = 5
+    self.raw_qubits = cirq.GridQubit.rect(1, self.num_qubits)
+    p_param = sympy.Symbol("p")
+    p_circuit = cirq.Circuit(cirq.X(q)**p_param for q in self.raw_qubits)
+    self.p_qnn = circuit_model.DirectQuantumCircuit(
+        p_circuit,
+        initializer=tf.keras.initializers.RandomUniform(
+            minval=-5.0, maxval=5.0),
+        name="p_qnn")
 
   def test_init(self):
     """Confirms QuantumInference is initialized correctly."""
@@ -94,31 +108,13 @@ class QuantumInferenceTest(tf.test.TestCase):
     d/dp <s|(X^p)^dagger Z X^p|s> = -(-1)^s pi sin(pi * p)
     """
 
-    # Build QNN representing X^p|s>
-    num_qubits = 5
-    qubits = cirq.GridQubit.rect(1, num_qubits)
-    p_param = sympy.Symbol("p")
-    p_circuit = cirq.Circuit(cirq.X(q)**p_param for q in qubits)
-    p_qnn = circuit_model.DirectQuantumCircuit(
-        p_circuit,
-        initializer=tf.keras.initializers.RandomUniform(
-            minval=-5.0, maxval=5.0),
-        name="p_qnn")
-
     # Build inference object
-    exp_infer = circuit_infer.QuantumInference(p_qnn)
+    exp_infer = circuit_infer.QuantumInference(self.p_qnn)
 
     # Choose some bitstrings.
     num_bitstrings = 10
-    bitstrings_raw = []
-    for _ in range(num_bitstrings):
-      bitstrings_raw.append([])
-      for _ in range(num_qubits):
-        if random.choice([True, False]):
-          bitstrings_raw[-1].append(0)
-        else:
-          bitstrings_raw[-1].append(1)
-    bitstrings = tf.constant(bitstrings_raw, dtype=tf.int8)
+    bitstrings = tfp.distributions.Bernoulli(
+        probs=[0.5] * self.num_qubits, dtype=tf.int8).sample(num_bitstrings)
     counts = tf.random.uniform([num_bitstrings], 1, 1000, tf.int32)
 
     # Get true expectation values based on the bitstrings.
@@ -138,9 +134,9 @@ class QuantumInferenceTest(tf.test.TestCase):
         expected_y_exps_grad,
         expected_z_exps_grad,
     ]
-    sin_pi_p = math.sin(math.pi * p_qnn.symbol_values[0])
-    cos_pi_p = math.cos(math.pi * p_qnn.symbol_values[0])
-    for bits in bitstrings_raw:
+    sin_pi_p = math.sin(math.pi * self.p_qnn.symbol_values[0])
+    cos_pi_p = math.cos(math.pi * self.p_qnn.symbol_values[0])
+    for bits in bitstrings.numpy().tolist():
       for exps in expected + expected_grad:
         exps.append([])
       for s in bits:
@@ -161,9 +157,9 @@ class QuantumInferenceTest(tf.test.TestCase):
           tf.reduce_sum(exps * e_counts, 0) / total_counts)
 
     # Measure operators on every qubit.
-    x_ops = tfq.convert_to_tensor([1 * cirq.X(q) for q in qubits])
-    y_ops = tfq.convert_to_tensor([1 * cirq.Y(q) for q in qubits])
-    z_ops = tfq.convert_to_tensor([1 * cirq.Z(q) for q in qubits])
+    x_ops = tfq.convert_to_tensor([1 * cirq.X(q) for q in self.raw_qubits])
+    y_ops = tfq.convert_to_tensor([1 * cirq.Y(q) for q in self.raw_qubits])
+    z_ops = tfq.convert_to_tensor([1 * cirq.Z(q) for q in self.raw_qubits])
     all_ops = [x_ops, y_ops, z_ops]
 
     # Check with reduce True (this is the default)
@@ -172,7 +168,7 @@ class QuantumInferenceTest(tf.test.TestCase):
       for op in all_ops:
         actual_exps.append(exp_infer.expectation(bitstrings, counts, op))
     actual_exps_grad = [
-        tf.squeeze(tape.jacobian(exps, p_qnn.trainable_variables))
+        tf.squeeze(tape.jacobian(exps, self.p_qnn.trainable_variables))
         for exps in actual_exps
     ]
     del tape
@@ -188,7 +184,7 @@ class QuantumInferenceTest(tf.test.TestCase):
         actual_exps.append(
             exp_infer.expectation(bitstrings, counts, op, reduce=False))
     actual_exps_grad = [
-        tf.squeeze(tape.jacobian(exps, p_qnn.trainable_variables))
+        tf.squeeze(tape.jacobian(exps, self.p_qnn.trainable_variables))
         for exps in actual_exps
     ]
     del tape
@@ -199,14 +195,12 @@ class QuantumInferenceTest(tf.test.TestCase):
 
   def test_sample_basic(self):
     """Confirms correct sampling from identity, bit flip, and GHZ QNNs."""
-    num_qubits = 5
-    raw_qubits = cirq.GridQubit.rect(1, num_qubits)
     bitstrings = tf.constant(
-        list(itertools.product([0, 1], repeat=num_qubits)), dtype=tf.int8)
+        list(itertools.product([0, 1], repeat=self.num_qubits)), dtype=tf.int8)
     counts = tf.random.uniform([tf.shape(bitstrings)[0]], 10, 100, tf.int32)
 
     ident_qnn = circuit_model.DirectQuantumCircuit(
-        cirq.Circuit(cirq.I(q) for q in raw_qubits), name="identity")
+        cirq.Circuit(cirq.I(q) for q in self.raw_qubits), name="identity")
     ident_infer = circuit_infer.QuantumInference(ident_qnn)
     test_samples = ident_infer.sample(bitstrings, counts)
     for i, (b, c) in enumerate(zip(bitstrings, counts)):
@@ -215,7 +209,7 @@ class QuantumInferenceTest(tf.test.TestCase):
         self.assertAllEqual(test_samples[i][j], b)
 
     flip_qnn = circuit_model.DirectQuantumCircuit(
-        cirq.Circuit(cirq.X(q) for q in raw_qubits), name="flip")
+        cirq.Circuit(cirq.X(q) for q in self.raw_qubits), name="flip")
     flip_infer = circuit_infer.QuantumInference(flip_qnn)
     test_samples = flip_infer.sample(bitstrings, counts)
     for i, (b, c) in enumerate(zip(bitstrings, counts)):
@@ -226,23 +220,25 @@ class QuantumInferenceTest(tf.test.TestCase):
             tf.cast(tf.math.logical_not(tf.cast(b, tf.bool)), tf.int8))
 
     ghz_param = sympy.Symbol("ghz")
-    ghz_circuit = cirq.Circuit(cirq.X(raw_qubits[0])**ghz_param) + cirq.Circuit(
-        cirq.CNOT(q0, q1) for q0, q1 in zip(raw_qubits, raw_qubits[1:]))
+    ghz_circuit = cirq.Circuit(cirq.X(
+        self.raw_qubits[0])**ghz_param) + cirq.Circuit(
+            cirq.CNOT(q0, q1)
+            for q0, q1 in zip(self.raw_qubits, self.raw_qubits[1:]))
     ghz_qnn = circuit_model.DirectQuantumCircuit(
         ghz_circuit,
         initializer=tf.keras.initializers.Constant(value=0.5),
         name="ghz")
     ghz_infer = circuit_infer.QuantumInference(ghz_qnn)
     test_samples = ghz_infer.sample(
-        tf.expand_dims(tf.constant([0] * num_qubits, dtype=tf.int8), 0),
+        tf.expand_dims(tf.constant([0] * self.num_qubits, dtype=tf.int8), 0),
         tf.expand_dims(counts[0], 0))[0].to_tensor()
     # Both |0...0> and |1...1> should be among the measured bitstrings
     self.assertTrue(
         test_util.check_bitstring_exists(
-            tf.constant([0] * num_qubits, dtype=tf.int8), test_samples))
+            tf.constant([0] * self.num_qubits, dtype=tf.int8), test_samples))
     self.assertTrue(
         test_util.check_bitstring_exists(
-            tf.constant([1] * num_qubits, dtype=tf.int8), test_samples))
+            tf.constant([1] * self.num_qubits, dtype=tf.int8), test_samples))
 
   def test_sample_uneven(self):
     """Check for discrepancy in samples when count entries differ."""

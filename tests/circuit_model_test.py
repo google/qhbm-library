@@ -24,6 +24,7 @@ import tensorflow as tf
 import tensorflow_quantum as tfq
 
 from qhbmlib import circuit_model
+from qhbmlib import utils
 
 
 class QuantumCircuitTest(tf.test.TestCase):
@@ -45,17 +46,22 @@ class QuantumCircuitTest(tf.test.TestCase):
     expected_inverse_pqc = tfq.convert_to_tensor([inverse_pqc])
     expected_name = "TestOE"
     init_val_const = tf.random.uniform([1, 42], dtype=tf.float32)
-    initial_values = tf.Variable(init_val_const)
+    expected_value_layers_inputs = tf.Variable(init_val_const)
     value_layer_0 = tf.keras.layers.Dense(5)
     value_layer_1 = tf.keras.layers.Dense(len(raw_symbols))
-    value_layer_2 = tf.keras.layers.Lambda(lambda x: tf.squeeze(x, 0))
+    value_layer_2 = utils.Squeeze(0)
+    expected_value_layers = [value_layer_0, value_layer_1, value_layer_2]
     expected_symbol_values = value_layer_2(
-        value_layer_1(value_layer_0(initial_values)))
-    actual_layer = circuit_model.QuantumCircuit(
-        pqc, expected_symbol_names, initial_values,
-        [value_layer_0, value_layer_1, value_layer_2], expected_name)
+        value_layer_1(value_layer_0(expected_value_layers_inputs)))
+    actual_layer = circuit_model.QuantumCircuit(pqc, expected_symbol_names,
+                                                expected_value_layers_inputs,
+                                                expected_value_layers,
+                                                expected_name)
     self.assertAllEqual(actual_layer.qubits, expected_qubits)
     self.assertAllEqual(actual_layer.symbol_names, expected_symbol_names)
+    self.assertAllEqual(actual_layer.value_layers_inputs,
+                        expected_value_layers_inputs)
+    self.assertAllEqual(actual_layer.value_layers, expected_value_layers)
     self.assertAllEqual(actual_layer.symbol_values, expected_symbol_values)
     self.assertAllEqual(
         tfq.from_tensor(actual_layer.pqc), tfq.from_tensor(expected_pqc))

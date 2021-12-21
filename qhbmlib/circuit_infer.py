@@ -51,7 +51,8 @@ class QuantumInference(tf.keras.layers.Layer):
           backend=backend, differentiator=differentiator)
 
       def _expectation_function(circuits, symbol_names, symbol_values,
-                                operators, _):
+                                operators, *args):
+        del args
         return self._expectation_layer(
             circuits,
             symbol_names=symbol_names,
@@ -146,13 +147,12 @@ class QuantumInference(tf.keras.layers.Layer):
     num_circuits = tf.shape(circuits)[0]
     tiled_values = tf.tile(
         tf.expand_dims(self.qnn.symbol_values, 0), [num_circuits, 1])
+    num_samples_mask = tf.cast((tf.ragged.range(counts) + 1).to_tensor(),
+                               tf.bool)
+    num_samples_mask = tf.map_fn(tf.random.shuffle, num_samples_mask)
     samples = self._sample_layer(
         circuits,
         symbol_names=self.qnn.symbol_names,
         symbol_values=tiled_values,
         repetitions=tf.expand_dims(tf.math.reduce_max(counts), 0))
-    num_samples_mask = tf.cast((tf.ragged.range(counts) + 1).to_tensor(),
-                               tf.bool)
-    num_samples_mask = tf.map_fn(tf.random.shuffle, num_samples_mask)
-    samples = tf.ragged.boolean_mask(samples, num_samples_mask)
-    return samples
+    return tf.ragged.boolean_mask(samples, num_samples_mask)
