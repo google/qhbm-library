@@ -36,29 +36,6 @@ def check_order(order: int) -> int:
   return order
 
 
-class Squeeze(tf.keras.layers.Layer):
-  """Wraps tf.squeeze in a Keras Layer."""
-
-  def __init__(self, axis=None):
-    """Initializes a Squeeze layer.
-
-    Args:
-      axis: An optional list of ints. Defaults to []. If specified, only
-        squeezes the dimensions listed. The dimension index starts at 0. It is
-        an error to squeeze a dimension that is not 1. Must be in the range
-        [-rank(input), rank(input)). Must be specified if input is
-        a RaggedTensor.
-    """
-    super().__init__()
-    if axis is None:
-      axis = []
-    self._axis = axis
-
-  def call(self, inputs):
-    """Applies tf.squeeze to the inputs."""
-    return tf.squeeze(inputs, axis=self._axis)
-
-
 class SpinsFromBitstrings(tf.keras.layers.Layer):
   """Simple layer taking bits to spins."""
 

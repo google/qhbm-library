@@ -21,7 +21,7 @@ import cirq
 import tensorflow as tf
 
 from qhbmlib import energy_model
-from qhbmlib import energy_model_utils
+from qhbmlib import utils
 
 
 class BitstringEnergyTest(tf.test.TestCase):
@@ -32,10 +32,7 @@ class BitstringEnergyTest(tf.test.TestCase):
     expected_num_bits = 5
     expected_bits = [5, 17, 22, 30, 42]
     expected_name = "init_test"
-    expected_energy_layers = [
-        tf.keras.layers.Dense(1),
-        energy_model_utils.Squeeze(-1)
-    ]
+    expected_energy_layers = [tf.keras.layers.Dense(1), utils.Squeeze(-1)]
     actual_b = energy_model.BitstringEnergy(
         expected_bits, expected_energy_layers, name=expected_name)
     self.assertEqual(actual_b.num_bits, expected_num_bits)
@@ -49,7 +46,7 @@ class BitstringEnergyTest(tf.test.TestCase):
     energy_layers = [
         tf.keras.layers.Dense(
             1, kernel_initializer=tf.keras.initializers.Constant(1)),
-        energy_model_utils.Squeeze(-1)
+        utils.Squeeze(-1)
     ]
     test_b = energy_model.BitstringEnergy(list(range(num_bits)), energy_layers)
     test_bitstrings = tf.constant(
@@ -77,7 +74,7 @@ class BitstringEnergyTest(tf.test.TestCase):
         expected_layer_list.append(
             tf.keras.layers.Dense(units[i], activation=activations[i]))
       expected_layer_list.append(tf.keras.layers.Dense(1))
-      expected_layer_list.append(energy_model_utils.Squeeze(-1))
+      expected_layer_list.append(utils.Squeeze(-1))
       actual_mlp = energy_model.BitstringEnergy(bits, expected_layer_list)
 
       expected_mlp = tf.keras.Sequential(expected_layer_list)

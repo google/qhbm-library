@@ -39,19 +39,6 @@ class CheckHelpersTest(tf.test.TestCase):
       _ = energy_model_utils.check_order(0)
 
 
-class SqueezeTest(tf.test.TestCase):
-  """Tests the Squeeze layer."""
-
-  def test_layer(self):
-    """Confirms the layer squeezes correctly."""
-    inputs = tf.constant([[[1]], [[2]]])
-    expected_axis = 1
-    expected_outputs = tf.constant([[1], [2]])
-    actual_layer = energy_model_utils.Squeeze(expected_axis)
-    actual_outputs = actual_layer(inputs)
-    self.assertAllEqual(actual_outputs, expected_outputs)
-
-
 class SpinsFromBitstringsTest(tf.test.TestCase):
   """Tests the SpinsFromBitstrings layer."""
 

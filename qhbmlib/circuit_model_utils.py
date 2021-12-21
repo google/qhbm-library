@@ -1,4 +1,3 @@
-#!/bin/bash
 # Copyright 2021 The QHBM Library Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,13 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+"""Utilities for the circuit_model module."""
 
-poetry run yapf --in-place --recursive qhbmlib/
-poetry run yapf --in-place --recursive tests/
-./scripts/check_lint.sh
-retval=$?
-if [ "$retval" == 1 ]
-then
-  exit 1
-fi
-poetry run pytest --cov .
+from typing import List
+
+import cirq
+import sympy
+
+
+def bit_circuit(qubits: List[cirq.GridQubit], name="bit_circuit"):
+  """Returns exponentiated X gate on each qubit and the exponent symbols."""
+  circuit = cirq.Circuit()
+  for n, q in enumerate(qubits):
+    bit = sympy.Symbol("{0}_bit_{1}".format(name, n))
+    circuit += cirq.X(q)**bit
+  return circuit
