@@ -21,7 +21,6 @@ import cirq
 import tensorflow as tf
 
 from qhbmlib import energy_model
-from qhbmlib import energy_model_utils
 from qhbmlib import utils
 
 
