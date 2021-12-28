@@ -31,8 +31,8 @@ class QuantumCircuit(tf.keras.layers.Layer):
   def __init__(self,
                pqc: cirq.Circuit,
                symbol_names: tf.Tensor,
-               value_layers_inputs: Union[tf.Variable, List[tf.Variable]],
-               value_layers: List[tf.keras.layers.Layer],
+               value_layers_inputs: List[List[tf.Variable]],
+               value_layers: List[List[tf.keras.layers.Layer]],
                name: Union[None, str] = None):
     """Initializes a QuantumCircuit.
 
@@ -41,8 +41,10 @@ class QuantumCircuit(tf.keras.layers.Layer):
       symbol_names: Strings which are used to specify the order in which the
         values in `self.symbol_values` should be placed inside of the circuit.
       value_layers_inputs: Inputs to the `value_layers` argument.
-      value_layers: Concatenation of these layers yields trainable map from
-        `value_layers_inputs` to the values to substitute into the circuit.
+      value_layers: The concatenation of the layers in entry `i` yields a
+        trainable map from `value_layers_inputs[i]` to the `i` entry in the list
+        of intermediate values.  The list of intermediate values is concatenated
+        to yield the values to substitute into the circuit.
       name: Optional name for the model.
     """
     super().__init__(name=name)
@@ -79,7 +81,7 @@ class QuantumCircuit(tf.keras.layers.Layer):
 
   @property
   def value_layers_inputs(self):
-    """Variable or list of variables which are inputs to `value_layers`.
+    """List of lists of variables which are inputs to `value_layers`.
 
     This property (and `value_layers`) is where the caller would access model
     weights to be updated from a secondary model or hypernetwork.
@@ -88,7 +90,7 @@ class QuantumCircuit(tf.keras.layers.Layer):
 
   @property
   def value_layers(self):
-    """List of Keras layers which calculate the current parameter values.
+    """List of lists of Keras layers which calculate current parameter values.
 
     This property (and `value_layers_inputs`) is where the caller would access
     model weights to be updated from a secondary model or hypernetwork.
@@ -102,10 +104,13 @@ class QuantumCircuit(tf.keras.layers.Layer):
     This should be structured such that `self.symbol_values[i]` is the current
     value of `self.symbol_names[i]` in `self.pqc` and `self.inverse_pqc`.
     """
-    x = self._value_layers_inputs
-    for layer in self._value_layers:
-      x = layer(x)
-    return x
+    intermediate_values = []
+    for inputs, layers in zip(self.value_layers_inputs, self.value_layers):
+      x = inputs
+      for layer in layers:
+        x = layer(x)
+      intermediate_values.append(x)
+    return tf.concat(intermediate_values, 0)
 
   @property
   def pqc(self):
@@ -124,12 +129,10 @@ class QuantumCircuit(tf.keras.layers.Layer):
     `self._value_layers_inputs`.
     """
     del input_shape
-    if isinstance(self.value_layers_inputs, list):
-      x = [tf.shape(t) for t in self._value_layers_inputs]
-    else:
-      x = tf.shape(self.value_layers_inputs)
-    for layer in self._value_layers:
-      x = layer.compute_output_shape(x)
+    for inputs, layers in zip(self.value_layers_inputs, self.value_layers):
+      x = [tf.shape(t) for t in self.value_layers_inputs]
+      for layer in layers:
+        x = layer.compute_output_shape(x)
 
   def call(self, inputs):
     """Inputs are bitstrings prepended as initial states to `self.pqc`."""
@@ -140,6 +143,14 @@ class QuantumCircuit(tf.keras.layers.Layer):
     pqcs = tf.tile(self.pqc, [num_bitstrings])
     return tfq.append_circuit(bit_circuits, pqcs)
 
+  def __add__(self, other):
+    """Returns QuantumCircuit with `self.pqc` appended to `other.pqc`."""
+    new_pqc = tfq.append_circuit(self.pqc, other.pqc)
+    new_symbol_names = tf.concat([self.symbol_names, other.symbol_names], 0)
+    new_value_layers_inputs = self.value_layers_inputs + other.value_layers_inputs
+    new_value_layers = self.value_layers + other.value_layers
+    new_name = self.name + other.name
+    return QuantumCircuit(new_pqc, new_symbol_names, new_value_layers_inputs, new_value_layers, new_name)
 
 class DirectQuantumCircuit(QuantumCircuit):
   """QuantumCircuit with direct map from model variables to circuit params."""
@@ -162,8 +173,8 @@ class DirectQuantumCircuit(QuantumCircuit):
     raw_symbol_names = list(sorted(tfq.util.get_circuit_symbols(pqc)))
     symbol_names = tf.constant([str(x) for x in raw_symbol_names],
                                dtype=tf.string)
-    values = tf.Variable(initializer(shape=[len(raw_symbol_names)]))
-    super().__init__(pqc, symbol_names, values, [])
+    values = [[tf.Variable(initializer(shape=[len(raw_symbol_names)]))]]
+    super().__init__(pqc, symbol_names, values, [[]])
 
 
 class QAIA(QuantumCircuit):
@@ -228,12 +239,12 @@ class QAIA(QuantumCircuit):
       flat_symbols.extend(q_symb + c_symb)
     symbol_names = tf.constant(flat_symbols)
 
-    value_layers_inputs = [
+    value_layers_inputs = [[
         tf.Variable(initializer(shape=[num_layers])),  # true etas
         tf.Variable(initializer(shape=[len(classical_h_terms)])),  # thetas
         tf.Variable(
             initializer(shape=[num_layers, len(quantum_h_terms)])),  # gammas
-    ]
+    ]]
 
     def embed_params(inputs):
       """Tiles up the variables to properly tie QAIA parameters."""
@@ -243,6 +254,6 @@ class QAIA(QuantumCircuit):
       classical_params = exp_etas * tiled_thetas
       return tf.concat([classical_params, inputs[2]], 1)
 
-    value_layers = [tf.keras.layers.Lambda(embed_params)]
+    value_layers = [[tf.keras.layers.Lambda(embed_params)]]
 
     super().__init__(pqc, symbol_names, value_layers_inputs, value_layers)
