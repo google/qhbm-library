@@ -111,7 +111,8 @@ class QuantumCircuitTest(tf.test.TestCase):
     other_value_layers_inputs = [[
         tf.Variable(tf.random.uniform([1], dtype=tf.float32))
     ]]
-    expected_value_layers_inputs = self.expected_value_layers_inputs + other_value_layers_inputs
+    expected_value_layers_inputs = (
+        self.expected_value_layers_inputs + other_value_layers_inputs)
     other_value_layers = [[utils.Squeeze(0)]]
     expected_value_layers = self.expected_value_layers + other_value_layers
     expected_symbol_values = tf.concat(
