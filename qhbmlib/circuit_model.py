@@ -31,7 +31,7 @@ class QuantumCircuit(tf.keras.layers.Layer):
   def __init__(self,
                pqc: cirq.Circuit,
                symbol_names: tf.Tensor,
-               value_layers_inputs: List[List[tf.Variable]],
+               value_layers_inputs: List[Union[tf.Variable, List[tf.Variable]]],
                value_layers: List[List[tf.keras.layers.Layer]],
                name: Union[None, str] = None):
     """Initializes a QuantumCircuit.
@@ -104,7 +104,8 @@ class QuantumCircuit(tf.keras.layers.Layer):
     This should be structured such that `self.symbol_values[i]` is the current
     value of `self.symbol_names[i]` in `self.pqc` and `self.inverse_pqc`.
     """
-    intermediate_values = []
+    # TODO(#???): empty value because concat requires at least two entries.
+    intermediate_values = [[]]
     for inputs, layers in zip(self.value_layers_inputs, self.value_layers):
       x = inputs
       for layer in layers:
@@ -130,7 +131,10 @@ class QuantumCircuit(tf.keras.layers.Layer):
     """
     del input_shape
     for inputs, layers in zip(self.value_layers_inputs, self.value_layers):
-      x = [tf.shape(t) for t in self.value_layers_inputs]
+      if isinstance(inputs, tf.Variable):
+        x = inputs.get_shape()
+      else:
+        x = [v.get_shape() for v in inputs]
       for layer in layers:
         x = layer.compute_output_shape(x)
 
@@ -173,8 +177,9 @@ class DirectQuantumCircuit(QuantumCircuit):
     raw_symbol_names = list(sorted(tfq.util.get_circuit_symbols(pqc)))
     symbol_names = tf.constant([str(x) for x in raw_symbol_names],
                                dtype=tf.string)
-    values = [[tf.Variable(initializer(shape=[len(raw_symbol_names)]))]]
-    super().__init__(pqc, symbol_names, values, [[]])
+    values = [tf.Variable(initializer(shape=[len(raw_symbol_names)]))]
+    value_layers = [[]]
+    super().__init__(pqc, symbol_names, values, value_layers)
 
 
 class QAIA(QuantumCircuit):
@@ -252,7 +257,7 @@ class QAIA(QuantumCircuit):
       tiled_thetas = tf.tile(
           tf.expand_dims(inputs[1], 0), [tf.shape(inputs[0])[0], 1])
       classical_params = exp_etas * tiled_thetas
-      return tf.concat([classical_params, inputs[2]], 1)
+      return tf.reshape(tf.concat([classical_params, inputs[2]], 1), [-1])
 
     value_layers = [[tf.keras.layers.Lambda(embed_params)]]
 
