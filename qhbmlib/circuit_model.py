@@ -154,7 +154,9 @@ class QuantumCircuit(tf.keras.layers.Layer):
     new_value_layers_inputs = self.value_layers_inputs + other.value_layers_inputs
     new_value_layers = self.value_layers + other.value_layers
     new_name = self.name + other.name
-    return QuantumCircuit(new_pqc, new_symbol_names, new_value_layers_inputs, new_value_layers, new_name)
+    return QuantumCircuit(new_pqc, new_symbol_names, new_value_layers_inputs,
+                          new_value_layers, new_name)
+
 
 class DirectQuantumCircuit(QuantumCircuit):
   """QuantumCircuit with direct map from model variables to circuit params."""

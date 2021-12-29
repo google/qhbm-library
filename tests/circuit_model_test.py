@@ -99,42 +99,42 @@ class QuantumCircuitTest(tf.test.TestCase):
     other_qubits = cirq.GridQubit.rect(1, 2 * self.num_qubits)
     expected_qubits = other_qubits  # since is superset of self.expected_qubits
     other_symbols = [sympy.Symbol("other_symbol")]
-    expected_symbol_names = tf.constant([str(s) for s in self.raw_symbols + other_symbols])
+    expected_symbol_names = tf.constant(
+        [str(s) for s in self.raw_symbols + other_symbols])
     other_pqc = cirq.Circuit()
     for s in other_symbols:
       for q in other_qubits:
         other_pqc += cirq.Y(q)**s
     raw_expected_pqc = self.raw_pqc + other_pqc
     expected_pqc = tfq.convert_to_tensor([raw_expected_pqc])
-    expected_inverse_pqc = tfq.convert_to_tensor([raw_expected_pqc ** -1])
-    other_value_layers_inputs = [[tf.Variable(tf.random.uniform([1], dtype=tf.float32))]]
+    expected_inverse_pqc = tfq.convert_to_tensor([raw_expected_pqc**-1])
+    other_value_layers_inputs = [[
+        tf.Variable(tf.random.uniform([1], dtype=tf.float32))
+    ]]
     expected_value_layers_inputs = self.expected_value_layers_inputs + other_value_layers_inputs
     other_value_layers = [[utils.Squeeze(0)]]
     expected_value_layers = self.expected_value_layers + other_value_layers
-    expected_symbol_values = tf.concat([self.expected_symbol_values, other_value_layers_inputs[0][0]], 0)
+    expected_symbol_values = tf.concat(
+        [self.expected_symbol_values, other_value_layers_inputs[0][0]], 0)
     other_name = "the_other_layer"
     expected_name = self.expected_name + other_name
     other_layer = circuit_model.QuantumCircuit(
         other_pqc, tf.constant([str(s) for s in other_symbols]),
-        other_value_layers_inputs, other_value_layers,
-        other_name)
+        other_value_layers_inputs, other_value_layers, other_name)
     actual_add = self.actual_layer + other_layer
     self.assertAllEqual(actual_add.qubits, expected_qubits)
-    self.assertAllEqual(actual_add.symbol_names,
-                        expected_symbol_names)
+    self.assertAllEqual(actual_add.symbol_names, expected_symbol_names)
     self.assertAllClose(actual_add.value_layers_inputs,
                         expected_value_layers_inputs)
-    self.assertAllEqual(actual_add.value_layers,
-                        expected_value_layers)
-    self.assertAllEqual(actual_add.symbol_values,
-                        expected_symbol_values)
+    self.assertAllEqual(actual_add.value_layers, expected_value_layers)
+    self.assertAllEqual(actual_add.symbol_values, expected_symbol_values)
     self.assertAllEqual(
-        tfq.from_tensor(actual_add.pqc),
-        tfq.from_tensor(expected_pqc))
+        tfq.from_tensor(actual_add.pqc), tfq.from_tensor(expected_pqc))
     self.assertAllEqual(
         tfq.from_tensor(actual_add.inverse_pqc),
         tfq.from_tensor(expected_inverse_pqc))
     self.assertEqual(actual_add.name, expected_name)
+
 
 class DirectQuantumCircuitTest(tf.test.TestCase):
   """Tests the DirectQuantumCircuit class."""
@@ -161,7 +161,8 @@ class DirectQuantumCircuitTest(tf.test.TestCase):
     self.assertAllClose(actual_qnn.value_layers_inputs,
                         expected_value_layers_inputs)
     self.assertAllEqual(actual_qnn.value_layers, expected_value_layers)
-    self.assertAllClose(actual_qnn.symbol_values, expected_value_layers_inputs[0])
+    self.assertAllClose(actual_qnn.symbol_values,
+                        expected_value_layers_inputs[0])
     self.assertAllEqual(
         tfq.from_tensor(actual_qnn.pqc),
         tfq.from_tensor(tfq.convert_to_tensor([expected_pqc])))
@@ -211,7 +212,9 @@ class QAIATest(tf.test.TestCase):
     ]]
     expected_symbol_values = []
     for _ in range(num_layers):
-      expected_symbol_values += (([eta_const * theta_const] * len(classical_h_terms)) + ([gamma_const] * len(quantum_h_terms)))
+      expected_symbol_values += (
+          ([eta_const * theta_const] * len(classical_h_terms)) +
+          ([gamma_const] * len(quantum_h_terms)))
     actual_qnn = circuit_model.QAIA(quantum_h_terms, classical_h_terms,
                                     num_layers)
     self.assertAllEqual(actual_qnn.qubits, expected_qubits)
@@ -225,7 +228,7 @@ class QAIATest(tf.test.TestCase):
 
     actual_qnn.value_layers_inputs[0][0].assign([eta_const] * num_layers)
     actual_qnn.value_layers_inputs[0][1].assign([theta_const] *
-                                             len(classical_h_terms))
+                                                len(classical_h_terms))
     actual_qnn.value_layers_inputs[0][2].assign(
         [[gamma_const] * len(quantum_h_terms)] * num_layers)
     self.assertAllClose(actual_qnn.value_layers_inputs,
