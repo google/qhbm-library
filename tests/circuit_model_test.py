@@ -35,10 +35,10 @@ class QuantumCircuitTest(tf.test.TestCase):
     super().setUp()
     self.num_qubits = 5
     self.expected_qubits = cirq.GridQubit.rect(1, self.num_qubits)
-    raw_symbols = [sympy.Symbol("s0"), sympy.Symbol("s1")]
-    self.expected_symbol_names = tf.constant([str(s) for s in raw_symbols])
+    self.raw_symbols = [sympy.Symbol("s0"), sympy.Symbol("s1")]
+    self.expected_symbol_names = tf.constant([str(s) for s in self.raw_symbols])
     self.raw_pqc = cirq.Circuit()
-    for s in raw_symbols:
+    for s in self.raw_symbols:
       for q in self.expected_qubits:
         self.raw_pqc += cirq.X(q)**s
         self.raw_pqc += cirq.Z(q)**s
@@ -48,7 +48,7 @@ class QuantumCircuitTest(tf.test.TestCase):
     init_const = tf.random.uniform([1, 42], dtype=tf.float32)
     self.expected_value_layers_inputs = [tf.Variable(init_const)]
     value_layer_0 = tf.keras.layers.Dense(5)
-    value_layer_1 = tf.keras.layers.Dense(len(raw_symbols))
+    value_layer_1 = tf.keras.layers.Dense(len(self.raw_symbols))
     value_layer_2 = utils.Squeeze(0)
     self.expected_value_layers = [[value_layer_0, value_layer_1, value_layer_2]]
     self.expected_symbol_values = value_layer_2(
@@ -94,6 +94,47 @@ class QuantumCircuitTest(tf.test.TestCase):
     self.assertAllEqual(
         tfq.from_tensor(actual_outputs), tfq.from_tensor(expected_outputs))
 
+  def test_add(self):
+    """Confirms addition of QuantumCircuits works correctly."""
+    other_qubits = cirq.GridQubit.rect(1, 2 * self.num_qubits)
+    expected_qubits = other_qubits  # since is superset of self.expected_qubits
+    other_symbols = [sympy.Symbol("other_symbol")]
+    expected_symbol_names = tf.constant([str(s) for s in self.raw_symbols + other_symbols])
+    other_pqc = cirq.Circuit()
+    for s in other_symbols:
+      for q in other_qubits:
+        other_pqc += cirq.Y(q)**s
+    raw_expected_pqc = self.raw_pqc + other_pqc
+    expected_pqc = tfq.convert_to_tensor([raw_expected_pqc])
+    expected_inverse_pqc = tfq.convert_to_tensor([raw_expected_pqc ** -1])
+    other_value_layers_inputs = [[tf.Variable(tf.random.uniform([1], dtype=tf.float32))]]
+    expected_value_layers_inputs = self.expected_value_layers_inputs + other_value_layers_inputs
+    other_value_layers = [[utils.Squeeze(0)]]
+    expected_value_layers = self.expected_value_layers + other_value_layers
+    expected_symbol_values = tf.concat([self.expected_symbol_values, other_value_layers_inputs[0][0]], 0)
+    other_name = "the_other_layer"
+    expected_name = self.expected_name + other_name
+    other_layer = circuit_model.QuantumCircuit(
+        other_pqc, tf.constant([str(s) for s in other_symbols]),
+        other_value_layers_inputs, other_value_layers,
+        other_name)
+    actual_add = self.actual_layer + other_layer
+    self.assertAllEqual(actual_add.qubits, expected_qubits)
+    self.assertAllEqual(actual_add.symbol_names,
+                        expected_symbol_names)
+    self.assertAllClose(actual_add.value_layers_inputs,
+                        expected_value_layers_inputs)
+    self.assertAllEqual(actual_add.value_layers,
+                        expected_value_layers)
+    self.assertAllEqual(actual_add.symbol_values,
+                        expected_symbol_values)
+    self.assertAllEqual(
+        tfq.from_tensor(actual_add.pqc),
+        tfq.from_tensor(expected_pqc))
+    self.assertAllEqual(
+        tfq.from_tensor(actual_add.inverse_pqc),
+        tfq.from_tensor(expected_inverse_pqc))
+    self.assertEqual(actual_add.name, expected_name)
 
 class DirectQuantumCircuitTest(tf.test.TestCase):
   """Tests the DirectQuantumCircuit class."""
