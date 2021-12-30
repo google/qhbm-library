@@ -61,7 +61,6 @@ class QuantumCircuit(tf.keras.layers.Layer):
     self._value_layers_inputs = value_layers_inputs
 
     self._pqc = tfq.convert_to_tensor([pqc])
-    self._inverse_pqc = tfq.convert_to_tensor([pqc**-1])
 
     raw_bit_circuit = circuit_model_utils.bit_circuit(self.qubits)
     bit_symbol_names = list(
@@ -118,11 +117,6 @@ class QuantumCircuit(tf.keras.layers.Layer):
     """TFQ tensor representation of the parameterized unitary circuit."""
     return self._pqc
 
-  @property
-  def inverse_pqc(self):
-    """Inverse of `self.pqc`."""
-    return self._inverse_pqc
-
   def build(self, input_shape):
     """Builds the layers which calculate the values.
 
@@ -148,7 +142,11 @@ class QuantumCircuit(tf.keras.layers.Layer):
     return tfq.append_circuit(bit_circuits, pqcs)
 
   def __add__(self, other):
-    """Returns a QuantumCircuit with `self.pqc` appended to `other.pqc`."""
+    """Returns a QuantumCircuit with `self.pqc` appended to `other.pqc`.
+
+    Note that no new `tf.Variable`s are created, the new QuantumCircuit contains
+    the variables in both `self` and `other`.
+    """
     new_pqc = tfq.from_tensor(tfq.append_circuit(self.pqc, other.pqc))[0]
     new_symbol_names = tf.concat([self.symbol_names, other.symbol_names], 0)
     new_value_layers_inputs = (
@@ -157,6 +155,19 @@ class QuantumCircuit(tf.keras.layers.Layer):
     new_name = self.name + other.name
     return QuantumCircuit(new_pqc, new_symbol_names, new_value_layers_inputs,
                           new_value_layers, new_name)
+
+  def __pow__(self, exponent):
+    """Returns a QuantumCircuit with inverted `self.pqc`.
+
+    Note that no new `tf.Variable`s are created, the new QuantumCircuit contains
+    the same variables as `self`.
+    """
+    if exponent != -1:
+      raise ValueError("Only the inverse (exponent == -1) is supported.")
+    new_pqc = tfq.from_tensor(self.pqc)[0] ** -1
+    new_name = self.name + "_inverse"
+    return QuantumCircuit(new_pqc, self.symbol_names, self.value_layers_inputs,
+                          self.value_layers, new_name)
 
 
 class DirectQuantumCircuit(QuantumCircuit):

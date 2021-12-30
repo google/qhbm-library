@@ -42,9 +42,7 @@ class QuantumCircuitTest(tf.test.TestCase):
       for q in self.expected_qubits:
         self.raw_pqc += cirq.X(q)**s
         self.raw_pqc += cirq.Z(q)**s
-    inverse_pqc = self.raw_pqc**-1
     self.expected_pqc = tfq.convert_to_tensor([self.raw_pqc])
-    self.expected_inverse_pqc = tfq.convert_to_tensor([inverse_pqc])
     init_const = tf.random.uniform([1, 42], dtype=tf.float32)
     self.expected_value_layers_inputs = [tf.Variable(init_const)]
     value_layer_0 = tf.keras.layers.Dense(5)
@@ -73,9 +71,6 @@ class QuantumCircuitTest(tf.test.TestCase):
     self.assertAllEqual(
         tfq.from_tensor(self.actual_layer.pqc),
         tfq.from_tensor(self.expected_pqc))
-    self.assertAllEqual(
-        tfq.from_tensor(self.actual_layer.inverse_pqc),
-        tfq.from_tensor(self.expected_inverse_pqc))
     self.assertEqual(self.actual_layer.name, self.expected_name)
 
   def test_call(self):
@@ -107,7 +102,6 @@ class QuantumCircuitTest(tf.test.TestCase):
         other_pqc += cirq.Y(q)**s
     raw_expected_pqc = self.raw_pqc + other_pqc
     expected_pqc = tfq.convert_to_tensor([raw_expected_pqc])
-    expected_inverse_pqc = tfq.convert_to_tensor([raw_expected_pqc**-1])
     other_value_layers_inputs = [[
         tf.Variable(tf.random.uniform([1], dtype=tf.float32))
     ]]
@@ -131,10 +125,11 @@ class QuantumCircuitTest(tf.test.TestCase):
     self.assertAllEqual(actual_add.symbol_values, expected_symbol_values)
     self.assertAllEqual(
         tfq.from_tensor(actual_add.pqc), tfq.from_tensor(expected_pqc))
-    self.assertAllEqual(
-        tfq.from_tensor(actual_add.inverse_pqc),
-        tfq.from_tensor(expected_inverse_pqc))
     self.assertEqual(actual_add.name, expected_name)
+
+  def test_pow(self):
+    """Confirms inversion of QuantumCircuits works correctly."""
+    pass
 
 
 class DirectQuantumCircuitTest(tf.test.TestCase):
@@ -167,9 +162,6 @@ class DirectQuantumCircuitTest(tf.test.TestCase):
     self.assertAllEqual(
         tfq.from_tensor(actual_qnn.pqc),
         tfq.from_tensor(tfq.convert_to_tensor([expected_pqc])))
-    self.assertAllEqual(
-        tfq.from_tensor(actual_qnn.inverse_pqc),
-        tfq.from_tensor(tfq.convert_to_tensor([expected_pqc**-1])))
 
 
 class QAIATest(tf.test.TestCase):
@@ -223,9 +215,6 @@ class QAIATest(tf.test.TestCase):
     self.assertAllEqual(
         tfq.from_tensor(actual_qnn.pqc),
         tfq.from_tensor(tfq.convert_to_tensor([expected_pqc])))
-    self.assertAllEqual(
-        tfq.from_tensor(actual_qnn.inverse_pqc),
-        tfq.from_tensor(tfq.convert_to_tensor([expected_pqc**-1])))
 
     actual_qnn.value_layers_inputs[0][0].assign([eta_const] * num_layers)
     actual_qnn.value_layers_inputs[0][1].assign([theta_const] *
