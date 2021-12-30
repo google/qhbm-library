@@ -128,8 +128,15 @@ class QuantumCircuitTest(tf.test.TestCase):
     self.assertEqual(actual_add.name, expected_name)
 
   def test_pow(self):
-    """Confirms inversion of QuantumCircuits works correctly."""
-    pass
+    """Confirms inversion of QuantumCircuit works correctly."""
+    actual_inverse = self.actual_layer ** -1
+    expected_pqc = tfq.convert_to_tensor([self.raw_pqc ** -1])
+    self.assertNotAllEqual(
+      tfq.from_tensor(self.actual_layer.pqc),
+      tfq.from_tensor(actual_inverse.pqc))
+    self.assertAllEqual(
+      tfq.from_tensor(actual_inverse.pqc),
+      tfq.from_tensor(expected_pqc))
 
 
 class DirectQuantumCircuitTest(tf.test.TestCase):
