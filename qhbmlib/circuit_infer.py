@@ -128,9 +128,7 @@ class QuantumInference(tf.keras.layers.Layer):
       return tf.reduce_sum(tf.transpose(probs * tf.transpose(expectations)), 0)
     return expectations
 
-  def sample(self,
-             qnn: circuit_model.QuantumCircuit,
-             initial_states: tf.Tensor,
+  def sample(self, qnn: circuit_model.QuantumCircuit, initial_states: tf.Tensor,
              counts: tf.Tensor):
     """Returns bitstring samples from the QNN.
 

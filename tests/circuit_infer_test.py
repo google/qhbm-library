@@ -161,7 +161,8 @@ class QuantumInferenceTest(tf.test.TestCase):
     with tf.GradientTape(persistent=True) as tape:
       actual_exps = []
       for op in all_ops:
-        actual_exps.append(exp_infer.expectation(self.p_qnn, bitstrings, counts, op))
+        actual_exps.append(
+            exp_infer.expectation(self.p_qnn, bitstrings, counts, op))
     actual_exps_grad = [
         tf.squeeze(tape.jacobian(exps, self.p_qnn.trainable_variables))
         for exps in actual_exps
@@ -177,7 +178,8 @@ class QuantumInferenceTest(tf.test.TestCase):
       actual_exps = []
       for op in all_ops:
         actual_exps.append(
-            exp_infer.expectation(self.p_qnn, bitstrings, counts, op, reduce=False))
+            exp_infer.expectation(
+                self.p_qnn, bitstrings, counts, op, reduce=False))
     actual_exps_grad = [
         tf.squeeze(tape.jacobian(exps, self.p_qnn.trainable_variables))
         for exps in actual_exps
@@ -195,7 +197,7 @@ class QuantumInferenceTest(tf.test.TestCase):
     counts = tf.random.uniform([tf.shape(bitstrings)[0]], 10, 100, tf.int32)
 
     q_infer = circuit_infer.QuantumInference()
-    
+
     ident_qnn = circuit_model.DirectQuantumCircuit(
         cirq.Circuit(cirq.I(q) for q in self.raw_qubits), name="identity")
     test_samples = q_infer.sample(ident_qnn, bitstrings, counts)
