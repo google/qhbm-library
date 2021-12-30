@@ -148,7 +148,7 @@ class QuantumCircuit(tf.keras.layers.Layer):
     return tfq.append_circuit(bit_circuits, pqcs)
 
   def __add__(self, other):
-    """Returns QuantumCircuit with `self.pqc` appended to `other.pqc`."""
+    """Returns a QuantumCircuit with `self.pqc` appended to `other.pqc`."""
     new_pqc = tfq.from_tensor(tfq.append_circuit(self.pqc, other.pqc))[0]
     new_symbol_names = tf.concat([self.symbol_names, other.symbol_names], 0)
     new_value_layers_inputs = (
