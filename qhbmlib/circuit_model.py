@@ -174,10 +174,11 @@ class QuantumCircuit(tf.keras.layers.Layer):
     if isinstance(exponent, int):
       if exponent != -1:
         raise ValueError("Only the inverse (exponent == -1) is supported.")
-      new_pqc = tfq.from_tensor(self.pqc)[0] ** -1
+      new_pqc = tfq.from_tensor(self.pqc)[0]**-1
       new_name = self.name + "_inverse"
-      return QuantumCircuit(new_pqc, self.symbol_names, self.value_layers_inputs,
-                            self.value_layers, new_name)
+      return QuantumCircuit(new_pqc, self.symbol_names,
+                            self.value_layers_inputs, self.value_layers,
+                            new_name)
     else:
       raise TypeError
 

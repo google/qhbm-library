@@ -130,11 +130,11 @@ class QuantumCircuitTest(tf.test.TestCase):
     # Confirm that tf.Variables in the sum are the same as in the addends.
     var_1 = tf.Variable([5.0])
     qnn_1 = circuit_model.QuantumCircuit(
-        cirq.Circuit(cirq.X(cirq.GridQubit(0, 0)) ** sympy.Symbol("a")),
+        cirq.Circuit(cirq.X(cirq.GridQubit(0, 0))**sympy.Symbol("a")),
         tf.constant(["a"]), [var_1], [[]])
     var_2 = tf.Variable([-7.0])
     qnn_2 = circuit_model.QuantumCircuit(
-        cirq.Circuit(cirq.X(cirq.GridQubit(0, 0)) ** sympy.Symbol("b")),
+        cirq.Circuit(cirq.X(cirq.GridQubit(0, 0))**sympy.Symbol("b")),
         tf.constant(["b"]), [var_2], [[]])
     actual_sum = qnn_1 + qnn_2
     # modify individual variables and confirm changes in the sum
@@ -152,8 +152,8 @@ class QuantumCircuitTest(tf.test.TestCase):
     symbol_names_2 = ["second", shared_symbol_name, "something"]
     symbols_1 = [sympy.Symbol(s) for s in symbol_names_1]
     symbols_2 = [sympy.Symbol(s) for s in symbol_names_2]
-    pqc_1 = cirq.Circuit([cirq.X(qubit_1) ** s for s in symbols_1])
-    pqc_2 = cirq.Circuit([cirq.Y(qubit_2) ** s for s in symbols_2])
+    pqc_1 = cirq.Circuit([cirq.X(qubit_1)**s for s in symbols_1])
+    pqc_2 = cirq.Circuit([cirq.Y(qubit_2)**s for s in symbols_2])
     qnn_1 = circuit_model.QuantumCircuit(
         pqc_1, tf.constant([str(s) for s in symbol_names_1]),
         [tf.random.uniform([len(symbol_names_1)], dtype=tf.float32)], [[]])
@@ -168,31 +168,29 @@ class QuantumCircuitTest(tf.test.TestCase):
 
   def test_pow(self):
     """Confirms inversion of QuantumCircuit works correctly."""
-    actual_inverse = self.actual_layer ** -1
-    expected_pqc = tfq.convert_to_tensor([self.raw_pqc ** -1])
+    actual_inverse = self.actual_layer**-1
+    expected_pqc = tfq.convert_to_tensor([self.raw_pqc**-1])
     self.assertNotAllEqual(
-      tfq.from_tensor(self.actual_layer.pqc),
-      tfq.from_tensor(actual_inverse.pqc))
+        tfq.from_tensor(self.actual_layer.pqc),
+        tfq.from_tensor(actual_inverse.pqc))
     self.assertAllEqual(
-      tfq.from_tensor(actual_inverse.pqc),
-      tfq.from_tensor(expected_pqc))
+        tfq.from_tensor(actual_inverse.pqc), tfq.from_tensor(expected_pqc))
 
     # Confirm that tf.Variables in the inverse are the same as self.
     var_1 = tf.Variable([2.5])
     qnn_1 = circuit_model.QuantumCircuit(
-        cirq.Circuit(cirq.X(cirq.GridQubit(0, 0)) ** sympy.Symbol("a")),
+        cirq.Circuit(cirq.X(cirq.GridQubit(0, 0))**sympy.Symbol("a")),
         tf.constant(["a"]), [var_1], [[]])
-    actual_inverse = qnn_1 ** -1
+    actual_inverse = qnn_1**-1
     var_1.assign([-3.0])
     self.assertAllClose(actual_inverse.trainable_variables[0], var_1)
 
   def test_pow_error(self):
     """Confirms bad inputs to __pow__ are rejected."""
     with self.assertRaises(TypeError):
-      _ = self.actual_layer ** "junk"
-    with self.assertRaisesRegex(
-        ValueError, expected_regex="Only the inverse"):
-      _ = self.actual_layer ** 2
+      _ = self.actual_layer**"junk"
+    with self.assertRaisesRegex(ValueError, expected_regex="Only the inverse"):
+      _ = self.actual_layer**2
 
 
 class DirectQuantumCircuitTest(tf.test.TestCase):
