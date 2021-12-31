@@ -147,14 +147,23 @@ class QuantumCircuit(tf.keras.layers.Layer):
     Note that no new `tf.Variable`s are created, the new QuantumCircuit contains
     the variables in both `self` and `other`.
     """
-    new_pqc = tfq.from_tensor(tfq.append_circuit(self.pqc, other.pqc))[0]
-    new_symbol_names = tf.concat([self.symbol_names, other.symbol_names], 0)
-    new_value_layers_inputs = (
-        self.value_layers_inputs + other.value_layers_inputs)
-    new_value_layers = self.value_layers + other.value_layers
-    new_name = self.name + other.name
-    return QuantumCircuit(new_pqc, new_symbol_names, new_value_layers_inputs,
-                          new_value_layers, new_name)
+    if isinstance(other, QuantumCircuit):
+      intersection = tf.sets.intersection(
+          tf.expand_dims(self.symbol_names, 0),
+          tf.expand_dims(other.symbol_names, 0))
+      if not tf.equal(tf.size(intersection.values), 0):
+        raise ValueError(
+            "Circuits to be summed must not have symbols in common.")
+      new_pqc = tfq.from_tensor(tfq.append_circuit(self.pqc, other.pqc))[0]
+      new_symbol_names = tf.concat([self.symbol_names, other.symbol_names], 0)
+      new_value_layers_inputs = (
+          self.value_layers_inputs + other.value_layers_inputs)
+      new_value_layers = self.value_layers + other.value_layers
+      new_name = self.name + other.name
+      return QuantumCircuit(new_pqc, new_symbol_names, new_value_layers_inputs,
+                            new_value_layers, new_name)
+    else:
+      raise TypeError
 
   def __pow__(self, exponent):
     """Returns a QuantumCircuit with inverted `self.pqc`.
@@ -162,12 +171,15 @@ class QuantumCircuit(tf.keras.layers.Layer):
     Note that no new `tf.Variable`s are created, the new QuantumCircuit contains
     the same variables as `self`.
     """
-    if exponent != -1:
-      raise ValueError("Only the inverse (exponent == -1) is supported.")
-    new_pqc = tfq.from_tensor(self.pqc)[0] ** -1
-    new_name = self.name + "_inverse"
-    return QuantumCircuit(new_pqc, self.symbol_names, self.value_layers_inputs,
-                          self.value_layers, new_name)
+    if isinstance(exponent, int):
+      if exponent != -1:
+        raise ValueError("Only the inverse (exponent == -1) is supported.")
+      new_pqc = tfq.from_tensor(self.pqc)[0] ** -1
+      new_name = self.name + "_inverse"
+      return QuantumCircuit(new_pqc, self.symbol_names, self.value_layers_inputs,
+                            self.value_layers, new_name)
+    else:
+      raise TypeError
 
 
 class DirectQuantumCircuit(QuantumCircuit):
