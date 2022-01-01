@@ -103,7 +103,7 @@ class QuantumCircuit(tf.keras.layers.Layer):
     This should be structured such that `self.symbol_values[i]` is the current
     value of `self.symbol_names[i]` in `self.pqc` and `self.inverse_pqc`.
     """
-    # TODO(#???): empty value because concat requires at least two entries.
+    # TODO(#123): empty value because concat requires at least two entries.
     intermediate_values = [[]]
     for inputs, layers in zip(self.value_layers_inputs, self.value_layers):
       x = inputs
