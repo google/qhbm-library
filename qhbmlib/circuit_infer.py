@@ -81,7 +81,7 @@ class QuantumInference(tf.keras.layers.Layer):
     return self._differentiator
 
   def expectation(self,
-                  
+                  qnn: circuit_model.QuantumCircuit,
                   initial_states: tf.Tensor,
                   counts: tf.Tensor,
                   operators: tf.Tensor,
