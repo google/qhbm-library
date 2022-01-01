@@ -178,8 +178,7 @@ class QuantumInferenceTest(tf.test.TestCase):
       actual_exps = []
       for op in all_ops:
         actual_exps.append(
-            exp_infer.expectation(
-                self.p_qnn, bitstrings, counts, op, False))
+            exp_infer.expectation(self.p_qnn, bitstrings, counts, op, False))
     actual_exps_grad = [
         tf.squeeze(tape.jacobian(exps, self.p_qnn.trainable_variables))
         for exps in actual_exps
