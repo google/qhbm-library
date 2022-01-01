@@ -21,6 +21,7 @@ import tensorflow as tf
 import tensorflow_quantum as tfq
 
 from qhbmlib import circuit_model
+from qhbmlib import energy_model
 
 
 class QuantumInference(tf.keras.layers.Layer):

@@ -21,6 +21,7 @@ import cirq
 import math
 import sympy
 import tensorflow as tf
+from tensorflow.python import eager
 import tensorflow_probability as tfp
 import tensorflow_quantum as tfq
 
@@ -157,21 +158,33 @@ class QuantumInferenceTest(tf.test.TestCase):
     z_ops = tfq.convert_to_tensor([1 * cirq.Z(q) for q in self.raw_qubits])
     all_ops = [x_ops, y_ops, z_ops]
 
-    # Check with reduce True (this is the default)
-    with tf.GradientTape(persistent=True) as tape:
-      actual_exps = []
-      for op in all_ops:
-        actual_exps.append(
-            exp_infer.expectation(self.p_qnn, bitstrings, counts, op))
-    actual_exps_grad = [
-        tf.squeeze(tape.jacobian(exps, self.p_qnn.trainable_variables))
-        for exps in actual_exps
-    ]
-    del tape
-    for a, e in zip(actual_exps, expected_reduced):
-      self.assertAllClose(a, e, atol=ATOL)
-    for a, e in zip(actual_exps_grad, expected_grad_reduced):
-      self.assertAllClose(a, e, atol=GRAD_ATOL)
+    @tf.function
+    def tf_function_exp(qnn, bitstrings, counts, op):
+      """Wrapper to confirm expectation can be traced."""
+      return exp_infer.expectation(qnn, bitstrings, counts, op)
+
+    for exp_f in [exp_infer.expectation, tf_function_exp]:
+      # Check with reduce True (this is the default)
+      with tf.GradientTape(persistent=True) as tape:
+        actual_exps = []
+        for op in all_ops:
+          actual_exps.append(exp_f(self.p_qnn, bitstrings, counts, op))
+
+      # TODO(#???): add test with tf.function wrapping, currently
+      #             there is a bug in TFQ when taking gradients.
+      if not isinstance(exp_f, eager.def_function.Function):
+        actual_exps_grad = [
+            tf.squeeze(tape.jacobian(exps, self.p_qnn.trainable_variables))
+            for exps in actual_exps
+        ]
+      del tape
+      for a, e in zip(actual_exps, expected_reduced):
+        self.assertAllClose(a, e, atol=ATOL)
+      if not isinstance(exp_f, eager.def_function.Function):
+        for a, e in zip(actual_exps_grad, expected_grad_reduced):
+          self.assertAllClose(a, e, atol=GRAD_ATOL)
+    # Confirm tracing only happened once.
+    self.assertEqual(tf_function_exp.experimental_get_tracing_count(), 1)
 
     # Check with reduce False
     with tf.GradientTape(persistent=True) as tape:
