@@ -14,15 +14,11 @@
 # ==============================================================================
 """Tools for inference on quantum Hamiltonians."""
 
-from typing import List, Type
+from typing import Union
 
-import cirq
-import numpy as np
 import tensorflow as tf
-import tensorflow_quantum as tfq
 
 from qhbmlib import circuit_infer
-from qhbmlib import circuit_model
 from qhbmlib import energy_infer
 from qhbmlib import energy_model
 from qhbmlib import hamiltonian_model
@@ -33,9 +29,11 @@ class QHBM(tf.keras.layers.Layer):
   """Methods for inference on Hamiltonian objects."""
 
   def __init__(self,
-               e_inference: energy_infer.InferenceLayer,
-               q_inference: circuit_infer.QuantumInference):
+               e_inference: energy_infer.EnergyInference,
+               q_inference: circuit_infer.QuantumInference,
+               name: Union[None, str] = None):
     """Initializes a QHBM."""
+    super().__init__(name=name)
     self._e_inference = e_inference
     self._q_inference = q_inference
 
@@ -47,9 +45,7 @@ class QHBM(tf.keras.layers.Layer):
   def q_inference(self):
     return self._q_inference
 
-  def circuits(self,
-               model: hamiltonian_model.Hamiltonian,
-               num_samples: int):
+  def circuits(self, model: hamiltonian_model.Hamiltonian, num_samples: int):
     self.e_inference.infer(model.energy)
     samples = self.e_inference.sample(num_samples)
     bitstrings, counts = util.unique_bitstrings_with_counts(samples)
@@ -59,26 +55,24 @@ class QHBM(tf.keras.layers.Layer):
                   model: hamiltonian_model.Hamiltonian,
                   ops: Union[tf.Tensor, hamiltonian_model.Hamiltonian],
                   num_samples: int,
-                  reduce: bool=True):
+                  reduce: bool = True):
     self.e_inference.infer(model.energy)
     samples = self.e_inference.sample(num_samples)
     bitstrings, counts = util.unique_bitstrings_with_counts(samples)
     if isinstance(ops, tf.Tensor):
       return self.q_inference.expectation(
           model.circuit, bitstrings, counts, ops, reduce=reduce)
-    elif isinstance(model.energy, energy_model.PauliMixin):
-      u_dagger_u = model.circuit + op.circuit_dagger
-      operator_shards = model.energy.operator_shards(model.circuit.qubits)
+    elif isinstance(ops.energy, energy_model.PauliMixin):
+      u_dagger_u = model.circuit + ops.circuit_dagger
+      operator_shards = ops.energy.operator_shards(ops.circuit.qubits)
       expectation_shards = self.q_inference.expectation(
           u_dagger_u, bitstrings, counts, operator_shards, reduce=reduce)
-      return model.energy.operator_expectation(expectation_shards)
+      return ops.energy.operator_expectation(expectation_shards)
     else:
       raise NotImplementedError(
           "General `BitstringEnergy` models not yet supported.")
 
-  def sample(self,
-             model: hamiltonian_model.Hamiltonian,
-             num_samples: int):
+  def sample(self, model: hamiltonian_model.Hamiltonian, num_samples: int):
     self.e_inference.infer(model.energy)
     samples = self.e_inference.sample(num_samples)
     bitstrings, counts = util.unique_bitstrings_with_counts(samples)

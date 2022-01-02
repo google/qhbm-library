@@ -14,7 +14,7 @@
 # ==============================================================================
 """Tools for defining quantum Hamiltonian-based models."""
 
-from typing import List
+from typing import List, Union
 
 import tensorflow as tf
 
@@ -27,27 +27,30 @@ class Hamiltonian(tf.keras.layers.Layer):
 
   def __init__(self,
                energy: energy_model.BitstringEnergy,
-               circuit: circuit_model.QuantumCircuit):
+               circuit: circuit_model.QuantumCircuit,
+               name: Union[None, str] = None):
     """Initializes a Hamiltonian."""
+    super().__init__(name=name)
     if energy.num_bits != len(circuit.qubits):
       raise ValueError(
-        "`energy` and `circuit` must act on the same number of bits.")
+          "`energy` and `circuit` must act on the same number of bits.")
     self.energy = energy
     self.circuit = circuit
-    self.circuit_dagger = circuit ** -1
+    self.circuit_dagger = circuit**-1
 
   def __add__(self, other):
     if isinstance(other, Hamiltonian):
       return HamiltonianSum([self, other])
     else:
       raise TypeError
-    
+
 
 class HamiltonianSum(tf.keras.layers.Layer):
   """Sum of potentially non-commuting Hamiltonians."""
 
-  def __init__(self, terms: List[Hamiltonian]):
+  def __init__(self, terms: List[Hamiltonian], name: Union[None, str] = None):
     """Initializes a HamiltonianSum."""
+    super().__init__(name=name)
     self.terms = terms
 
   def __add__(self, other):
