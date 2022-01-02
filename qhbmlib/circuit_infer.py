@@ -27,7 +27,6 @@ class QuantumInference(tf.keras.layers.Layer):
   """Methods for inference on QuantumCircuit objects."""
 
   def __init__(self,
-               qnn: circuit_model.QuantumCircuit,
                backend: Union[str, cirq.Sampler] = "noiseless",
                differentiator: Union[None,
                                      tfq.differentiators.Differentiator] = None,
@@ -35,14 +34,12 @@ class QuantumInference(tf.keras.layers.Layer):
     """Initialize a QuantumInference layer.
 
     Args:
-      qnn: The parameterized quantum circuit on which to do inference.
       backend: Specifies what backend TFQ will use to compute expectation
         values. `str` options are {"noisy", "noiseless"}; users may also specify
         a preconfigured cirq execution object to use instead.
       differentiator: Specifies how to take the derivative of a quantum circuit.
       name: Identifier for this inference engine.
     """
-    self.qnn = qnn
     self._differentiator = differentiator
     self._backend = backend
     self._sample_layer = tfq.layers.Sample(backend=backend)
@@ -84,6 +81,7 @@ class QuantumInference(tf.keras.layers.Layer):
     return self._differentiator
 
   def expectation(self,
+                  qnn: circuit_model.QuantumCircuit,
                   initial_states: tf.Tensor,
                   counts: tf.Tensor,
                   operators: tf.Tensor,
@@ -91,6 +89,7 @@ class QuantumInference(tf.keras.layers.Layer):
     """Returns the expectation values of the operators against the QNN.
 
       Args:
+        qnn: The parameterized quantum circuit on which to do inference.
         initial_states: Shape [batch_size, num_qubits] of dtype `tf.int8`.
           These are the initial states of each qubit in the circuit.
         counts: Shape [batch_size] of dtype `tf.int32` such that `counts[i]` is
@@ -100,7 +99,7 @@ class QuantumInference(tf.keras.layers.Layer):
           the the corresponding expectation.
         operators: `tf.Tensor` of strings with shape [n_ops], result of calling
           `tfq.convert_to_tensor` on a list of cirq.PauliSum, `[op1, op2, ...]`.
-          Will be tiled to measure `<op_j>_(self.qnn)|initial_states[i]>`
+          Will be tiled to measure `<op_j>_((qnn)|initial_states[i]>)`
           for each i and j.
         reduce: bool flag for whether or not to average over i.
 
@@ -110,15 +109,15 @@ class QuantumInference(tf.keras.layers.Layer):
         Else, a `tf.Tensor` with shape [batch_size, n_ops] whose entries are the
         unaveraged expectation values of each `operator` against each `circuit`.
       """
-    circuits = self.qnn(initial_states)
+    circuits = qnn(initial_states)
     num_circuits = tf.shape(circuits)[0]
     num_operators = tf.shape(operators)[0]
     tiled_values = tf.tile(
-        tf.expand_dims(self.qnn.symbol_values, 0), [num_circuits, 1])
+        tf.expand_dims(qnn.symbol_values, 0), [num_circuits, 1])
     tiled_operators = tf.tile(tf.expand_dims(operators, 0), [num_circuits, 1])
     expectations = self._expectation_function(
         circuits,
-        self.qnn.symbol_names,
+        qnn.symbol_names,
         tiled_values,
         tiled_operators,
         tf.tile(tf.expand_dims(counts, 1), [1, num_operators]),
@@ -129,30 +128,32 @@ class QuantumInference(tf.keras.layers.Layer):
       return tf.reduce_sum(tf.transpose(probs * tf.transpose(expectations)), 0)
     return expectations
 
-  def sample(self, initial_states, counts):
+  def sample(self, qnn: circuit_model.QuantumCircuit, initial_states: tf.Tensor,
+             counts: tf.Tensor):
     """Returns bitstring samples from the QNN.
 
       Args:
+        qnn: The parameterized quantum circuit on which to do inference.
         initial_states: Shape [batch_size, num_qubits] of dtype `tf.int8`.
           These are the initial states of each qubit in the circuit.
         counts: Shape [batch_size] of dtype `tf.int32` such that `counts[i]` is
-          the number of samples to draw from `self.pqc|initial_states[i]>`.
+          the number of samples to draw from `(qnn)|initial_states[i]>`.
 
       Returns:
         ragged_samples: `tf.RaggedTensor` of DType `tf.int8` structured such
           that `ragged_samples[i]` contains `counts[i]` bitstrings drawn from
-          `(self.qnn)|initial_states[i]>`.
+          `(qnn)|initial_states[i]>`.
     """
-    circuits = self.qnn(initial_states)
+    circuits = qnn(initial_states)
     num_circuits = tf.shape(circuits)[0]
     tiled_values = tf.tile(
-        tf.expand_dims(self.qnn.symbol_values, 0), [num_circuits, 1])
+        tf.expand_dims(qnn.symbol_values, 0), [num_circuits, 1])
     num_samples_mask = tf.cast((tf.ragged.range(counts) + 1).to_tensor(),
                                tf.bool)
     num_samples_mask = tf.map_fn(tf.random.shuffle, num_samples_mask)
     samples = self._sample_layer(
         circuits,
-        symbol_names=self.qnn.symbol_names,
+        symbol_names=qnn.symbol_names,
         symbol_values=tiled_values,
         repetitions=tf.expand_dims(tf.math.reduce_max(counts), 0))
     return tf.ragged.boolean_mask(samples, num_samples_mask)
