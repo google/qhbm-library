@@ -25,13 +25,13 @@ from tensorflow_probability import distributions as tfd
 from qhbmlib import energy_model
 
 
-class InferenceLayer(tf.keras.layers.Layer, abc.ABC):
+class EnergyInference(tf.keras.layers.Layer, abc.ABC):
   """Sets the methods required for inference on BitstringEnergy objects."""
 
   def __init__(self,
                energy: energy_model.BitstringEnergy,
                name: Union[None, str] = None):
-    """Initializes an InferenceLayer.
+    """Initializes an EnergyInference.
 
     Args:
       energy: The parameterized energy function which defines this distribution
@@ -87,13 +87,13 @@ class InferenceLayer(tf.keras.layers.Layer, abc.ABC):
     return self.sample(inputs)
 
 
-class AnalyticInferenceLayer(InferenceLayer):
+class AnalyticEnergyInference(EnergyInference):
   """Uses an explicit categorical distribution to implement parent functions."""
 
   def __init__(self,
                energy: energy_model.BitstringEnergy,
                name: Union[None, str] = None):
-    """Initializes an AnalyticInferenceLayer.
+    """Initializes an AnalyticEnergyInference.
 
     Internally, this class saves all possible bitstrings as a tensor, whose
     energies are calculated relative to an input energy function for sampling
@@ -154,13 +154,13 @@ class AnalyticInferenceLayer(InferenceLayer):
       return self.sample(inputs)
 
 
-class BernoulliInferenceLayer(InferenceLayer):
+class BernoulliEnergyInference(EnergyInference):
   """Manages inference for a Bernoulli defined by spin energies."""
 
   def __init__(self,
                energy: energy_model.BitstringEnergy,
                name: Union[None, str] = None):
-    """Initializes a BernoulliInferenceLayer.
+    """Initializes a BernoulliEnergyInference.
 
     Args:
       energy: The parameterized energy function which defines this distribution
