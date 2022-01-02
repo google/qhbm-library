@@ -53,8 +53,8 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
 
     # Single bit test.
     one_bit_energy = energy_model.KOBE([0], 1)
+    one_bit_energy.build([None, one_bit_energy.num_bits])
     actual_layer = energy_infer.AnalyticEnergyInference(one_bit_energy)
-    actual_layer.build([])
     # For single factor Bernoulli, theta=0 is 50% chance of 1.
     one_bit_energy.set_weights([tf.constant([0.0])])
 
@@ -134,8 +134,8 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     expected_log_partition = tf.math.log(tf.constant(3641.8353))
 
     energy = energy_model.KOBE([0, 1], 2)
+    energy.build([None, energy.num_bits])
     actual_layer = energy_infer.AnalyticEnergyInference(energy)
-    actual_layer.build([])
     energy.set_weights([test_thetas])
     actual_layer.infer()
     actual_log_partition = actual_layer.log_partition()
@@ -147,8 +147,8 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     expected_entropy = tf.constant(0.00233551808)
 
     energy = energy_model.KOBE([0, 1], 2)
+    energy.build([None, energy.num_bits])
     actual_layer = energy_infer.AnalyticEnergyInference(energy)
-    actual_layer.build([])
     energy.set_weights([test_thetas])
     actual_layer.infer()
     actual_entropy = actual_layer.entropy()
@@ -194,8 +194,8 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     """Confirms that bitstrings are sampled as expected."""
     n_samples = 1e7
     energy = energy_model.BernoulliEnergy([1])
+    energy.build([None, energy.num_bits])
     actual_layer = energy_infer.BernoulliEnergyInference(energy)
-    actual_layer.build([])
 
     # For single factor Bernoulli, theta = 0 is 50% chance of 1.
     energy.set_weights([tf.constant([0.0])])
@@ -223,8 +223,8 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     # Two bit tests.
     energy = energy_model.BernoulliEnergy([0, 1],
                                           tf.keras.initializers.Constant(0.0))
+    energy.build([None, energy.num_bits])
     actual_layer = energy_infer.BernoulliEnergyInference(energy)
-    actual_layer.build([])
     actual_layer.infer()
     samples = actual_layer.sample(n_samples)
     for b in [[0, 0], [0, 1], [1, 0], [1, 1]]:
@@ -258,8 +258,8 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
                                   [1, 0, 0], [1, 0, 1], [1, 1, 0], [1, 1, 1]],
                                  dtype=tf.int8)
     energy = energy_model.BernoulliEnergy([5, 6, 7])
+    energy.build([None, energy.num_bits])
     actual_layer = energy_infer.BernoulliEnergyInference(energy)
-    actual_layer.build([])
     actual_layer.infer()
     expected_log_partition = tf.reduce_logsumexp(-1.0 * energy(all_bitstrings))
     actual_log_partition = actual_layer.log_partition()
@@ -291,8 +291,8 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     expected_entropy = -1.0 * tf.reduce_sum(all_probs * tf.math.log(all_probs))
 
     energy = energy_model.BernoulliEnergy([0, 1, 2])
+    energy.build([None, energy.num_bits])
     actual_layer = energy_infer.BernoulliEnergyInference(energy)
-    actual_layer.build([])
     energy.set_weights([test_thetas])
     actual_layer.infer()
     actual_entropy = actual_layer.entropy()
@@ -302,8 +302,8 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     """Confirms that calling the layer works correctly."""
     energy = energy_model.BernoulliEnergy([1],
                                           tf.keras.initializers.Constant(0.0))
+    energy.build([None, energy.num_bits])
     actual_layer = energy_infer.BernoulliEnergyInference(energy)
-    actual_layer.build([])
     self.assertIsNone(actual_layer.current_dist)
     actual_dist = actual_layer(None)
     self.assertIsInstance(actual_dist, tfp.distributions.Bernoulli)

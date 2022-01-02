@@ -28,14 +28,10 @@ from qhbmlib import energy_model
 class EnergyInference(tf.keras.layers.Layer, abc.ABC):
   """Sets the methods required for inference on BitstringEnergy objects."""
 
-  def __init__(self,
-               energy: energy_model.BitstringEnergy,
-               name: Union[None, str] = None):
+  def __init__(self, energy, name: Union[None, str] = None):
     """Initializes an EnergyInference.
 
     Args:
-      energy: The parameterized energy function which defines this distribution
-        via the equations of an energy based model.
       name: Optional name for the model.
     """
     super().__init__(name=name)
@@ -47,11 +43,14 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     return self._energy
 
   @abc.abstractmethod
-  def infer(self):
+  def infer(self, energy: energy_model.BitstringEnergy):
     """Do the work to ready this layer for use.
 
-    This should be called each time the underlying model in
-    `self.energy` is updated.
+    This should be called each time the underlying model is updated.
+
+    Args:
+      energy: The parameterized energy function which defines this distribution
+        via the equations of an energy based model.
     """
     raise NotImplementedError()
 
@@ -72,15 +71,6 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
   def log_partition(self):
     """Returns an estimate of the log partition function."""
     raise NotImplementedError()
-
-  def build(self, input_shape):
-    """Builds the internal energy function.
-
-    `input_shape` is unused because it is known to be `[]`, since calls are
-    given a scalar, the number of samples to draw from the distribution.
-    """
-    del input_shape
-    self.energy.build([None, self.energy.num_bits])
 
   def call(self, inputs):
     """Returns the number of samples specified in the inputs."""
