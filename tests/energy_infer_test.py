@@ -32,8 +32,8 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     bits = [0, 1, 3]
     order = 2
     expected_name = "test_analytic_dist_name"
-    actual_layer = energy_infer.AnalyticEnergyInference(len(bits),
-                                                        expected_name)
+    actual_layer = energy_infer.AnalyticEnergyInference(
+        len(bits), expected_name)
     self.assertEqual(actual_layer.name, expected_name)
 
     expected_bitstrings = tf.constant(
@@ -160,7 +160,8 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
                                        tf.keras.initializers.Constant(0.0))
     actual_layer = energy_infer.AnalyticEnergyInference(1)
     self.assertIsNone(actual_layer.current_dist)
-    with self.assertRaisesRegex(RuntimeError, expected_regex="`infer` must be called"):
+    with self.assertRaisesRegex(
+        RuntimeError, expected_regex="`infer` must be called"):
       _ = actual_layer(None)
     actual_layer.infer(one_bit_energy)
     actual_dist = actual_layer(None)
@@ -185,8 +186,6 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
 
   def test_init(self):
     """Tests that components are initialized correctly."""
-    bits = [0, 1, 3]
-    expected_energy = energy_model.BernoulliEnergy(bits)
     expected_name = "test_analytic_dist_name"
     actual_layer = energy_infer.BernoulliEnergyInference(expected_name)
     self.assertEqual(actual_layer.name, expected_name)
@@ -306,7 +305,8 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     energy.build([None, energy.num_bits])
     actual_layer = energy_infer.BernoulliEnergyInference()
     self.assertIsNone(actual_layer.current_dist)
-    with self.assertRaisesRegex(RuntimeError, expected_regex="`infer` must be called"):
+    with self.assertRaisesRegex(
+        RuntimeError, expected_regex="`infer` must be called"):
       _ = actual_layer(None)
     actual_layer.infer(energy)
     actual_dist = actual_layer(None)

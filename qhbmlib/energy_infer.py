@@ -74,9 +74,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
 class AnalyticEnergyInference(EnergyInference):
   """Uses an explicit categorical distribution to implement parent functions."""
 
-  def __init__(self,
-               num_bits: int,
-               name: Union[None, str] = None):
+  def __init__(self, num_bits: int, name: Union[None, str] = None):
     """Initializes an AnalyticEnergyInference.
 
     Internally, this class saves all possible bitstrings as a tensor, whose
@@ -89,8 +87,7 @@ class AnalyticEnergyInference(EnergyInference):
     """
     super().__init__(name=name)
     self._all_bitstrings = tf.constant(
-        list(itertools.product([0, 1], repeat=num_bits)),
-        dtype=tf.int8)
+        list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
     self._dist_realization = tfp.layers.DistributionLambda(
         make_distribution_fn=lambda t: tfd.Categorical(logits=-1 * t))
     self.energy = None
