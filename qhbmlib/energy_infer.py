@@ -28,19 +28,13 @@ from qhbmlib import energy_model
 class EnergyInference(tf.keras.layers.Layer, abc.ABC):
   """Sets the methods required for inference on BitstringEnergy objects."""
 
-  def __init__(self, energy, name: Union[None, str] = None):
+  def __init__(self, name: Union[None, str] = None):
     """Initializes an EnergyInference.
 
     Args:
       name: Optional name for the model.
     """
     super().__init__(name=name)
-    self._energy = energy
-
-  @property
-  def energy(self):
-    """The energy model on which this layer performs inference."""
-    return self._energy
 
   @abc.abstractmethod
   def infer(self, energy: energy_model.BitstringEnergy):
@@ -81,7 +75,7 @@ class AnalyticEnergyInference(EnergyInference):
   """Uses an explicit categorical distribution to implement parent functions."""
 
   def __init__(self,
-               energy: energy_model.BitstringEnergy,
+               num_bits: int,
                name: Union[None, str] = None):
     """Initializes an AnalyticEnergyInference.
 
@@ -90,16 +84,16 @@ class AnalyticEnergyInference(EnergyInference):
     and other inference tasks.
 
     Args:
-      energy: The parameterized energy function which defines this distribution
-        via the equations of an energy based model.
+      num_bits: Number of bits on which this layer acts.
       name: Optional name for the model.
     """
-    super().__init__(energy, name=name)
+    super().__init__(name=name)
     self._all_bitstrings = tf.constant(
-        list(itertools.product([0, 1], repeat=self.energy.num_bits)),
+        list(itertools.product([0, 1], repeat=num_bits)),
         dtype=tf.int8)
     self._dist_realization = tfp.layers.DistributionLambda(
         make_distribution_fn=lambda t: tfd.Categorical(logits=-1 * t))
+    self.energy = None
     self._current_dist = None
 
   @property
@@ -117,8 +111,9 @@ class AnalyticEnergyInference(EnergyInference):
     """Bernoulli distribution set during last call to `self.infer`."""
     return self._current_dist
 
-  def infer(self):
+  def infer(self, energy: energy_model.BitstringEnergy):
     """See base class docstring."""
+    self.energy = energy
     x = tf.squeeze(self.all_energies)
     self._current_dist = self._dist_realization(x)
 
@@ -137,7 +132,7 @@ class AnalyticEnergyInference(EnergyInference):
 
   def call(self, inputs):
     if self._current_dist is None:
-      self.infer()
+      raise RuntimeError("`infer` must be called at least once.")
     if inputs is None:
       return self._current_dist
     else:
@@ -147,19 +142,16 @@ class AnalyticEnergyInference(EnergyInference):
 class BernoulliEnergyInference(EnergyInference):
   """Manages inference for a Bernoulli defined by spin energies."""
 
-  def __init__(self,
-               energy: energy_model.BitstringEnergy,
-               name: Union[None, str] = None):
+  def __init__(self, name: Union[None, str] = None):
     """Initializes a BernoulliEnergyInference.
 
     Args:
-      energy: The parameterized energy function which defines this distribution
-        via the equations of an energy based model.
       name: Optional name for the model.
     """
-    super().__init__(energy, name=name)
+    super().__init__(name=name)
     self._dist_realization = tfp.layers.DistributionLambda(
         make_distribution_fn=lambda t: tfd.Bernoulli(logits=t, dtype=tf.int8))
+    self.energy = None
     self._current_dist = None
 
   @property
@@ -167,8 +159,9 @@ class BernoulliEnergyInference(EnergyInference):
     """Categorical distribution set during last call to `self.infer`."""
     return self._current_dist
 
-  def infer(self):
+  def infer(self, energy: energy_model.BitstringEnergy):
     """See base class docstring."""
+    self.energy = energy
     self._current_dist = self._dist_realization(self.energy.logits)
 
   def sample(self, n):
@@ -198,7 +191,7 @@ class BernoulliEnergyInference(EnergyInference):
 
   def call(self, inputs):
     if self._current_dist is None:
-      self.infer()
+      raise RuntimeError("`infer` must be called at least once.")
     if inputs is None:
       return self._current_dist
     else:
