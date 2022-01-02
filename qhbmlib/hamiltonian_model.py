@@ -14,6 +14,8 @@
 # ==============================================================================
 """Tools for defining quantum Hamiltonian-based models."""
 
+from typing import List
+
 import tensorflow as tf
 
 from qhbmlib import circuit_model
@@ -21,7 +23,7 @@ from qhbmlib import energy_model
 
 
 class Hamiltonian(tf.keras.layers.Layer):
-  """Hamiltonian representation of a QHBM."""
+  """Diagonalized representation of a Hermitian operator."""
 
   def __init__(self,
                energy: energy_model.BitstringEnergy,
@@ -32,11 +34,26 @@ class Hamiltonian(tf.keras.layers.Layer):
         "`energy` and `circuit` must act on the same number of bits.")
     self.energy = energy
     self.circuit = circuit
+    self.circuit_dagger = circuit ** -1
 
-
-class CirqHamiltonian(Hamiltonian):
-  """Wraps a cirq.PauliSum as a Hamiltonian object."""
-
-  def __init__(self, ham: cirq.PauliSum):
-    """Initializes a CirqHamiltonian."""
+  def __add__(self, other):
+    if isinstance(other, Hamiltonian):
+      return HamiltonianSum([self, other])
+    else:
+      raise TypeError
     
+
+class HamiltonianSum(tf.keras.layers.Layer):
+  """Sum of potentially non-commuting Hamiltonians."""
+
+  def __init__(self, terms: List[Hamiltonian]):
+    """Initializes a HamiltonianSum."""
+    self.terms = terms
+
+  def __add__(self, other):
+    if isinstance(other, Hamiltonian):
+      return HamiltonianSum(self.terms + [other])
+    elif isinstance(other, HamiltonianSum):
+      return HamiltonianSum(self.terms + other.terms)
+    else:
+      raise TypeError
