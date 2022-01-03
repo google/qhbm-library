@@ -64,7 +64,9 @@ class QHBMTest(tf.test.TestCase):
     self.expected_e_inference = energy_infer.AnalyticEnergyInference(3)
     self.expected_q_inference = circuit_infer.QuantumInference()
     self.expected_name = "nameforaQHBM"
-    self.actual_qhbm = hamiltonian_infer.QHBM(self.expected_e_inference, self.expected_q_inference, self.expected_name)
+    self.actual_qhbm = hamiltonian_infer.QHBM(self.expected_e_inference,
+                                              self.expected_q_inference,
+                                              self.expected_name)
 
   def test_init(self):
     """Tests QHBM initialization."""
@@ -75,8 +77,9 @@ class QHBMTest(tf.test.TestCase):
   def test_circuits(self):
     """Confirms correct circuits are sampled."""
     num_samples = int(1e7)
-    actual_circuits, actual_counts = self.actual_qhbm.circuits(self.model, num_samples)
-    
+    actual_circuits, actual_counts = self.actual_qhbm.circuits(
+        self.model, num_samples)
+
     # Circuits with the allowed-to-be-sampled bitstrings prepended.
     u = tfq.from_tensor(self.model.circuit.pqc)[0]
     qubits = self.model.circuit.qubits
@@ -105,8 +108,8 @@ class QHBMTest(tf.test.TestCase):
             expected_circuits_deser[1] == actual_circuits_deser[1],
         ]))
     # Check that the fraction is approximately 0.5 (equal counts)
-    self.assertAllClose(actual_counts[0], actual_counts[1], atol=num_samples/1000)
-
+    self.assertAllClose(
+        actual_counts[0], actual_counts[1], atol=num_samples / 1000)
 
   def test_expectation(self):
     pass
