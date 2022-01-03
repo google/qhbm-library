@@ -29,7 +29,13 @@ class Hamiltonian(tf.keras.layers.Layer):
                energy: energy_model.BitstringEnergy,
                circuit: circuit_model.QuantumCircuit,
                name: Union[None, str] = None):
-    """Initializes a Hamiltonian."""
+    """Initializes a Hamiltonian.
+
+    Args:
+      energy: Represents the eigenvalues of this operator.
+      circuit: Represents the eigenvectors of this operator.
+      name: Optional name for the model.
+    """
     super().__init__(name=name)
     if energy.num_bits != len(circuit.qubits):
       raise ValueError(
@@ -39,6 +45,7 @@ class Hamiltonian(tf.keras.layers.Layer):
     self.circuit_dagger = circuit**-1
 
   def __add__(self, other):
+    """Returns a HamiltonianSum representing the sum of `self` and `other`."""
     if isinstance(other, Hamiltonian):
       return HamiltonianSum([self, other])
     else:

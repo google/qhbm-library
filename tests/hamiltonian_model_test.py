@@ -36,8 +36,14 @@ class HamiltonianTest(tf.test.TestCase):
     """Initializes test objects."""
     super().setUp()
     self.expected_name = "this_IS_theTestHam42"
-    self.expected_energy =
-    self.expected_circuit = 
+    self.num_bits = 3
+    self.expected_energy = energy_model.BernoulliEnergy(list(range(self.num_bits)))
+    self.expected_energy.build([None, self.num_bits])
+    qubits = cirq.GridQubit.rect(1, self.num_bits)
+    symbols = [sympy.Symbol(str(n)) for n in range(self.num_bits)]
+    pqc = cirq.Circuit(cirq.X(q) ** s for q, s in zip(qubits, symbols)) 
+    self.expected_circuit = circuit_model.DirectQuantumCircuit(pqc)
+    self.expected_circuit.build([])
     self.actual_hamiltonian = hamiltonian_model.Hamiltonian(
         self.expected_energy,
         self.expected_circuit,
@@ -45,7 +51,17 @@ class HamiltonianTest(tf.test.TestCase):
 
   def test_init(self):
     """Tests Hamiltonian initialization."""
-    pass
+    self.assertEqual(self.actual_hamiltonian.name, self.expected_name)
+    self.assertEqual(self.actual_hamiltonian.energy, self.expected_energy)
+    self.assertEqual(self.actual_hamiltonian.circuit, self.expected_circuit)
+    self.assertEqual(tfq.from_tensor(
+      self.actual_hamiltonian.circuit_dagger.pqc), tfq.from_tensor((self.expected_circuit ** -1).pqc))
+
+  def test_init_error(self):
+    """Confirms initialization fails for mismatched energy and circuit."""
+    small_energy = energy_model.BernoulliEnergy(list(range(self.num_bits - 1)))
+    with self.assertRaisesRegex(ValueError, expected_regex="same number of bits"):
+      _ = hamiltonian_model.Hamiltonian(small_energy, self.expected_circuit)
 
   def test_add(self):
     """Tests Hamiltonian addition."""
