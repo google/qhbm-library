@@ -50,12 +50,18 @@ class HamiltonianTest(tf.test.TestCase):
         self.expected_name)
 
   def test_init(self):
-    """Tests Hamiltonian initialization."""
+    """Tests Hamiltonian initialization.
+
+    The first three equality checks are by python id.
+    """
     self.assertEqual(self.actual_hamiltonian.name, self.expected_name)
     self.assertEqual(self.actual_hamiltonian.energy, self.expected_energy)
     self.assertEqual(self.actual_hamiltonian.circuit, self.expected_circuit)
     self.assertEqual(tfq.from_tensor(
       self.actual_hamiltonian.circuit_dagger.pqc), tfq.from_tensor((self.expected_circuit ** -1).pqc))
+    expected_variables = self.expected_energy.trainable_variables + self.expected_circuit.trainable_variables
+    self.assertNotEmpty(expected_variables)
+    self.assertAllClose(self.actual_hamiltonian.trainable_variables, expected_variables)
 
   def test_init_error(self):
     """Confirms initialization fails for mismatched energy and circuit."""
@@ -74,10 +80,29 @@ class HamiltonianSumTest(tf.test.TestCase):
   def setUp(self):
     """Initializes test objects."""
     super().setUp()
+    self.expected_name = "SumThing"
+    self.num_bits_list = [2, 3]
+    self.expected_energy_list = [energy_model.BernoulliEnergy(list(range(num_bits))) for num_bits in self.num_bits_list]
+    for energy, num_bits in zip(self.expected_energy_list, self.num_bits_list):
+      energy.build([None, num_bits])
+    symbols_list = [[sympy.Symbol(str(n)) for n in range(num_bits)] for num_bits in self.num_bits_list]
+    qubits_list = [cirq.GridQubit.rect(1, num_bits) for num_bits in self.num_bits_list]
+    pqc_list = [cirq.Circuit(cirq.X(q) ** s for q, s in zip(qubits, symbols)) for qubits, symbols in zip(qubits_list, symbols_list)]
+    self.expected_circuit_list = [circuit_model.DirectQuantumCircuit(pqc) for pqc in pqc_list]
+    for circuit in self.expected_circuit_list:
+      circuit.build([])
+    self.expected_terms = [hamiltonian_model.Hamiltonian(e, c) for e, c in zip(self.expected_energy_list, self.expected_circuit_list)]
+    self.actual_hamiltonian_sum = hamiltonian_model.HamiltonianSum(self.expected_terms, self.expected_name)
 
   def test_init(self):
     """Tests HamiltonianSum initialization."""
-    pass
+    self.assertEqual(self.actual_hamiltonian_sum.name, self.expected_name)
+    expected_variables = []
+    for e, c in zip(self.expected_energy_list, self.expected_circuit_list):
+      expected_variables += e.trainable_variables
+      expected_variables += c.trainable_variables
+    self.assertNotEmpty(expected_variables)
+    self.assertAllClose(self.actual_hamiltonian_sum.trainable_variables, expected_variables)
 
   def test_add(self):
     """Tests HamiltonianSum addition."""

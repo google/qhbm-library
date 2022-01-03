@@ -61,6 +61,7 @@ class HamiltonianSum(tf.keras.layers.Layer):
     self.terms = terms
 
   def __add__(self, other):
+    """Returns a HamiltonianSum representing the sum of `self` and `other`."""
     if isinstance(other, Hamiltonian):
       return HamiltonianSum(self.terms + [other])
     elif isinstance(other, HamiltonianSum):
