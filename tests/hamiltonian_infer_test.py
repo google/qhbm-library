@@ -17,13 +17,17 @@
 import absl
 import itertools
 import random
+import string
 
 import cirq
 import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
+from tensorflow_quantum.python import util as tfq_util
 
+from qhbmlib import circuit_infer
 from qhbmlib import circuit_model
+from qhbmlib import energy_infer
 from qhbmlib import energy_model
 from qhbmlib import hamiltonian_model
 from qhbmlib import hamiltonian_infer
@@ -37,12 +41,72 @@ class QHBMTest(tf.test.TestCase):
     """Initializes test objects."""
     super().setUp()
 
+    # Model hamiltonian
+    num_bits = 3
+    energy = energy_model.BernoulliEnergy(list(range(num_bits)))
+    energy.build([None, num_bits])
+    # pin first and last bits, middle bit free.
+    energy.set_weights([tf.constant([-23, 0, 17])])
+    qubits = cirq.GridQubit.rect(1, num_bits)
+    symbols = set()
+    num_symbols = 20
+    for _ in range(num_symbols):
+      symbol = ""
+      for s in random.sample(string.ascii_letters, 10):
+        symbol += s
+      symbols.add(symbol)
+    pqc = tfq_util.random_symbol_circuit(qubits, symbols)
+    circuit = circuit_model.DirectQuantumCircuit(pqc)
+    circuit.build([])
+    self.model = hamiltonian_model.Hamiltonian(energy, circuit)
+
+    # Inference
+    self.expected_e_inference = energy_infer.AnalyticEnergyInference(3)
+    self.expected_q_inference = circuit_infer.QuantumInference()
+    self.expected_name = "nameforaQHBM"
+    self.actual_qhbm = hamiltonian_infer.QHBM(self.expected_e_inference, self.expected_q_inference, self.expected_name)
+
   def test_init(self):
     """Tests QHBM initialization."""
-    pass
+    self.assertEqual(self.actual_qhbm.e_inference, self.expected_e_inference)
+    self.assertEqual(self.actual_qhbm.q_inference, self.expected_q_inference)
+    self.assertEqual(self.actual_qhbm.name, self.expected_name)
 
   def test_circuits(self):
-    pass
+    """Confirms correct circuits are sampled."""
+    num_samples = int(1e7)
+    actual_circuits, actual_counts = self.actual_qhbm.circuits(self.model, num_samples)
+    
+    # Circuits with the allowed-to-be-sampled bitstrings prepended.
+    u = tfq.from_tensor(self.model.circuit.pqc)[0]
+    qubits = self.model.circuit.qubits
+    expected_circuits_deser = [
+        cirq.Circuit(
+            cirq.X(qubits[0])**0,
+            cirq.X(qubits[1])**0,
+            cirq.X(qubits[2]),
+        ) + u,
+        cirq.Circuit(
+            cirq.X(qubits[0])**0,
+            cirq.X(qubits[1]),
+            cirq.X(qubits[2]),
+        ) + u,
+    ]
+    # Check that both circuits are generated.
+    actual_circuits_deser = tfq.from_tensor(actual_circuits)
+    self.assertTrue(
+        any([
+            expected_circuits_deser[0] == actual_circuits_deser[0],
+            expected_circuits_deser[0] == actual_circuits_deser[1],
+        ]))
+    self.assertTrue(
+        any([
+            expected_circuits_deser[1] == actual_circuits_deser[0],
+            expected_circuits_deser[1] == actual_circuits_deser[1],
+        ]))
+    # Check that the fraction is approximately 0.5 (equal counts)
+    self.assertAllClose(actual_counts[0], actual_counts[1], atol=num_samples/1000)
+
 
   def test_expectation(self):
     pass
