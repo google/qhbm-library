@@ -14,7 +14,6 @@
 # ==============================================================================
 """Tests for the hamiltonian_infer module."""
 
-
 import absl
 import itertools
 import random
