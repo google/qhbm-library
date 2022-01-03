@@ -15,12 +15,10 @@
 """Tests for the hamiltonian_infer module."""
 
 import absl
-import itertools
 import random
 import string
 
 import cirq
-import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
 from tensorflow_quantum.python import util as tfq_util
@@ -31,7 +29,6 @@ from qhbmlib import energy_infer
 from qhbmlib import energy_model
 from qhbmlib import hamiltonian_model
 from qhbmlib import hamiltonian_infer
-from qhbmlib import utils
 
 
 class QHBMTest(tf.test.TestCase):
@@ -51,10 +48,7 @@ class QHBMTest(tf.test.TestCase):
     symbols = set()
     num_symbols = 20
     for _ in range(num_symbols):
-      symbol = ""
-      for s in random.sample(string.ascii_letters, 10):
-        symbol += s
-      symbols.add(symbol)
+      symbols.add("".join(random.sample(string.ascii_letters, 10)))
     pqc = tfq_util.random_symbol_circuit(qubits, symbols)
     circuit = circuit_model.DirectQuantumCircuit(pqc)
     circuit.build([])

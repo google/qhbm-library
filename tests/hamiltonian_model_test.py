@@ -56,7 +56,9 @@ class HamiltonianTest(tf.test.TestCase):
     self.assertEqual(
         tfq.from_tensor(self.actual_hamiltonian.circuit_dagger.pqc),
         tfq.from_tensor((self.expected_circuit**-1).pqc))
-    expected_variables = self.expected_energy.trainable_variables + self.expected_circuit.trainable_variables
+    expected_variables = (
+        self.expected_energy.trainable_variables +
+        self.expected_circuit.trainable_variables)
     self.assertNotEmpty(expected_variables)
     self.assertAllClose(self.actual_hamiltonian.trainable_variables,
                         expected_variables)
