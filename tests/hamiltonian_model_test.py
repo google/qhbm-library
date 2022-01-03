@@ -15,8 +15,6 @@
 """Tests for the hamiltonian_model module."""
 
 import absl
-import itertools
-import random
 
 import cirq
 import sympy
@@ -26,7 +24,6 @@ import tensorflow_quantum as tfq
 from qhbmlib import circuit_model
 from qhbmlib import energy_model
 from qhbmlib import hamiltonian_model
-from qhbmlib import utils
 
 
 class HamiltonianTest(tf.test.TestCase):
