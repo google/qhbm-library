@@ -31,8 +31,8 @@ class QuantumCircuit(tf.keras.layers.Layer):
   def __init__(self,
                pqc: cirq.Circuit,
                symbol_names: tf.Tensor,
-               value_layers_inputs: Union[tf.Variable, List[tf.Variable]],
-               value_layers: List[tf.keras.layers.Layer],
+               value_layers_inputs: List[Union[tf.Variable, List[tf.Variable]]],
+               value_layers: List[List[tf.keras.layers.Layer]],
                name: Union[None, str] = None):
     """Initializes a QuantumCircuit.
 
@@ -41,8 +41,10 @@ class QuantumCircuit(tf.keras.layers.Layer):
       symbol_names: Strings which are used to specify the order in which the
         values in `self.symbol_values` should be placed inside of the circuit.
       value_layers_inputs: Inputs to the `value_layers` argument.
-      value_layers: Concatenation of these layers yields trainable map from
-        `value_layers_inputs` to the values to substitute into the circuit.
+      value_layers: The concatenation of the layers in entry `i` yields a
+        trainable map from `value_layers_inputs[i]` to the `i` entry in the list
+        of intermediate values.  The list of intermediate values is concatenated
+        to yield the values to substitute into the circuit.
       name: Optional name for the model.
     """
     super().__init__(name=name)
@@ -59,7 +61,6 @@ class QuantumCircuit(tf.keras.layers.Layer):
     self._value_layers_inputs = value_layers_inputs
 
     self._pqc = tfq.convert_to_tensor([pqc])
-    self._inverse_pqc = tfq.convert_to_tensor([pqc**-1])
 
     raw_bit_circuit = circuit_model_utils.bit_circuit(self.qubits)
     bit_symbol_names = list(
@@ -79,7 +80,7 @@ class QuantumCircuit(tf.keras.layers.Layer):
 
   @property
   def value_layers_inputs(self):
-    """Variable or list of variables which are inputs to `value_layers`.
+    """List of lists of variables which are inputs to `value_layers`.
 
     This property (and `value_layers`) is where the caller would access model
     weights to be updated from a secondary model or hypernetwork.
@@ -88,7 +89,7 @@ class QuantumCircuit(tf.keras.layers.Layer):
 
   @property
   def value_layers(self):
-    """List of Keras layers which calculate the current parameter values.
+    """List of lists of Keras layers which calculate current parameter values.
 
     This property (and `value_layers_inputs`) is where the caller would access
     model weights to be updated from a secondary model or hypernetwork.
@@ -102,20 +103,19 @@ class QuantumCircuit(tf.keras.layers.Layer):
     This should be structured such that `self.symbol_values[i]` is the current
     value of `self.symbol_names[i]` in `self.pqc` and `self.inverse_pqc`.
     """
-    x = self._value_layers_inputs
-    for layer in self._value_layers:
-      x = layer(x)
-    return x
+    # TODO(#123): empty value because concat requires at least two entries.
+    intermediate_values = [[]]
+    for inputs, layers in zip(self.value_layers_inputs, self.value_layers):
+      x = inputs
+      for layer in layers:
+        x = layer(x)
+      intermediate_values.append(x)
+    return tf.concat(intermediate_values, 0)
 
   @property
   def pqc(self):
     """TFQ tensor representation of the parameterized unitary circuit."""
     return self._pqc
-
-  @property
-  def inverse_pqc(self):
-    """Inverse of `self.pqc`."""
-    return self._inverse_pqc
 
   def build(self, input_shape):
     """Builds the layers which calculate the values.
@@ -124,12 +124,13 @@ class QuantumCircuit(tf.keras.layers.Layer):
     `self._value_layers_inputs`.
     """
     del input_shape
-    if isinstance(self.value_layers_inputs, list):
-      x = [tf.shape(t) for t in self._value_layers_inputs]
-    else:
-      x = tf.shape(self.value_layers_inputs)
-    for layer in self._value_layers:
-      x = layer.compute_output_shape(x)
+    for inputs, layers in zip(self.value_layers_inputs, self.value_layers):
+      if isinstance(inputs, tf.Variable):
+        x = inputs.get_shape()
+      else:
+        x = [v.get_shape() for v in inputs]
+      for layer in layers:
+        x = layer.compute_output_shape(x)
 
   def call(self, inputs):
     """Inputs are bitstrings prepended as initial states to `self.pqc`."""
@@ -139,6 +140,45 @@ class QuantumCircuit(tf.keras.layers.Layer):
         tf.cast(inputs, tf.float32))
     pqcs = tf.tile(self.pqc, [num_bitstrings])
     return tfq.append_circuit(bit_circuits, pqcs)
+
+  def __add__(self, other: "QuantumCircuit"):
+    """Returns a QuantumCircuit with `self.pqc` appended to `other.pqc`.
+
+    Note that no new `tf.Variable`s are created, the new QuantumCircuit contains
+    the variables in both `self` and `other`.
+    """
+    if isinstance(other, QuantumCircuit):
+      intersection = tf.sets.intersection(
+          tf.expand_dims(self.symbol_names, 0),
+          tf.expand_dims(other.symbol_names, 0))
+      if not tf.equal(tf.size(intersection.values), 0):
+        raise ValueError(
+            "Circuits to be summed must not have symbols in common.")
+      new_pqc = tfq.from_tensor(tfq.append_circuit(self.pqc, other.pqc))[0]
+      new_symbol_names = tf.concat([self.symbol_names, other.symbol_names], 0)
+      new_value_layers_inputs = (
+          self.value_layers_inputs + other.value_layers_inputs)
+      new_value_layers = self.value_layers + other.value_layers
+      new_name = self.name + "_" + other.name
+      return QuantumCircuit(new_pqc, new_symbol_names, new_value_layers_inputs,
+                            new_value_layers, new_name)
+    else:
+      raise TypeError
+
+  def __pow__(self, exponent):
+    """Returns a QuantumCircuit with inverted `self.pqc`.
+
+    Note that no new `tf.Variable`s are created, the new QuantumCircuit contains
+    the same variables as `self`.
+    """
+    if exponent == -1:
+      new_pqc = tfq.from_tensor(self.pqc)[0]**-1
+      new_name = self.name + "_inverse"
+      return QuantumCircuit(new_pqc, self.symbol_names,
+                            self.value_layers_inputs, self.value_layers,
+                            new_name)
+    else:
+      raise ValueError("Only the inverse (exponent == -1) is supported.")
 
 
 class DirectQuantumCircuit(QuantumCircuit):
@@ -162,8 +202,9 @@ class DirectQuantumCircuit(QuantumCircuit):
     raw_symbol_names = list(sorted(tfq.util.get_circuit_symbols(pqc)))
     symbol_names = tf.constant([str(x) for x in raw_symbol_names],
                                dtype=tf.string)
-    values = tf.Variable(initializer(shape=[len(raw_symbol_names)]))
-    super().__init__(pqc, symbol_names, values, [])
+    values = [tf.Variable(initializer(shape=[len(raw_symbol_names)]))]
+    value_layers = [[]]
+    super().__init__(pqc, symbol_names, values, value_layers)
 
 
 class QAIA(QuantumCircuit):
@@ -228,12 +269,12 @@ class QAIA(QuantumCircuit):
       flat_symbols.extend(q_symb + c_symb)
     symbol_names = tf.constant(flat_symbols)
 
-    value_layers_inputs = [
+    value_layers_inputs = [[
         tf.Variable(initializer(shape=[num_layers])),  # true etas
         tf.Variable(initializer(shape=[len(classical_h_terms)])),  # thetas
         tf.Variable(
             initializer(shape=[num_layers, len(quantum_h_terms)])),  # gammas
-    ]
+    ]]
 
     def embed_params(inputs):
       """Tiles up the variables to properly tie QAIA parameters."""
@@ -241,8 +282,8 @@ class QAIA(QuantumCircuit):
       tiled_thetas = tf.tile(
           tf.expand_dims(inputs[1], 0), [tf.shape(inputs[0])[0], 1])
       classical_params = exp_etas * tiled_thetas
-      return tf.concat([classical_params, inputs[2]], 1)
+      return tf.reshape(tf.concat([classical_params, inputs[2]], 1), [-1])
 
-    value_layers = [tf.keras.layers.Lambda(embed_params)]
+    value_layers = [[tf.keras.layers.Lambda(embed_params)]]
 
     super().__init__(pqc, symbol_names, value_layers_inputs, value_layers)
