@@ -18,6 +18,7 @@ from typing import List, Union
 
 import cirq
 import tensorflow as tf
+import tensorflow_quantum as tfq
 
 from qhbmlib import circuit_infer
 from qhbmlib import energy_infer
@@ -77,8 +78,7 @@ class QHBM(tf.keras.layers.Layer):
 
   def expectation(self,
                   model: hamiltonian_model.Hamiltonian,
-                  ops: Union[List[cirq.PauliSum],
-                             hamiltonian_model.Hamiltonian],
+                  ops: Union[tf.Tensor, hamiltonian_model.Hamiltonian],
                   num_samples: int,
                   reduce: bool = True):
     """Estimates observable expectation values against the density operator.
@@ -86,17 +86,18 @@ class QHBM(tf.keras.layers.Layer):
     Args:
       model: The modular Hamiltonian whose normalized exponential is the
         density operator against which expectation values will be estimated.
-      ops: The observables to measure.  Either a list of cirq.PauliSums or a
-        Hamiltonian, tiled to measure `<op_j>_((qnn)|initial_states[i]>)`
-        for each bitstring i and op j.
+      ops: The observable to measure.  If `tf.Tensor`, strings with shape
+        [n_ops], result of calling `tfq.convert_to_tensor` on a list of
+        cirq.PauliSum, `[op1, op2, ...]`. Else, a Hamiltonian.  Tiled to measure
+        `<op_j>_((qnn)|initial_states[i]>)` for each bitstring i and op j.
       reduce: bool flag for whether or not to average over i.
 
-      Returns:
-        If `reduce` is true, a `tf.Tensor` with shape [n_ops] whose entries are
-        are the batch-averaged expectation values of `operators`.
-        Else, a `tf.Tensor` with shape [batch_size, n_ops] whose entries are the
-        unaveraged expectation values of each `operator` against each `circuit`.
-      """
+    Returns:
+      If `reduce` is true, a `tf.Tensor` with shape [n_ops] whose entries are
+      are the batch-averaged expectation values of `operators`.
+      Else, a `tf.Tensor` with shape [batch_size, n_ops] whose entries are the
+      unaveraged expectation values of each `operator` against each `circuit`.
+    """
     self.e_inference.infer(model.energy)
     samples = self.e_inference.sample(num_samples)
     bitstrings, counts = util.unique_bitstrings_with_counts(samples)
