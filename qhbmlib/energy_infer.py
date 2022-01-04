@@ -25,33 +25,26 @@ from tensorflow_probability import distributions as tfd
 from qhbmlib import energy_model
 
 
-class InferenceLayer(tf.keras.layers.Layer, abc.ABC):
+class EnergyInference(tf.keras.layers.Layer, abc.ABC):
   """Sets the methods required for inference on BitstringEnergy objects."""
 
-  def __init__(self,
-               energy: energy_model.BitstringEnergy,
-               name: Union[None, str] = None):
-    """Initializes an InferenceLayer.
+  def __init__(self, name: Union[None, str] = None):
+    """Initializes an EnergyInference.
+
+    Args:
+      name: Optional name for the model.
+    """
+    super().__init__(name=name)
+
+  @abc.abstractmethod
+  def infer(self, energy: energy_model.BitstringEnergy):
+    """Do the work to ready this layer for use.
+
+    This should be called each time the underlying model is updated.
 
     Args:
       energy: The parameterized energy function which defines this distribution
         via the equations of an energy based model.
-      name: Optional name for the model.
-    """
-    super().__init__(name=name)
-    self._energy = energy
-
-  @property
-  def energy(self):
-    """The energy model on which this layer performs inference."""
-    return self._energy
-
-  @abc.abstractmethod
-  def infer(self):
-    """Do the work to ready this layer for use.
-
-    This should be called each time the underlying model in
-    `self.energy` is updated.
     """
     raise NotImplementedError()
 
@@ -73,41 +66,28 @@ class InferenceLayer(tf.keras.layers.Layer, abc.ABC):
     """Returns an estimate of the log partition function."""
     raise NotImplementedError()
 
-  def build(self, input_shape):
-    """Builds the internal energy function.
-
-    `input_shape` is unused because it is known to be `[]`, since calls are
-    given a scalar, the number of samples to draw from the distribution.
-    """
-    del input_shape
-    self.energy.build([None, self.energy.num_bits])
-
   def call(self, inputs):
     """Returns the number of samples specified in the inputs."""
     return self.sample(inputs)
 
 
-class AnalyticInferenceLayer(InferenceLayer):
+class AnalyticEnergyInference(EnergyInference):
   """Uses an explicit categorical distribution to implement parent functions."""
 
-  def __init__(self,
-               energy: energy_model.BitstringEnergy,
-               name: Union[None, str] = None):
-    """Initializes an AnalyticInferenceLayer.
+  def __init__(self, num_bits: int, name: Union[None, str] = None):
+    """Initializes an AnalyticEnergyInference.
 
     Internally, this class saves all possible bitstrings as a tensor, whose
     energies are calculated relative to an input energy function for sampling
     and other inference tasks.
 
     Args:
-      energy: The parameterized energy function which defines this distribution
-        via the equations of an energy based model.
+      num_bits: Number of bits on which this layer acts.
       name: Optional name for the model.
     """
-    super().__init__(energy, name=name)
+    super().__init__(name=name)
     self._all_bitstrings = tf.constant(
-        list(itertools.product([0, 1], repeat=self.energy.num_bits)),
-        dtype=tf.int8)
+        list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
     self._dist_realization = tfp.layers.DistributionLambda(
         make_distribution_fn=lambda t: tfd.Categorical(logits=-1 * t))
     self._current_dist = None
@@ -127,8 +107,9 @@ class AnalyticInferenceLayer(InferenceLayer):
     """Bernoulli distribution set during last call to `self.infer`."""
     return self._current_dist
 
-  def infer(self):
+  def infer(self, energy: energy_model.BitstringEnergy):
     """See base class docstring."""
+    self.energy = energy
     x = tf.squeeze(self.all_energies)
     self._current_dist = self._dist_realization(x)
 
@@ -147,27 +128,23 @@ class AnalyticInferenceLayer(InferenceLayer):
 
   def call(self, inputs):
     if self._current_dist is None:
-      self.infer()
+      raise RuntimeError("`infer` must be called at least once.")
     if inputs is None:
       return self._current_dist
     else:
       return self.sample(inputs)
 
 
-class BernoulliInferenceLayer(InferenceLayer):
+class BernoulliEnergyInference(EnergyInference):
   """Manages inference for a Bernoulli defined by spin energies."""
 
-  def __init__(self,
-               energy: energy_model.BitstringEnergy,
-               name: Union[None, str] = None):
-    """Initializes a BernoulliInferenceLayer.
+  def __init__(self, name: Union[None, str] = None):
+    """Initializes a BernoulliEnergyInference.
 
     Args:
-      energy: The parameterized energy function which defines this distribution
-        via the equations of an energy based model.
       name: Optional name for the model.
     """
-    super().__init__(energy, name=name)
+    super().__init__(name=name)
     self._dist_realization = tfp.layers.DistributionLambda(
         make_distribution_fn=lambda t: tfd.Bernoulli(logits=t, dtype=tf.int8))
     self._current_dist = None
@@ -177,8 +154,9 @@ class BernoulliInferenceLayer(InferenceLayer):
     """Categorical distribution set during last call to `self.infer`."""
     return self._current_dist
 
-  def infer(self):
+  def infer(self, energy: energy_model.BitstringEnergy):
     """See base class docstring."""
+    self.energy = energy
     self._current_dist = self._dist_realization(self.energy.logits)
 
   def sample(self, n):
@@ -208,7 +186,7 @@ class BernoulliInferenceLayer(InferenceLayer):
 
   def call(self, inputs):
     if self._current_dist is None:
-      self.infer()
+      raise RuntimeError("`infer` must be called at least once.")
     if inputs is None:
       return self._current_dist
     else:
