@@ -14,8 +14,9 @@
 # ==============================================================================
 """Tools for inference on quantum Hamiltonians."""
 
-from typing import Union
+from typing import List, Union
 
+import cirq
 import tensorflow as tf
 
 from qhbmlib import circuit_infer
@@ -76,7 +77,8 @@ class QHBM(tf.keras.layers.Layer):
 
   def expectation(self,
                   model: hamiltonian_model.Hamiltonian,
-                  ops: Union[List[cirq.PauliSum], hamiltonian_model.Hamiltonian],
+                  ops: Union[List[cirq.PauliSum],
+                             hamiltonian_model.Hamiltonian],
                   num_samples: int,
                   reduce: bool = True):
     """Estimates observable expectation values against the density operator.
@@ -85,9 +87,9 @@ class QHBM(tf.keras.layers.Layer):
       model: The modular Hamiltonian whose normalized exponential is the
         density operator against which expectation values will be estimated.
       ops: The observables to measure.  Either a list of cirq.PauliSums or a
-        Hamiltonian.  Will be tiled to measure `<op_j>_((qnn)|initial_states[i]>)`
+        Hamiltonian, tiled to measure `<op_j>_((qnn)|initial_states[i]>)`
         for each bitstring i and op j.
-        reduce: bool flag for whether or not to average over i.
+      reduce: bool flag for whether or not to average over i.
 
       Returns:
         If `reduce` is true, a `tf.Tensor` with shape [n_ops] whose entries are
