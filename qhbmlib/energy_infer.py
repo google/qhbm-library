@@ -90,7 +90,6 @@ class AnalyticEnergyInference(EnergyInference):
         list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
     self._dist_realization = tfp.layers.DistributionLambda(
         make_distribution_fn=lambda t: tfd.Categorical(logits=-1 * t))
-    self.energy = None
     self._current_dist = None
 
   @property
@@ -148,7 +147,6 @@ class BernoulliEnergyInference(EnergyInference):
     super().__init__(name=name)
     self._dist_realization = tfp.layers.DistributionLambda(
         make_distribution_fn=lambda t: tfd.Bernoulli(logits=t, dtype=tf.int8))
-    self.energy = None
     self._current_dist = None
 
   @property
