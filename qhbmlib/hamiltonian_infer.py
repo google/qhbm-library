@@ -32,30 +32,69 @@ class QHBM(tf.keras.layers.Layer):
                e_inference: energy_infer.EnergyInference,
                q_inference: circuit_infer.QuantumInference,
                name: Union[None, str] = None):
-    """Initializes a QHBM."""
+    """Initializes a QHBM.
+
+    Args:
+      e_inference: Attends to density operator eigenvalues.
+      q_inference: Attends to density operator eigenvectors.
+      name: Optional name for the model.
+    """
     super().__init__(name=name)
     self._e_inference = e_inference
     self._q_inference = q_inference
 
   @property
   def e_inference(self):
+    """The object used for inference on density operator eigenvalues."""
     return self._e_inference
 
   @property
   def q_inference(self):
+    """The object used for inference on density operator eigenvectors."""
     return self._q_inference
 
   def circuits(self, model: hamiltonian_model.Hamiltonian, num_samples: int):
+    """Draws pure states from the density operator.
+
+    Args:
+      model: The modular Hamiltonian whose normalized exponential is the
+        density operator from which states will be approximately sampled.
+      num_samples: Number of states to draw from the density operator.
+
+    Returns:
+      states: 1D `tf.Tensor` of dtype `tf.string`.  Each entry is a TFQ string
+        representation of a state drawn from the density operator represented by
+        the input `model`.
+      counts: 1D `tf.Tensor` of dtype `tf.int32`.  `counts[i]` is the number of
+        times `states[i]` was drawn from the density operator.
+    """
     self.e_inference.infer(model.energy)
     samples = self.e_inference.sample(num_samples)
     bitstrings, counts = util.unique_bitstrings_with_counts(samples)
-    return model.circuit(bitstrings), counts
+    states = model.circuit(bitstrings)
+    return states, counts
 
   def expectation(self,
                   model: hamiltonian_model.Hamiltonian,
-                  ops: Union[tf.Tensor, hamiltonian_model.Hamiltonian],
+                  ops: Union[List[cirq.PauliSum], hamiltonian_model.Hamiltonian],
                   num_samples: int,
                   reduce: bool = True):
+    """Estimates observable expectation values against the density operator.
+
+    Args:
+      model: The modular Hamiltonian whose normalized exponential is the
+        density operator against which expectation values will be estimated.
+      ops: The observables to measure.  Either a list of cirq.PauliSums or a
+        Hamiltonian.  Will be tiled to measure `<op_j>_((qnn)|initial_states[i]>)`
+        for each bitstring i and op j.
+        reduce: bool flag for whether or not to average over i.
+
+      Returns:
+        If `reduce` is true, a `tf.Tensor` with shape [n_ops] whose entries are
+        are the batch-averaged expectation values of `operators`.
+        Else, a `tf.Tensor` with shape [batch_size, n_ops] whose entries are the
+        unaveraged expectation values of each `operator` against each `circuit`.
+      """
     self.e_inference.infer(model.energy)
     samples = self.e_inference.sample(num_samples)
     bitstrings, counts = util.unique_bitstrings_with_counts(samples)
@@ -73,6 +112,7 @@ class QHBM(tf.keras.layers.Layer):
           "General `BitstringEnergy` models not yet supported.")
 
   def sample(self, model: hamiltonian_model.Hamiltonian, num_samples: int):
+    """Repeatedly measures the density operator in the computational basis."""
     self.e_inference.infer(model.energy)
     samples = self.e_inference.sample(num_samples)
     bitstrings, counts = util.unique_bitstrings_with_counts(samples)
