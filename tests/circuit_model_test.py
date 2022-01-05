@@ -112,7 +112,7 @@ class QuantumCircuitTest(tf.test.TestCase):
     expected_symbol_values = tf.concat(
         [self.expected_symbol_values, other_value_layers_inputs[0][0]], 0)
     other_name = "the_other_layer"
-    expected_name = self.expected_name + other_name
+    expected_name = self.expected_name + "_" + other_name
     other_layer = circuit_model.QuantumCircuit(
         other_pqc, tf.constant([str(s) for s in other_symbols]),
         other_value_layers_inputs, other_value_layers, other_name)
@@ -187,8 +187,6 @@ class QuantumCircuitTest(tf.test.TestCase):
 
   def test_pow_error(self):
     """Confirms bad inputs to __pow__ are rejected."""
-    with self.assertRaises(TypeError):
-      _ = self.actual_layer**"junk"
     with self.assertRaisesRegex(ValueError, expected_regex="Only the inverse"):
       _ = self.actual_layer**2
 
