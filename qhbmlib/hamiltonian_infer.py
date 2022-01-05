@@ -120,3 +120,19 @@ class QHBM(tf.keras.layers.Layer):
     samples = self.e_inference.sample(num_samples)
     bitstrings, counts = util.unique_bitstrings_with_counts(samples)
     return self.q_inference.sample(model.circuit, bitstrings, counts)
+
+
+def density_matrix(model: hamiltonian_model.Hamiltonian):
+  e_inf = energy_infer.AnalyticEnergyInference(model.energy.num_bits)
+  e_inf.infer(model.energy)
+  probabilities = tf.cast(e_inf.all_probabilities(), tf.complex64)
+  resolved_pqc = tfq.resolve_parameters(
+      model.circuit.pqc,
+      model.circuit.symbol_names,
+      tf.expand_dims(model.circuit.symbol_values, 0))
+  unitary_matrix = tfq.layers.Unitary()(resolved_pqc).to_tensor()[0]
+  unitary_probs = tf.multiply(
+    unitary_matrix,
+    tf.tile(
+      tf.expand_dims(probabilities, 0), [tf.shape(unitary_matrix)[0], 1]))
+  return tf.matmul(unitary_probs, tf.linalg.adjoint(unitary_matrix))

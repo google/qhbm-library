@@ -104,6 +104,12 @@ class AnalyticEnergyInference(EnergyInference):
     return self.energy(self.all_bitstrings)
 
   @property
+  def all_probabilities(self):
+    """Returns the probability of every bitstring."""
+    return tf.exp(-self.all_energies()) / tf.exp(
+        self.log_partition())
+
+  @property
   def current_dist(self):
     """Bernoulli distribution set during last call to `self.infer`."""
     return self._current_dist
