@@ -141,7 +141,7 @@ class QuantumCircuit(tf.keras.layers.Layer):
     pqcs = tf.tile(self.pqc, [num_bitstrings])
     return tfq.append_circuit(bit_circuits, pqcs)
 
-  def __add__(self, other):
+  def __add__(self, other: "QuantumCircuit"):
     """Returns a QuantumCircuit with `self.pqc` appended to `other.pqc`.
 
     Note that no new `tf.Variable`s are created, the new QuantumCircuit contains
@@ -159,7 +159,7 @@ class QuantumCircuit(tf.keras.layers.Layer):
       new_value_layers_inputs = (
           self.value_layers_inputs + other.value_layers_inputs)
       new_value_layers = self.value_layers + other.value_layers
-      new_name = self.name + other.name
+      new_name = self.name + "_" + other.name
       return QuantumCircuit(new_pqc, new_symbol_names, new_value_layers_inputs,
                             new_value_layers, new_name)
     else:
@@ -171,16 +171,14 @@ class QuantumCircuit(tf.keras.layers.Layer):
     Note that no new `tf.Variable`s are created, the new QuantumCircuit contains
     the same variables as `self`.
     """
-    if isinstance(exponent, int):
-      if exponent != -1:
-        raise ValueError("Only the inverse (exponent == -1) is supported.")
+    if exponent == -1:
       new_pqc = tfq.from_tensor(self.pqc)[0]**-1
       new_name = self.name + "_inverse"
       return QuantumCircuit(new_pqc, self.symbol_names,
                             self.value_layers_inputs, self.value_layers,
                             new_name)
     else:
-      raise TypeError
+      raise ValueError("Only the inverse (exponent == -1) is supported.")
 
 
 class DirectQuantumCircuit(QuantumCircuit):
