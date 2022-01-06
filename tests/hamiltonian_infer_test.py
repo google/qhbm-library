@@ -108,6 +108,7 @@ class QHBMTest(tf.test.TestCase):
   def test_expectation(self):
     pass
 
+
   def test_sample(self):
     pass
 
