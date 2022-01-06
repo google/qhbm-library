@@ -43,28 +43,3 @@ class Hamiltonian(tf.keras.layers.Layer):
     self.energy = energy
     self.circuit = circuit
     self.circuit_dagger = circuit**-1
-
-  def __add__(self, other):
-    """Returns a HamiltonianSum representing the sum of `self` and `other`."""
-    if isinstance(other, Hamiltonian):
-      return HamiltonianSum([self, other])
-    else:
-      raise TypeError
-
-
-class HamiltonianSum(tf.keras.layers.Layer):
-  """Sum of potentially non-commuting Hamiltonians."""
-
-  def __init__(self, terms: List[Hamiltonian], name: Union[None, str] = None):
-    """Initializes a HamiltonianSum."""
-    super().__init__(name=name)
-    self.terms = terms
-
-  def __add__(self, other):
-    """Returns a HamiltonianSum representing the sum of `self` and `other`."""
-    if isinstance(other, Hamiltonian):
-      return HamiltonianSum(self.terms + [other])
-    elif isinstance(other, HamiltonianSum):
-      return HamiltonianSum(self.terms + other.terms)
-    else:
-      raise TypeError

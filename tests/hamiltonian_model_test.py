@@ -70,63 +70,6 @@ class HamiltonianTest(tf.test.TestCase):
         ValueError, expected_regex="same number of bits"):
       _ = hamiltonian_model.Hamiltonian(small_energy, self.expected_circuit)
 
-  def test_add(self):
-    """Tests Hamiltonian addition."""
-    pass
-
-
-class HamiltonianSumTest(tf.test.TestCase):
-  """Tests the HamiltonianSum class."""
-
-  def setUp(self):
-    """Initializes test objects."""
-    super().setUp()
-    self.expected_name = "SumThing"
-    self.num_bits_list = [2, 3]
-    self.expected_energy_list = [
-        energy_model.BernoulliEnergy(list(range(num_bits)))
-        for num_bits in self.num_bits_list
-    ]
-    for energy, num_bits in zip(self.expected_energy_list, self.num_bits_list):
-      energy.build([None, num_bits])
-    symbols_list = [[sympy.Symbol(str(n))
-                     for n in range(num_bits)]
-                    for num_bits in self.num_bits_list]
-    qubits_list = [
-        cirq.GridQubit.rect(1, num_bits) for num_bits in self.num_bits_list
-    ]
-    pqc_list = [
-        cirq.Circuit(cirq.X(q)**s
-                     for q, s in zip(qubits, symbols))
-        for qubits, symbols in zip(qubits_list, symbols_list)
-    ]
-    self.expected_circuit_list = [
-        circuit_model.DirectQuantumCircuit(pqc) for pqc in pqc_list
-    ]
-    for circuit in self.expected_circuit_list:
-      circuit.build([])
-    self.expected_terms = [
-        hamiltonian_model.Hamiltonian(e, c)
-        for e, c in zip(self.expected_energy_list, self.expected_circuit_list)
-    ]
-    self.actual_hamiltonian_sum = hamiltonian_model.HamiltonianSum(
-        self.expected_terms, self.expected_name)
-
-  def test_init(self):
-    """Tests HamiltonianSum initialization."""
-    self.assertEqual(self.actual_hamiltonian_sum.name, self.expected_name)
-    expected_variables = []
-    for e, c in zip(self.expected_energy_list, self.expected_circuit_list):
-      expected_variables += e.trainable_variables
-      expected_variables += c.trainable_variables
-    self.assertNotEmpty(expected_variables)
-    self.assertAllClose(self.actual_hamiltonian_sum.trainable_variables,
-                        expected_variables)
-
-  def test_add(self):
-    """Tests HamiltonianSum addition."""
-    pass
-
 
 if __name__ == "__main__":
   absl.logging.info("Running hamiltonian_model_test.py ...")
