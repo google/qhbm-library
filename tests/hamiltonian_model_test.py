@@ -67,6 +67,14 @@ class HamiltonianTest(tf.test.TestCase):
     self.assertAllClose(self.actual_hamiltonian.trainable_variables,
                         expected_variables)
 
+    # check None operator shards.
+    pqc = cirq.Circuit(cirq.X(cirq.GridQubit(0, 0))**sympy.Symbol("a"))
+    qnn = circuit_model.DirectQuantumCircuit(pqc)
+    energy = energy_model.BitstringEnergy([1], [])
+    actual_ham = hamiltonian_model.Hamiltonian(energy, qnn)
+    self.assertIsNone(actual_ham.operator_shards)
+    
+
   def test_init_error(self):
     """Confirms initialization fails for mismatched energy and circuit."""
     small_energy = energy_model.BernoulliEnergy(list(range(self.num_bits - 1)))
