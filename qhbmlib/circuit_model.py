@@ -147,7 +147,9 @@ class QuantumCircuit(tf.keras.layers.Layer):
           tf.expand_dims(self.symbol_names, 0),
           tf.expand_dims(other.symbol_names, 0))
       tf.debugging.assert_equal(
-          tf.size(intersection.values), 0, message="Circuits to be summed must not have symbols in common.")
+          tf.size(intersection.values),
+          0,
+          message="Circuits to be summed must not have symbols in common.")
       new_pqc = tfq.append_circuit(self.pqc, other.pqc)
       new_qubits = list(set(self.qubits + other.qubits))
       new_symbol_names = tf.concat([self.symbol_names, other.symbol_names], 0)
@@ -155,8 +157,8 @@ class QuantumCircuit(tf.keras.layers.Layer):
           self.value_layers_inputs + other.value_layers_inputs)
       new_value_layers = self.value_layers + other.value_layers
       new_name = self.name + "_" + other.name
-      return QuantumCircuit(new_pqc, new_qubits, new_symbol_names, new_value_layers_inputs,
-                            new_value_layers, new_name)
+      return QuantumCircuit(new_pqc, new_qubits, new_symbol_names,
+                            new_value_layers_inputs, new_value_layers, new_name)
     else:
       raise TypeError
 
@@ -169,9 +171,10 @@ class QuantumCircuit(tf.keras.layers.Layer):
     if exponent == -1:
       new_pqc = tfq.from_tensor(self.pqc)[0]**-1
       new_name = self.name + "_inverse"
-      return QuantumCircuit(tfq.convert_to_tensor([new_pqc]), new_pqc.all_qubits(), self.symbol_names,
-                            self.value_layers_inputs, self.value_layers,
-                            new_name)
+      return QuantumCircuit(
+          tfq.convert_to_tensor([new_pqc]), new_pqc.all_qubits(),
+          self.symbol_names, self.value_layers_inputs, self.value_layers,
+          new_name)
     else:
       raise ValueError("Only the inverse (exponent == -1) is supported.")
 
@@ -199,7 +202,9 @@ class DirectQuantumCircuit(QuantumCircuit):
                                dtype=tf.string)
     values = [tf.Variable(initializer(shape=[len(raw_symbol_names)]))]
     value_layers = [[]]
-    super().__init__(tfq.convert_to_tensor([pqc]), pqc.all_qubits(), symbol_names, values, value_layers)
+    super().__init__(
+        tfq.convert_to_tensor([pqc]), pqc.all_qubits(), symbol_names, values,
+        value_layers)
 
 
 class QAIA(QuantumCircuit):
@@ -281,4 +286,6 @@ class QAIA(QuantumCircuit):
 
     value_layers = [[tf.keras.layers.Lambda(embed_params)]]
 
-    super().__init__(tfq.convert_to_tensor([pqc]), pqc.all_qubits(), symbol_names, value_layers_inputs, value_layers)
+    super().__init__(
+        tfq.convert_to_tensor([pqc]), pqc.all_qubits(), symbol_names,
+        value_layers_inputs, value_layers)
