@@ -42,6 +42,8 @@ class HamiltonianTest(tf.test.TestCase):
     pqc = cirq.Circuit(cirq.X(q)**s for q, s in zip(qubits, symbols))
     self.expected_circuit = circuit_model.DirectQuantumCircuit(pqc)
     self.expected_circuit.build([])
+    self.expected_operator_shards = self.expected_energy.operator_shards(
+        self.expected_circuit.qubits)
     self.actual_hamiltonian = hamiltonian_model.Hamiltonian(
         self.expected_energy, self.expected_circuit, self.expected_name)
 
@@ -56,6 +58,8 @@ class HamiltonianTest(tf.test.TestCase):
     self.assertEqual(
         tfq.from_tensor(self.actual_hamiltonian.circuit_dagger.pqc),
         tfq.from_tensor((self.expected_circuit**-1).pqc))
+    self.assertAllEqual(tfq.from_tensor(self.actual_hamiltonian.operator_shards),
+                        self.expected_operator_shards)
     expected_variables = (
         self.expected_energy.trainable_variables +
         self.expected_circuit.trainable_variables)

@@ -17,6 +17,7 @@
 from typing import List, Union
 
 import tensorflow as tf
+import tensorflow_quantum as tfq
 
 from qhbmlib import circuit_model
 from qhbmlib import energy_model
@@ -43,3 +44,8 @@ class Hamiltonian(tf.keras.layers.Layer):
     self.energy = energy
     self.circuit = circuit
     self.circuit_dagger = circuit**-1
+
+    self.operator_shards = None
+    if isinstance(self.energy, energy_model.PauliMixin):
+      self.operator_shards = tfq.convert_to_tensor(
+          self.energy.operator_shards(self.circuit.qubits))
