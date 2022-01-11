@@ -27,8 +27,8 @@ class Squeeze(tf.keras.layers.Layer):
       axis: An optional list of ints. Defaults to []. If specified, only
         squeezes the dimensions listed. The dimension index starts at 0. It is
         an error to squeeze a dimension that is not 1. Must be in the range
-        [-rank(input), rank(input)). Must be specified if input is
-        a RaggedTensor.
+        [-rank(input), rank(input)). Must be specified if input is a
+        RaggedTensor.
     """
     super().__init__()
     if axis is None:

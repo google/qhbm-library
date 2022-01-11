@@ -79,6 +79,35 @@ class VariableDot(tf.keras.layers.Layer):
     return tf.reduce_sum(inputs * self.kernel, -1)
 
 
+class BetaVariableDot(tf.keras.layers.Layer):
+  """Utility layer for dotting input with a same-sized variable."""
+
+  def __init__(self,
+               initializer: tf.keras.initializers.Initializer = tf.keras
+               .initializers.RandomUniform()):
+    """Initializes a VariableDot layer.
+
+    Args:
+      initializer: A `tf.keras.initializers.Initializer` which specifies how to
+        initialize the values of the parameters.
+    """
+    super().__init__()
+    self._initializer = initializer
+
+  def build(self, input_shape):
+    """Initializes the internal variables."""
+    self.beta = tf.Variable(
+        initial_value=self._initializer([]), name="beta", trainable=True)
+    self.kernel = tf.Variable(
+        initial_value=self._initializer((input_shape[-1],)),
+        name="kernel",
+        trainable=True)
+
+  def call(self, inputs):
+    """Returns the dot product between the inputs and this layer's variables."""
+    return self.beta * tf.reduce_sum(inputs * self.kernel, -1)
+
+
 class Parity(tf.keras.layers.Layer):
   """Computes the parities of input spins."""
 

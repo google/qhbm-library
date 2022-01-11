@@ -370,7 +370,7 @@ def qubits_to_indices(qubits):
 
   Args:
     qubits: Python `list` of `cirq.GridQubit`s.
-  
+
   Returns:
     indices: `tf.Tensor` of shape [len(qubits), 2] where `indices[i][0]` and
       `indices[i][1]` give the row of and column of `qubits[i]`, respectively.
@@ -381,7 +381,7 @@ def qubits_to_indices(qubits):
 
 def qubit_sub_indices(qubits_total, qubits_sublist):
   """Returns the indices of the qubit sublist in the qubit total.
-  
+
   Args:
     qubits_total: `tf.Tensor` of shape [n, 2], the output of `qubits_to_indices`
       on some list of `cirq.GridQubit`s.

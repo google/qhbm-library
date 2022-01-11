@@ -20,10 +20,10 @@ import cirq
 import sympy
 
 
-def bit_circuit(qubits: List[cirq.GridQubit], name="bit_circuit"):
+def bit_circuit(qubits: List[cirq.GridQubit], name='bit_circuit'):
   """Returns exponentiated X gate on each qubit and the exponent symbols."""
   circuit = cirq.Circuit()
   for n, q in enumerate(qubits):
-    bit = sympy.Symbol("{0}_bit_{1}".format(name, n))
+    bit = sympy.Symbol('{0}_bit_{1}'.format(name, n))
     circuit += cirq.X(q)**bit
   return circuit

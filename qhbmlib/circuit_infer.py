@@ -90,17 +90,17 @@ class QuantumInference(tf.keras.layers.Layer):
 
       Args:
         qnn: The parameterized quantum circuit on which to do inference.
-        initial_states: Shape [batch_size, num_qubits] of dtype `tf.int8`.
-          These are the initial states of each qubit in the circuit.
+        initial_states: Shape [batch_size, num_qubits] of dtype `tf.int8`. These
+          are the initial states of each qubit in the circuit.
         counts: Shape [batch_size] of dtype `tf.int32` such that `counts[i]` is
           the weight of `initial_states[i]` when computing expectations.
-          Additionally, if `self.backend != "noiseless", `counts[i]` samples
-          are drawn from `(qnn)|initial_states[i]>` and used to compute
-          the the corresponding expectation.
+          Additionally, if `self.backend != "noiseless", `counts[i]` samples are
+          drawn from `(qnn)|initial_states[i]>` and used to compute the the
+          corresponding expectation.
         operators: `tf.Tensor` of strings with shape [n_ops], result of calling
           `tfq.convert_to_tensor` on a list of cirq.PauliSum, `[op1, op2, ...]`.
-          Will be tiled to measure `<op_j>_((qnn)|initial_states[i]>)`
-          for each i and j.
+          Will be tiled to measure `<op_j>_((qnn)|initial_states[i]>)` for each
+          i and j.
         reduce: bool flag for whether or not to average over i.
 
       Returns:
@@ -134,8 +134,8 @@ class QuantumInference(tf.keras.layers.Layer):
 
       Args:
         qnn: The parameterized quantum circuit on which to do inference.
-        initial_states: Shape [batch_size, num_qubits] of dtype `tf.int8`.
-          These are the initial states of each qubit in the circuit.
+        initial_states: Shape [batch_size, num_qubits] of dtype `tf.int8`. These
+          are the initial states of each qubit in the circuit.
         counts: Shape [batch_size] of dtype `tf.int32` such that `counts[i]` is
           the number of samples to draw from `(qnn)|initial_states[i]>`.
 

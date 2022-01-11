@@ -207,3 +207,45 @@ class KOBE(BitstringEnergy, PauliMixin):
         string = cirq.PauliString(string_factors)
       ops.append(cirq.PauliSum.from_pauli_strings(string))
     return ops
+
+
+class BetaKOBE(BitstringEnergy, PauliMixin):
+  """Kth Order Binary Energy function."""
+
+  def __init__(self,
+               bits: List[int],
+               order: int,
+               initializer: tf.keras.initializers.Initializer = tf.keras
+               .initializers.RandomUniform(),
+               name: Union[None, str] = None):
+    """Initializes a KOBE.
+
+    Args:
+      bits: Each entry is an index on which the distribution is supported.
+      order: The order of the KOBE.
+      initializer: Specifies how to initialize the values of the parameters.
+      name: Optional name for the model.
+    """
+    parity_layer = energy_model_utils.Parity(bits, order)
+    self._num_terms = parity_layer.num_terms
+    self._indices = parity_layer.indices
+    pre_process = [energy_model_utils.SpinsFromBitstrings(), parity_layer]
+    post_process = [energy_model_utils.BetaVariableDot(initializer=initializer)]
+    super().__init__(bits, pre_process + post_process, name)
+    self._post_process = post_process
+
+  @property
+  def post_process(self):
+    """See base class description."""
+    return self._post_process
+
+  def operator_shards(self, qubits: List[cirq.GridQubit]):
+    """See base class description."""
+    ops = []
+    for i in range(self._num_terms):
+      string_factors = []
+      for loc in self._indices[i]:
+        string_factors.append(cirq.Z(qubits[loc]))
+        string = cirq.PauliString(string_factors)
+      ops.append(cirq.PauliSum.from_pauli_strings(string))
+    return ops
