@@ -21,6 +21,7 @@ import random
 import cirq
 import sympy
 import tensorflow as tf
+from tensorflow.python.framework import errors
 import tensorflow_quantum as tfq
 
 from qhbmlib import circuit_model
@@ -53,7 +54,7 @@ class QuantumCircuitTest(tf.test.TestCase):
         value_layer_1(value_layer_0(self.expected_value_layers_inputs[0])))
     self.expected_name = "TestOE"
     self.actual_layer = circuit_model.QuantumCircuit(
-        self.raw_pqc, self.expected_symbol_names,
+        self.expected_pqc, self.expected_qubits, self.expected_symbol_names,
         self.expected_value_layers_inputs, self.expected_value_layers,
         self.expected_name)
 
@@ -114,7 +115,7 @@ class QuantumCircuitTest(tf.test.TestCase):
     other_name = "the_other_layer"
     expected_name = self.expected_name + "_" + other_name
     other_layer = circuit_model.QuantumCircuit(
-        other_pqc, tf.constant([str(s) for s in other_symbols]),
+        tfq.convert_to_tensor([other_pqc]), other_pqc.all_qubits(), tf.constant([str(s) for s in other_symbols]),
         other_value_layers_inputs, other_value_layers, other_name)
     actual_add = self.actual_layer + other_layer
     self.assertAllEqual(actual_add.qubits, expected_qubits)
@@ -129,13 +130,13 @@ class QuantumCircuitTest(tf.test.TestCase):
     
     # Confirm that tf.Variables in the sum are the same as in the addends.
     var_1 = tf.Variable([5.0])
+    pqc_1 = cirq.Circuit(cirq.X(cirq.GridQubit(0, 0))**sympy.Symbol("a"))
     qnn_1 = circuit_model.QuantumCircuit(
-        cirq.Circuit(cirq.X(cirq.GridQubit(0, 0))**sympy.Symbol("a")),
-        tf.constant(["a"]), [var_1], [[]])
+        tfq.convert_to_tensor([pqc_1]), pqc_1.all_qubits(), tf.constant(["a"]), [var_1], [[]])
     var_2 = tf.Variable([-7.0])
+    pqc_2 = cirq.Circuit(cirq.X(cirq.GridQubit(0, 0))**sympy.Symbol("b"))
     qnn_2 = circuit_model.QuantumCircuit(
-        cirq.Circuit(cirq.X(cirq.GridQubit(0, 0))**sympy.Symbol("b")),
-        tf.constant(["b"]), [var_2], [[]])
+        tfq.convert_to_tensor([pqc_2]), pqc_2.all_qubits(), tf.constant(["b"]), [var_2], [[]])
     actual_sum = qnn_1 + qnn_2
     # modify individual variables and confirm changes in the sum
     var_1.assign([-3.0])
@@ -148,11 +149,11 @@ class QuantumCircuitTest(tf.test.TestCase):
     var_1 = tf.Variable([5.0])
     pqc_1 = cirq.Circuit(cirq.X(cirq.GridQubit(0, 0))**sympy.Symbol("a"))
     qnn_1 = circuit_model.QuantumCircuit(
-      pqc_1, tf.constant(["a"]), [var_1], [[]])
+        tfq.convert_to_tensor([pqc_1]), pqc_1.all_qubits(), tf.constant(["a"]), [var_1], [[]])
     var_2 = tf.Variable([-7.0])
     pqc_2 = cirq.Circuit(cirq.X(cirq.GridQubit(0, 0))**sympy.Symbol("b"))
     qnn_2 = circuit_model.QuantumCircuit(
-        pqc_2, tf.constant(["b"]), [var_2], [[]])
+        tfq.convert_to_tensor([pqc_2]), pqc_2.all_qubits(), tf.constant(["b"]), [var_2], [[]])
 
     @tf.function
     def add_traced(qnn_a, qnn_b):
@@ -160,7 +161,7 @@ class QuantumCircuitTest(tf.test.TestCase):
       return actual_sum.pqc
 
     actual_sum_pqc = add_traced(qnn_1, qnn_2)
-    expected_sum_pqc = pqc_1 + pqc_2
+    expected_sum_pqc = tfq.from_tensor(tfq.convert_to_tensor([pqc_1 + pqc_2]))
     self.assertAllEqual(tfq.from_tensor(actual_sum_pqc), expected_sum_pqc)
     
 
@@ -176,15 +177,15 @@ class QuantumCircuitTest(tf.test.TestCase):
     pqc_1 = cirq.Circuit([cirq.X(qubit_1)**s for s in symbols_1])
     pqc_2 = cirq.Circuit([cirq.Y(qubit_2)**s for s in symbols_2])
     qnn_1 = circuit_model.QuantumCircuit(
-        pqc_1, tf.constant([str(s) for s in symbol_names_1]),
+        tfq.convert_to_tensor([pqc_1]), pqc_1.all_qubits(), tf.constant([str(s) for s in symbol_names_1]),
         [tf.random.uniform([len(symbol_names_1)], dtype=tf.float32)], [[]])
     qnn_2 = circuit_model.QuantumCircuit(
-        pqc_2, tf.constant([str(s) for s in symbol_names_2]),
+        tfq.convert_to_tensor([pqc_2]), pqc_2.all_qubits(), tf.constant([str(s) for s in symbol_names_2]),
         [tf.random.uniform([len(symbol_names_2)], dtype=tf.float32)], [[]])
     with self.assertRaises(TypeError):
       _ = qnn_1 + 1
     with self.assertRaisesRegex(
-        ValueError, expected_regex="must not have symbols in common"):
+        errors.InvalidArgumentError, expected_regex="must not have symbols in common"):
       _ = qnn_1 + qnn_2
 
   def test_pow(self):
@@ -199,8 +200,9 @@ class QuantumCircuitTest(tf.test.TestCase):
 
     # Confirm that tf.Variables in the inverse are the same as self.
     var_1 = tf.Variable([2.5])
+    pqc_1 = cirq.Circuit(cirq.X(cirq.GridQubit(0, 0))**sympy.Symbol("a"))
     qnn_1 = circuit_model.QuantumCircuit(
-        cirq.Circuit(cirq.X(cirq.GridQubit(0, 0))**sympy.Symbol("a")),
+        tfq.convert_to_tensor([pqc_1]), pqc_1.all_qubits(),
         tf.constant(["a"]), [var_1], [[]])
     actual_inverse = qnn_1**-1
     var_1.assign([-3.0])

@@ -29,7 +29,8 @@ class QuantumCircuit(tf.keras.layers.Layer):
   """Class for representing a quantum circuit."""
 
   def __init__(self,
-               pqc: cirq.Circuit,
+               pqc: tf.Tensor,
+               qubits: List[cirq.GridQubit],
                symbol_names: tf.Tensor,
                value_layers_inputs: List[Union[tf.Variable, List[tf.Variable]]],
                value_layers: List[List[tf.keras.layers.Layer]],
@@ -37,7 +38,8 @@ class QuantumCircuit(tf.keras.layers.Layer):
     """Initializes a QuantumCircuit.
 
     Args:
-      pqc: Representation of a parameterized quantum circuit.
+      pqc: TFQ string representation of a parameterized quantum circuit.
+      qubits: The qubits on which `pqc` acts.
       symbol_names: Strings which are used to specify the order in which the
         values in `self.symbol_values` should be placed inside of the circuit.
       value_layers_inputs: Inputs to the `value_layers` argument.
@@ -49,18 +51,11 @@ class QuantumCircuit(tf.keras.layers.Layer):
     """
     super().__init__(name=name)
 
-    if set(tfq.util.get_circuit_symbols(pqc)) != {
-        s.decode("utf-8") for s in symbol_names.numpy()
-    }:
-      absl.logging.warning(
-          "Argument `pqc` does not have exactly the same parameters as"
-          "`symbol_names`, indicating unused `self.symbol_values` outputs.")
-    self._qubits = sorted(pqc.all_qubits())
+    self._pqc = pqc
+    self._qubits = sorted(qubits)
     self._symbol_names = symbol_names
     self._value_layers = value_layers
     self._value_layers_inputs = value_layers_inputs
-
-    self._pqc = tfq.convert_to_tensor([pqc])
 
     raw_bit_circuit = circuit_model_utils.bit_circuit(self.qubits)
     bit_symbol_names = list(
@@ -151,16 +146,16 @@ class QuantumCircuit(tf.keras.layers.Layer):
       intersection = tf.sets.intersection(
           tf.expand_dims(self.symbol_names, 0),
           tf.expand_dims(other.symbol_names, 0))
-      if not tf.equal(tf.size(intersection.values), 0):
-        raise ValueError(
-            "Circuits to be summed must not have symbols in common.")
-      new_pqc = tfq.from_tensor(tfq.append_circuit(self.pqc, other.pqc))[0]
+      tf.debugging.assert_equal(
+          tf.size(intersection.values), 0, message="Circuits to be summed must not have symbols in common.")
+      new_pqc = tfq.append_circuit(self.pqc, other.pqc)
+      new_qubits = list(set(self.qubits + other.qubits))
       new_symbol_names = tf.concat([self.symbol_names, other.symbol_names], 0)
       new_value_layers_inputs = (
           self.value_layers_inputs + other.value_layers_inputs)
       new_value_layers = self.value_layers + other.value_layers
       new_name = self.name + "_" + other.name
-      return QuantumCircuit(new_pqc, new_symbol_names, new_value_layers_inputs,
+      return QuantumCircuit(new_pqc, new_qubits, new_symbol_names, new_value_layers_inputs,
                             new_value_layers, new_name)
     else:
       raise TypeError
@@ -174,7 +169,7 @@ class QuantumCircuit(tf.keras.layers.Layer):
     if exponent == -1:
       new_pqc = tfq.from_tensor(self.pqc)[0]**-1
       new_name = self.name + "_inverse"
-      return QuantumCircuit(new_pqc, self.symbol_names,
+      return QuantumCircuit(tfq.convert_to_tensor([new_pqc]), new_pqc.all_qubits(), self.symbol_names,
                             self.value_layers_inputs, self.value_layers,
                             new_name)
     else:
@@ -204,7 +199,7 @@ class DirectQuantumCircuit(QuantumCircuit):
                                dtype=tf.string)
     values = [tf.Variable(initializer(shape=[len(raw_symbol_names)]))]
     value_layers = [[]]
-    super().__init__(pqc, symbol_names, values, value_layers)
+    super().__init__(tfq.convert_to_tensor([pqc]), pqc.all_qubits(), symbol_names, values, value_layers)
 
 
 class QAIA(QuantumCircuit):
@@ -286,4 +281,4 @@ class QAIA(QuantumCircuit):
 
     value_layers = [[tf.keras.layers.Lambda(embed_params)]]
 
-    super().__init__(pqc, symbol_names, value_layers_inputs, value_layers)
+    super().__init__(tfq.convert_to_tensor([pqc]), pqc.all_qubits(), symbol_names, value_layers_inputs, value_layers)
