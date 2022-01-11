@@ -14,7 +14,6 @@
 # ==============================================================================
 """Tools for defining quantum circuit models."""
 
-import absl
 from typing import List, Union
 
 import cirq
