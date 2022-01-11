@@ -14,19 +14,12 @@
 # ==============================================================================
 """Implementation of general QHBMs in TFQ."""
 
-import inspect
-import itertools
-import numbers
-from typing import Any, Callable, Iterable, List, Union
-
-import cirq
-import sympy
 import tensorflow as tf
-import tensorflow_probability as tfp
 import tensorflow_quantum as tfq
 
 
 class QHBM(tf.keras.Model):
+  """Class for Quantum Hamiltonian-Based Model."""
 
   def __init__(self, ebm, qnn, name=None):
     super().__init__(name=name)
