@@ -29,6 +29,7 @@ from qhbmlib import energy_infer
 from qhbmlib import energy_model
 from qhbmlib import hamiltonian_model
 from qhbmlib import hamiltonian_infer
+from tests import test_util
 
 
 class QHBMTest(tf.test.TestCase):
@@ -105,12 +106,22 @@ class QHBMTest(tf.test.TestCase):
     self.assertAllClose(
         actual_counts[0], actual_counts[1], atol=num_samples / 1000)
 
-  def test_expectation(self):
-    pass
-
+  def test_expectation_cirq(self):
+    """Compares library expectation values to those from Cirq."""
+    num_bits = 3
+    qubits = cirq.GridQubit.rect(1, num_bits)
+    
+    test_pauli = test_util.get_random_pauli_sum(qubits)
+    num_symbols = 20
+    for _ in range(num_symbols):
+      symbols.add("".join(random.sample(string.ascii_letters, 10)))
+    circuits, resolvers = random_symbol_circuit_resolver_batch
+    print(circuits)
+    print(resolvers)
+    assert False
 
   def test_sample(self):
-    pass
+    """Compares library samples to those from Cirq."""
 
 
 if __name__ == "__main__":

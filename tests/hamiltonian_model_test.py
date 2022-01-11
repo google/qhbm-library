@@ -73,7 +73,6 @@ class HamiltonianTest(tf.test.TestCase):
     energy = energy_model.BitstringEnergy([1], [])
     actual_ham = hamiltonian_model.Hamiltonian(energy, qnn)
     self.assertIsNone(actual_ham.operator_shards)
-    
 
   def test_init_error(self):
     """Confirms initialization fails for mismatched energy and circuit."""
