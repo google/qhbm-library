@@ -126,7 +126,7 @@ class QuantumCircuitTest(tf.test.TestCase):
     self.assertAllEqual(
         tfq.from_tensor(actual_add.pqc), tfq.from_tensor(expected_pqc))
     self.assertEqual(actual_add.name, expected_name)
-
+    
     # Confirm that tf.Variables in the sum are the same as in the addends.
     var_1 = tf.Variable([5.0])
     qnn_1 = circuit_model.QuantumCircuit(
@@ -142,6 +142,27 @@ class QuantumCircuitTest(tf.test.TestCase):
     var_2.assign([12.0])
     self.assertAllClose(actual_sum.trainable_variables[0], var_1)
     self.assertAllClose(actual_sum.trainable_variables[1], var_2)
+
+  def test_trace_add(self):
+    """Confirm addition works under tf.function tracing."""
+    var_1 = tf.Variable([5.0])
+    pqc_1 = cirq.Circuit(cirq.X(cirq.GridQubit(0, 0))**sympy.Symbol("a"))
+    qnn_1 = circuit_model.QuantumCircuit(
+      pqc_1, tf.constant(["a"]), [var_1], [[]])
+    var_2 = tf.Variable([-7.0])
+    pqc_2 = cirq.Circuit(cirq.X(cirq.GridQubit(0, 0))**sympy.Symbol("b"))
+    qnn_2 = circuit_model.QuantumCircuit(
+        pqc_2, tf.constant(["b"]), [var_2], [[]])
+
+    @tf.function
+    def add_traced(qnn_a, qnn_b):
+      actual_sum = qnn_a + qnn_b
+      return actual_sum.pqc
+
+    actual_sum_pqc = add_traced(qnn_1, qnn_2)
+    expected_sum_pqc = pqc_1 + pqc_2
+    self.assertAllEqual(tfq.from_tensor(actual_sum_pqc), expected_sum_pqc)
+    
 
   def test_add_error(self):
     """Confirms bad inputs to __add__ are rejected."""
