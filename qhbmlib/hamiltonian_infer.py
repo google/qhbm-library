@@ -132,9 +132,11 @@ class QHBM(tf.keras.layers.Layer):
         draw as inputs to the quantum circuit of `model`. and use for sampling.
 
     Returns:
-      
+      `tf.Tensor` of shape [num_samples, model.energy.num_bits] containing the
+      computational basis measurements of the density operator.
     """
     self.e_inference.infer(model.energy)
     samples = self.e_inference.sample(num_samples)
     bitstrings, counts = util.unique_bitstrings_with_counts(samples)
-    return self.q_inference.sample(model.circuit, bitstrings, counts)
+    ragged_samples = self.q_inference.sample(model.circuit, bitstrings, counts)
+    return ragged_samples.values.to_tensor()

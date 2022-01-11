@@ -40,19 +40,19 @@ class QHBMTest(tf.test.TestCase):
 
     # Model hamiltonian
     num_bits = 3
-    energy = energy_model.BernoulliEnergy(list(range(num_bits)))
+    self.energy = energy_model.BernoulliEnergy(list(range(num_bits)))
     energy.build([None, num_bits])
     # pin first and last bits, middle bit free.
-    energy.set_weights([tf.constant([-23, 0, 17])])
+    self.energy.set_weights([tf.constant([-23, 0, 17])])
     qubits = cirq.GridQubit.rect(1, num_bits)
     symbols = set()
     num_symbols = 20
     for _ in range(num_symbols):
       symbols.add("".join(random.sample(string.ascii_letters, 10)))
-    pqc = tfq_util.random_symbol_circuit(qubits, symbols)
-    circuit = circuit_model.DirectQuantumCircuit(pqc)
+    self.pqc = tfq_util.random_symbol_circuit(qubits, symbols)
+    circuit = circuit_model.DirectQuantumCircuit(self.pqc)
     circuit.build([])
-    self.model = hamiltonian_model.Hamiltonian(energy, circuit)
+    self.model = hamiltonian_model.Hamiltonian(self.energy, circuit)
 
     # Inference
     self.expected_e_inference = energy_infer.AnalyticEnergyInference(3)
