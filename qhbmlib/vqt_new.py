@@ -84,7 +84,7 @@ def vqt(qhbm, model, num_samples, hamiltonian, beta):
       grad_qhbm = [g_e + g_q for g_e, g_q in zip(grad_ebm, grad_qnn)]
       if variables is None:
         return grad_qhbm
-      return grad_qhbm, [tf.zeros_like(g) for g in variables]
+      return grad_qhbm # , [tf.zeros_like(g) for g in variables]
 
     return beta * expectation - entropy, grad
 
