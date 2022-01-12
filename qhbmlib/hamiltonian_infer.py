@@ -106,7 +106,7 @@ class QHBM(tf.keras.layers.Layer):
           model.circuit, bitstrings, counts, ops, reduce=reduce)
     elif isinstance(ops.energy, energy_model.PauliMixin):
       u_dagger_u = model.circuit + ops.circuit_dagger
-      operator_shards = ops.energy.operator_shards(ops.circuit.qubits)
+      operator_shards = ops.operator_shards
       expectation_shards = self.q_inference.expectation(
           u_dagger_u, bitstrings, counts, operator_shards, reduce=reduce)
       return ops.energy.operator_expectation(expectation_shards)

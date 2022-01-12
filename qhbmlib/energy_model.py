@@ -204,7 +204,7 @@ class KOBE(BitstringEnergy, PauliMixin):
       string_factors = []
       for loc in self._indices[i]:
         string_factors.append(cirq.Z(qubits[loc]))
-        string = cirq.PauliString(string_factors)
+      string = cirq.PauliString(string_factors)
       ops.append(cirq.PauliSum.from_pauli_strings(string))
     return ops
 

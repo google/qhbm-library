@@ -47,7 +47,7 @@ def get_config():
   training = ml_collections.ConfigDict()
   # If False, only simulate the dataset (no model training)
   training.train = True
-  training.samples = 10000
+  training.samples = 250
   training.max_steps = 1000
   training.regularizer_order = 2
   training.regularizer_initial_strength = 0.0

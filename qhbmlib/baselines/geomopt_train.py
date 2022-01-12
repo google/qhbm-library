@@ -131,12 +131,14 @@ def information_matrix(h_inf, model, model_copy, config):
 
   Args:
     h_inf: Hamiltonian inference.
-    model: qhbm model.
-    model_copy: qhbm model copy.
+    model: qhbm model. exp(-model)/Z(model) = rho.
+    model_copy: copy of model.
     config: config dict.
 
   Returns:
-    The BKM information matrix.
+    The BKM information matrix. This is tr[d_j rho d_k model] element-wise i.e.
+    the Hilbert-Schmidt inner product of a mixture coords tangent vector and
+    an exponential coords tangent vector.
   """
 
   def ebm_block():
@@ -149,83 +151,37 @@ def information_matrix(h_inf, model, model_copy, config):
     energy_jac = tape.jacobian(energies, model.energy.trainable_variables[0])
     avg_energy_grad = tf.reduce_mean(energy_jac, axis=0)
     centered_energy_jac = energy_jac - avg_energy_grad
+    # sample-based approximation of covariance of energy grads.
     return tf.matmul(tf.transpose(centered_energy_jac),
                      centered_energy_jac) / config.training.num_samples
 
-  # makes copy of PQC params.
-  qnn_values = tf.identity(model.circuit.value_layers_inputs[0])
-  qnn_shape = tf.shape(model.circuit.trainable_variables[0])
-  qnn_dim = qnn_shape[0]
-
-  def qnn_block():
-    shift = tf.constant(0.5)
-    scale = tf.constant(np.pi**2 / 4)
-
-    def energy(state_indices, state_updates, hamiltonian_indices,
-               hamiltonian_updates):
-      model.circuit.value_layers_inputs[0].assign(
-          tf.tensor_scatter_nd_add(
-              qnn_values, indices=state_indices, updates=state_updates))
-      model_copy.circuit.value_layers_inputs[0].assign(
-          tf.tensor_scatter_nd_add(
-              qnn_values,
-              indices=hamiltonian_indices,
-              updates=hamiltonian_updates))
-      return h_inf.expectation(model, model_copy, config.training.num_samples)
-
-    def row(i):
-
-      def elem(j):
-        energy_pp = energy([[i]], [shift], [[j]], [shift])
-        energy_mm = energy([[i]], [-shift], [[j]], [-shift])
-        energy_pm = energy([[i]], [shift], [[j]], [-shift])
-        energy_mp = energy([[i]], [-shift], [[j]], [shift])
-        return scale * (energy_pm + energy_mp - energy_pp - energy_mm)
-
-      indices = tf.range(i + 1)
-      updates = tf.map_fn(
-          fn=elem, elems=indices, fn_output_signature=tf.float32)
-      indices = tf.expand_dims(indices, -1)
-      return tf.scatter_nd(indices=indices, updates=updates, shape=qnn_shape)
-
-    indices = tf.range(qnn_dim)
-    lower = tf.map_fn(fn=row, elems=indices, fn_output_signature=tf.float32)
-    upper = tf.transpose(lower)
-    total = lower + upper
-    indices = tf.tile(tf.expand_dims(indices, 1), [1, 2])
-    updates = tf.gather_nd(lower, indices)
-    return tf.tensor_scatter_nd_update(total, indices, updates)
-
   def cross_block():
-    shift = tf.constant(0.5)
-    scale = tf.constant(np.pi / 2)
-
-    def energy_grad(indices, updates):
-      model.circuit.value_layers_inputs[0].assign(
-          tf.tensor_scatter_nd_add(
-              qnn_values, indices=indices, updates=updates))
-
-      model_copy.circuit.value_layers_inputs[0].assign(qnn_values)
-      with tf.GradientTape() as tape:
-        tape.watch(model_copy.energy.trainable_variables[0])
+    with tf.GradientTape() as t2:
+      t2.watch(model.circuit.trainable_variables[0])
+      with tf.GradientTape() as t1:
+        t1.watch(model_copy.energy.trainable_variables[0])
         expectation = h_inf.expectation(model, model_copy,
                                         config.training.num_samples)
-      return tape.jacobian(expectation,
-                           model_copy.energy.trainable_variables[0])
 
-    def row(i):
-      return scale * (
-          energy_grad([[i]], [-shift]) - energy_grad([[i]], [shift]))
+      g = t1.gradient(expectation, model_copy.energy.trainable_variables[0])
 
-    indices = tf.range(qnn_dim)
-    return tf.map_fn(fn=row, elems=indices, fn_output_signature=tf.float32)
+    return t2.jacobian(g, model.circuit.trainable_variables[0])
+
+  def qnn_block():
+    with tf.GradientTape() as t2:
+      t2.watch(model.circuit.trainable_variables[0])
+      with tf.GradientTape() as t1:
+        t1.watch(model_copy.circuit.trainable_variables[0])
+        expectation = h_inf.expectation(model, model_copy,
+                                        config.training.num_samples)
+
+      g = t1.gradient(expectation, model_copy.circuit.trainable_variables[0])
+
+    return t2.jacobian(g, model.circuit.trainable_variables[0])
 
   block_ebm = ebm_block()
-  block_qnn = qnn_block()
   block_cross = cross_block()
-
-  model.circuit.value_layers_inputs[0].assign(qnn_values)
-  del model_copy
+  block_qnn = qnn_block()
 
   block_upper = tf.concat([block_ebm, tf.transpose(block_cross)], 1)
   block_lower = tf.concat([block_cross, block_qnn], 1)
@@ -249,7 +205,7 @@ def train_model(h_inf, model, target_dm, target_h, beta, optimizer,
       config.hparams.qnn_param_lim,
       "vqt_model_copy")
 
-  # @tf.function
+  @tf.function
   def train_step(s):
     if s > config.training.regularizer_decay_steps:
       reg_strength = 0.0
