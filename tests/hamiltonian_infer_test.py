@@ -42,7 +42,7 @@ class QHBMTest(tf.test.TestCase):
     # Model hamiltonian
     num_bits = 3
     self.energy = energy_model.BernoulliEnergy(list(range(num_bits)))
-    energy.build([None, num_bits])
+    self.energy.build([None, num_bits])
     # pin first and last bits, middle bit free.
     self.energy.set_weights([tf.constant([-23, 0, 17])])
     qubits = cirq.GridQubit.rect(1, num_bits)
@@ -110,18 +110,41 @@ class QHBMTest(tf.test.TestCase):
     """Compares library expectation values to those from Cirq."""
     num_bits = 3
     qubits = cirq.GridQubit.rect(1, num_bits)
-    
-    test_pauli = test_util.get_random_pauli_sum(qubits)
-    num_symbols = 20
+    raw_op = test_util.get_random_pauli_sum(qubits)
+    ops = tfq.convert_to_tensor([raw_op])
+
+    symbols = set()
+    num_symbols = 10
     for _ in range(num_symbols):
       symbols.add("".join(random.sample(string.ascii_letters, 10)))
-    circuits, resolvers = random_symbol_circuit_resolver_batch
-    print(circuits)
-    print(resolvers)
-    assert False
+    symbols = list(symbols)
+    circuits, resolvers = tfq.util.random_symbol_circuit_resolver_batch(
+        qubits, symbols, 1)
+
+    energy = energy_model.BernoulliEnergy(list(range(num_bits)))
+    energy.build([None, num_bits])
+    circuit = circuit_model.QuantumCircuit(
+        circuits[0], tf.constant(symbols), [tf.Variable([resolvers[0][s] for s in symbols])], [[]])
+    circuit.build([])
+    actual_hamiltonian = hamiltonian_model.Hamiltonian(energy, circuit)
+
+    e_infer = energy_infer.BernoulliEnergyInference()
+    q_infer = circuit_infer.QuantumInference()
+    actual_h_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
+
+    num_samples = 1e7
+    actual_expectation = actual_h_infer.expectation(
+        actual_hamiltonian, ops, num_samples)
+
+    total_circuits = 
+    expected_expectation = cirq.Simulator().simulate_expectation_values(
+        circuits[0], [raw_op], resolvers[0])
+    
+    self.assertAllClose(actual_expectation, expected_expectation)
 
   def test_sample(self):
     """Compares library samples to those from Cirq."""
+    pass
 
 
 if __name__ == "__main__":
