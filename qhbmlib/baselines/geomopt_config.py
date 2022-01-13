@@ -47,23 +47,22 @@ def get_config():
   training = ml_collections.ConfigDict()
   # If False, only simulate the dataset (no model training)
   training.train = True
-  training.samples = 250
-  training.max_steps = 1000
+  training.samples = 500
+  training.max_steps = 2000
   # training.regularizer_order = 2
   # training.regularizer_initial_strength = 0.0
   # training.regularizer_decay_steps = 500
   # Fraction of loss within which to converge
-  training.loss_stop_threshold = 0.04
-  training.loss_stop_ignore_steps = 0
+  # training.loss_stop_threshold = 0.04
+  # training.loss_stop_ignore_steps = 0
   training.method = 'natural'
   training.activation = 'sigmoid'
   training.lmbda = 100
-  training.num_steps = 500
-  training.num_start_steps = 3
+  # training.num_steps = 500
+  # training.num_start_steps = 3
   # start_opt = tf.keras.optimizers.SGD(learning_rate=0.001)
   # training.start_optimizer = tf.keras.optimizers.serialize(start_opt)
-  training.num_start_inner_steps = 3000
-  training.optimizer = 'ADAM'
+  training.optimizer = 'SGD'
   training.learning_rate = 0.01
   # training.learning_rate_end = 0.001
   # training.learning_decay_start = 500
@@ -73,9 +72,10 @@ def get_config():
 
   geometry = ml_collections.ConfigDict()
   geometry.num_inner_steps = 20
+  geometry.num_start_inner_steps = 3000
   geometry.num_samples = 1e3
   geometry.eps = 1e-2
-  geometry.eigval_eps = False
+  geometry.eigval_eps = True
   geometry.fast = False
   geometry.l2_regularizer = 0
   config.geometry = geometry
@@ -97,10 +97,11 @@ def get_config():
   hparams = ml_collections.ConfigDict()
   hparams.ebm_param_lim = 0.25
   hparams.qnn_param_lim = 0.25
-  # hparams.loss_p_threshold = 0.005  # Fraction of loss within which to converge
+  # Fraction of loss within which to converge
+  # hparams.loss_p_threshold = 0.005
   hparams.max_iterations = 1
   # hparams.kobe_order = 2
-  hparams.p = 5  # default
+  hparams.p = 6  # default
   config.hparams = hparams
 
   config.args = {
@@ -111,9 +112,15 @@ def get_config():
 
 
 def get_sweep(hyper):
-  num_trials = 1  # 2**10
+  num_random_trials = 2**6  # 2**10
   return hyper.product([
-      hyper.sweep('seed', hyper.discrete(range(num_trials))),
-      hyper.sweep('config.hparams.p', [2]),
+      hyper.sweep('config.training.method', ['natural', 'vanilla']),
+      hyper.sweep('config.hparams.p', [6]),
       hyper.sweep('config.dataset.bias', [1.0]),
+      hyper.zipit([
+          hyper.loguniform('config.training.learning_rate',
+                           hyper.interval(0.001, 1.0)),
+          hyper.uniform('seed', hyper.interval(1, 1e6))
+      ],
+                  length=num_random_trials),
   ])

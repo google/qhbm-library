@@ -196,7 +196,7 @@ def information_matrix(h_inf, model, model_copy, config):
 
 
 def train_model(h_inf, model, model_copy, target_dm, target_h, beta, optimizer,
-                metrics_writer, config):
+                metrics_writer, config, work_unit):
   """Train given model and write metrics on progress."""
 
   @tf.function
@@ -205,35 +205,61 @@ def train_model(h_inf, model, model_copy, target_dm, target_h, beta, optimizer,
       loss = vqt_new.vqt(h_inf, model, config.training.samples, target_h, beta)
     grads = tape.gradient(loss, model.trainable_variables)
 
-    im = information_matrix(h_inf, model, model_copy, config)
-    if config.geometry.eigval_eps:
-      e, _ = tf.linalg.eig(im)
-      e = tf.sort(tf.cast(e, tf.float32))
-      if e[0] <= config.geometry.eps:
-        reg = config.geometry.eps - e[0]
+    if config.training.method == "natural":
+      for c, m in zip(model_copy.variables, model.variables):
+        c.assign(m)
+      im = information_matrix(h_inf, model, model_copy, config)
+      if config.geometry.eigval_eps:
+        e = tf.linalg.eigvalsh(im)
+        e = tf.sort(tf.cast(e, tf.float32))
+        if e[0] <= config.geometry.eps:
+          reg = config.geometry.eps + tf.math.abs(tf.math.minimum(e[0], 0.0))
+        else:
+          reg = 0.0
       else:
-        reg = 0.0
-    else:
-      reg = config.geometry.eps
-    reg_im = im + reg * tf.eye(tf.shape(im)[0])
+        reg = config.geometry.eps
+      reg_im = im + reg * tf.eye(tf.shape(im)[0])
 
-    flat_grads = tf.concat([tf.reshape(g, [-1]) for g in grads], 0)
-    flat_natural_grads = tf.squeeze(
-        tf.linalg.lstsq(
-            reg_im,
-            tf.expand_dims(flat_grads, 1),
-            l2_regularizer=config.geometry.l2_regularizer,
-            fast=config.geometry.fast))
-    vars_shapes = [tf.shape(var) for var in model.trainable_variables]
-    vars_sizes = [tf.size(var) for var in model.trainable_variables]
-    natural_grads = []
-    i = 0
-    for size, shape in zip(vars_sizes, vars_shapes):
-      natural_grads.append(tf.reshape(flat_natural_grads[i:i + size], shape))
-      i += size
-    optimizer.apply_gradients(zip(natural_grads, model.trainable_variables))
-    for c, m in zip(model_copy.variables, model.variables):
-      c.assign(m)
+      flat_grads = tf.concat([tf.reshape(g, [-1]) for g in grads], 0)
+      flat_natural_grads = tf.squeeze(
+          tf.linalg.lstsq(
+              reg_im,
+              tf.expand_dims(flat_grads, 1),
+              l2_regularizer=config.geometry.l2_regularizer,
+              fast=config.geometry.fast))
+      vars_shapes = [tf.shape(var) for var in model.trainable_variables]
+      vars_sizes = [tf.size(var) for var in model.trainable_variables]
+      natural_grads = []
+      i = 0
+      for size, shape in zip(vars_sizes, vars_shapes):
+        natural_grads.append(tf.reshape(flat_natural_grads[i:i + size], shape))
+        i += size
+      grads = natural_grads
+
+      with metrics_writer.as_default():
+        if config.logging.thetas_grads:
+          tf.summary.histogram("thetas_grads", grads[:-1], step=s)
+        if config.logging.phis_grads:
+          tf.summary.histogram("phis_grads", grads[-1:], step=s)
+
+        e = tf.linalg.eigvalsh(im)
+        e = tf.sort(tf.cast(e, tf.float32))
+        tf.summary.histogram("im_eigvals", e, step=s)
+        tf.summary.scalar("min_im_eigval", e[0], step=s)
+        tf.summary.scalar("max_im_eigval", e[-1], step=s)
+        tf.summary.scalar("avg_im_eigval", tf.reduce_mean(e), step=s)
+        tf.summary.scalar("im_norm", tf.linalg.norm(im), step=s)
+
+        tf.summary.scalar("reg", reg, step=s)
+        e = tf.linalg.eigvalsh(reg_im)
+        e = tf.sort(tf.cast(e, tf.float32))
+        tf.summary.histogram("reg_im_eigvals", e, step=s)
+        tf.summary.scalar("min_reg_im_eigval", e[0], step=s)
+        tf.summary.scalar("max_reg_im_eigval", e[-1], step=s)
+        tf.summary.scalar("avg_reg_im_eigval", tf.reduce_mean(e), step=s)
+        tf.summary.scalar("reg_im_norm", tf.linalg.norm(reg_im), step=s)
+
+    optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
     with metrics_writer.as_default():
       if config.logging.loss:
@@ -248,33 +274,16 @@ def train_model(h_inf, model, model_copy, target_dm, target_h, beta, optimizer,
         tf.summary.histogram("phis", model.energy.trainable_variables, step=s)
       if config.logging.thetas_grads:
         tf.summary.histogram("thetas_grads", grads[:-1], step=s)
-        tf.summary.histogram("thetas_natural_grads", natural_grads[0], step=s)
-        tf.summary.histogram(
-            "thetas_natural_grads_maybe", natural_grads[:-1], step=s)
       if config.logging.phis_grads:
         tf.summary.histogram("phis_grads", grads[-1:], step=s)
-        tf.summary.histogram("phis_natural_grads", natural_grads[1], step=s)
-        tf.summary.histogram(
-            "phis_natural_grads_maybe", natural_grads[-1:], step=s)
-      e, _ = tf.linalg.eig(im)
-      e = tf.sort(tf.cast(e, tf.float32))
-      tf.summary.histogram("im_eigvals", e, step=s)
-      tf.summary.scalar("min_im_eigval", e[0], step=s)
-      tf.summary.scalar("max_im_eigval", e[-1], step=s)
-      tf.summary.scalar("avg_im_eigval", tf.reduce_mean(e), step=s)
-      tf.summary.scalar("im_norm", tf.linalg.norm(im), step=s)
 
-      tf.summary.scalar("reg", reg, step=s)
-      e, _ = tf.linalg.eig(reg_im)
-      e = tf.sort(tf.cast(e, tf.float32))
-      tf.summary.histogram("reg_im_eigvals", e, step=s)
-      tf.summary.scalar("min_reg_im_eigval", e[0], step=s)
-      tf.summary.scalar("max_reg_im_eigval", e[-1], step=s)
-      tf.summary.scalar("avg_reg_im_eigval", tf.reduce_mean(e), step=s)
-      tf.summary.scalar("reg_im_norm", tf.linalg.norm(reg_im), step=s)
+    return loss
 
   for s in tf.range(config.training.max_steps, dtype=tf.int64):
-    train_step(s)
+    loss = train_step(s)
+
+    objective = work_unit.get_measurement_series("train/loss")
+    objective.create_measurement(loss, s + 1)
 
   return s
 
@@ -390,11 +399,9 @@ def main(argv):
             config.hparams.p,
             config.hparams.qnn_param_lim,
             "vqt_model_copy")
-        for c, m in zip(model_copy.variables, model.variables):
-          c.assign(m)
         final_step = train_model(h_inf, model, model_copy, target_thermal_state,
                                  target_h_t, beta, current_optimizer,
-                                 model_metrics_writer, config)
+                                 model_metrics_writer, config, work_unit)
         with model_metrics_writer.as_default():
           if config.logging.relative_entropy:
             # VQT direction of relative entropy
@@ -421,6 +428,8 @@ def main(argv):
     with summary_writer.as_default():
       hp.hparams({
           "qnn_layers": config.hparams.p,
+          "training_method": config.training.method,
+          "learning_rate": config.training.learning_rate,
       })
 
 
