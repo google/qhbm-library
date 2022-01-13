@@ -42,11 +42,10 @@ class WeightedAverageTest(tf.test.TestCase):
     counts = tf.constant(raw_counts, dtype=tf.int32)
     raw_values = [[2.7, -5.9], [-0.5, 3.2]]
     values = tf.constant(raw_values, dtype=tf.float32)
-    expected_average = [
-        (raw_counts[0] / count_sum) * raw_values[0][0]
-        + (raw_counts[1] / count_sum) * raw_values[1][0],
-        (raw_counts[0] / count_sum) * raw_values[0][1]
-        + (raw_counts[1] / count_sum) * raw_values[1][1]]
+    expected_average = [(raw_counts[0] / count_sum) * raw_values[0][0] +
+                        (raw_counts[1] / count_sum) * raw_values[1][0],
+                        (raw_counts[0] / count_sum) * raw_values[0][1] +
+                        (raw_counts[1] / count_sum) * raw_values[1][1]]
     actual_average = utils.weighted_average(values, counts)
     self.assertAllClose(actual_average, expected_average)
 

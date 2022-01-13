@@ -21,6 +21,7 @@ import tensorflow as tf
 import tensorflow_quantum as tfq
 
 from qhbmlib import circuit_model
+from qhbmlib import utils
 
 
 class QuantumInference(tf.keras.layers.Layer):
@@ -123,9 +124,7 @@ class QuantumInference(tf.keras.layers.Layer):
         tf.tile(tf.expand_dims(counts, 1), [1, num_operators]),
     )
     if reduce:
-      probs = tf.cast(counts, tf.float32) / tf.cast(
-          tf.reduce_sum(counts), tf.float32)
-      return tf.reduce_sum(tf.transpose(probs * tf.transpose(expectations)), 0)
+      return utils.weighted_average(expectations, counts)
     return expectations
 
   def sample(self, qnn: circuit_model.QuantumCircuit, initial_states: tf.Tensor,

@@ -53,4 +53,3 @@ def weighted_average(values: tf.Tensor, counts: tf.Tensor):
   expanded_counts = tf.expand_dims(tf.cast(counts, tf.float32), -1)
   weighted_values = expanded_counts * values
   return tf.reduce_sum(weighted_values, 0) / tf.reduce_sum(expanded_counts)
-
