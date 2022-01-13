@@ -47,7 +47,7 @@ class WeightedAverageTest(tf.test.TestCase):
                         (raw_counts[0] / count_sum) * raw_values[0][1] +
                         (raw_counts[1] / count_sum) * raw_values[1][1]]
     actual_average = utils.weighted_average(counts, values)
-    self.assertAllEqual(actual_average, expected_average)
+    self.assertAllClose(actual_average, expected_average)
 
 
 if __name__ == "__main__":
