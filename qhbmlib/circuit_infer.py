@@ -124,7 +124,7 @@ class QuantumInference(tf.keras.layers.Layer):
         tf.tile(tf.expand_dims(counts, 1), [1, num_operators]),
     )
     if reduce:
-      return utils.weighted_average(expectations, counts)
+      return utils.weighted_average(counts, expectations)
     return expectations
 
   def sample(self, qnn: circuit_model.QuantumCircuit, initial_states: tf.Tensor,

@@ -40,15 +40,15 @@ class Squeeze(tf.keras.layers.Layer):
     return tf.squeeze(inputs, axis=self._axis)
 
 
-def weighted_average(values: tf.Tensor, counts: tf.Tensor):
+def weighted_average(counts: tf.Tensor, values: tf.Tensor):
   """Returns the weighted average of input values.
 
   Row `i` of `values` is multiplied by `counts[i]`, resulting in a weighted
   version of values; the mean is then taken across the first dimension.
 
   Args:
-    values: Floats of shape [batch_size, n].
     counts: Non-negative integers of shape [batch_size].
+    values: Floats of shape [batch_size, n].
   """
   expanded_counts = tf.expand_dims(tf.cast(counts, tf.float32), -1)
   weighted_values = expanded_counts * values
