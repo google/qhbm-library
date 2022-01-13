@@ -22,7 +22,7 @@ def get_config():
       config.experiment_name)
   # BEGIN GOOGLE-INTERNAL
   config.gfs_user = 'x-quantum'
-  config.cell = 'yo'
+  config.cell = 'lu'
   output_dir = ('/cns/{cell}-d/home/{group}/{user}/rs=6.3/geomopt/'
                 '{experiment}/'.format(
                     cell=config.cell,
@@ -49,9 +49,9 @@ def get_config():
   training.train = True
   training.samples = 250
   training.max_steps = 1000
-  training.regularizer_order = 2
-  training.regularizer_initial_strength = 0.0
-  training.regularizer_decay_steps = 500
+  # training.regularizer_order = 2
+  # training.regularizer_initial_strength = 0.0
+  # training.regularizer_decay_steps = 500
   # Fraction of loss within which to converge
   training.loss_stop_threshold = 0.04
   training.loss_stop_ignore_steps = 0
@@ -69,13 +69,16 @@ def get_config():
   # training.learning_decay_start = 500
   # training.learning_decay_end = 1000
   # training.learning_decay_step = 25
-  training.num_inner_steps = 20
-  training.num_samples = 1e5
-  training.eps = 1e-2
-  training.eigval_eps = False
-  training.fast = False
-  training.l2_regularizer = 0
   config.training = training
+
+  geometry = ml_collections.ConfigDict()
+  geometry.num_inner_steps = 20
+  geometry.num_samples = 1e3
+  geometry.eps = 1e-2
+  geometry.eigval_eps = False
+  geometry.fast = False
+  geometry.l2_regularizer = 0
+  config.geometry = geometry
 
   # logging settings
   logging = ml_collections.ConfigDict()

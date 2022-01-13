@@ -55,16 +55,6 @@ flags.DEFINE_string(
 FLAGS = flags.FLAGS
 
 
-def lazy_mkdir(path):
-  try:
-    if google_internal:
-      gfile.MakeDirs(path)
-    else:
-      os.mkdir(path)
-  except FileExistsError:
-    pass
-
-
 def get_tfim_hamiltonian(num_qubits, bias):
   qubits = cirq.GridQubit.rect(1, num_qubits)
   hamiltonian = cirq.PauliSum()
@@ -143,7 +133,7 @@ def information_matrix(h_inf, model, model_copy, config):
 
   def ebm_block():
     h_inf.e_inference.infer(model.energy)
-    samples = h_inf.e_inference.sample(config.training.num_samples)
+    samples = h_inf.e_inference.sample(config.geometry.num_samples)
 
     with tf.GradientTape() as tape:
       tape.watch(model.energy.trainable_variables[0])
@@ -152,8 +142,9 @@ def information_matrix(h_inf, model, model_copy, config):
     avg_energy_grad = tf.reduce_mean(energy_jac, axis=0)
     centered_energy_jac = energy_jac - avg_energy_grad
     # sample-based approximation of covariance of energy grads.
-    return tf.matmul(tf.transpose(centered_energy_jac),
-                     centered_energy_jac) / config.training.num_samples
+    return tf.matmul(
+        centered_energy_jac, centered_energy_jac,
+        transpose_a=True) / config.geometry.num_samples
 
   def cross_block():
     with tf.GradientTape() as t2:
@@ -161,80 +152,69 @@ def information_matrix(h_inf, model, model_copy, config):
       with tf.GradientTape() as t1:
         t1.watch(model_copy.energy.trainable_variables[0])
         expectation = h_inf.expectation(model, model_copy,
-                                        config.training.num_samples)
+                                        config.geometry.num_samples)
 
       g = t1.gradient(expectation, model_copy.energy.trainable_variables[0])
 
     return t2.jacobian(g, model.circuit.trainable_variables[0])
 
   def qnn_block():
-    with tf.GradientTape() as t2:
-      t2.watch(model.circuit.trainable_variables[0])
-      with tf.GradientTape() as t1:
-        t1.watch(model_copy.circuit.trainable_variables[0])
+    shift = tf.constant(0.5)
+    scale = tf.constant(np.pi / 2)
+
+    qnn_values = tf.identity(model.circuit.value_layers_inputs[0])
+
+    def adj_diff_grad(indices, updates):
+      model.circuit.value_layers_inputs[0].assign(
+          tf.tensor_scatter_nd_add(
+              qnn_values, indices=indices, updates=updates))
+
+      with tf.GradientTape() as tape:
+        tape.watch(model_copy.circuit.trainable_variables[0])
         expectation = h_inf.expectation(model, model_copy,
-                                        config.training.num_samples)
+                                        config.geometry.num_samples)
 
-      g = t1.gradient(expectation, model_copy.circuit.trainable_variables[0])
+      return tape.jacobian(expectation,
+                           model_copy.circuit.trainable_variables[0])
 
-    return t2.jacobian(g, model.circuit.trainable_variables[0])
+    def row(i):
+      return scale * (
+          adj_diff_grad([[i]], [-shift]) - adj_diff_grad([[i]], [shift]))
+
+    indices = tf.range(tf.shape(model.circuit.trainable_variables[0])[0])
+    model.circuit.value_layers_inputs[0].assign(qnn_values)
+    return tf.map_fn(fn=row, elems=indices, fn_output_signature=tf.float32)
 
   block_ebm = ebm_block()
   block_cross = cross_block()
   block_qnn = qnn_block()
 
-  block_upper = tf.concat([block_ebm, tf.transpose(block_cross)], 1)
-  block_lower = tf.concat([block_cross, block_qnn], 1)
-  return tf.concat([block_upper, block_lower], 0)
+  block_upper = tf.concat([block_ebm, block_cross], 1)
+  block_lower = tf.concat([tf.transpose(block_cross), block_qnn], 1)
+  im = tf.concat([block_upper, block_lower], 0)
+  return (im + tf.transpose(im)) / 2.
 
 
-def train_model(h_inf, model, target_dm, target_h, beta, optimizer,
+def train_model(h_inf, model, model_copy, target_dm, target_h, beta, optimizer,
                 metrics_writer, config):
   """Train given model and write metrics on progress."""
 
-  loss_list = []
-
-  def regularizer_func(current_strength, ebm_params):
-    return current_strength * tf.math.reduce_sum(
-        tf.math.pow(tf.math.abs(ebm_params), config.training.regularizer_order))
-
-  model_copy = get_initial_qhbm(
-      config.dataset.num_sites,  # target_h,
-      config.hparams.ebm_param_lim,
-      config.hparams.p,
-      config.hparams.qnn_param_lim,
-      "vqt_model_copy")
-
   @tf.function
   def train_step(s):
-    if s > config.training.regularizer_decay_steps:
-      reg_strength = 0.0
-    else:
-      reg_strength = config.training.regularizer_initial_strength * (
-          1 - tf.cast(s, tf.float32) / config.training.regularizer_decay_steps)
-    with tf.GradientTape(persistent=True) as tape:
+    with tf.GradientTape() as tape:
       loss = vqt_new.vqt(h_inf, model, config.training.samples, target_h, beta)
-      regularizer = regularizer_func(reg_strength,
-                                     model.energy.trainable_variables)
-    grads_loss = tape.gradient(loss, model.trainable_variables)
-    grads_regularizer = tape.gradient(
-        regularizer,
-        model.trainable_variables,
-        unconnected_gradients=tf.UnconnectedGradients.ZERO)
-    del tape
-
-    grads = [g_l + g_r for g_l, g_r in zip(grads_loss, grads_regularizer)]
+    grads = tape.gradient(loss, model.trainable_variables)
 
     im = information_matrix(h_inf, model, model_copy, config)
-    if config.training.eigval_eps:
+    if config.geometry.eigval_eps:
       e, _ = tf.linalg.eig(im)
       e = tf.sort(tf.cast(e, tf.float32))
-      if e[0] <= config.training.eps:
-        reg = config.training.eps - e[0]
+      if e[0] <= config.geometry.eps:
+        reg = config.geometry.eps - e[0]
       else:
         reg = 0.0
     else:
-      reg = config.training.eps
+      reg = config.geometry.eps
     reg_im = im + reg * tf.eye(tf.shape(im)[0])
 
     flat_grads = tf.concat([tf.reshape(g, [-1]) for g in grads], 0)
@@ -242,8 +222,8 @@ def train_model(h_inf, model, target_dm, target_h, beta, optimizer,
         tf.linalg.lstsq(
             reg_im,
             tf.expand_dims(flat_grads, 1),
-            l2_regularizer=config.training.l2_regularizer,
-            fast=config.training.fast))
+            l2_regularizer=config.geometry.l2_regularizer,
+            fast=config.geometry.fast))
     vars_shapes = [tf.shape(var) for var in model.trainable_variables]
     vars_sizes = [tf.size(var) for var in model.trainable_variables]
     natural_grads = []
@@ -251,6 +231,9 @@ def train_model(h_inf, model, target_dm, target_h, beta, optimizer,
     for size, shape in zip(vars_sizes, vars_shapes):
       natural_grads.append(tf.reshape(flat_natural_grads[i:i + size], shape))
       i += size
+    optimizer.apply_gradients(zip(natural_grads, model.trainable_variables))
+    for c, m in zip(model_copy.variables, model.variables):
+      c.assign(m)
 
     with metrics_writer.as_default():
       if config.logging.loss:
@@ -273,7 +256,6 @@ def train_model(h_inf, model, target_dm, target_h, beta, optimizer,
         tf.summary.histogram("phis_natural_grads", natural_grads[1], step=s)
         tf.summary.histogram(
             "phis_natural_grads_maybe", natural_grads[-1:], step=s)
-
       e, _ = tf.linalg.eig(im)
       e = tf.sort(tf.cast(e, tf.float32))
       tf.summary.histogram("im_eigvals", e, step=s)
@@ -290,25 +272,11 @@ def train_model(h_inf, model, target_dm, target_h, beta, optimizer,
       tf.summary.scalar("max_reg_im_eigval", e[-1], step=s)
       tf.summary.scalar("avg_reg_im_eigval", tf.reduce_mean(e), step=s)
       tf.summary.scalar("reg_im_norm", tf.linalg.norm(reg_im), step=s)
-    return loss, natural_grads
 
   for s in tf.range(config.training.max_steps, dtype=tf.int64):
-    loss, grads = train_step(s)
-    loss_list.append(loss)
-    if s % 2 == 0:
-      first_half_loss = tf.reduce_mean(
-          tf.stack(loss_list[config.training.loss_stop_ignore_steps:s // 2]))
-      second_half_loss = tf.reduce_mean(tf.stack(loss_list[s // 2:]))
-      loss_diff = first_half_loss - second_half_loss
-      with metrics_writer.as_default():
-        tf.summary.scalar("loss_diff", loss_diff, step=s)
-        tf.summary.scalar("second_half_loss", second_half_loss, step=s)
+    train_step(s)
 
-    # apply gradients at the end so that all recorded metrics are from the
-    # same value of the model
-    optimizer.apply_gradients(zip(grads, model.trainable_variables))
-
-  return second_half_loss, s
+  return s
 
 
 def main(argv):
@@ -415,9 +383,18 @@ def main(argv):
         model_metrics_writer = tf.summary.create_file_writer(model_dir)
         logging.info(f"Number of layers: {config.hparams.p}")
         initial_t = time.time()
-        _, final_step = train_model(h_inf, model, target_thermal_state,
-                                    target_h_t, beta, current_optimizer,
-                                    model_metrics_writer, config)
+
+        model_copy = get_initial_qhbm(
+            config.dataset.num_sites,  # target_h,
+            config.hparams.ebm_param_lim,
+            config.hparams.p,
+            config.hparams.qnn_param_lim,
+            "vqt_model_copy")
+        for c, m in zip(model_copy.variables, model.variables):
+          c.assign(m)
+        final_step = train_model(h_inf, model, model_copy, target_thermal_state,
+                                 target_h_t, beta, current_optimizer,
+                                 model_metrics_writer, config)
         with model_metrics_writer.as_default():
           if config.logging.relative_entropy:
             # VQT direction of relative entropy
