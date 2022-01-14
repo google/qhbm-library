@@ -32,6 +32,24 @@ class SqueezeTest(tf.test.TestCase):
     self.assertAllEqual(actual_outputs, expected_outputs)
 
 
+class WeightedAverageTest(tf.test.TestCase):
+  """Tests the weighted average function."""
+
+  def test_explicit(self):
+    """Uses explicit averaging to test the function."""
+    raw_counts = [37, 5]
+    count_sum = sum(raw_counts)
+    counts = tf.constant(raw_counts, dtype=tf.int32)
+    raw_values = [[2.7, -5.9], [-0.5, 3.2]]
+    values = tf.constant(raw_values, dtype=tf.float32)
+    expected_average = [(raw_counts[0] / count_sum) * raw_values[0][0] +
+                        (raw_counts[1] / count_sum) * raw_values[1][0],
+                        (raw_counts[0] / count_sum) * raw_values[0][1] +
+                        (raw_counts[1] / count_sum) * raw_values[1][1]]
+    actual_average = utils.weighted_average(counts, values)
+    self.assertAllClose(actual_average, expected_average)
+
+
 if __name__ == "__main__":
   print("Running utils_test.py ...")
   tf.test.main()
