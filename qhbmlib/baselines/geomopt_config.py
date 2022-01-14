@@ -44,7 +44,7 @@ def get_config():
   dataset.beta_max = 3.0
   dataset.beta_steps = 1
   dataset.digits = 3
-  dataset.lattice_dimension = 2
+  dataset.lattice_dimension = 1
   config.dataset = dataset
 
   # training settings
@@ -52,7 +52,7 @@ def get_config():
   # If False, only simulate the dataset (no model training)
   training.train = True
   training.method = 'natural'
-  training.optimizer = tf.keras.optimizers.serialize(tf.keras.optimizers.SGD(learning_rate=0.01))
+  training.optimizer = tf.keras.optimizers.serialize(tf.keras.optimizers.SGD(learning_rate=0.16))
   training.num_steps = 1000
   training.num_samples = 500
   # training.lmbda (use 1/lr instead)
@@ -110,12 +110,14 @@ def get_sweep(hyper):
       hyper.sweep(
           'config.dataset.bias',
           [
-              2.5  # ferromagnetic regime (vanilla QHEA struggles)
+              1.0  # 1-d critical point
+              # 2.5  # 2-d ferromagnetic regime (vanilla QHEA struggles)
           ]),
-      hyper.zipit([
-          hyper.loguniform('config.training.learning_rate',
-                           hyper.interval(1e-3, 1.0)),
-          hyper.uniform('seed', hyper.discrete(range(0, int(1e6))))
-      ],
-                  length=num_random_trials),
+      hyper.zipit(
+          [
+              # hyper.loguniform('config.training.learning_rate',
+              #                  hyper.interval(1e-3, 1.0)),
+              hyper.uniform('seed', hyper.discrete(range(0, int(1e6))))
+          ],
+          length=num_random_trials),
   ])
