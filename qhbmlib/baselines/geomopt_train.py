@@ -96,33 +96,55 @@ def get_tfim_hamiltonian(bias, config):
     return x_hamiltonian, z_hamiltonian
 
 
-def get_average_correlation_op(num_qubits):
-  qubits = cirq.GridQubit.rect(1, num_qubits)
-  op = cirq.PauliSum()
-  for q0, q1 in zip(qubits, qubits[1:]):
-    op += (1.0 / (num_qubits - 1)) * cirq.Z(q0) * cirq.Z(q1)
-  return op
+def get_average_correlation_op(config):
+  num_rows = config.dataset.num_rows
+  num_cols = config.dataset.num_cols
+  if config.dataset.lattice_dimension == 1:
+    num_sites = num_rows * num_cols
+    qubits = cirq.GridQubit.rect(1, num_sites)
+    op = cirq.PauliSum()
+    for q0, q1 in zip(qubits, qubits[1:]):
+      op += (1.0 / (num_sites - 1)) * cirq.Z(q0) * cirq.Z(q1)
+    return op
+  elif config.dataset.lattice_dimension == 2:
+    hamiltonian = cirq.PauliSum()
+    qubits = _qubit_grid(num_rows, num_cols)
+    extended_qubits = _qubit_grid(num_rows, num_cols)
+    for r, row in enumerate(qubits):
+      extended_qubits[r].append(row[0])
+    extended_qubits.append(qubits[0])
+    count = 0
+    # Horizontal interactions.
+    for row in extended_qubits[:-1]:
+      for q0, q1 in zip(row, row[1:]):
+        hamiltonian += cirq.Z(q0) * cirq.Z(q1)
+        count += 1
+    # Vertical interactions.
+    for row_0, row_1 in zip(extended_qubits, extended_qubits[1:]):
+      for q0, q1 in zip(row_0[:-1], row_1):
+        hamiltonian += cirq.Z(q0) * cirq.Z(q1)
+        count += 1
+    hamiltonian = hamiltonian / float(count)
+    return hamiltonian
 
 
-def get_long_correlation_op(num_qubits):
-  qubits = cirq.GridQubit.rect(1, num_qubits)
-  op = cirq.PauliSum.from_pauli_strings(cirq.PauliString({qubits[0]: cirq.I}))
-  for q in qubits:
-    op *= cirq.Z(q)
-  return op
+# def get_long_correlation_op(num_qubits):
+#   qubits = cirq.GridQubit.rect(1, num_qubits)
+#   op = cirq.PauliSum.from_pauli_strings(cirq.PauliString({qubits[0]: cirq.I}))
+#   for q in qubits:
+#     op *= cirq.Z(q)
+#   return op
 
 
-def compute_data_point_metrics(beta_t, target_h_m_t, average_correlation_op_m_t,
-                               long_correlation_op_m_t):
+def compute_data_point_metrics(beta_t, target_h_m_t,
+                               average_correlation_op_m_t):
   target_thermal_state = util.np_get_thermal_state(beta_t, target_h_m_t)
   true_correlation = tf.linalg.trace(
       tf.matmul(average_correlation_op_m_t, target_thermal_state))
-  true_long_correlation = tf.linalg.trace(
-      tf.matmul(long_correlation_op_m_t, target_thermal_state))
   rho_eigs = tf.linalg.eigvalsh(target_thermal_state)
   rho_prod = tf.math.multiply_no_nan(tf.math.log(rho_eigs), rho_eigs)
   true_entropy = -tf.math.reduce_sum(rho_prod)
-  return target_thermal_state, true_correlation, true_entropy, true_long_correlation
+  return target_thermal_state, true_correlation, true_entropy
 
 
 def get_initial_qhbm(config, name):
@@ -358,18 +380,17 @@ def main(argv):
   with gfile.Open(os.path.join(results_dir, "config.json"), "w") as outfile:
     json.dump(config.to_dict(), outfile)
 
-  num_sites = config.dataset.num_rows * config.dataset.num_cols
-  average_correlation_op = get_average_correlation_op(num_sites)
+  average_correlation_op = get_average_correlation_op(config)
   average_correlation_op_m = average_correlation_op.matrix()
   average_correlation_op_m_t = tf.constant(
       average_correlation_op_m, dtype=tf.complex128)
   average_correlation_op_t = tfq.convert_to_tensor([average_correlation_op])
 
-  long_correlation_op = get_long_correlation_op(num_sites)
-  long_correlation_op_m = long_correlation_op.matrix()
-  long_correlation_op_m_t = tf.constant(
-      long_correlation_op_m, dtype=tf.complex128)
-  long_correlation_op_t = tfq.convert_to_tensor([long_correlation_op])
+  # long_correlation_op = get_long_correlation_op(num_sites)
+  # long_correlation_op_m = long_correlation_op.matrix()
+  # long_correlation_op_m_t = tf.constant(
+  #     long_correlation_op_m, dtype=tf.complex128)
+  # long_correlation_op_t = tfq.convert_to_tensor([long_correlation_op])
 
   if config.training.optimizer == "ADAM":
     optimizer_initializer = tf.keras.optimizers.Adam
@@ -401,13 +422,11 @@ def main(argv):
       with tf.profiler.experimental.Profile(results_dir):
         with tf.profiler.experimental.Trace(
             "compute_data_point_metrics", step_num=0, _r=1):
-          target_thermal_state, true_correlation, true_entropy, true_long_correlation = compute_data_point_metrics(
-              beta_t, target_h_m_t, average_correlation_op_m_t,
-              long_correlation_op_m_t)
+          target_thermal_state, true_correlation, true_entropy = compute_data_point_metrics(
+              beta_t, target_h_m_t, average_correlation_op_m_t)
     else:
-      target_thermal_state, true_correlation, true_entropy, true_long_correlation = compute_data_point_metrics(
-          beta_t, target_h_m_t, average_correlation_op_m_t,
-          long_correlation_op_m_t)
+      target_thermal_state, true_correlation, true_entropy = compute_data_point_metrics(
+          beta_t, target_h_m_t, average_correlation_op_m_t)
     data_point_label = (
         f"bias_{str(bias).replace('.','p')}_beta_{str(beta).replace('.','p')}")
     data_point_dir = os.path.join(results_dir, "metrics", data_point_label,
@@ -417,8 +436,8 @@ def main(argv):
     with data_point_metrics_writer.as_default():
       step_zero = tf.constant(0, dtype=tf.int64)
       tf.summary.scalar("true_correlation", true_correlation, step=step_zero)
-      tf.summary.scalar(
-          "true_long_correlation", true_long_correlation, step=step_zero)
+      # tf.summary.scalar(
+      #     "true_long_correlation", true_long_correlation, step=step_zero)
       tf.summary.scalar("true_entropy", true_entropy, step=step_zero)
 
     # Training loop
@@ -452,11 +471,12 @@ def main(argv):
                                                 config.training.samples)[0]
           tf.summary.scalar(
               "model_correlation", model_correlation, step=final_step)
-          model_long_correlation = h_inf.expectation(model,
-                                                     long_correlation_op_t,
-                                                     config.training.samples)[0]
-          tf.summary.scalar(
-              "model_long_correlation", model_long_correlation, step=final_step)
+          # model_long_correlation = h_inf.expectation(model,
+          #                                            long_correlation_op_t,
+          #                                            config.training.samples)[0]
+          # tf.summary.scalar(
+          #     "model_long_correlation", model_long_correlation,
+          #     step=final_step)
         total_wall_time = time.time() - initial_t
         logging.info("Finished training. total %.2f min",
                      total_wall_time / 60.0)

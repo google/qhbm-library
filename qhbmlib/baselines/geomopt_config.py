@@ -55,7 +55,7 @@ def get_config():
   training.activation = 'sigmoid'
   # training.lmbda (use 1/lr instead)
   training.optimizer = 'SGD'
-  training.learning_rate = 0.16
+  training.learning_rate = 0.01
   config.training = training
 
   geometry = ml_collections.ConfigDict()
@@ -99,24 +99,17 @@ def get_config():
 def get_sweep(hyper):
   num_random_trials = 2**4
   return hyper.product([
-      hyper.sweep(
-          'config.training.method',
-          [
-              'natural',
-              'vanilla'
-          ]),
+      hyper.sweep('config.training.method', ['natural', 'vanilla']),
       hyper.sweep('config.hparams.p', [6]),
       hyper.sweep(
           'config.dataset.bias',
           [
-              # 1.0
-              3.05
+              2.5  # ferromagnetic regime (vanilla QHEA struggles)
           ]),
-      hyper.zipit(
-          [
-              hyper.loguniform('config.training.learning_rate',
-                               hyper.interval(1e-3, 1.0)),
-              hyper.uniform('seed', hyper.discrete(range(0, int(1e6))))
-          ],
-          length=num_random_trials),
+      hyper.zipit([
+          hyper.loguniform('config.training.learning_rate',
+                           hyper.interval(1e-3, 1.0)),
+          hyper.uniform('seed', hyper.discrete(range(0, int(1e6))))
+      ],
+                  length=num_random_trials),
   ])
