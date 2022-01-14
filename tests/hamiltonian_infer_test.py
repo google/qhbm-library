@@ -77,7 +77,7 @@ class QHBMTest(tf.test.TestCase):
     # Circuits with the allowed-to-be-sampled bitstrings prepended.
     u = tfq.from_tensor(self.model.circuit.pqc)[0]
     qubits = self.model.circuit.qubits
-    expected_circuits_deser = [
+    expected_circuits_deserialized = [
         cirq.Circuit(
             cirq.X(qubits[0])**0,
             cirq.X(qubits[1])**0,
@@ -90,16 +90,16 @@ class QHBMTest(tf.test.TestCase):
         ) + u,
     ]
     # Check that both circuits are generated.
-    actual_circuits_deser = tfq.from_tensor(actual_circuits)
+    actual_circuits_deserialized = tfq.from_tensor(actual_circuits)
     self.assertTrue(
         any([
-            expected_circuits_deser[0] == actual_circuits_deser[0],
-            expected_circuits_deser[0] == actual_circuits_deser[1],
+            expected_circuits_deserialized[0] == actual_circuits_deserialized[0],
+            expected_circuits_deserialized[0] == actual_circuits_deserialized[1],
         ]))
     self.assertTrue(
         any([
-            expected_circuits_deser[1] == actual_circuits_deser[0],
-            expected_circuits_deser[1] == actual_circuits_deser[1],
+            expected_circuits_deserialized[1] == actual_circuits_deserialized[0],
+            expected_circuits_deserialized[1] == actual_circuits_deserialized[1],
         ]))
     # Check that the fraction is approximately 0.5 (equal counts)
     self.assertAllClose(

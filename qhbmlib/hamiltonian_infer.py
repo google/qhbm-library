@@ -53,7 +53,7 @@ class QHBM(tf.keras.layers.Layer):
     return self._q_inference
 
   def circuits(self, model: hamiltonian_model.Hamiltonian, num_samples: int):
-    """Draws pure states from the density operator.
+    r"""Draws thermally distributed eigenstates from the model Hamiltonian.
 
     Args:
       model: The modular Hamiltonian whose normalized exponential is the
@@ -62,10 +62,9 @@ class QHBM(tf.keras.layers.Layer):
 
     Returns:
       states: 1D `tf.Tensor` of dtype `tf.string`.  Each entry is a TFQ string
-        representation of a state drawn from the density operator represented by
-        the input `model`.
+        representation of an eigenstate of the Hamiltonian `model`.
       counts: 1D `tf.Tensor` of dtype `tf.int32`.  `counts[i]` is the number of
-        times `states[i]` was drawn from the density operator.
+        times `states[i]` was drawn from the thermal ensemble.
     """
     self.e_inference.infer(model.energy)
     samples = self.e_inference.sample(num_samples)
