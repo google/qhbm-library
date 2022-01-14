@@ -74,4 +74,3 @@ class QHBM(tf.keras.layers.Layer):
     bitstrings, counts = util.unique_bitstrings_with_counts(samples)
     states = model.circuit(bitstrings)
     return states, counts
-
