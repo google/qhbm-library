@@ -52,7 +52,7 @@ class QHBM(tf.keras.layers.Layer):
     """The object used for inference on density operator eigenvectors."""
     return self._q_inference
 
-  def circuits(self, model: hamiltonian_model.Hamiltonian, num_samples: int, resolve=True):
+  def circuits(self, model: hamiltonian_model.Hamiltonian, num_samples: int):
     r"""Draws thermally distributed eigenstates from the model Hamiltonian.
 
     We define some terms that will be used to explain the algorithm.

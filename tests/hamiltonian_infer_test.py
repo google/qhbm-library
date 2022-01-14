@@ -99,13 +99,17 @@ class QHBMTest(tf.test.TestCase):
       actual_circuits_deserialized = tfq.from_tensor(actual_circuits)
       self.assertTrue(
           any([
-              expected_circuits_deserialized[0] == actual_circuits_deserialized[0],
-              expected_circuits_deserialized[0] == actual_circuits_deserialized[1],
+              expected_circuits_deserialized[0] ==
+              actual_circuits_deserialized[0],
+              expected_circuits_deserialized[0] ==
+              actual_circuits_deserialized[1],
           ]))
       self.assertTrue(
           any([
-              expected_circuits_deserialized[1] == actual_circuits_deserialized[0],
-              expected_circuits_deserialized[1] == actual_circuits_deserialized[1],
+              expected_circuits_deserialized[1] ==
+              actual_circuits_deserialized[0],
+              expected_circuits_deserialized[1] ==
+              actual_circuits_deserialized[1],
           ]))
       # Check that the fraction is approximately 0.5 (equal counts)
       self.assertAllClose(
