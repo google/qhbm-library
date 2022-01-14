@@ -24,3 +24,8 @@ __pycache__/
 *#
 *~
 *.#
+
+# ignore vim temp files
+*.swp
+*.swo
+
