@@ -14,14 +14,12 @@
 # ==============================================================================
 """Tools for inference on quantum Hamiltonians."""
 
-from typing import List, Union
+from typing import Union
 
-import cirq
 import tensorflow as tf
 
 from qhbmlib import circuit_infer
 from qhbmlib import energy_infer
-from qhbmlib import energy_model
 from qhbmlib import hamiltonian_model
 from qhbmlib import util
 

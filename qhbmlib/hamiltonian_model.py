@@ -14,7 +14,7 @@
 # ==============================================================================
 """Tools for defining quantum Hamiltonian-based models."""
 
-from typing import List, Union
+from typing import Union
 
 import tensorflow as tf
 import tensorflow_quantum as tfq
