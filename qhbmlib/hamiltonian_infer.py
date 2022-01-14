@@ -65,9 +65,9 @@ class QHBM(tf.keras.layers.Layer):
     $$\rho_T = \sum_x p_\theta(x)U_\phi\ket{x}\bra{x}U_\phi^\dagger,$$
     where the probability is given by
     $$p_\theta(x) = \tr[\exp(-K_\theta)]\bra{x}\exp(-K_\theta)\ket{x}$$
-    for $x\in\{1, \ldots, \dim(K_{\theta\phi})\} = \mathcal{X}$.  Note that each
+    for $x\in\{1, \ldots, \dim(K_{\theta\phi})\} = \mathcal{X}$. Note that each
     $U_\phi\ket{x}$ is an eigenvector of both $\rho_T$ and $K_{\theta\phi}$.
-    Corresponding to this density operator is the [ensemble of quantum states][2]
+    Corresponding to this operator is the [ensemble of quantum states][2]
     $$\mathcal{E} = \{p_\theta(x), U_\phi\ket{x}\}_{x\in\mathcal{X}}.$$
     This function returns pure state samples from the ensemble.
 
