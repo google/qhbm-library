@@ -58,21 +58,34 @@ class QHBM(tf.keras.layers.Layer):
     We define some terms that will be used to explain the algorithm.
     `model` is some modular Hamiltonian
     $$K_{\theta\phi} = U_\phi K_\theta U_\phi^\dagger.$$
-    Following Wilde's "Quantum Information Theory" second edition,
-    the corresponding thermal state can be written
+    The [thermal state][1] corresponding to the model is
+    $$ \rho_T = Z^{-1} e^{-\beta K_{\theta\phi}}.$$
+    For QHBMs, we fix $\beta = 1$, effectively absorbing it into the definition
+    of the modular Hamiltonian.  Then $\rho_T$ can be expanded as
     $$\rho_T = \sum_x p_\theta(x)U_\phi\ket{x}\bra{x}U_\phi^\dagger,$$
     where the probability is given by
     $$p_\theta(x) = \tr[\exp(-K_\theta)]\bra{x}\exp(-K_\theta)\ket{x}$$
-    for $x\in\{1, \ldots, \dim(K_{\theta\phi})\}$.  Note that each
+    for $x\in\{1, \ldots, \dim(K_{\theta\phi})\} = \mathcal{X}$.  Note that each
     $U_\phi\ket{x}$ is an eigenvector of both $\rho_T$ and $K_{\theta\phi}$.
+    Corresponding to this density operator is the [ensemble of quantum states][2]
+    $$\mathcal{E} = \{p_\theta(x), U_\phi\ket{x}\}_{x\in\mathcal{X}}.$$
+    This function returns pure state samples from the ensemble.
 
     We now explain the algorithm.  First, construct $X$ to be a classical
     random variable with probability distribution $p_\theta(x)$ set by
-    `model.energy`.  Then, draw $n = $`num_samples` bitstrings,
+    `model.energy`.  Then, draw $n = $`num\_samples` bitstrings,
     $S=\{x_1, \ldots, x_n\}$, from $X$.  For each unique $x_i\in S$, set
     `states[i]` to the TFQ string representation of $U_\phi\ket{x_i}$, where
     $U_\phi$ is set by `model.circuit`.  Finally, set `counts[i]` equal to the
     number of times $x_i$ occurs in $S$.
+
+    #### References
+    [1]: Nielsen, Michael A. and Chuang, Isaac L. (2010).
+         Quantum Computation and Quantum Information.
+         Cambridge University Press.
+    [2]: Wilde, Mark M. (2017).
+         Quantum Information Theory (second edition).
+         Cambridge University Press.
 
     Args:
       model: The modular Hamiltonian whose normalized exponential is the
