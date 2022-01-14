@@ -71,39 +71,45 @@ class QHBMTest(tf.test.TestCase):
   def test_circuits(self):
     """Confirms correct circuits are sampled."""
     num_samples = int(1e7)
-    actual_circuits, actual_counts = self.actual_qhbm.circuits(
-        self.model, num_samples)
 
-    # Circuits with the allowed-to-be-sampled bitstrings prepended.
-    u = tfq.from_tensor(self.model.circuit.pqc)[0]
-    qubits = self.model.circuit.qubits
-    expected_circuits_deserialized = [
-        cirq.Circuit(
-            cirq.X(qubits[0])**0,
-            cirq.X(qubits[1])**0,
-            cirq.X(qubits[2]),
-        ) + u,
-        cirq.Circuit(
-            cirq.X(qubits[0])**0,
-            cirq.X(qubits[1]),
-            cirq.X(qubits[2]),
-        ) + u,
-    ]
-    # Check that both circuits are generated.
-    actual_circuits_deserialized = tfq.from_tensor(actual_circuits)
-    self.assertTrue(
-        any([
-            expected_circuits_deserialized[0] == actual_circuits_deserialized[0],
-            expected_circuits_deserialized[0] == actual_circuits_deserialized[1],
-        ]))
-    self.assertTrue(
-        any([
-            expected_circuits_deserialized[1] == actual_circuits_deserialized[0],
-            expected_circuits_deserialized[1] == actual_circuits_deserialized[1],
-        ]))
-    # Check that the fraction is approximately 0.5 (equal counts)
-    self.assertAllClose(
-        actual_counts[0], actual_counts[1], atol=num_samples / 1000)
+    @tf.function
+    def circuit_func(model, num_samples):
+      """Wrapper to test tracing."""
+      return self.actual_qhbm.circuits(model, num_samples)
+
+    for func in [self.actual_qhbm.circuits, circuit_func]:
+      actual_circuits, actual_counts = func(self.model, num_samples)
+
+      # Circuits with the allowed-to-be-sampled bitstrings prepended.
+      u = tfq.from_tensor(self.model.circuit.pqc)[0]
+      qubits = self.model.circuit.qubits
+      expected_circuits_deserialized = [
+          cirq.Circuit(
+              cirq.X(qubits[0])**0,
+              cirq.X(qubits[1])**0,
+              cirq.X(qubits[2]),
+          ) + u,
+          cirq.Circuit(
+              cirq.X(qubits[0])**0,
+              cirq.X(qubits[1]),
+              cirq.X(qubits[2]),
+          ) + u,
+      ]
+      # Check that both circuits are generated.
+      actual_circuits_deserialized = tfq.from_tensor(actual_circuits)
+      self.assertTrue(
+          any([
+              expected_circuits_deserialized[0] == actual_circuits_deserialized[0],
+              expected_circuits_deserialized[0] == actual_circuits_deserialized[1],
+          ]))
+      self.assertTrue(
+          any([
+              expected_circuits_deserialized[1] == actual_circuits_deserialized[0],
+              expected_circuits_deserialized[1] == actual_circuits_deserialized[1],
+          ]))
+      # Check that the fraction is approximately 0.5 (equal counts)
+      self.assertAllClose(
+          actual_counts[0], actual_counts[1], atol=num_samples / 1000)
 
 
 if __name__ == "__main__":
