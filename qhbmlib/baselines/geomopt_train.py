@@ -176,7 +176,21 @@ def get_initial_qhbm(config, name):
         raw_qubits, num_model_layers, name)
   qnn_initializer = tf.keras.initializers.RandomUniform(
       minval=-config.hparams.qnn_param_lim, maxval=config.hparams.qnn_param_lim)
-  test_qnn = circuit_model.DirectQuantumCircuit(u, qnn_initializer)
+  if config.training.method == 'mirror':
+    symbol_names = tf.constant([str(x) for x in list(sorted(tfq.util.get_circuit_symbols(u)))], dtype=tf.string)
+    values = [tf.Variable(qnn_initializer(shape=[len(symbol_names)]))]
+    if config.geometry.activation == 'tanh':
+      activation = tf.keras.layers.Activation(lambda x: np.pi * tf.tanh(config.geometry.activation_scale * x))
+    elif config.geometry.activation == 'sigmoid':
+      activation = tf.keras.layers.Activation(lambda x: 2 * np.pi * (tf.sigmoid(config.geometry.activation_scale * x) - 0.5))
+    elif config.geometry.activation == 'clip':
+      activation = tf.keras.layers.Activation(lambda x: tf.clip_by_value(x, -np.pi, np.pi))
+    else:
+      raise ValueError()
+    value_layers = [[activation]]
+    test_qnn = circuit_model.QuantumCircuit(u, u.all_qubits(), symbol_names, values, value_layers)
+  else:
+    test_qnn = circuit_model.DirectQuantumCircuit(u, qnn_initializer)
   test_qnn.build([])
   return hamiltonian_model.Hamiltonian(energy, test_qnn, name)
 
@@ -259,19 +273,30 @@ def information_matrix(h_inf, model, model_copy, config):
   im = tf.concat([block_upper, block_lower], 0)
   return (im + tf.transpose(im)) / 2.
 
+def conditional_decorator(dec, condition):
+    def decorator(func):
+        if condition:
+            return dec(func)
+        return func
+    return decorator
 
-def train_model(h_inf, model, model_copy, target_dm, target_h, beta, optimizer,
-                metrics_writer, config, work_unit):
+def train_model(h_inf, model, model_copy, target_h, beta, target_loss, target_dm, avg_corr_op,
+                metrics_dir, config, work_unit):
   """Train given model and write metrics on progress."""
-
-  @tf.function
-  def train_step(s):
+  metrics_writer = tf.summary.create_file_writer(metrics_dir)
+  optimizer = tf.keras.optimizers.get(dict(config.training.optimizer))
+  
+  @conditional_decorator(tf.function, config.training.method == 'vanilla' or config.training.method == 'natural')
+  def train_step(step):
     with tf.GradientTape() as tape:
-      loss = vqt_new.vqt(h_inf, model, config.training.samples, target_h, beta)
-    grads = tape.gradient(loss, model.trainable_variables)
+      loss = vqt_new.vqt(h_inf, model, config.training.num_samples, target_h, beta)
+    loss_grads = tape.gradient(loss, model.trainable_variables)
+
+    if config.training.method == 'vanilla':
+      optimizer.apply_gradients(zip(loss_grads, model.trainable_variables))
 
     if config.training.method == "natural":
-      for c, m in zip(model_copy.variables, model.variables):
+      for c, m in zip(model_copy.trainable_variables, model.trainable_variables):
         c.assign(m)
       im = information_matrix(h_inf, model, model_copy, config)
       if config.geometry.eigval_eps:
@@ -285,7 +310,7 @@ def train_model(h_inf, model, model_copy, target_dm, target_h, beta, optimizer,
         reg = config.geometry.eps
       reg_im = im + reg * tf.eye(tf.shape(im)[0])
 
-      flat_grads = tf.concat([tf.reshape(g, [-1]) for g in grads], 0)
+      flat_grads = tf.concat([tf.reshape(g, [-1]) for g in loss_grads], 0)
       flat_natural_grads = tf.squeeze(
           tf.linalg.lstsq(
               reg_im,
@@ -299,59 +324,121 @@ def train_model(h_inf, model, model_copy, target_dm, target_h, beta, optimizer,
       for size, shape in zip(vars_sizes, vars_shapes):
         natural_grads.append(tf.reshape(flat_natural_grads[i:i + size], shape))
         i += size
-      grads = natural_grads
+      optimizer.apply_gradients(zip(natural_grads, model.trainable_variables))
 
       with metrics_writer.as_default():
-        if config.logging.thetas_grads:
-          tf.summary.histogram("thetas_grads", grads[:-1], step=s)
-        if config.logging.phis_grads:
-          tf.summary.histogram("phis_grads", grads[-1:], step=s)
-
         e = tf.linalg.eigvalsh(im)
         e = tf.sort(tf.cast(e, tf.float32))
-        tf.summary.histogram("im_eigvals", e, step=s)
-        tf.summary.scalar("min_im_eigval", e[0], step=s)
-        tf.summary.scalar("max_im_eigval", e[-1], step=s)
-        tf.summary.scalar("avg_im_eigval", tf.reduce_mean(e), step=s)
-        tf.summary.scalar("im_norm", tf.linalg.norm(im), step=s)
+        tf.summary.histogram("im_eigvals", e, step=step)
+        tf.summary.scalar("min_im_eigval", e[0], step=step)
+        tf.summary.scalar("max_im_eigval", e[-1], step=step)
+        tf.summary.scalar("avg_im_eigval", tf.reduce_mean(e), step=step)
+        tf.summary.scalar("im_norm", tf.linalg.norm(im), step=step)
 
-        tf.summary.scalar("reg", reg, step=s)
+        tf.summary.scalar("reg", reg, step=step)
         e = tf.linalg.eigvalsh(reg_im)
         e = tf.sort(tf.cast(e, tf.float32))
-        tf.summary.histogram("reg_im_eigvals", e, step=s)
-        tf.summary.scalar("min_reg_im_eigval", e[0], step=s)
-        tf.summary.scalar("max_reg_im_eigval", e[-1], step=s)
-        tf.summary.scalar("avg_reg_im_eigval", tf.reduce_mean(e), step=s)
-        tf.summary.scalar("reg_im_norm", tf.linalg.norm(reg_im), step=s)
+        tf.summary.histogram("reg_im_eigvals", e, step=step)
+        tf.summary.scalar("min_reg_im_eigval", e[0], step=step)
+        tf.summary.scalar("max_reg_im_eigval", e[-1], step=step)
+        tf.summary.scalar("avg_reg_im_eigval", tf.reduce_mean(e), step=step)
+        tf.summary.scalar("reg_im_norm", tf.linalg.norm(reg_im), step=step)
 
-    optimizer.apply_gradients(zip(grads, model.trainable_variables))
+        tf.summary.histogram(f'energy_natural_grads', natural_grads[:-1], step=step)
+        tf.summary.histogram(f'circuit_natural_grads', natural_grads[-1:], step=step)
+        tf.summary.scalar(f'energy_natural_grad_size', tf.reduce_max(tf.abs(natural_grads[:-1])), step=step)
+        tf.summary.scalar(f'circuit_natural_grad_size', tf.reduce_max(tf.abs(natural_grads[-1:])), step=step)
 
+    if config.training.method == 'mirror':
+      step_metrics_dir = os.path.join(metrics_dir, f'train_step_{step}')
+      step_metrics_writer = tf.summary.create_file_writer(step_metrics_dir)
+
+      learning_rate = optimizer.learning_rate
+      if isinstance(learning_rate, tf.keras.optimizers.schedules.LearningRateSchedule):
+        learning_rate = learning_rate(step)
+      inner_optimizer = tf.keras.optimizers.get(dict(config.training.inner_optimizers[step]))
+
+      for c, m in zip(model_copy.trainable_variables, model.trainable_variables):
+        c.assign(m)
+
+      @tf.function
+      def train_inner_step(inner_step):
+        with tf.GradientTape(persistent=True) as tape:
+          energy_inner_prod = tf.reduce_sum([tf.reduce_sum(v * g) for v, g in zip(model.energy.trainable_variables, loss_grads[:-1])])
+          circuit_inner_prod = tf.reduce_sum([tf.reduce_sum(v * g) for v, g in zip(model.circuit.symbol_values, loss_grads[-1:])])
+          inner_prod = energy_inner_prod + circuit_inner_prod
+          reg = vqt_new.vqt(model, config.training.num_samples, model_copy, 1.0)
+          inner_loss = inner_prod + 1.0 / learning_rate * reg
+        inner_loss_grads = tape.gradient(inner_loss, model.trainable_variables)
+        inner_prod_grads = tape.gradient(inner_prod, model.trainable_variables)
+        reg_grads = tape.gradient(reg, model.trainable_variables)
+        inner_optimizer.apply_gradients(zip(inner_loss_grads, model.trainable_variables))
+
+        with step_metrics_writer.as_default():
+          tf.summary.scalar(f'energy_inner_prod', energy_inner_prod, step=inner_step)
+          tf.summary.scalar(f'circuit_inner_prod', circuit_inner_prod, step=inner_step)
+          tf.summary.scalar(f'inner_prod', inner_prod, step=inner_step)
+          tf.summary.histogram(f'energy_inner_prod_grads', inner_prod_grads[:-1], step=inner_step)
+          tf.summary.histogram(f'circuit_inner_prod_grads', inner_prod_grads[-1:], step=inner_step)
+          tf.summary.scalar(f'energy_inner_prod_grad_size', tf.reduce_max(tf.abs(inner_prod_grads[:-1])), step=inner_step)
+          tf.summary.scalar(f'circuit_inner_prod_grad_size', tf.reduce_max(tf.abs(inner_prod_grads[-1:])), step=inner_step)
+
+          tf.summary.scalar(f'reg', reg, step=inner_step)
+          tf.summary.histogram(f'energy_reg_grads', reg_grads[:-1], step=inner_step)
+          tf.summary.histogram(f'circuit_reg_grads', reg_grads[-1:], step=inner_step)
+          tf.summary.scalar(f'energy_reg_grad_size', tf.reduce_max(tf.abs(reg_grads[:-1])), step=inner_step)
+          tf.summary.scalar(f'circuit_reg_grad_size', tf.reduce_max(tf.abs(reg_grads[-1:])), step=inner_step)
+
+          tf.summary.scalar(f'inner_loss', inner_loss, step=inner_step)
+          tf.summary.histogram(f'energy_inner_loss_grads', inner_loss_grads[:-1], step=inner_step)
+          tf.summary.histogram(f'circuit_inner_loss_grads', inner_loss_grads[-1:], step=inner_step)
+          tf.summary.scalar(f'energy_inner_loss_grad_size', tf.reduce_max(tf.abs(inner_loss_grads[:-1])), step=inner_step)
+          tf.summary.scalar(f'circuit_inner_loss_grad_size', tf.reduce_max(tf.abs(inner_loss_grads[-1:])), step=inner_step)
+        
+          running_loss = vqt_new.vqt(model, config.training.num_samples, target_h, beta)
+          tf.summary.scalar(f'running_loss', running_loss, step=inner_step)
+
+          tf.summary.histogram(f'energy_variables', model.energy.trainable_variables, step=inner_step)
+          tf.summary.histogram(f'circuit_variables', model.circuit.trainable_variables, step=inner_step)
+          tf.summary.histogram(f'activation_circuit_variables', model.circuit.symbol_values, step=inner_step)
+
+      for inner_step in tf.range(config.geometry.num_inner_steps[step], dtype=tf.int64):
+        train_inner_step(inner_step)
+    
     with metrics_writer.as_default():
-      if config.logging.loss:
-        tf.summary.scalar("loss", loss, step=s)
+      tf.summary.scalar("loss", loss, step=step)
+      tf.summary.histogram("energy_loss_grads", loss_grads[:-1], step=step)
+      tf.summary.histogram("circuit_loss_grads", loss_grads[-1:], step=step)
+      tf.summary.histogram("energy_loss_grad_size", tf.reduce_max(tf.abs(loss_grads[:-1])), step=step)
+      tf.summary.histogram("circuit_loss_grad_size", tf.reduce_max(tf.abs(loss_grads[-1:])), step=step)
+      tf.summary.histogram("energy_variables", model.energy.trainable_variables, step=step)
+      tf.summary.histogram("circuit_variables", model.circuit.trainable_variables, step=step)
+      if step == 0:
+        tf.summary.scalar("target_loss", target_loss, step=step)
       if config.logging.fidelity:
-        if s % config.logging.expensive_downsample == 0 or s == config.training.max_steps - 1:
+        if step % config.logging.expensive_downsample == 0 or step == config.training.num_steps - 1:
           fidelity = hamiltonian_infer.fidelity(model, target_dm)
-          tf.summary.scalar("fidelity", fidelity, step=s)
-      if config.logging.thetas:
-        tf.summary.histogram(
-            "thetas", model.circuit.trainable_variables, step=s)
-      if config.logging.phis:
-        tf.summary.histogram("phis", model.energy.trainable_variables, step=s)
-      if config.logging.thetas_grads:
-        tf.summary.histogram("thetas_grads", grads[:-1], step=s)
-      if config.logging.phis_grads:
-        tf.summary.histogram("phis_grads", grads[-1:], step=s)
+          tf.summary.scalar("fidelity", fidelity, step=step)
+      if config.logging.relative_entropy:
+        if step % config.logging.expensive_downsample == 0 or step == config.training.num_steps - 1:
+          relative_entropy = util.relative_entropy(hamiltonian_infer.density_matrix(model), target_dm)
+          tf.summary.scalar("relative_entropy", relative_entropy, step=step)
+      if config.logging.model_correlation:
+        if step % config.logging.expensive_downsample == 0 or step == config.training.num_steps - 1:
+          model_correlation = h_inf.expectation(model, avg_corr_op, config.training.num_samples)[0]
+          tf.summary.scalar("model_correlation", model_correlation, step=step)
+      if config.logging.density_matrix:
+        if step % config.logging.expensive_downsample == 0 or step == config.training.num_steps - 1:
+          density_matrix = util.density_matrix_to_image(hamiltonian_infer.density_matrix(model))
+          tf.summary.image("density_matrix", density_matrix, step=step)
 
     return loss
 
-  for s in tf.range(config.training.max_steps, dtype=tf.int64):
-    loss = train_step(s)
+  for step in tf.range(config.training.num_steps, dtype=tf.int64):
+    loss = train_step(step)
 
     objective = work_unit.get_measurement_series("train/loss")
-    objective.create_measurement(loss, s + 1)
-
-  return s
+    objective.create_measurement(loss, step + 1)
 
 
 def main(argv):
@@ -392,14 +479,14 @@ def main(argv):
   #     long_correlation_op_m, dtype=tf.complex128)
   # long_correlation_op_t = tfq.convert_to_tensor([long_correlation_op])
 
-  if config.training.optimizer == "ADAM":
-    optimizer_initializer = tf.keras.optimizers.Adam
-  elif config.training.optimizer == "SGD":
-    optimizer_initializer = tf.keras.optimizers.SGD
-  else:
-    raise ValueError(
-        f"config.training.optimizer {config.training.optimizer} is not supported"
-    )
+  # if config.training.optimizer == "ADAM":
+  #   optimizer_initializer = tf.keras.optimizers.Adam
+  # elif config.training.optimizer == "SGD":
+  #   optimizer_initializer = tf.keras.optimizers.SGD
+  # else:
+  #   raise ValueError(
+  #       f"config.training.optimizer {config.training.optimizer} is not supported"
+  #   )
 
   finished_profile = False
   float_bias = config.dataset.bias
@@ -442,35 +529,31 @@ def main(argv):
 
     # Training loop
     if config.training.train:
-      for iteration in range(config.hparams.max_iterations):
+      for iteration in range(config.hparams.num_iterations):
         model = get_initial_qhbm(config, "vqt_model")
         e_inf = energy_infer.AnalyticEnergyInference(model.energy.num_bits)
         q_inf = circuit_infer.QuantumInference()
         h_inf = hamiltonian_infer.QHBM(e_inf, q_inf)
 
-        current_optimizer = optimizer_initializer(config.training.learning_rate)
         model_label = f"p_{config.hparams.p}_iteration_{iteration}"
         model_dir = os.path.join(results_dir, "metrics", data_point_label,
                                  model_label)
-        model_metrics_writer = tf.summary.create_file_writer(model_dir)
         logging.info(f"Number of layers: {config.hparams.p}")
         initial_t = time.time()
 
         model_copy = get_initial_qhbm(config, "vqt_model_copy")
-        final_step = train_model(h_inf, model, model_copy, target_thermal_state,
-                                 target_h_t, beta, current_optimizer,
-                                 model_metrics_writer, config, work_unit)
-        with model_metrics_writer.as_default():
-          if config.logging.relative_entropy:
-            # VQT direction of relative entropy
-            relative_entropy = util.relative_entropy(
-                hamiltonian_infer.density_matrix(model), target_thermal_state)
-            tf.summary.scalar(
-                "relative_entropy", relative_entropy, step=final_step)
-          model_correlation = h_inf.expectation(model, average_correlation_op_t,
-                                                config.training.samples)[0]
-          tf.summary.scalar(
-              "model_correlation", model_correlation, step=final_step)
+        train_model(h_inf, model, model_copy, target_h_t, beta, true_entropy, target_thermal_state, average_correlation_op_t, model_dir, config, work_unit)
+        # with model_metrics_writer.as_default():
+        #   if config.logging.relative_entropy:
+        #     # VQT direction of relative entropy
+        #     relative_entropy = util.relative_entropy(
+        #         hamiltonian_infer.density_matrix(model), target_thermal_state)
+        #     tf.summary.scalar(
+        #         "relative_entropy", relative_entropy, step=final_step)
+        #   model_correlation = h_inf.expectation(model, average_correlation_op_t,
+        #                                         config.training.samples)[0]
+        #   tf.summary.scalar(
+        #       "model_correlation", model_correlation, step=final_step)
           # model_long_correlation = h_inf.expectation(model,
           #                                            long_correlation_op_t,
           #                                            config.training.samples)[0]

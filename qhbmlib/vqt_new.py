@@ -17,7 +17,8 @@
 import tensorflow as tf
 
 from qhbmlib import util
-
+from qhbmlib import energy_model
+from qhbmlib import hamiltonian_model
 
 def vqt(qhbm, model, num_samples, hamiltonian, beta):
   """Computes the VQT loss of a given QHBM against given thermal state params.
@@ -43,22 +44,35 @@ def vqt(qhbm, model, num_samples, hamiltonian, beta):
     # We use `model.qnn.trainable_variables` / `model.ebm.trainable_variables`
     # instead
     del trainable_variables
+
     qhbm.e_inference.infer(model.energy)
     samples = qhbm.e_inference.sample(num_samples)
     bitstrings, counts = util.unique_bitstrings_with_counts(samples)
     probs = tf.cast(counts, tf.float32) / tf.cast(num_samples, tf.float32)
-    expectation = tf.squeeze(
-        qhbm.q_inference.expectation(model.circuit, bitstrings, counts,
-                                     hamiltonian), -1)
+    if isinstance(hamiltonian, tf.Tensor):
+      expectation = tf.squeeze(qhbm.q_inference.expectation(
+          model.circuit, bitstrings, counts, hamiltonian), -1)
+    elif isinstance(hamiltonian.energy, energy_model.PauliMixin):
+      u_dagger_u = model.circuit + hamiltonian.circuit_dagger
+      operator_shards = hamiltonian.operator_shards
+      expectation_shards = qhbm.q_inference.expectation(
+          u_dagger_u, bitstrings, counts, operator_shards)
+      expectation = hamiltonian.energy.operator_expectation(expectation_shards)
+
     entropy = qhbm.e_inference.entropy()
 
     def grad(grad_y, variables=model.trainable_variables):
       with tf.GradientTape() as tape:
         tape.watch(model.trainable_variables)
-        beta_expectations = beta * tf.squeeze(
+        if isinstance(hamiltonian, tf.Tensor):
+          beta_expectations = beta * tf.squeeze(
             qhbm.q_inference.expectation(
                 model.circuit, bitstrings, counts, hamiltonian, reduce=False),
             -1)
+        elif isinstance(hamiltonian.energy, energy_model.PauliMixin):
+          expectation_shards = qhbm.q_inference.expectation(
+          u_dagger_u, bitstrings, counts, operator_shards, reduce=False)
+          beta_expectations = beta * hamiltonian.energy.operator_expectation(expectation_shards)
         beta_expectation = tf.reduce_sum(probs * beta_expectations)
       grad_qnn = tape.gradient(
           beta_expectation,

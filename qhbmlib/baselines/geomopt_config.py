@@ -4,6 +4,8 @@ import datetime
 import getpass
 import os.path
 
+import tensorflow as tf
+import numpy as np
 import ml_collections
 
 
@@ -49,35 +51,39 @@ def get_config():
   training = ml_collections.ConfigDict()
   # If False, only simulate the dataset (no model training)
   training.train = True
-  training.samples = 500
-  training.max_steps = 1000
   training.method = 'natural'
-  training.activation = 'sigmoid'
+  training.optimizer = tf.keras.optimizers.serialize(tf.keras.optimizers.SGD(learning_rate=0.01))
+  training.num_steps = 1000
+  training.num_samples = 500
   # training.lmbda (use 1/lr instead)
-  training.optimizer = 'SGD'
-  training.learning_rate = 0.01
   config.training = training
 
   geometry = ml_collections.ConfigDict()
-  geometry.num_inner_steps = 20
-  geometry.num_start_inner_steps = 3000
-  geometry.num_samples = 1e3
+  # NGD
   geometry.eps = 1e-2
   geometry.eigval_eps = True
   geometry.fast = False
   geometry.l2_regularizer = 0
+  # MD
+  geometry.activation = 'sigmoid'
+  geometry.activation_scale = 6.0 / np.pi
+  geometry.inner_optimizers = [tf.keras.optimizers.serialize(tf.keras.optimizers.SGD(learning_rate=0.001))] * 3 + [tf.keras.optimizers.serialize(tf.keras.optimizers.Adam(learning_rate=0.01))] * (training.num_steps - 3)
+  geometry.num_inner_steps = [20] * training.num_steps
+  # geometry.num_samples = 1e3
   config.geometry = geometry
 
   # logging settings
   logging = ml_collections.ConfigDict()
-  logging.loss = True
   logging.fidelity = True
-  logging.thetas = True
-  logging.phis = True
-  logging.thetas_grads = True
-  logging.phis_grads = True
   logging.relative_entropy = True
+  logging.model_correlation = True
+  logging.density_matrix = False
   logging.expensive_downsample = 10
+  # logging.loss = True
+  # logging.thetas = True
+  # logging.phis = True
+  # logging.thetas_grads = True
+  # logging.phis_grads = True
   config.logging = logging
 
   # hyperparameters
@@ -85,7 +91,7 @@ def get_config():
   hparams.ebm_param_lim = 0.25
   hparams.qnn_param_lim = 0.5
   # Fraction of loss within which to converge
-  hparams.max_iterations = 1
+  hparams.num_iterations = 1
   hparams.p = 6  # default
   config.hparams = hparams
 
