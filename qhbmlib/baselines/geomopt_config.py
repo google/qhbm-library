@@ -35,12 +35,14 @@ def get_config():
 
   # dataset generation settings.
   dataset = ml_collections.ConfigDict()
-  dataset.num_sites = 4
+  dataset.num_rows = 3
+  dataset.num_cols = 3
   dataset.bias = 1.0
   dataset.beta_min = 1.0
   dataset.beta_max = 3.0
   dataset.beta_steps = 1
   dataset.digits = 3
+  dataset.lattice_dimension = 2
   config.dataset = dataset
 
   # training settings
@@ -48,26 +50,12 @@ def get_config():
   # If False, only simulate the dataset (no model training)
   training.train = True
   training.samples = 500
-  training.max_steps = 2000
-  # training.regularizer_order = 2
-  # training.regularizer_initial_strength = 0.0
-  # training.regularizer_decay_steps = 500
-  # Fraction of loss within which to converge
-  # training.loss_stop_threshold = 0.04
-  # training.loss_stop_ignore_steps = 0
+  training.max_steps = 1000
   training.method = 'natural'
   training.activation = 'sigmoid'
-  training.lmbda = 100
-  # training.num_steps = 500
-  # training.num_start_steps = 3
-  # start_opt = tf.keras.optimizers.SGD(learning_rate=0.001)
-  # training.start_optimizer = tf.keras.optimizers.serialize(start_opt)
+  # training.lmbda (use 1/lr instead)
   training.optimizer = 'SGD'
-  training.learning_rate = 0.01
-  # training.learning_rate_end = 0.001
-  # training.learning_decay_start = 500
-  # training.learning_decay_end = 1000
-  # training.learning_decay_step = 25
+  training.learning_rate = 0.16
   config.training = training
 
   geometry = ml_collections.ConfigDict()
@@ -89,18 +77,15 @@ def get_config():
   logging.thetas_grads = True
   logging.phis_grads = True
   logging.relative_entropy = True
-  # logging.analytic = False
-  # logging.image = False
+  logging.expensive_downsample = 10
   config.logging = logging
 
   # hyperparameters
   hparams = ml_collections.ConfigDict()
   hparams.ebm_param_lim = 0.25
-  hparams.qnn_param_lim = 0.25
+  hparams.qnn_param_lim = 0.5
   # Fraction of loss within which to converge
-  # hparams.loss_p_threshold = 0.005
   hparams.max_iterations = 1
-  # hparams.kobe_order = 2
   hparams.p = 6  # default
   config.hparams = hparams
 
@@ -112,15 +97,26 @@ def get_config():
 
 
 def get_sweep(hyper):
-  num_random_trials = 2**6  # 2**10
+  num_random_trials = 2**4
   return hyper.product([
-      hyper.sweep('config.training.method', ['natural', 'vanilla']),
+      hyper.sweep(
+          'config.training.method',
+          [
+              'natural',
+              'vanilla'
+          ]),
       hyper.sweep('config.hparams.p', [6]),
-      hyper.sweep('config.dataset.bias', [1.0]),
-      hyper.zipit([
-          hyper.loguniform('config.training.learning_rate',
-                           hyper.interval(0.001, 1.0)),
-          hyper.uniform('seed', hyper.interval(1, 1e6))
-      ],
-                  length=num_random_trials),
+      hyper.sweep(
+          'config.dataset.bias',
+          [
+              # 1.0
+              3.05
+          ]),
+      hyper.zipit(
+          [
+              hyper.loguniform('config.training.learning_rate',
+                               hyper.interval(1e-3, 1.0)),
+              hyper.uniform('seed', hyper.discrete(range(0, int(1e6))))
+          ],
+          length=num_random_trials),
   ])

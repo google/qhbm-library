@@ -55,13 +55,45 @@ flags.DEFINE_string(
 FLAGS = flags.FLAGS
 
 
-def get_tfim_hamiltonian(num_qubits, bias):
-  qubits = cirq.GridQubit.rect(1, num_qubits)
-  hamiltonian = cirq.PauliSum()
-  for i in range(num_qubits):
-    hamiltonian -= bias * cirq.X(qubits[i])
-    hamiltonian -= cirq.Z(qubits[i]) * cirq.Z(qubits[(i + 1) % num_qubits])
-  return hamiltonian
+def _qubit_grid(rows, cols):
+  """Rectangle of qubits returned as a nested list."""
+  qubits = []
+  for r in range(rows):
+    qubits.append([cirq.GridQubit(r, c) for c in range(cols)])
+  return qubits
+
+
+def get_tfim_hamiltonian(bias, config):
+  if config.dataset.lattice_dimension == 1:
+    num_sites = config.dataset.num_rows * config.dataset.num_cols
+    qubits = cirq.GridQubit.rect(1, num_sites)
+    hamiltonian = cirq.PauliSum()
+    for i in range(num_sites):
+      hamiltonian -= bias * cirq.X(qubits[i])
+      hamiltonian -= cirq.Z(qubits[i]) * cirq.Z(qubits[(i + 1) % num_sites])
+    return hamiltonian
+  elif config.dataset.lattice_dimension == 2:
+    num_rows = config.dataset.num_rows
+    num_cols = config.dataset.num_cols
+    z_hamiltonian = cirq.PauliSum()
+    x_hamiltonian = cirq.PauliSum()
+    qubits = _qubit_grid(num_rows, num_cols)
+    extended_qubits = _qubit_grid(num_rows, num_cols)
+    for r, row in enumerate(qubits):
+      extended_qubits[r].append(row[0])
+    extended_qubits.append(qubits[0])
+    # Horizontal interactions.
+    for row in extended_qubits[:-1]:
+      for q0, q1 in zip(row, row[1:]):
+        z_hamiltonian -= cirq.Z(q0) * cirq.Z(q1)
+    # Vertical interactions.
+    for row_0, row_1 in zip(extended_qubits, extended_qubits[1:]):
+      for q0, q1 in zip(row_0[:-1], row_1):
+        z_hamiltonian -= cirq.Z(q0) * cirq.Z(q1)
+    for row in qubits:
+      for q in row:
+        x_hamiltonian -= bias * cirq.X(q)
+    return x_hamiltonian, z_hamiltonian
 
 
 def get_average_correlation_op(num_qubits):
@@ -93,24 +125,35 @@ def compute_data_point_metrics(beta_t, target_h_m_t, average_correlation_op_m_t,
   return target_thermal_state, true_correlation, true_entropy, true_long_correlation
 
 
-def get_initial_qhbm(num_sites, ebm_param_lim, num_model_layers, qnn_param_lim,
-                     name):
+def get_initial_qhbm(config, name):
   """Gets initial untrained QHBM."""
+  num_sites = config.dataset.num_rows * config.dataset.num_cols
+  num_model_layers = config.hparams.p
+
   # energy
   ebm_initializer = tf.keras.initializers.RandomUniform(
-      minval=-ebm_param_lim, maxval=ebm_param_lim)
+      minval=-config.hparams.ebm_param_lim, maxval=config.hparams.ebm_param_lim)
   energy = energy_model.KOBE(list(range(num_sites)), 2, ebm_initializer)
   energy.build([None, num_sites])
 
   # circuit
-  raw_qubits = cirq.GridQubit.rect(1, num_sites)
+  if config.dataset.lattice_dimension == 1:
+    raw_qubits = cirq.GridQubit.rect(1, num_sites)
+  elif config.dataset.lattice_dimension == 2:
+    raw_qubits = cirq.GridQubit.rect(config.dataset.num_rows,
+                                     config.dataset.num_cols)
+  else:
+    raise ValueError(
+        f"lattice_dimension {config.dataset.lattice_dimension} is not supported"
+    )
+
   if num_model_layers == 0:
     u = cirq.Circuit(cirq.I(q) for q in raw_qubits)
   else:
     u, _ = architectures.get_hardware_efficient_model_unitary(
         raw_qubits, num_model_layers, name)
   qnn_initializer = tf.keras.initializers.RandomUniform(
-      minval=-qnn_param_lim, maxval=qnn_param_lim)
+      minval=-config.hparams.qnn_param_lim, maxval=config.hparams.qnn_param_lim)
   test_qnn = circuit_model.DirectQuantumCircuit(u, qnn_initializer)
   test_qnn.build([])
   return hamiltonian_model.Hamiltonian(energy, test_qnn, name)
@@ -265,8 +308,9 @@ def train_model(h_inf, model, model_copy, target_dm, target_h, beta, optimizer,
       if config.logging.loss:
         tf.summary.scalar("loss", loss, step=s)
       if config.logging.fidelity:
-        fidelity = hamiltonian_infer.fidelity(model, target_dm)
-        tf.summary.scalar("fidelity", fidelity, step=s)
+        if s % config.logging.expensive_downsample == 0 or s == config.training.max_steps - 1:
+          fidelity = hamiltonian_infer.fidelity(model, target_dm)
+          tf.summary.scalar("fidelity", fidelity, step=s)
       if config.logging.thetas:
         tf.summary.histogram(
             "thetas", model.circuit.trainable_variables, step=s)
@@ -314,13 +358,14 @@ def main(argv):
   with gfile.Open(os.path.join(results_dir, "config.json"), "w") as outfile:
     json.dump(config.to_dict(), outfile)
 
-  average_correlation_op = get_average_correlation_op(config.dataset.num_sites)
+  num_sites = config.dataset.num_rows * config.dataset.num_cols
+  average_correlation_op = get_average_correlation_op(num_sites)
   average_correlation_op_m = average_correlation_op.matrix()
   average_correlation_op_m_t = tf.constant(
       average_correlation_op_m, dtype=tf.complex128)
   average_correlation_op_t = tfq.convert_to_tensor([average_correlation_op])
 
-  long_correlation_op = get_long_correlation_op(config.dataset.num_sites)
+  long_correlation_op = get_long_correlation_op(num_sites)
   long_correlation_op_m = long_correlation_op.matrix()
   long_correlation_op_m_t = tf.constant(
       long_correlation_op_m, dtype=tf.complex128)
@@ -338,7 +383,11 @@ def main(argv):
   finished_profile = False
   float_bias = config.dataset.bias
   bias = round(float_bias, config.dataset.digits)
-  target_h = get_tfim_hamiltonian(config.dataset.num_sites, bias)
+  if config.dataset.lattice_dimension == 1:
+    target_h = get_tfim_hamiltonian(bias, config)
+  elif config.dataset.lattice_dimension == 2:
+    x_ham, z_ham = get_tfim_hamiltonian(bias, config)
+    target_h = x_ham + z_ham
   target_h_m = target_h.matrix()
   target_h_m_t = tf.constant(target_h_m, dtype=tf.complex128)
   target_h_t = tfq.convert_to_tensor([target_h])
@@ -375,12 +424,7 @@ def main(argv):
     # Training loop
     if config.training.train:
       for iteration in range(config.hparams.max_iterations):
-        model = get_initial_qhbm(
-            config.dataset.num_sites,  # target_h,
-            config.hparams.ebm_param_lim,
-            config.hparams.p,
-            config.hparams.qnn_param_lim,
-            "vqt_model")
+        model = get_initial_qhbm(config, "vqt_model")
         e_inf = energy_infer.AnalyticEnergyInference(model.energy.num_bits)
         q_inf = circuit_infer.QuantumInference()
         h_inf = hamiltonian_infer.QHBM(e_inf, q_inf)
@@ -393,12 +437,7 @@ def main(argv):
         logging.info(f"Number of layers: {config.hparams.p}")
         initial_t = time.time()
 
-        model_copy = get_initial_qhbm(
-            config.dataset.num_sites,  # target_h,
-            config.hparams.ebm_param_lim,
-            config.hparams.p,
-            config.hparams.qnn_param_lim,
-            "vqt_model_copy")
+        model_copy = get_initial_qhbm(config, "vqt_model_copy")
         final_step = train_model(h_inf, model, model_copy, target_thermal_state,
                                  target_h_t, beta, current_optimizer,
                                  model_metrics_writer, config, work_unit)
