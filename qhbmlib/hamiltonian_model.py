@@ -14,7 +14,7 @@
 # ==============================================================================
 """Tools for defining quantum Hamiltonian-based models."""
 
-from typing import List, Union
+from typing import Union
 
 import tensorflow as tf
 import tensorflow_quantum as tfq
@@ -24,7 +24,7 @@ from qhbmlib import energy_model
 
 
 class Hamiltonian(tf.keras.layers.Layer):
-  """Diagonalized representation of a Hermitian operator."""
+  """Diagonalized (spectral) representation of a Hermitian operator."""
 
   def __init__(self,
                energy: energy_model.BitstringEnergy,
