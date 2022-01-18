@@ -71,5 +71,5 @@ def unique_bitstrings_with_counts(bitstrings, out_idx=tf.dtypes.int32):
         number of occurences of `y[i]` in `input_bitstrings`.
   """
   y, _, counts = tf.raw_ops.UniqueWithCountsV2(
-      bitstrings, axis=[0], out_idx=out_idx)
+      x=bitstrings, axis=[0], out_idx=out_idx)
   return y, counts

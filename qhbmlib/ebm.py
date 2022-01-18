@@ -25,6 +25,7 @@ import tensorflow_probability as tfp
 import tensorflow_quantum as tfq
 
 from qhbmlib import util
+from qhbmlib import utils
 
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
