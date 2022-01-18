@@ -27,7 +27,6 @@ from qhbmlib import ebm
 from qhbmlib import qhbm
 from qhbmlib import qmhl
 from qhbmlib import qnn
-from qhbmlib import util
 from tests import test_util
 
 ATOL = 1e-3
@@ -127,7 +126,7 @@ class QMHLTest(tf.test.TestCase):
         data_probs = tf.random.uniform([num_qubits])
         raw_samples = tfp.distributions.Bernoulli(
             probs=1 - data_probs, dtype=tf.int8).sample(num_data_samples)
-        unique_bitstrings, target_counts = util.unique_bitstrings_with_counts(
+        unique_bitstrings, target_counts = utils.unique_bitstrings_with_counts(
             raw_samples)
         # Flip bits according to the distribution
         target_states_list = []
