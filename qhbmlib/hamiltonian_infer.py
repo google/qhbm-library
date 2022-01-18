@@ -21,6 +21,7 @@ import tensorflow as tf
 from qhbmlib import circuit_infer
 from qhbmlib import energy_infer
 from qhbmlib import hamiltonian_model
+from qhbmlib import utils
 
 
 class QHBM(tf.keras.layers.Layer):

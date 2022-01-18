@@ -70,6 +70,6 @@ def unique_bitstrings_with_counts(bitstrings, out_idx=tf.dtypes.int32):
       count: 1-D `tf.Tensor` of dtype `out_idx` such that `count[i]` is the
         number of occurences of `y[i]` in `input_bitstrings`.
   """
-  y, _, counts = tf.raw_ops.UniqueWithCountsV2(bitstrings, axis=[0], out_idx=out_idx)
-  return y, counts 
-
+  y, _, counts = tf.raw_ops.UniqueWithCountsV2(
+      bitstrings, axis=[0], out_idx=out_idx)
+  return y, counts
