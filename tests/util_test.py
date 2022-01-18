@@ -453,7 +453,8 @@ class UniqueBitstringsWithCountsTest(tf.test.TestCase):
   def test_identity(self):
     # Case when all entries are unique.
     test_bitstrings = tf.constant([[1], [0]], dtype=tf.int8)
-    test_y, _, test_count = tf.raw_ops.UniqueWithCountsV2(x=test_bitstrings, axis=[0])
+    test_y, _, test_count = tf.raw_ops.UniqueWithCountsV2(
+        x=test_bitstrings, axis=[0])
     self.assertAllEqual(test_y, test_bitstrings)
     self.assertAllEqual(test_count, tf.constant([1, 1]))
 
@@ -472,7 +473,8 @@ class UniqueBitstringsWithCountsTest(tf.test.TestCase):
         ],
         dtype=tf.int8,
     )
-    test_y, _, test_count = tf.raw_ops.UniqueWithCountsV2(x=test_bitstrings, axis=[0])
+    test_y, _, test_count = tf.raw_ops.UniqueWithCountsV2(
+        x=test_bitstrings, axis=[0])
     self.assertAllEqual(test_y, tf.constant([[0], [1]]))
     self.assertAllEqual(test_count, tf.constant([3, 5]))
 
@@ -491,7 +493,8 @@ class UniqueBitstringsWithCountsTest(tf.test.TestCase):
         ],
         dtype=tf.int8,
     )
-    test_y, _, test_count = tf.raw_ops.UniqueWithCountsV2(x=test_bitstrings, axis=[0])
+    test_y, _, test_count = tf.raw_ops.UniqueWithCountsV2(
+        x=test_bitstrings, axis=[0])
     self.assertAllEqual(test_y, tf.constant([[1, 0, 1], [1, 1, 1], [0, 1, 1]]))
     self.assertAllEqual(test_count, tf.constant([4, 2, 2]))
 

@@ -403,4 +403,3 @@ def qubit_sub_indices(qubits_total, qubits_sublist):
   doubled_indices = tf.where(reduced_qubit_overlaps)
   sub_indices = tf.transpose(doubled_indices)[1]
   return sub_indices
-
