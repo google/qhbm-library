@@ -578,7 +578,7 @@ class EBM(tf.keras.Model):
           tfp.distributions.Categorical(logits=-1 *
                                         self.energies()).sample(num_samples))
       if unique:
-        return utils.unique_bitstrings_with_counts(sampled)
+        return utils.unique_bitstrings_with_counts(samples)
       return samples
     else:
       return self._energy_sampler.sample(num_samples, unique=unique)

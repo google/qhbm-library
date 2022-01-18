@@ -27,6 +27,7 @@ from qhbmlib import ebm
 from qhbmlib import qhbm
 from qhbmlib import qmhl
 from qhbmlib import qnn
+from qhbmlib import utils
 from tests import test_util
 
 ATOL = 1e-3
