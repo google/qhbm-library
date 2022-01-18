@@ -53,3 +53,23 @@ def weighted_average(counts: tf.Tensor, values: tf.Tensor):
   expanded_counts = tf.expand_dims(tf.cast(counts, tf.float32), -1)
   weighted_values = expanded_counts * values
   return tf.reduce_sum(weighted_values, 0) / tf.reduce_sum(expanded_counts)
+
+
+def unique_bitstrings_with_counts(bitstrings, out_idx=tf.dtypes.int32):
+  """Extract the unique bitstrings in the given bitstring tensor.
+
+    Args:
+     bitstrings: 2-D `tf.Tensor` of dtype `int8`.  This tensor is
+        interpreted as a list of bitstrings.
+      out_idx: An optional `tf.DType` from: `tf.int32`, `tf.int64`. Defaults to
+        `tf.int32`.  Specified type of idx and count outputs.
+
+    Returns:
+      y: 2-D `tf.Tensor` of dtype `int8` containing the unique 0-axis entries of
+        `input_bitstrings`.
+      count: 1-D `tf.Tensor` of dtype `out_idx` such that `count[i]` is the
+        number of occurences of `y[i]` in `input_bitstrings`.
+  """
+  y, _, counts = tf.raw_ops.UniqueWithCountsV2(bitstrings, axis=[0], out_idx=out_idx)
+  return y, counts 
+
