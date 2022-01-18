@@ -447,58 +447,6 @@ class QubitSubIndicesTest(tf.test.TestCase):
     self.assertAllEqual(actual_sub_indices, expected_sub_indices)
 
 
-class UniqueBitstringsWithCountsTest(tf.test.TestCase):
-  """Test unique_with_counts from the qhbm library."""
-
-  def test_identity(self):
-    # Case when all entries are unique.
-    test_bitstrings = tf.constant([[1], [0]], dtype=tf.int8)
-    test_y, _, test_count = tf.raw_ops.UniqueWithCountsV2(
-        x=test_bitstrings, axis=[0])
-    self.assertAllEqual(test_y, test_bitstrings)
-    self.assertAllEqual(test_count, tf.constant([1, 1]))
-
-  def test_short(self):
-    # Case when bitstrings are length 1.
-    test_bitstrings = tf.constant(
-        [
-            [0],
-            [1],
-            [0],
-            [1],
-            [1],
-            [0],
-            [1],
-            [1],
-        ],
-        dtype=tf.int8,
-    )
-    test_y, _, test_count = tf.raw_ops.UniqueWithCountsV2(
-        x=test_bitstrings, axis=[0])
-    self.assertAllEqual(test_y, tf.constant([[0], [1]]))
-    self.assertAllEqual(test_count, tf.constant([3, 5]))
-
-  def test_long(self):
-    # Case when bitstrings are of length > 1.
-    test_bitstrings = tf.constant(
-        [
-            [1, 0, 1],
-            [1, 1, 1],
-            [0, 1, 1],
-            [1, 0, 1],
-            [1, 1, 1],
-            [0, 1, 1],
-            [1, 0, 1],
-            [1, 0, 1],
-        ],
-        dtype=tf.int8,
-    )
-    test_y, _, test_count = tf.raw_ops.UniqueWithCountsV2(
-        x=test_bitstrings, axis=[0])
-    self.assertAllEqual(test_y, tf.constant([[1, 0, 1], [1, 1, 1], [0, 1, 1]]))
-    self.assertAllEqual(test_count, tf.constant([4, 2, 2]))
-
-
 if __name__ == "__main__":
   print("Running util_test.py ...")
   tf.test.main()
