@@ -122,8 +122,6 @@ class QHBMTest(tf.test.TestCase):
     num_ops = 4
     qubits = cirq.GridQubit.rect(1, num_bits)
     raw_ops = [test_util.get_random_pauli_sum(qubits) for _ in range(num_ops)]
-    for op in raw_ops:
-      print(op)
     ops = tfq.convert_to_tensor(raw_ops)
 
     # unitary
@@ -137,7 +135,8 @@ class QHBMTest(tf.test.TestCase):
     resolver = {k: resolvers[0].value_of(k) for k in resolvers[0]}
 
     # hamiltonian model and inference
-    energy = energy_model.BernoulliEnergy(list(range(num_bits)))
+    energy_initializer = tf.keras.initializers.RandomUniform(-1, 1)
+    energy = energy_model.BernoulliEnergy(list(range(num_bits)), energy_initializer)
     energy.build([None, num_bits])
     circuit = circuit_model.QuantumCircuit(
         circuits[0], tf.constant(symbols), [tf.Variable([resolver[s] for s in symbols])], [[]])
@@ -154,16 +153,15 @@ class QHBMTest(tf.test.TestCase):
     bitstrings, counts = util.unique_bitstrings_with_counts(samples)
     bit_list = bitstrings.numpy().tolist()
     counts_list = counts.numpy().tolist()
-    num_unique = tf.shape(bitstrings)[0]
+    num_unique = len(counts_list)
 
     # bitstring injectors
     bitstring_circuit = circuit_model_utils.bit_circuit(qubits)
     bitstring_symbols = tfq.util.get_circuit_symbols(bitstring_circuit)
     bitstring_resolvers = [{s: b for s, b in zip(bitstring_symbols, bstr)} for bstr in bit_list]
     total_resolvers = [{**r, **resolver} for r in bitstring_resolvers]
-    print(total_resolvers)
     total_circuit = bitstring_circuit + circuits[0]
-    tiled_total_circuit = [total_circuit] * num_unique.numpy().tolist()
+    tiled_total_circuit = [total_circuit] * num_unique
     raw_expectation_list = [
         [cirq.Simulator().simulate_expectation_values(c, o, r)[0] for o in raw_ops]
     for c, r in zip(tiled_total_circuit, total_resolvers)]
