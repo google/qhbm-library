@@ -72,4 +72,3 @@ def unique_bitstrings_with_counts(bitstrings, out_idx=tf.dtypes.int32):
   y, _, counts = tf.raw_ops.UniqueWithCountsV2(
       x=bitstrings, axis=[0], out_idx=out_idx)
   return y, counts
-
