@@ -114,9 +114,7 @@ class QHBM(tf.keras.layers.Layer):
     states = model.circuit(bitstrings)
     return states, counts
 
-  def expectation(self,
-                  model: hamiltonian_model.Hamiltonian,
-                  ops: tf.Tensor,
+  def expectation(self, model: hamiltonian_model.Hamiltonian, ops: tf.Tensor,
                   num_samples: int):
     """Estimates observable expectation values against the density operator.
 
@@ -146,4 +144,3 @@ class QHBM(tf.keras.layers.Layer):
     bitstrings, counts = util.unique_bitstrings_with_counts(samples)
     return self.q_inference.expectation(
         model.circuit, bitstrings, counts, ops, reduce=True)
-

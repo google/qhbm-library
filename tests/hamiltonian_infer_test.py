@@ -25,10 +25,14 @@ from tensorflow_quantum.python import util as tfq_util
 
 from qhbmlib import circuit_infer
 from qhbmlib import circuit_model
+from qhbmlib import circuit_model_utils
 from qhbmlib import energy_infer
 from qhbmlib import energy_model
 from qhbmlib import hamiltonian_model
 from qhbmlib import hamiltonian_infer
+from qhbmlib import util
+from qhbmlib import utils
+from tests import test_util
 
 
 class QHBMTest(tf.test.TestCase):
@@ -136,10 +140,12 @@ class QHBMTest(tf.test.TestCase):
 
     # hamiltonian model and inference
     energy_initializer = tf.keras.initializers.RandomUniform(-1, 1)
-    energy = energy_model.BernoulliEnergy(list(range(num_bits)), energy_initializer)
+    energy = energy_model.BernoulliEnergy(
+        list(range(num_bits)), energy_initializer)
     energy.build([None, num_bits])
     circuit = circuit_model.QuantumCircuit(
-        circuits[0], tf.constant(symbols), [tf.Variable([resolver[s] for s in symbols])], [[]])
+        circuits[0], tf.constant(symbols),
+        [tf.Variable([resolver[s] for s in symbols])], [[]])
     circuit.build([])
     actual_hamiltonian = hamiltonian_model.Hamiltonian(energy, circuit)
     e_infer = energy_infer.BernoulliEnergyInference()
@@ -158,17 +164,20 @@ class QHBMTest(tf.test.TestCase):
     # bitstring injectors
     bitstring_circuit = circuit_model_utils.bit_circuit(qubits)
     bitstring_symbols = tfq.util.get_circuit_symbols(bitstring_circuit)
-    bitstring_resolvers = [{s: b for s, b in zip(bitstring_symbols, bstr)} for bstr in bit_list]
+    bitstring_resolvers = [
+        dict(zip(bitstring_symbols, bstr)) for bstr in bit_list
+    ]
     total_resolvers = [{**r, **resolver} for r in bitstring_resolvers]
     total_circuit = bitstring_circuit + circuits[0]
     tiled_total_circuit = [total_circuit] * num_unique
-    raw_expectation_list = [
-        [cirq.Simulator().simulate_expectation_values(c, o, r)[0] for o in raw_ops]
-    for c, r in zip(tiled_total_circuit, total_resolvers)]
+    raw_expectation_list = [[
+        cirq.Simulator().simulate_expectation_values(c, o,
+                                                     r)[0] for o in raw_ops
+    ] for c, r in zip(tiled_total_circuit, total_resolvers)]
     expected_expectations = utils.weighted_average(counts, raw_expectation_list)
 
-    actual_expectations = actual_h_infer.expectation(
-        actual_hamiltonian, ops, num_samples)
+    actual_expectations = actual_h_infer.expectation(actual_hamiltonian, ops,
+                                                     num_samples)
     self.assertAllClose(actual_expectations, expected_expectations)
 
 
