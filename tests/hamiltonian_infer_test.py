@@ -173,10 +173,6 @@ class QHBMTest(tf.test.TestCase):
         actual_hamiltonian, ops, num_samples)
     self.assertAllClose(actual_expectations, expected_expectations)
 
-  def test_sample(self):
-    """Compares library samples to those from Cirq."""
-    pass
-
 
 if __name__ == "__main__":
   absl.logging.info("Running hamiltonian_infer_test.py ...")
