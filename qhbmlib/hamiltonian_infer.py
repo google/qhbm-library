@@ -31,6 +31,8 @@ class QHBM(tf.keras.layers.Layer):
   Here we formalize some aspects of thermal states, which will be used later
   to explain particular methods of this class.
 
+  # TODO(#119): add reference to updated QHBM paper.
+
   Each method takes as input some modular Hamiltonian
   $$K_{\theta\phi} = U_\phi K_\theta U_\phi^\dagger.$$
   The [thermal state][1] corresponding to the model is
@@ -87,7 +89,7 @@ class QHBM(tf.keras.layers.Layer):
   def circuits(self, model: hamiltonian_model.Hamiltonian, num_samples: int):
     r"""Draws thermally distributed eigenstates from the model Hamiltonian.
 
-    We now explain the algorithm.  First, construct $X$ to be a classical
+    Here we explain the algorithm.  First, construct $X$ to be a classical
     random variable with probability distribution $p_\theta(x)$ set by
     `model.energy`.  Then, draw $n = $`num\_samples` bitstrings,
     $S=\{x_1, \ldots, x_n\}$, from $X$.  For each unique $x_i\in S$, set
@@ -121,14 +123,17 @@ class QHBM(tf.keras.layers.Layer):
     TODO(#119): add expectation and derivative equations and discussions
                 from updated paper.
 
+    Implicitly sample `num_samples` pure states from the canonical ensemble
+    corresponding to the thermal state defined by `model`.  For each such state
+    |psi>, estimate the expectation value <psi|op_j|psi> for each `ops[j]`.
+    Then, average these expectation values over the sampled states.
+
     Args:
       model: The modular Hamiltonian whose normalized exponential is the
         density operator against which expectation values will be estimated.
       ops: The observables to measure.  If `tf.Tensor`, strings with shape
         [n_ops], result of calling `tfq.convert_to_tensor` on a list of
-        cirq.PauliSum, `[op1, op2, ...]`.  Tiled to measure `<op_j>_((qnn)|x>)`
-        once for each  unique sample `x` drawn from the EBM associated with
-        `model`.
+        cirq.PauliSum, `[op1, op2, ...]`.
       num_samples: Number of draws from the EBM associated with `model` to
         average over.
 

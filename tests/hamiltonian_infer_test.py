@@ -167,7 +167,7 @@ class QHBMTest(tf.test.TestCase):
     raw_expectation_list = [
         [cirq.Simulator().simulate_expectation_values(c, o, r)[0] for o in raw_ops]
     for c, r in zip(tiled_total_circuit, total_resolvers)]
-    expected_expectations = utils.weighted_average(raw_expectation_list, counts)
+    expected_expectations = utils.weighted_average(counts, raw_expectation_list)
 
     actual_expectations = actual_h_infer.expectation(
         actual_hamiltonian, ops, num_samples)
