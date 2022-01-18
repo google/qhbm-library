@@ -516,7 +516,7 @@ class MCMC(EnergySampler):
 
     sampled_states = sampled_states[:num_samples]
     if unique:
-      return util.unique_bitstrings_with_counts(sampled_states)
+      return tf.raw_ops.UniqueWithCountsV2(sampled_states, axix=[0])
     return sampled_states
 
 
@@ -577,7 +577,7 @@ class EBM(tf.keras.Model):
           tfp.distributions.Categorical(logits=-1 *
                                         self.energies()).sample(num_samples))
       if unique:
-        return util.unique_bitstrings_with_counts(samples)
+        return tf.raw_ops.UniqueWithCountsV2(sampled, axix=[0])
       return samples
     else:
       return self._energy_sampler.sample(num_samples, unique=unique)
@@ -675,7 +675,7 @@ class Bernoulli(EBM):
     samples = tfp.distributions.Bernoulli(
         logits=2 * self.kernel, dtype=tf.int8).sample(num_samples)
     if unique:
-      return util.unique_bitstrings_with_counts(samples)
+      return tf.raw_ops.UniqueWithCountsV2(sampled, axix=[0])
     return samples
 
   def energies(self):
