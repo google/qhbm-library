@@ -675,7 +675,7 @@ class Bernoulli(EBM):
     samples = tfp.distributions.Bernoulli(
         logits=2 * self.kernel, dtype=tf.int8).sample(num_samples)
     if unique:
-      return tf.raw_ops.UniqueWithCountsV2(sampled, axix=[0])
+      return tf.raw_ops.UniqueWithCountsV2(samples, axix=[0])
     return samples
 
   def energies(self):
