@@ -447,21 +447,6 @@ class QubitSubIndicesTest(tf.test.TestCase):
     self.assertAllEqual(actual_sub_indices, expected_sub_indices)
 
 
-#  def test_large(self):
-#    """Test when the number of bitstrings is large."""
-#    multiplier = int(1e8)
-#    test_bitstrings = tf.constant(
-#        ([[1, 0, 1]] * multiplier) + [[0, 1, 0]], dtype=tf.int8)
-#    test_y, test_count = util.unique_bitstrings_with_counts(test_bitstrings)
-#    print(test_y.numpy().tolist())
-#    print(test_count.numpy().tolist())
-#    test_bitstrings_2 = tf.constant(
-#        [[1, 0, 1]] + [[0, 1, 0]] * multiplier, dtype=tf.int8)
-#    test_y, test_count = util.unique_bitstrings_with_counts(test_bitstrings_2)
-#    print(test_y.numpy().tolist())
-#    print(test_count.numpy().tolist())
-#    assert False
-
 if __name__ == "__main__":
   print("Running util_test.py ...")
   tf.test.main()
