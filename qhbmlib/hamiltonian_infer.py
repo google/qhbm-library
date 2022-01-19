@@ -116,7 +116,7 @@ class QHBM(tf.keras.layers.Layer):
 
   def expectation(self,
                   model: hamiltonian_model.Hamiltonian,
-                  ops: Union[tf.Tensor, List[hamiltonian_model.Hamiltonian],
+                  ops: Union[tf.Tensor, hamiltonian_model.Hamiltonian,
                   num_samples: int):
     """Estimates observable expectation values against the density operator.
 
@@ -133,7 +133,7 @@ class QHBM(tf.keras.layers.Layer):
         density operator against which expectation values will be estimated.
       ops: The observables to measure.  If `tf.Tensor`, strings with shape
         [n_ops], result of calling `tfq.convert_to_tensor` on a list of
-        cirq.PauliSum, `[op1, op2, ...]`.  Otherwise, a list of Hamiltonians.
+        cirq.PauliSum, `[op1, op2, ...]`.  Otherwise, a Hamiltonian.
       num_samples: Number of draws from the EBM associated with `model` to
         average over.
 
@@ -147,14 +147,11 @@ class QHBM(tf.keras.layers.Layer):
     if isinstance(ops, tf.Tensor):
       return self.q_inference.expectation(
           model.circuit, bitstrings, counts, ops, reduce=True)
-    elif all([isinstance(o.energy, energy_model.PauliMixin) for o in ops]):
-      expectations = []
-      for o in ops:
-        u_dagger_u = model.circuit + o.circuit_dagger
-        expectation_shards = self.q_inference.expectation(
-            u_dagger_u, bitstrings, counts, o.operator_shards, reduce=True)
-        expectations.append(o.energy.operator_expectation(expectation_shards))
-      return expectations
+    elif isinstance(ops.energy, energy_model.PauliMixin):
+      u_dagger_u = model.circuit + ops.circuit_dagger
+      expectation_shards = self.q_inference.expectation(
+          u_dagger_u, bitstrings, counts, ops.operator_shards, reduce=True)
+      return tf.expand_dims(ops.energy.operator_expectation(expectation_shards), 0)
     else:
       raise NotImplementedError(
           "General `BitstringEnergy` models not yet supported.")
