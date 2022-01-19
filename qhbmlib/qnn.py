@@ -23,6 +23,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_quantum as tfq
 from qhbmlib import util
+from qhbmlib import utils
 
 
 def bit_circuit(qubits, name="bit_circuit"):
@@ -172,7 +173,7 @@ class QNN(tf.keras.Model):
       samples = tf.ragged.boolean_mask(samples, num_samples_mask)
     if unique:
       samples = samples.values.to_tensor()
-      return util.unique_bitstrings_with_counts(samples)
+      return utils.unique_bitstrings_with_counts(samples)
     elif reduce:
       samples = samples.values.to_tensor()
     return samples
