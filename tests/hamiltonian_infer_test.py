@@ -210,7 +210,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     model_h_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
 
     # sample bitstrings
-    num_samples = 1e7
+    num_samples = 1e8
     samples = e_infer.sample(num_samples)
     bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
     bit_list = bitstrings.numpy().tolist()
