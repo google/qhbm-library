@@ -21,7 +21,7 @@ import tensorflow as tf
 from qhbmlib import circuit_infer
 from qhbmlib import energy_infer
 from qhbmlib import hamiltonian_model
-from qhbmlib import util
+from qhbmlib import utils
 
 
 class QHBM(tf.keras.layers.Layer):
@@ -110,7 +110,7 @@ class QHBM(tf.keras.layers.Layer):
     """
     self.e_inference.infer(model.energy)
     samples = self.e_inference.sample(num_samples)
-    bitstrings, counts = util.unique_bitstrings_with_counts(samples)
+    bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
     states = model.circuit(bitstrings)
     return states, counts
 
