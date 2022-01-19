@@ -14,6 +14,8 @@
 # ==============================================================================
 """Tests for the utils module."""
 
+from absl.testing import parameterized
+
 import tensorflow as tf
 
 from qhbmlib import utils
@@ -48,6 +50,58 @@ class WeightedAverageTest(tf.test.TestCase):
                         (raw_counts[1] / count_sum) * raw_values[1][1]]
     actual_average = utils.weighted_average(counts, values)
     self.assertAllClose(actual_average, expected_average)
+
+
+class UniqueBitstringsWithCountsTest(parameterized.TestCase, tf.test.TestCase):
+  """Test unique_bitstrings_with_counts from the qhbm library."""
+
+  @parameterized.parameters(
+      [{
+          "bit_type": bit_type,
+          "out_idx": out_idx
+      }
+       for bit_type in
+       [tf.dtypes.int8, tf.dtypes.int32, tf.dtypes.int64, tf.dtypes.float32]
+       for out_idx in [tf.dtypes.int32, tf.dtypes.int64]])
+  def test_identity(self, bit_type, out_idx):
+    """Case when all entries are unique."""
+    test_bitstrings = tf.constant([[1], [0]], dtype=bit_type)
+    test_y, test_count = utils.unique_bitstrings_with_counts(
+        test_bitstrings, out_idx=out_idx)
+    self.assertAllEqual(test_y, test_bitstrings)
+    self.assertAllEqual(test_count, tf.constant([1, 1]))
+
+  def test_short(self):
+    """Case when bitstrings are length 1."""
+    test_bitstrings = tf.constant([
+        [0],
+        [1],
+        [0],
+        [1],
+        [1],
+        [0],
+        [1],
+        [1],
+    ],)
+    test_y, test_count = utils.unique_bitstrings_with_counts(test_bitstrings)
+    self.assertAllEqual(test_y, tf.constant([[0], [1]]))
+    self.assertAllEqual(test_count, tf.constant([3, 5]))
+
+  def test_long(self):
+    """Case when bitstrings are of length > 1."""
+    test_bitstrings = tf.constant([
+        [1, 0, 1],
+        [1, 1, 1],
+        [0, 1, 1],
+        [1, 0, 1],
+        [1, 1, 1],
+        [0, 1, 1],
+        [1, 0, 1],
+        [1, 0, 1],
+    ],)
+    test_y, test_count = utils.unique_bitstrings_with_counts(test_bitstrings)
+    self.assertAllEqual(test_y, tf.constant([[1, 0, 1], [1, 1, 1], [0, 1, 1]]))
+    self.assertAllEqual(test_count, tf.constant([4, 2, 2]))
 
 
 if __name__ == "__main__":
