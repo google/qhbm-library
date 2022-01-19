@@ -113,9 +113,14 @@ class AnalyticEnergyInference(EnergyInference):
     x = tf.squeeze(self.all_energies)
     self._current_dist = self._dist_realization(x)
 
-  def sample(self, n):
-    """See base class docstring"""
-    return tf.gather(self.all_bitstrings, self._current_dist.sample(n), axis=0)
+  def sample(self, n, seed=None):
+    """Returns samples from the EBM corresponding to `self.energy`.
+
+    This can be an approximate sampling.
+    Args:
+      
+    """
+    return tf.gather(self.all_bitstrings, self._current_dist.sample(n, seed=seed), axis=0)
 
   def entropy(self):
     """See base class docstring"""
