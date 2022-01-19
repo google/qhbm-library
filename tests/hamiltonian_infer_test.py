@@ -30,7 +30,6 @@ from qhbmlib import energy_infer
 from qhbmlib import energy_model
 from qhbmlib import hamiltonian_model
 from qhbmlib import hamiltonian_infer
-from qhbmlib import util
 from qhbmlib import utils
 from tests import test_util
 
@@ -122,31 +121,24 @@ class QHBMTest(tf.test.TestCase):
   def test_expectation_cirq(self):
     """Compares library expectation values to those from Cirq."""
     # observable
-    num_bits = 3
-    num_ops = 2
+    num_bits = 4
+    num_ops = 3
+    num_factors = 4
     qubits = cirq.GridQubit.rect(1, num_bits)
     raw_ops = [test_util.get_random_pauli_sum(qubits) for _ in range(num_ops)]
     ops = tfq.convert_to_tensor(raw_ops)
 
     # unitary
-    symbols = set()
-    while len(symbols) < num_bits:
-      symbols.add("".join(random.sample(string.ascii_letters, 10)))
-    symbols = list(symbols)
-    circuits, resolvers = tfq.util.random_symbol_circuit_resolver_batch(
-        qubits, symbols, 1)
-    resolver = {k: resolvers[0].value_of(k) for k in resolvers[0]}
-    symbol_value_list = [resolver[s] for s in symbols]
+    n_moments = 10
+    act_fraction = 0.9
+    raw_circuit = cirq.testing.random_circuit(qubits, n_moments, act_fraction)
 
     # hamiltonian model and inference
     energy_initializer = tf.keras.initializers.RandomUniform(-1, 1)
     energy = energy_model.BernoulliEnergy(
         list(range(num_bits)), energy_initializer)
     energy.build([None, num_bits])
-    energy.set_weights([tf.constant(symbol_value_list)])
-    circuit = circuit_model.QuantumCircuit(
-        tfq.convert_to_tensor(circuits), qubits, tf.constant(symbols),
-        [tf.Variable([resolver[s] for s in symbols])], [[]])
+    circuit = circuit_model.DirectQuantumCircuit(raw_circuit)
     circuit.build([])
     actual_hamiltonian = hamiltonian_model.Hamiltonian(energy, circuit)
     e_infer = energy_infer.BernoulliEnergyInference()
@@ -155,9 +147,9 @@ class QHBMTest(tf.test.TestCase):
     actual_h_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
 
     # sample bitstrings
-    num_samples = 1e9
+    num_samples = 1e6
     samples = e_infer.sample(num_samples)
-    bitstrings, counts = util.unique_bitstrings_with_counts(samples)
+    bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
     bit_list = bitstrings.numpy().tolist()
 
     # bitstring injectors
@@ -166,20 +158,16 @@ class QHBMTest(tf.test.TestCase):
     bitstring_resolvers = [
         dict(zip(bitstring_symbols, bstr)) for bstr in bit_list
     ]
-    total_resolvers = [{**r, **resolver} for r in bitstring_resolvers]
-    total_circuit = bitstring_circuit + circuits[0]
+    total_circuit = bitstring_circuit + raw_circuit
     raw_expectation_list = [[
         cirq.Simulator().simulate_expectation_values(total_circuit, o,
                                                      r)[0].real for o in raw_ops
-    ] for r in total_resolvers]
+    ] for r in bitstring_resolvers]
     expected_expectations = utils.weighted_average(counts, raw_expectation_list)
 
     actual_expectations = actual_h_infer.expectation(actual_hamiltonian, ops,
                                                      num_samples)
-    # TODO(#85): configure seed or decrease tolerance.
-    this_rtol = 3e-6  # since this is a comparison of two stochastic quantities.
-    self.assertAllClose(
-        actual_expectations, expected_expectations, rtol=this_rtol)
+    self.assertAllClose(actual_expectations, expected_expectations)
 
 
 if __name__ == "__main__":
