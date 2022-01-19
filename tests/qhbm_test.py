@@ -24,7 +24,7 @@ import tensorflow_quantum as tfq
 from qhbmlib import ebm
 from qhbmlib import qhbm
 from qhbmlib import qnn
-from qhbmlib import util
+from qhbmlib import utils
 from tests import test_util
 
 # Global tolerance, set for float32.
@@ -195,8 +195,8 @@ class QHBMBasicFunctionTest(tf.test.TestCase):
     test_samples_1 = ragged_samples[1].to_tensor()
     self.assertEqual(n_samples_0, test_samples_0.shape[0])
     self.assertEqual(n_samples_1, test_samples_1.shape[0])
-    uniques_0, _ = util.unique_bitstrings_with_counts(test_samples_0)
-    uniques_1, _ = util.unique_bitstrings_with_counts(test_samples_1)
+    uniques_0, _ = utils.unique_bitstrings_with_counts(test_samples_0)
+    uniques_1, _ = utils.unique_bitstrings_with_counts(test_samples_1)
     self.assertEqual(1, uniques_0.shape[0])
     self.assertEqual(1, uniques_1.shape[0])
     self.assertAllEqual(tf.constant([0, 1, 0], dtype=tf.int8), uniques_0[0])

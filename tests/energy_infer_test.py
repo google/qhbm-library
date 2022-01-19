@@ -19,7 +19,7 @@ import tensorflow_probability as tfp
 
 from qhbmlib import energy_infer
 from qhbmlib import energy_model
-from qhbmlib import util
+from qhbmlib import utils
 
 from tests import test_util
 
@@ -69,7 +69,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
         test_util.check_bitstring_exists(
             tf.constant([1], dtype=tf.int8), samples))
     # Check that the fraction is approximately 0.5 (equal counts)
-    _, counts = util.unique_bitstrings_with_counts(samples)
+    _, counts = utils.unique_bitstrings_with_counts(samples)
     self.assertAllClose(1.0, counts[0] / counts[1], atol=1e-3)
 
     # Large energy penalty pins the bit.
@@ -97,7 +97,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
       b_tf = tf.constant([b], dtype=tf.int8)
       self.assertTrue(test_util.check_bitstring_exists(b_tf, samples))
 
-    _, counts = util.unique_bitstrings_with_counts(samples)
+    _, counts = utils.unique_bitstrings_with_counts(samples)
     # Check that the fraction is approximately 0.125 (equal counts)
     self.assertAllClose(
         [0.125] * 8,
@@ -177,7 +177,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
         test_util.check_bitstring_exists(
             tf.constant([1], dtype=tf.int8), samples))
     # Check that the fraction is approximately 0.5 (equal counts)
-    _, counts = util.unique_bitstrings_with_counts(samples)
+    _, counts = utils.unique_bitstrings_with_counts(samples)
     self.assertAllClose(1.0, counts[0] / counts[1], atol=1e-3)
 
 
@@ -209,7 +209,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
         test_util.check_bitstring_exists(
             tf.constant([1], dtype=tf.int8), samples))
     # Check that the fraction is approximately 0.5 (equal counts)
-    _, counts = util.unique_bitstrings_with_counts(samples)
+    _, counts = utils.unique_bitstrings_with_counts(samples)
     self.assertAllClose(1.0, counts[0] / counts[1], atol=1e-3)
 
     # Large value of theta pins the bit.
@@ -217,7 +217,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     actual_layer.infer(energy)
     samples = actual_layer.sample(n_samples)
     # check that we got only one bitstring
-    bitstrings, _ = util.unique_bitstrings_with_counts(samples)
+    bitstrings, _ = utils.unique_bitstrings_with_counts(samples)
     self.assertAllEqual(bitstrings, [[1]])
 
     # Two bit tests.
@@ -231,7 +231,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
       b_tf = tf.constant([b], dtype=tf.int8)
       self.assertTrue(test_util.check_bitstring_exists(b_tf, samples))
     # Check that the fraction is approximately 0.25 (equal counts)
-    _, counts = util.unique_bitstrings_with_counts(samples)
+    _, counts = utils.unique_bitstrings_with_counts(samples)
     self.assertAllClose(
         [0.25] * 4,
         tf.cast(counts, tf.float32) / tf.cast(n_samples, tf.float32),
@@ -249,7 +249,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     for b in [[1, 0], [1, 1]]:
       b_tf = tf.constant([b], dtype=tf.int8)
       self.assertFalse(test_util.check_bitstring_exists(b_tf, samples))
-    _, counts = util.unique_bitstrings_with_counts(samples)
+    _, counts = utils.unique_bitstrings_with_counts(samples)
     self.assertAllClose(counts, [n_samples / 2] * 2, atol=n_samples / 1000)
 
   def test_log_partition(self):
@@ -323,7 +323,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
         test_util.check_bitstring_exists(
             tf.constant([1], dtype=tf.int8), samples))
     # Check that the fraction is approximately 0.5 (equal counts)
-    _, counts = util.unique_bitstrings_with_counts(samples)
+    _, counts = utils.unique_bitstrings_with_counts(samples)
     self.assertAllClose(1.0, counts[0] / counts[1], atol=1e-3)
 
 
