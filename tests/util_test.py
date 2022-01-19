@@ -462,7 +462,6 @@ class QubitSubIndicesTest(tf.test.TestCase):
 #    print(test_count.numpy().tolist())
 #    assert False
 
-
 if __name__ == "__main__":
   print("Running util_test.py ...")
   tf.test.main()

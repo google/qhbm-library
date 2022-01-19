@@ -160,7 +160,6 @@ class QHBMTest(tf.test.TestCase):
     bitstrings, counts = util.unique_bitstrings_with_counts(samples)
     bit_list = bitstrings.numpy().tolist()
     counts_list = counts.numpy().tolist()
-    num_unique = len(counts_list)
 
     # bitstring injectors
     bitstring_circuit = circuit_model_utils.bit_circuit(qubits)
@@ -180,7 +179,8 @@ class QHBMTest(tf.test.TestCase):
                                                      num_samples)
     # TODO(#85): configure seed or decrease tolerance.
     this_rtol = 3e-6  # since this is a comparison of two stochastic quantities.
-    self.assertAllClose(actual_expectations, expected_expectations, rtol=this_rtol)
+    self.assertAllClose(
+        actual_expectations, expected_expectations, rtol=this_rtol)
 
 
 if __name__ == "__main__":
