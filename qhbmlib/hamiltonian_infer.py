@@ -20,6 +20,7 @@ import tensorflow as tf
 
 from qhbmlib import circuit_infer
 from qhbmlib import energy_infer
+from qhbmlib import energy_model
 from qhbmlib import hamiltonian_model
 from qhbmlib import utils
 
@@ -116,7 +117,7 @@ class QHBM(tf.keras.layers.Layer):
 
   def expectation(self,
                   model: hamiltonian_model.Hamiltonian,
-                  ops: Union[tf.Tensor, hamiltonian_model.Hamiltonian,
+                  ops: Union[tf.Tensor, hamiltonian_model.Hamiltonian],
                   num_samples: int):
     """Estimates observable expectation values against the density operator.
 
