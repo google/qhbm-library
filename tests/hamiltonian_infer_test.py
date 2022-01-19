@@ -159,7 +159,6 @@ class QHBMTest(tf.test.TestCase):
     samples = e_infer.sample(num_samples)
     bitstrings, counts = util.unique_bitstrings_with_counts(samples)
     bit_list = bitstrings.numpy().tolist()
-    counts_list = counts.numpy().tolist()
 
     # bitstring injectors
     bitstring_circuit = circuit_model_utils.bit_circuit(qubits)
