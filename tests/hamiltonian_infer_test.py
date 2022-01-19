@@ -124,7 +124,6 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     # observable
     num_bits = 4
     num_ops = 3
-    num_factors = 4
     qubits = cirq.GridQubit.rect(1, num_bits)
     raw_ops = [test_util.get_random_pauli_sum(qubits) for _ in range(num_ops)]
     ops = tfq.convert_to_tensor(raw_ops)
@@ -171,13 +170,12 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     actual_expectations = actual_h_infer.expectation(actual_hamiltonian, ops,
                                                      num_samples)
     self.assertAllClose(actual_expectations, expected_expectations)
-  
-  @parameterized.parameters(
-      {
-          "energy_class": energy_class,
-          "energy_args": energy_args,
-      }
-       for energy_class, energy_args in zip([energy_model.BernoulliEnergy, energy_model.KOBE], [[], [2]]))
+
+  @parameterized.parameters({
+      "energy_class": energy_class,
+      "energy_args": energy_args,
+  } for energy_class, energy_args in zip(
+      [energy_model.BernoulliEnergy, energy_model.KOBE], [[], [2]]))
   def test_expectation_modham(self, energy_class, energy_args):
     """Confirm expectation of modular Hamiltonians works."""
     # set up the modular Hamiltonian to measure
@@ -186,23 +184,26 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     act_fraction = 1.0
     qubits = cirq.GridQubit.rect(1, num_bits)
     energy_init = tf.keras.initializers.RandomUniform(-10, 10)
-    energy_h = energy_class(*([list(range(num_bits))] + energy_args), initializer=energy_init)
+    energy_h = energy_class(
+        *([list(range(num_bits))] + energy_args), initializer=energy_init)
     energy_h.build([None, num_bits])
     raw_circuit_h = cirq.testing.random_circuit(qubits, n_moments, act_fraction)
     circuit_h = circuit_model.DirectQuantumCircuit(raw_circuit_h)
     circuit_h.build([])
     hamiltonian_measure = hamiltonian_model.Hamiltonian(energy_h, circuit_h)
     raw_shards = tfq.from_tensor(hamiltonian_measure.operator_shards)
-    
+
     # hamiltonian model and inference
     model_energy_initializer = tf.keras.initializers.RandomUniform(-1, 1)
     model_energy = energy_model.BernoulliEnergy(
         list(range(num_bits)), model_energy_initializer)
     model_energy.build([None, num_bits])
-    model_raw_circuit = cirq.testing.random_circuit(qubits, n_moments, act_fraction)
+    model_raw_circuit = cirq.testing.random_circuit(qubits, n_moments,
+                                                    act_fraction)
     model_circuit = circuit_model.DirectQuantumCircuit(model_raw_circuit)
     model_circuit.build([])
-    model_hamiltonian = hamiltonian_model.Hamiltonian(model_energy, model_circuit)
+    model_hamiltonian = hamiltonian_model.Hamiltonian(model_energy,
+                                                      model_circuit)
     e_infer = energy_infer.BernoulliEnergyInference()
     e_infer.infer(model_energy)
     q_infer = circuit_infer.QuantumInference()
@@ -222,18 +223,24 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     ]
 
     # calculate expected values
-    total_circuit = bitstring_circuit + model_raw_circuit + raw_circuit_h ** -1
+    total_circuit = bitstring_circuit + model_raw_circuit + raw_circuit_h**-1
     raw_expectation_list = [[
         hamiltonian_measure.energy.operator_expectation([
-            cirq.Simulator().simulate_expectation_values(total_circuit, o, r)[0].real for o in raw_shards])
-    ] for r in bitstring_resolvers]
+            cirq.Simulator().simulate_expectation_values(total_circuit, o,
+                                                         r)[0].real
+            for o in raw_shards
+        ])
+    ]
+                            for r in bitstring_resolvers]
     expected_expectations = utils.weighted_average(counts, raw_expectation_list)
 
-    actual_expectations = model_h_infer.expectation(model_hamiltonian, hamiltonian_measure,
+    actual_expectations = model_h_infer.expectation(model_hamiltonian,
+                                                    hamiltonian_measure,
                                                     num_samples)
     # TODO(#85)
     this_rtol = 1e-2
-    self.assertAllClose(actual_expectations, expected_expectations, rtol=this_rtol)
+    self.assertAllClose(
+        actual_expectations, expected_expectations, rtol=this_rtol)
 
 
 if __name__ == "__main__":

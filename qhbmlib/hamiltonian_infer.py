@@ -115,10 +115,9 @@ class QHBM(tf.keras.layers.Layer):
     states = model.circuit(bitstrings)
     return states, counts
 
-  def expectation(self,
-                  model: hamiltonian_model.Hamiltonian,
-                  ops: Union[tf.Tensor, hamiltonian_model.Hamiltonian],
-                  num_samples: int):
+  def expectation(self, model: hamiltonian_model.Hamiltonian,
+                  ops: Union[tf.Tensor,
+                             hamiltonian_model.Hamiltonian], num_samples: int):
     """Estimates observable expectation values against the density operator.
 
     TODO(#119): add expectation and derivative equations and discussions
@@ -152,8 +151,8 @@ class QHBM(tf.keras.layers.Layer):
       u_dagger_u = model.circuit + ops.circuit_dagger
       expectation_shards = self.q_inference.expectation(
           u_dagger_u, bitstrings, counts, ops.operator_shards, reduce=True)
-      return tf.expand_dims(ops.energy.operator_expectation(expectation_shards), 0)
+      return tf.expand_dims(
+          ops.energy.operator_expectation(expectation_shards), 0)
     else:
       raise NotImplementedError(
           "General `BitstringEnergy` models not yet supported.")
-
