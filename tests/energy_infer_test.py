@@ -49,12 +49,12 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
 
   def test_sample(self):
     """Confirms bitstrings are sampled as expected."""
-    n_samples = 1e7
+    n_samples = 1e6
 
     # Single bit test.
     one_bit_energy = energy_model.KOBE([0], 1)
     one_bit_energy.build([None, one_bit_energy.num_bits])
-    actual_layer = energy_infer.AnalyticEnergyInference(1)
+    actual_layer = energy_infer.AnalyticEnergyInference(1, seed=5)
     # For single factor Bernoulli, theta=0 is 50% chance of 1.
     one_bit_energy.set_weights([tf.constant([0.0])])
 
@@ -88,7 +88,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     # First a uniform sampling test.
     three_bit_energy = energy_model.KOBE([0, 1, 2], 3,
                                          tf.keras.initializers.Constant(0.0))
-    actual_layer = energy_infer.AnalyticEnergyInference(3)
+    actual_layer = energy_infer.AnalyticEnergyInference(3, seed=5)
     actual_layer.infer(three_bit_energy)
     samples = actual_layer.sample(n_samples)
 
@@ -158,7 +158,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     """Confirms that call behaves correctly."""
     one_bit_energy = energy_model.KOBE([0], 1,
                                        tf.keras.initializers.Constant(0.0))
-    actual_layer = energy_infer.AnalyticEnergyInference(1)
+    actual_layer = energy_infer.AnalyticEnergyInference(1, seed=5)
     self.assertIsNone(actual_layer.current_dist)
     with self.assertRaisesRegex(
         RuntimeError, expected_regex="`infer` must be called"):
@@ -167,7 +167,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     actual_dist = actual_layer(None)
     self.assertIsInstance(actual_dist, tfp.distributions.Categorical)
 
-    n_samples = 1e7
+    n_samples = 1e6
     samples = actual_layer(n_samples)
     # check that we got both bitstrings
     self.assertTrue(
@@ -192,10 +192,10 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
 
   def test_sample(self):
     """Confirms that bitstrings are sampled as expected."""
-    n_samples = 1e7
+    n_samples = 1e6
     energy = energy_model.BernoulliEnergy([1])
     energy.build([None, energy.num_bits])
-    actual_layer = energy_infer.BernoulliEnergyInference()
+    actual_layer = energy_infer.BernoulliEnergyInference(seed=42)
 
     # For single factor Bernoulli, theta = 0 is 50% chance of 1.
     energy.set_weights([tf.constant([0.0])])
@@ -224,7 +224,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     energy = energy_model.BernoulliEnergy([0, 1],
                                           tf.keras.initializers.Constant(0.0))
     energy.build([None, energy.num_bits])
-    actual_layer = energy_infer.BernoulliEnergyInference()
+    actual_layer = energy_infer.BernoulliEnergyInference(seed=42)
     actual_layer.infer(energy)
     samples = actual_layer.sample(n_samples)
     for b in [[0, 0], [0, 1], [1, 0], [1, 1]]:

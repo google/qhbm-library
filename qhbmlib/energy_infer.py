@@ -74,7 +74,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
 class AnalyticEnergyInference(EnergyInference):
   """Uses an explicit categorical distribution to implement parent functions."""
 
-  def __init__(self, num_bits: int, name: Union[None, str] = None):
+  def __init__(self, num_bits: int, name: Union[None, str] = None, seed=None):
     """Initializes an AnalyticEnergyInference.
 
     Internally, this class saves all possible bitstrings as a tensor, whose
@@ -84,8 +84,11 @@ class AnalyticEnergyInference(EnergyInference):
     Args:
       num_bits: Number of bits on which this layer acts.
       name: Optional name for the model.
+      seed: PRNG seed; see tfp.random.sanitize_seed for details. This seed will
+        be used in the `sample` method.
     """
     super().__init__(name=name)
+    self._seed = seed
     self._all_bitstrings = tf.constant(
         list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
     self._dist_realization = tfp.layers.DistributionLambda(
@@ -113,14 +116,9 @@ class AnalyticEnergyInference(EnergyInference):
     x = tf.squeeze(self.all_energies)
     self._current_dist = self._dist_realization(x)
 
-  def sample(self, n, seed=None):
-    """Returns samples from the EBM corresponding to `self.energy`.
-
-    This can be an approximate sampling.
-    Args:
-      
-    """
-    return tf.gather(self.all_bitstrings, self._current_dist.sample(n, seed=seed), axis=0)
+  def sample(self, n):
+    """See base class docstring"""
+    return tf.gather(self.all_bitstrings, self._current_dist.sample(n, seed=self._seed), axis=0)
 
   def entropy(self):
     """See base class docstring"""
@@ -143,13 +141,16 @@ class AnalyticEnergyInference(EnergyInference):
 class BernoulliEnergyInference(EnergyInference):
   """Manages inference for a Bernoulli defined by spin energies."""
 
-  def __init__(self, name: Union[None, str] = None):
+  def __init__(self, name: Union[None, str] = None, seed=None):
     """Initializes a BernoulliEnergyInference.
 
     Args:
       name: Optional name for the model.
+      seed: PRNG seed; see tfp.random.sanitize_seed for details. This seed will
+        be used in the `sample` method.
     """
     super().__init__(name=name)
+    self._seed = seed
     self._dist_realization = tfp.layers.DistributionLambda(
         make_distribution_fn=lambda t: tfd.Bernoulli(logits=t, dtype=tf.int8))
     self._current_dist = None
@@ -166,7 +167,7 @@ class BernoulliEnergyInference(EnergyInference):
 
   def sample(self, n):
     """See base class docstring"""
-    return self._current_dist.sample(n)
+    return self._current_dist.sample(n, seed=self._seed)
 
   def entropy(self):
     """Returns the exact entropy.
