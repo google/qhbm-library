@@ -88,7 +88,7 @@ class AnalyticEnergyInference(EnergyInference):
         be used in the `sample` method.
     """
     super().__init__(name=name)
-    self._seed = seed
+    self.seed = seed
     self._all_bitstrings = tf.constant(
         list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
     self._dist_realization = tfp.layers.DistributionLambda(
@@ -120,7 +120,7 @@ class AnalyticEnergyInference(EnergyInference):
     """See base class docstring"""
     return tf.gather(
         self.all_bitstrings,
-        self._current_dist.sample(n, seed=self._seed),
+        self._current_dist.sample(n, seed=self.seed),
         axis=0)
 
   def entropy(self):
@@ -153,7 +153,7 @@ class BernoulliEnergyInference(EnergyInference):
         be used in the `sample` method.
     """
     super().__init__(name=name)
-    self._seed = seed
+    self.seed = seed
     self._dist_realization = tfp.layers.DistributionLambda(
         make_distribution_fn=lambda t: tfd.Bernoulli(logits=t, dtype=tf.int8))
     self._current_dist = None
@@ -170,7 +170,7 @@ class BernoulliEnergyInference(EnergyInference):
 
   def sample(self, n):
     """See base class docstring"""
-    return self._current_dist.sample(n, seed=self._seed)
+    return self._current_dist.sample(n, seed=self.seed)
 
   def entropy(self):
     """Returns the exact entropy.
