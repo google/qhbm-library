@@ -137,10 +137,10 @@ class QHBM(tf.keras.layers.Layer):
       num_samples: Number of draws from the EBM associated with `model` to
         average over.
 
-      Returns:
-        `tf.Tensor` with shape [n_ops] whose entries are are the sample averaged
-        expectation values of each entry in `ops`.
-      """
+    Returns:
+      `tf.Tensor` with shape [n_ops] whose entries are are the sample averaged
+      expectation values of each entry in `ops`.
+    """
     self.e_inference.infer(model.energy)
     samples = self.e_inference.sample(num_samples)
     bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
