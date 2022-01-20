@@ -175,7 +175,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
       "energy_args": energy_args,
   } for energy_class, energy_args in zip(
       [energy_model.BernoulliEnergy, energy_model.KOBE], [[], [2]]))
-  def test_expectation_modham(self, energy_class, energy_args):
+  def test_expectation_modular_hamiltonian(self, energy_class, energy_args):
     """Confirm expectation of modular Hamiltonians works."""
     # set up the modular Hamiltonian to measure
     num_bits = 3
