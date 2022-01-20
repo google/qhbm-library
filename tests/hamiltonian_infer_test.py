@@ -134,14 +134,13 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     raw_circuit = cirq.testing.random_circuit(qubits, n_moments, act_fraction)
 
     # hamiltonian model and inference
-    energy_initializer = tf.keras.initializers.RandomUniform(-1, 1)
-    energy = energy_model.BernoulliEnergy(
-        list(range(num_bits)), energy_initializer)
+    seed = tf.constant([5, 6], dtype=tf.int32)
+    energy = energy_model.BernoulliEnergy(list(range(num_bits)))
     energy.build([None, num_bits])
     circuit = circuit_model.DirectQuantumCircuit(raw_circuit)
     circuit.build([])
     actual_hamiltonian = hamiltonian_model.Hamiltonian(energy, circuit)
-    e_infer = energy_infer.BernoulliEnergyInference()
+    e_infer = energy_infer.BernoulliEnergyInference(seed=seed)
     e_infer.infer(energy)
     q_infer = circuit_infer.QuantumInference()
     actual_h_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
@@ -154,7 +153,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
 
     # bitstring injectors
     bitstring_circuit = circuit_model_utils.bit_circuit(qubits)
-    bitstring_symbols = tfq.util.get_circuit_symbols(bitstring_circuit)
+    bitstring_symbols = sorted(tfq.util.get_circuit_symbols(bitstring_circuit))
     bitstring_resolvers = [
         dict(zip(bitstring_symbols, bstr)) for bstr in bit_list
     ]
@@ -183,9 +182,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     n_moments = 5
     act_fraction = 1.0
     qubits = cirq.GridQubit.rect(1, num_bits)
-    energy_init = tf.keras.initializers.RandomUniform(-10, 10)
-    energy_h = energy_class(
-        *([list(range(num_bits))] + energy_args), initializer=energy_init)
+    energy_h = energy_class(*([list(range(num_bits))] + energy_args))
     energy_h.build([None, num_bits])
     raw_circuit_h = cirq.testing.random_circuit(qubits, n_moments, act_fraction)
     circuit_h = circuit_model.DirectQuantumCircuit(raw_circuit_h)
@@ -194,9 +191,8 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     raw_shards = tfq.from_tensor(hamiltonian_measure.operator_shards)
 
     # hamiltonian model and inference
-    model_energy_initializer = tf.keras.initializers.RandomUniform(-1, 1)
-    model_energy = energy_model.BernoulliEnergy(
-        list(range(num_bits)), model_energy_initializer)
+    seed = tf.constant([5, 6], dtype=tf.int32)
+    model_energy = energy_model.BernoulliEnergy(list(range(num_bits)))
     model_energy.build([None, num_bits])
     model_raw_circuit = cirq.testing.random_circuit(qubits, n_moments,
                                                     act_fraction)
@@ -204,20 +200,20 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     model_circuit.build([])
     model_hamiltonian = hamiltonian_model.Hamiltonian(model_energy,
                                                       model_circuit)
-    e_infer = energy_infer.BernoulliEnergyInference()
+    e_infer = energy_infer.BernoulliEnergyInference(seed=seed)
     e_infer.infer(model_energy)
     q_infer = circuit_infer.QuantumInference()
     model_h_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
 
     # sample bitstrings
-    num_samples = 1e8
+    num_samples = 1e6
     samples = e_infer.sample(num_samples)
     bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
     bit_list = bitstrings.numpy().tolist()
 
     # bitstring injectors
     bitstring_circuit = circuit_model_utils.bit_circuit(qubits)
-    bitstring_symbols = tfq.util.get_circuit_symbols(bitstring_circuit)
+    bitstring_symbols = sorted(tfq.util.get_circuit_symbols(bitstring_circuit))
     bitstring_resolvers = [
         dict(zip(bitstring_symbols, bstr)) for bstr in bit_list
     ]
@@ -237,10 +233,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     actual_expectations = model_h_infer.expectation(model_hamiltonian,
                                                     hamiltonian_measure,
                                                     num_samples)
-    # TODO(#85)
-    this_rtol = 1e-2
-    self.assertAllClose(
-        actual_expectations, expected_expectations, rtol=this_rtol)
+    self.assertAllClose(actual_expectations, expected_expectations)
 
 
 if __name__ == "__main__":
