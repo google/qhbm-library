@@ -118,7 +118,10 @@ class AnalyticEnergyInference(EnergyInference):
 
   def sample(self, n):
     """See base class docstring"""
-    return tf.gather(self.all_bitstrings, self._current_dist.sample(n, seed=self._seed), axis=0)
+    return tf.gather(
+        self.all_bitstrings,
+        self._current_dist.sample(n, seed=self._seed),
+        axis=0)
 
   def entropy(self):
     """See base class docstring"""
