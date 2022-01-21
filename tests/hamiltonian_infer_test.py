@@ -141,12 +141,12 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     circuit.build([])
     actual_hamiltonian = hamiltonian_model.Hamiltonian(energy, circuit)
     e_infer = energy_infer.BernoulliEnergyInference(seed=seed)
-    e_infer.infer(energy)
     q_infer = circuit_infer.QuantumInference()
     actual_h_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
 
     # sample bitstrings
     num_samples = 1e6
+    e_infer.infer(energy)
     samples = e_infer.sample(num_samples)
     bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
     bit_list = bitstrings.numpy().tolist()
@@ -201,12 +201,12 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     model_hamiltonian = hamiltonian_model.Hamiltonian(model_energy,
                                                       model_circuit)
     e_infer = energy_infer.BernoulliEnergyInference(seed=seed)
-    e_infer.infer(model_energy)
     q_infer = circuit_infer.QuantumInference()
     model_h_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
 
     # sample bitstrings
     num_samples = 1e6
+    e_infer.infer(model_energy)
     samples = e_infer.sample(num_samples)
     bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
     bit_list = bitstrings.numpy().tolist()
