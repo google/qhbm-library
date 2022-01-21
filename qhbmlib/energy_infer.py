@@ -23,10 +23,19 @@ import tensorflow_probability as tfp
 from tensorflow_probability import distributions as tfd
 
 from qhbmlib import energy_model
+from qhbmlib import utils
 
 
 class EnergyInference(tf.keras.layers.Layer, abc.ABC):
-  """Sets the methods required for inference on BitstringEnergy objects."""
+  r"""Sets the methods required for inference on BitstringEnergy objects.
+
+  Let $E$ be the energy function defined by a given `BitstringEnergy`, and let
+  $X$ be the set of bitstrings in the domain of $E$.  Associated with $E$ is
+  a probability distribution
+  $$p(x) = \frac{e^{-E(x)}}{\sum_{y\in X} e^{-E(y)}},$$
+  which we call the Energy Based Model (EBM) associated with $E$.  Inference
+  in this class means estimating quantities of interest relative to the EBM.
+  """
 
   def __init__(self, name: Union[None, str] = None):
     """Initializes an EnergyInference.
@@ -56,10 +65,22 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     """
     raise NotImplementedError()
 
-  def expectation(self, function,):
-    """Estimates an expectation value."""
+  def expectation(self, function, num_samples):
+    """Estimates an expectation value using sample averaging.
 
-    self.sample
+    Args:
+      function: Callable with maps bitstring samples from the EBM to a tensor
+        of real numbers.
+      num_samples: The number of bitstring samples to use when estimating the
+        expectation value of `function`.
+
+    Returns:
+      Expectation value of `function`.
+    """
+    samples = self.sample(num_samples)
+    bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
+    values = function(bitstrings)
+    return utils.weighted_average(counts, values)
 
   @abc.abstractmethod
   def entropy(self):
