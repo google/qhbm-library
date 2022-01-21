@@ -56,6 +56,11 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     """
     raise NotImplementedError()
 
+  def expectation(self, function,):
+    """Estimates an expectation value."""
+
+    self.sample
+
   @abc.abstractmethod
   def entropy(self):
     """Returns an estimate of the entropy."""
