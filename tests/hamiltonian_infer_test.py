@@ -15,6 +15,7 @@
 """Tests for the hamiltonian_infer module."""
 
 import absl
+from absl.testing import parameterized
 import random
 import string
 
@@ -25,13 +26,16 @@ from tensorflow_quantum.python import util as tfq_util
 
 from qhbmlib import circuit_infer
 from qhbmlib import circuit_model
+from qhbmlib import circuit_model_utils
 from qhbmlib import energy_infer
 from qhbmlib import energy_model
 from qhbmlib import hamiltonian_model
 from qhbmlib import hamiltonian_infer
+from qhbmlib import utils
+from tests import test_util
 
 
-class QHBMTest(tf.test.TestCase):
+class QHBMTest(parameterized.TestCase, tf.test.TestCase):
   """Tests the QHBM class."""
 
   def setUp(self):
@@ -114,6 +118,122 @@ class QHBMTest(tf.test.TestCase):
       # Check that the fraction is approximately 0.5 (equal counts)
       self.assertAllClose(
           actual_counts[0], actual_counts[1], atol=num_samples / 1000)
+
+  def test_expectation_cirq(self):
+    """Compares library expectation values to those from Cirq."""
+    # observable
+    num_bits = 4
+    num_ops = 3
+    qubits = cirq.GridQubit.rect(1, num_bits)
+    raw_ops = [test_util.get_random_pauli_sum(qubits) for _ in range(num_ops)]
+    ops = tfq.convert_to_tensor(raw_ops)
+
+    # unitary
+    n_moments = 10
+    act_fraction = 0.9
+    raw_circuit = cirq.testing.random_circuit(qubits, n_moments, act_fraction)
+
+    # hamiltonian model and inference
+    seed = tf.constant([5, 6], dtype=tf.int32)
+    energy = energy_model.BernoulliEnergy(list(range(num_bits)))
+    energy.build([None, num_bits])
+    circuit = circuit_model.DirectQuantumCircuit(raw_circuit)
+    circuit.build([])
+    actual_hamiltonian = hamiltonian_model.Hamiltonian(energy, circuit)
+    e_infer = energy_infer.BernoulliEnergyInference(seed=seed)
+    q_infer = circuit_infer.QuantumInference()
+    actual_h_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
+
+    # sample bitstrings
+    num_samples = 1e6
+    e_infer.infer(energy)
+    samples = e_infer.sample(num_samples)
+    bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
+    bit_list = bitstrings.numpy().tolist()
+
+    # bitstring injectors
+    bitstring_circuit = circuit_model_utils.bit_circuit(qubits)
+    bitstring_symbols = sorted(tfq.util.get_circuit_symbols(bitstring_circuit))
+    bitstring_resolvers = [
+        dict(zip(bitstring_symbols, bstr)) for bstr in bit_list
+    ]
+
+    # calculate expected values
+    total_circuit = bitstring_circuit + raw_circuit
+    raw_expectation_list = [[
+        cirq.Simulator().simulate_expectation_values(total_circuit, o,
+                                                     r)[0].real for o in raw_ops
+    ] for r in bitstring_resolvers]
+    expected_expectations = utils.weighted_average(counts, raw_expectation_list)
+
+    actual_expectations = actual_h_infer.expectation(actual_hamiltonian, ops,
+                                                     num_samples)
+    self.assertAllClose(actual_expectations, expected_expectations)
+
+  @parameterized.parameters({
+      "energy_class": energy_class,
+      "energy_args": energy_args,
+  } for energy_class, energy_args in zip(
+      [energy_model.BernoulliEnergy, energy_model.KOBE], [[], [2]]))
+  def test_expectation_modular_hamiltonian(self, energy_class, energy_args):
+    """Confirm expectation of modular Hamiltonians works."""
+    # set up the modular Hamiltonian to measure
+    num_bits = 3
+    n_moments = 5
+    act_fraction = 1.0
+    qubits = cirq.GridQubit.rect(1, num_bits)
+    energy_h = energy_class(*([list(range(num_bits))] + energy_args))
+    energy_h.build([None, num_bits])
+    raw_circuit_h = cirq.testing.random_circuit(qubits, n_moments, act_fraction)
+    circuit_h = circuit_model.DirectQuantumCircuit(raw_circuit_h)
+    circuit_h.build([])
+    hamiltonian_measure = hamiltonian_model.Hamiltonian(energy_h, circuit_h)
+    raw_shards = tfq.from_tensor(hamiltonian_measure.operator_shards)
+
+    # hamiltonian model and inference
+    seed = tf.constant([5, 6], dtype=tf.int32)
+    model_energy = energy_model.BernoulliEnergy(list(range(num_bits)))
+    model_energy.build([None, num_bits])
+    model_raw_circuit = cirq.testing.random_circuit(qubits, n_moments,
+                                                    act_fraction)
+    model_circuit = circuit_model.DirectQuantumCircuit(model_raw_circuit)
+    model_circuit.build([])
+    model_hamiltonian = hamiltonian_model.Hamiltonian(model_energy,
+                                                      model_circuit)
+    e_infer = energy_infer.BernoulliEnergyInference(seed=seed)
+    q_infer = circuit_infer.QuantumInference()
+    model_h_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
+
+    # sample bitstrings
+    num_samples = 1e6
+    e_infer.infer(model_energy)
+    samples = e_infer.sample(num_samples)
+    bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
+    bit_list = bitstrings.numpy().tolist()
+
+    # bitstring injectors
+    bitstring_circuit = circuit_model_utils.bit_circuit(qubits)
+    bitstring_symbols = sorted(tfq.util.get_circuit_symbols(bitstring_circuit))
+    bitstring_resolvers = [
+        dict(zip(bitstring_symbols, bstr)) for bstr in bit_list
+    ]
+
+    # calculate expected values
+    total_circuit = bitstring_circuit + model_raw_circuit + raw_circuit_h**-1
+    raw_expectation_list = [[
+        hamiltonian_measure.energy.operator_expectation([
+            cirq.Simulator().simulate_expectation_values(total_circuit, o,
+                                                         r)[0].real
+            for o in raw_shards
+        ])
+    ]
+                            for r in bitstring_resolvers]
+    expected_expectations = utils.weighted_average(counts, raw_expectation_list)
+
+    actual_expectations = model_h_infer.expectation(model_hamiltonian,
+                                                    hamiltonian_measure,
+                                                    num_samples)
+    self.assertAllClose(actual_expectations, expected_expectations)
 
 
 if __name__ == "__main__":
