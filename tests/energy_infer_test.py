@@ -19,9 +19,46 @@ import tensorflow_probability as tfp
 
 from qhbmlib import energy_infer
 from qhbmlib import energy_model
+from qhbmlib import energy_model_utils
 from qhbmlib import utils
 
 from tests import test_util
+
+
+class EnergyInferenceTest(self):
+  """Tests a simple instantiation of EnergyInference."""
+
+  class SimpleEnergyInference(energy_infer.EnergyInference):
+    """EnergyInference which is independent of the input energy."""
+    
+    def __init__(self, num_bits, num_unique, unique_ratios):
+      """Initializes a simple class.
+
+      Internally, sets up a unique 
+
+      """
+      self.num_bits = num_bits
+
+    def infer(self, energy):
+      """Ignores the energy."""
+      del energy
+
+    def sample(self, n):
+      """Proportinally""" 
+    def entropy(self):
+      pass
+
+  def setUp(self):
+    """Initializes test objects."""
+    super().setUp()
+    
+      
+    self.e_infer = energy_infer.EnergyInference()
+
+  def test_expectation(self):
+    """Confirms correct averaging over input function."""
+    test_func = tf.keras.layers.Densej
+
 
 
 class AnalyticEnergyInferenceTest(tf.test.TestCase):
