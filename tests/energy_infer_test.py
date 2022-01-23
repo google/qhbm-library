@@ -92,7 +92,8 @@ class EnergyInferenceTest(tf.test.TestCase):
     expected_expectation = self.p_1 * values[0] + (1 - self.p_1) * values[1]
 
     num_samples = int(1e6)
-    actual_expectation = self.e_infer.expectation(self.test_function, num_samples)
+    actual_expectation = self.e_infer.expectation(self.test_function,
+                                                  num_samples)
 
     self.assertAllClose(actual_expectation, expected_expectation)
 
