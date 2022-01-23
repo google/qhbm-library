@@ -14,8 +14,6 @@
 # ==============================================================================
 """Tests for the energy_infer module."""
 
-import itertools
-
 import tensorflow as tf
 import tensorflow_probability as tfp
 
@@ -32,7 +30,7 @@ class EnergyInferenceTest(tf.test.TestCase):
 
   class TwoOutcomes(energy_infer.EnergyInference):
     """EnergyInference which is independent of the input energy."""
-    
+
     def __init__(self, bitstring_1, bitstring_2, p_1):
       """Initializes a simple inference class.
 
@@ -75,9 +73,9 @@ class EnergyInferenceTest(tf.test.TestCase):
       self.spins_from_bitstrings = energy_model_utils.SpinsFromBitstrings()
       self.parity = energy_model_utils.Parity(bits, order)
 
-    def call(self, bitstrings):
+    def call(self, inputs):
       """Apply the test layer to input bitstrings."""
-      return self.parity(self.spins_from_bitstrings(bitstrings))
+      return self.parity(self.spins_from_bitstrings(inputs))
 
   def setUp(self):
     """Initializes test objects."""
@@ -85,19 +83,23 @@ class EnergyInferenceTest(tf.test.TestCase):
     self.bitstring_1 = tf.constant([1, 1, 0, 1, 0], dtype=tf.int8)
     self.bitstring_2 = tf.constant([0, 0, 0, 1, 1], dtype=tf.int8)
     self.p_1 = 0.1
-    self.e_infer = self.TwoOutcomes(self.bitstring_1, self.bitstring_2, self.p_1)
+    self.e_infer = self.TwoOutcomes(self.bitstring_1, self.bitstring_2,
+                                    self.p_1)
     self.test_layer = self.TestLayer(list(range(5)), 2)
 
   def test_expectation(self):
     """Confirms correct averaging over input function."""
     values = []
-    for b in [tf.expand_dims(self.bitstring_1, 0), tf.expand_dims(self.bitstring_2, 0)]:
+    for b in [
+        tf.expand_dims(self.bitstring_1, 0),
+        tf.expand_dims(self.bitstring_2, 0)
+    ]:
       values.append(self.test_layer(tf.constant(b))[0])
     expected_expectation = self.p_1 * values[0] + (1 - self.p_1) * values[1]
 
     num_samples = int(1e6)
     actual_expectation = self.e_infer.expectation(self.test_layer, num_samples)
-    
+
     self.assertAllClose(actual_expectation, expected_expectation)
 
 
