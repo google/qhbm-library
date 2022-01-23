@@ -27,7 +27,7 @@ from qhbmlib import utils
 from tests import test_util
 
 
-class EnergyInferenceTest(self):
+class EnergyInferenceTest(tf.test.TestCase):
   """Tests a simple instantiation of EnergyInference."""
 
   class TwoOutcomes(energy_infer.EnergyInference):
@@ -41,8 +41,9 @@ class EnergyInferenceTest(self):
         bitstring_2: Second bitstring to sample.
         p_1: probability of sampling the first bitstring.
       """
-      self.bitstring_1 = tf.constant([bitstring_1], dtype=tf.int8)
-      self.bitstring_2 = tf.constant([bitstring_2], dtype=tf.int8)
+      super().__init__()
+      self.bitstring_1 = bitstring_1
+      self.bitstring_2 = bitstring_2
       self.p_1 = p_1
 
     def infer(self, energy):
@@ -53,8 +54,8 @@ class EnergyInferenceTest(self):
       """Deterministically samples bitstrings."""
       n_1 = round(self.p_1 * n)
       n_2 = n - n_1
-      bitstring_1_tile = tf.tile(self.bitstring_1, [n_1, 1])
-      bitstring_2_tile = tf.tile(self.bitstring_2, [n_2, 1])
+      bitstring_1_tile = tf.tile(tf.expand_dims(self.bitstring_1, 0), [n_1, 1])
+      bitstring_2_tile = tf.tile(tf.expand_dims(self.bitstring_2, 0), [n_2, 1])
       return tf.concat([bitstring_1_tile, bitstring_2_tile], 0)
 
     def entropy(self):
@@ -70,18 +71,19 @@ class EnergyInferenceTest(self):
 
     def __init__(self, bits, order):
       """Initializes a spin conversion and parity in the TestLayer."""
+      super().__init__()
       self.spins_from_bitstrings = energy_model_utils.SpinsFromBitstrings()
       self.parity = energy_model_utils.Parity(bits, order)
 
     def call(self, bitstrings):
       """Apply the test layer to input bitstrings."""
-      return self.parity(self.spins_from_bitstrings)
+      return self.parity(self.spins_from_bitstrings(bitstrings))
 
   def setUp(self):
     """Initializes test objects."""
     super().setUp()
-    self.bitstring_1 = [1, 1, 0, 1, 0]
-    self.bitstring_2 = [0, 0, 0, 1, 1]
+    self.bitstring_1 = tf.constant([1, 1, 0, 1, 0], dtype=tf.int8)
+    self.bitstring_2 = tf.constant([0, 0, 0, 1, 1], dtype=tf.int8)
     self.p_1 = 0.1
     self.e_infer = self.TwoOutcomes(self.bitstring_1, self.bitstring_2, self.p_1)
     self.test_layer = self.TestLayer(list(range(5)), 2)
@@ -89,11 +91,11 @@ class EnergyInferenceTest(self):
   def test_expectation(self):
     """Confirms correct averaging over input function."""
     values = []
-    for b in [[self.bitstring_1], [self.bitstring_2]]:
-      values.append(self.test_layer(b)[0])
+    for b in [tf.expand_dims(self.bitstring_1, 0), tf.expand_dims(self.bitstring_2, 0)]:
+      values.append(self.test_layer(tf.constant(b))[0])
     expected_expectation = self.p_1 * values[0] + (1 - self.p_1) * values[1]
 
-    num_samples = 1e6
+    num_samples = int(1e6)
     actual_expectation = self.e_infer.expectation(self.test_layer, num_samples)
     
     self.assertAllClose(actual_expectation, expected_expectation)
