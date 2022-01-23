@@ -76,10 +76,31 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     Returns:
       Expectation value of `function`.
     """
-    samples = self.sample(num_samples)
-    bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
-    values = function(bitstrings)
-    return utils.weighted_average(counts, values)
+
+    def _inner_expectation(thetas):
+      """Enables derivatives."""
+      samples = tf.stop_gradient(self.sample(num_samples))
+      bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
+      values = function(bitstrings)
+      average_values = utils.weighted_average(counts, values)
+
+      def grad_fn(upstream):
+        """See equation A3 in the QHBM paper appendix for details."""
+        with tf.GradientTape() as tape:
+          energies = self.energy(bitstrings)
+        energies_grads = tape.jacobian(energies, thetas)
+
+        # list comprehension since thetas is a list of variables
+        products = [eg * values for eg in energies_grads]
+        average_of_products = [utils.weighted_average(counts, p) for p in products]
+        average_energies_grads = [utils.weighted_average(counts, eg) for eg in energies_grads]
+        product_of_average = [aeg * average_values for aeg in average_energies_grads]
+
+        return [poa - aop for poa, aop in zip(product_of_averages, average_of_products)]
+
+      return average_values, grad_fn
+
+    return _inner_expectation(self.energy.trainable_variables)
 
   @abc.abstractmethod
   def entropy(self):
