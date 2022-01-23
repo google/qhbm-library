@@ -88,11 +88,11 @@ class EnergyInferenceTest(tf.test.TestCase):
         tf.expand_dims(self.bitstring_1, 0),
         tf.expand_dims(self.bitstring_2, 0)
     ]:
-      values.append(self.test_layer(tf.constant(b))[0])
+      values.append(self.test_function(tf.constant(b))[0])
     expected_expectation = self.p_1 * values[0] + (1 - self.p_1) * values[1]
 
     num_samples = int(1e6)
-    actual_expectation = self.e_infer.expectation(self.test_layer, num_samples)
+    actual_expectation = self.e_infer.expectation(self.test_function, num_samples)
 
     self.assertAllClose(actual_expectation, expected_expectation)
 
