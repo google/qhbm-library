@@ -65,11 +65,11 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     """
     raise NotImplementedError()
 
-  def expectation(self, function: tf.keras.layers.Layer, num_samples: int):
+  def expectation(self, function, num_samples: int):
     """Estimates an expectation value using sample averaging.
 
     Args:
-      function: Layer mapping a batch of bitstrings to a batch of real numbers.
+      function: Mapping from a batch of bitstrings to a batch of real numbers.
       num_samples: The number of bitstring samples to use when estimating the
         expectation value of `function`.
 

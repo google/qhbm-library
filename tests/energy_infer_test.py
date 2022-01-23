@@ -64,19 +64,6 @@ class EnergyInferenceTest(tf.test.TestCase):
       """Not implemented in this test class."""
       raise NotImplementedError()
 
-  class TestLayer(tf.keras.layers.Layer):
-    """Simple test layer to send to the expectation method."""
-
-    def __init__(self, bits, order):
-      """Initializes a spin conversion and parity in the TestLayer."""
-      super().__init__()
-      self.spins_from_bitstrings = energy_model_utils.SpinsFromBitstrings()
-      self.parity = energy_model_utils.Parity(bits, order)
-
-    def call(self, inputs):
-      """Apply the test layer to input bitstrings."""
-      return self.parity(self.spins_from_bitstrings(inputs))
-
   def setUp(self):
     """Initializes test objects."""
     super().setUp()
@@ -85,7 +72,14 @@ class EnergyInferenceTest(tf.test.TestCase):
     self.p_1 = 0.1
     self.e_infer = self.TwoOutcomes(self.bitstring_1, self.bitstring_2,
                                     self.p_1)
-    self.test_layer = self.TestLayer(list(range(5)), 2)
+    spins_from_bitstrings = energy_model_utils.SpinsFromBitstrings()
+    parity = energy_model_utils.Parity(list(range(5)), 2)
+
+    def test_function(bitstrings):
+      """Simple test function to send to expectation."""
+      return parity(spins_from_bitstrings(bitstrings))
+
+    self.test_function = test_function
 
   def test_expectation(self):
     """Confirms correct averaging over input function."""
