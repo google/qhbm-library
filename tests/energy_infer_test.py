@@ -14,6 +14,8 @@
 # ==============================================================================
 """Tests for the energy_infer module."""
 
+import itertools
+
 import tensorflow as tf
 import tensorflow_probability as tfp
 
@@ -28,37 +30,73 @@ from tests import test_util
 class EnergyInferenceTest(self):
   """Tests a simple instantiation of EnergyInference."""
 
-  class SimpleEnergyInference(energy_infer.EnergyInference):
+  class TwoOutcomes(energy_infer.EnergyInference):
     """EnergyInference which is independent of the input energy."""
     
-    def __init__(self, num_bits, num_unique, unique_ratios):
-      """Initializes a simple class.
+    def __init__(self, bitstring_1, bitstring_2, p_1):
+      """Initializes a simple inference class.
 
-      Internally, sets up a unique 
-
+      Args:
+        bitstring_1: First bitstring to sample.
+        bitstring_2: Second bitstring to sample.
+        p_1: probability of sampling the first bitstring.
       """
-      self.num_bits = num_bits
+      self.bitstring_1 = tf.constant([bitstring_1], dtype=tf.int8)
+      self.bitstring_2 = tf.constant([bitstring_2], dtype=tf.int8)
+      self.p_1 = p_1
 
     def infer(self, energy):
       """Ignores the energy."""
       del energy
 
     def sample(self, n):
-      """Proportinally""" 
+      """Deterministically samples bitstrings."""
+      n_1 = round(self.p_1 * n)
+      n_2 = n - n_1
+      bitstring_1_tile = tf.tile(self.bitstring_1, [n_1, 1])
+      bitstring_2_tile = tf.tile(self.bitstring_2, [n_2, 1])
+      return tf.concat([bitstring_1_tile, bitstring_2_tile], 0)
+
     def entropy(self):
-      pass
+      """Not implemented in this test class."""
+      raise NotImplementedError()
+
+    def log_partition(self):
+      """Not implemented in this test class."""
+      raise NotImplementedError()
+
+  class TestLayer(tf.keras.layers.Layer):
+    """Simple test layer to send to the expectation method."""
+
+    def __init__(self, bits, order):
+      """Initializes a spin conversion and parity in the TestLayer."""
+      self.spins_from_bitstrings = energy_model_utils.SpinsFromBitstrings()
+      self.parity = energy_model_utils.Parity(bits, order)
+
+    def call(self, bitstrings):
+      """Apply the test layer to input bitstrings."""
+      return self.parity(self.spins_from_bitstrings)
 
   def setUp(self):
     """Initializes test objects."""
     super().setUp()
-    
-      
-    self.e_infer = energy_infer.EnergyInference()
+    self.bitstring_1 = [1, 1, 0, 1, 0]
+    self.bitstring_2 = [0, 0, 0, 1, 1]
+    self.p_1 = 0.1
+    self.e_infer = self.TwoOutcomes(self.bitstring_1, self.bitstring_2, self.p_1)
+    self.test_layer = self.TestLayer(list(range(5)), 2)
 
   def test_expectation(self):
     """Confirms correct averaging over input function."""
-    test_func = tf.keras.layers.Densej
+    values = []
+    for b in [[self.bitstring_1], [self.bitstring_2]]:
+      values.append(self.test_layer(b)[0])
+    expected_expectation = self.p_1 * values[0] + (1 - self.p_1) * values[1]
 
+    num_samples = 1e6
+    actual_expectation = self.e_infer.expectation(self.test_layer, num_samples)
+    
+    self.assertAllClose(actual_expectation, expected_expectation)
 
 
 class AnalyticEnergyInferenceTest(tf.test.TestCase):
