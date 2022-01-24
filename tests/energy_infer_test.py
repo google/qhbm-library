@@ -19,9 +19,83 @@ import tensorflow_probability as tfp
 
 from qhbmlib import energy_infer
 from qhbmlib import energy_model
+from qhbmlib import energy_model_utils
 from qhbmlib import utils
 
 from tests import test_util
+
+
+class EnergyInferenceTest(tf.test.TestCase):
+  """Tests a simple instantiation of EnergyInference."""
+
+  class TwoOutcomes(energy_infer.EnergyInference):
+    """EnergyInference which is independent of the input energy."""
+
+    def __init__(self, bitstring_1, bitstring_2, p_1):
+      """Initializes a simple inference class.
+
+      Args:
+        bitstring_1: First bitstring to sample.
+        bitstring_2: Second bitstring to sample.
+        p_1: probability of sampling the first bitstring.
+      """
+      super().__init__()
+      self.bitstring_1 = bitstring_1
+      self.bitstring_2 = bitstring_2
+      self.p_1 = p_1
+
+    def infer(self, energy):
+      """Ignores the energy."""
+      del energy
+
+    def sample(self, n):
+      """Deterministically samples bitstrings."""
+      n_1 = round(self.p_1 * n)
+      n_2 = n - n_1
+      bitstring_1_tile = tf.tile(tf.expand_dims(self.bitstring_1, 0), [n_1, 1])
+      bitstring_2_tile = tf.tile(tf.expand_dims(self.bitstring_2, 0), [n_2, 1])
+      return tf.concat([bitstring_1_tile, bitstring_2_tile], 0)
+
+    def entropy(self):
+      """Not implemented in this test class."""
+      raise NotImplementedError()
+
+    def log_partition(self):
+      """Not implemented in this test class."""
+      raise NotImplementedError()
+
+  def setUp(self):
+    """Initializes test objects."""
+    super().setUp()
+    self.bitstring_1 = tf.constant([1, 1, 0, 1, 0], dtype=tf.int8)
+    self.bitstring_2 = tf.constant([0, 0, 0, 1, 1], dtype=tf.int8)
+    self.p_1 = 0.1
+    self.e_infer = self.TwoOutcomes(self.bitstring_1, self.bitstring_2,
+                                    self.p_1)
+    spins_from_bitstrings = energy_model_utils.SpinsFromBitstrings()
+    parity = energy_model_utils.Parity(list(range(5)), 2)
+
+    def test_function(bitstrings):
+      """Simple test function to send to expectation."""
+      return parity(spins_from_bitstrings(bitstrings))
+
+    self.test_function = test_function
+
+  def test_expectation(self):
+    """Confirms correct averaging over input function."""
+    values = []
+    for b in [
+        tf.expand_dims(self.bitstring_1, 0),
+        tf.expand_dims(self.bitstring_2, 0)
+    ]:
+      values.append(self.test_function(tf.constant(b))[0])
+    expected_expectation = self.p_1 * values[0] + (1 - self.p_1) * values[1]
+
+    num_samples = int(1e6)
+    actual_expectation = self.e_infer.expectation(self.test_function,
+                                                  num_samples)
+
+    self.assertAllClose(actual_expectation, expected_expectation)
 
 
 class AnalyticEnergyInferenceTest(tf.test.TestCase):
