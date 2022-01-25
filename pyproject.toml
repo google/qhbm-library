@@ -27,6 +27,8 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "~3.7 || ~3.8 || ~3.9"
+tensorflow = "2.7.0"
+tensorflow-probability = "0.15.0"
 tfq-nightly = "0.6.0.dev20220125"
 
 [tool.poetry.dev-dependencies]
