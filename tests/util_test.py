@@ -168,7 +168,7 @@ class FastFidelity(tf.test.TestCase):
     test_dm2 = test_util.generate_pure_random_density_operator(num_qubit)
     test_fidelity = util.fast_fidelity(test_dm1, test_dm2)
     ref_fidelity = util.fidelity(test_dm1, test_dm2)
-    self.assertAllClose(test_fidelity, ref_fidelity, atol=1e-4)
+    self.assertAllClose(test_fidelity, ref_fidelity, atol=2e-4)
 
 
 class FastFidelityMixedStates(tf.test.TestCase):
