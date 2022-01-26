@@ -17,10 +17,12 @@
 from absl.testing import parameterized
 
 import tensorflow as tf
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from qhbmlib import utils
 
 
+@tfp_test_util.test_all_tf_execution_regimes
 class SqueezeTest(tf.test.TestCase):
   """Tests the Squeeze layer."""
 
@@ -34,6 +36,7 @@ class SqueezeTest(tf.test.TestCase):
     self.assertAllEqual(actual_outputs, expected_outputs)
 
 
+@tfp_test_util.test_all_tf_execution_regimes
 class WeightedAverageTest(tf.test.TestCase):
   """Tests the weighted average function."""
 
@@ -52,6 +55,7 @@ class WeightedAverageTest(tf.test.TestCase):
     self.assertAllClose(actual_average, expected_average)
 
 
+@tfp_test_util.test_all_tf_execution_regimes
 class UniqueBitstringsWithCountsTest(parameterized.TestCase, tf.test.TestCase):
   """Test unique_bitstrings_with_counts from the qhbm library."""
 
