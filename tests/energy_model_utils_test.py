@@ -15,10 +15,12 @@
 """Tests for the energy_model_utils module."""
 
 import tensorflow as tf
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from qhbmlib import energy_model_utils
 
 
+@tfp_test_util.test_all_tf_execution_regimes
 class CheckHelpersTest(tf.test.TestCase):
   """Tests the input check functions."""
 
@@ -39,6 +41,7 @@ class CheckHelpersTest(tf.test.TestCase):
       _ = energy_model_utils.check_order(0)
 
 
+@tfp_test_util.test_all_tf_execution_regimes
 class SpinsFromBitstringsTest(tf.test.TestCase):
   """Tests the SpinsFromBitstrings layer."""
 
@@ -51,6 +54,9 @@ class SpinsFromBitstringsTest(tf.test.TestCase):
     self.assertAllEqual(actual_spins, expected_spins)
 
 
+# TODO(#136): Get this error in the graph mode decorator test:
+#             ERROR    tensorflow:test_util.py:1911 Could not find
+#             variable variable_dot/kernel.
 class VariableDotTest(tf.test.TestCase):
   """Tests the VariableDot layer."""
 
@@ -63,7 +69,6 @@ class VariableDotTest(tf.test.TestCase):
         tf.keras.initializers.Constant(const))
     actual_outputs = actual_layer(inputs)
     expected_outputs = tf.math.reduce_sum(inputs * const, -1)
-    print(expected_outputs)
     self.assertAllEqual(actual_outputs, expected_outputs)
 
     actual_layer = energy_model_utils.VariableDot()
@@ -77,6 +82,7 @@ class VariableDotTest(tf.test.TestCase):
     self.assertAllClose(actual_outputs, expected_outputs)
 
 
+@tfp_test_util.test_all_tf_execution_regimes
 class ParityTest(tf.test.TestCase):
   """Tests the Parity layer."""
 
