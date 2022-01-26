@@ -18,6 +18,7 @@ import cirq
 import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from qhbmlib import circuit_model_utils
 
@@ -26,6 +27,7 @@ def _pystr(x):
   return [str(y) for y in x]
 
 
+@tfp_test_util.test_all_tf_execution_regimes
 class BitCircuitTest(tf.test.TestCase):
   """Tests the bit_circuit function."""
 
