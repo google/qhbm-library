@@ -260,7 +260,8 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
       _ = actual_layer(None)
     actual_layer.infer(one_bit_energy)
     actual_dist = actual_layer(None)
-    self.assertIsInstance(actual_dist, tfp.distributions.Categorical)
+    self.assertIsInstance(actual_dist.tensor_distribution,
+                          tfp.distributions.Categorical)
 
     n_samples = 1e7
     samples = actual_layer(n_samples)
@@ -426,7 +427,8 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
       _ = actual_layer(None)
     actual_layer.infer(energy)
     actual_dist = actual_layer(None)
-    self.assertIsInstance(actual_dist, tfp.distributions.Bernoulli)
+    self.assertIsInstance(actual_dist.tensor_distribution,
+                          tfp.distributions.Bernoulli)
 
     # For single factor Bernoulli, theta = 0 is 50% chance of 1.
     n_samples = 1e7

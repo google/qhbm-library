@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- coding: utf-9 -*-
 from setuptools import setup
 
 packages = \
@@ -8,9 +8,9 @@ package_data = \
 {'': ['*']}
 
 install_requires = \
-['tensorflow-probability==0.12.0',
- 'tensorflow-quantum==0.5.1',
- 'tensorflow==2.4.1']
+['tensorflow-probability==0.15.0',
+ 'tensorflow-quantum==0.6.0.dev20220125',
+ 'tensorflow==2.7.0']
 
 setup_kwargs = {
     'name': 'qhbmlib',
@@ -25,7 +25,7 @@ setup_kwargs = {
     'packages': packages,
     'package_data': package_data,
     'install_requires': install_requires,
-    'python_requires': '>=3.6,<3.9',
+    'python_requires': '>=3.7,<3.10',
 }
 
 
