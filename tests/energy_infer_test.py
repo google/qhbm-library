@@ -45,11 +45,11 @@ class EnergyInferenceTest(tf.test.TestCase):
       self.p_1 = p_1
 
     def infer(self, energy):
-      """Ignores the energy."""
-      del energy
+      """Just sets the energy."""
+      self.energy = energy
 
     def sample(self, n):
-      """Deterministically samples bitstrings."""
+      """Deterministically samples bitstrings (ignores energy)."""
       n_1 = round(self.p_1 * n)
       n_2 = n - n_1
       bitstring_1_tile = tf.tile(tf.expand_dims(self.bitstring_1, 0), [n_1, 1])
@@ -64,6 +64,14 @@ class EnergyInferenceTest(tf.test.TestCase):
       """Not implemented in this test class."""
       raise NotImplementedError()
 
+  class ConstantEnergy(energy_model.BitstringEnergy):
+    """Simple constant energy."""
+  
+    def __init__(self, bits):
+      """Initializes a constant energy."""
+      energy_layers = [tf.keras.layers.Dense(1, kernel_initializer=tf.keras.initializers.Constant(0), bias_initializer = tf.keras.initializers.Constant(1)), utils.Squeeze(0)]
+      super().__init__(bits, energy_layers)
+
   def setUp(self):
     """Initializes test objects."""
     super().setUp()
@@ -72,6 +80,8 @@ class EnergyInferenceTest(tf.test.TestCase):
     self.p_1 = 0.1
     self.e_infer = self.TwoOutcomes(self.bitstring_1, self.bitstring_2,
                                     self.p_1)
+    self.energy = self.ConstantEnergy(list(range(5)))
+    self.e_infer.infer(self.energy)
     spins_from_bitstrings = energy_model_utils.SpinsFromBitstrings()
     parity = energy_model_utils.Parity(list(range(5)), 2)
 

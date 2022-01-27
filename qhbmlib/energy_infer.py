@@ -77,6 +77,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
       Expectation value of `function`.
     """
 
+    @tf.custom_gradient
     def _inner_expectation(thetas):
       """Enables derivatives."""
       samples = tf.stop_gradient(self.sample(num_samples))
@@ -92,11 +93,20 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
 
         # list comprehension since thetas is a list of variables
         products = [eg * values for eg in energies_grads]
-        average_of_products = [utils.weighted_average(counts, p) for p in products]
-        average_energies_grads = [utils.weighted_average(counts, eg) for eg in energies_grads]
-        product_of_average = [aeg * average_values for aeg in average_energies_grads]
+        average_of_products = [
+            utils.weighted_average(counts, p) for p in products
+        ]
+        average_energies_grads = [
+            utils.weighted_average(counts, eg) for eg in energies_grads
+        ]
+        product_of_average = [
+            aeg * average_values for aeg in average_energies_grads
+        ]
 
-        return [poa - aop for poa, aop in zip(product_of_averages, average_of_products)]
+        return [
+            poa - aop
+            for poa, aop in zip(product_of_averages, average_of_products)
+        ]
 
       return average_values, grad_fn
 
