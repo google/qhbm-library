@@ -141,7 +141,7 @@ class BernoulliEnergy(BitstringEnergy, PauliMixin):
       name: Optional name for the model.
     """
     pre_process = [energy_model_utils.SpinsFromBitstrings()]
-    post_process = [energy_model_utils.VariableDot(initializer=initializer)]
+    post_process = [energy_model_utils.VariableDot(bits, initializer=initializer)]
     super().__init__(bits, pre_process + post_process, name)
     self._post_process = post_process
 
@@ -188,7 +188,7 @@ class KOBE(BitstringEnergy, PauliMixin):
     self._num_terms = parity_layer.num_terms
     self._indices = parity_layer.indices
     pre_process = [energy_model_utils.SpinsFromBitstrings(), parity_layer]
-    post_process = [energy_model_utils.VariableDot(initializer=initializer)]
+    post_process = [energy_model_utils.VariableDot(bits, initializer=initializer)]
     super().__init__(bits, pre_process + post_process, name)
     self._post_process = post_process
 

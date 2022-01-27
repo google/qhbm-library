@@ -56,23 +56,18 @@ class VariableDot(tf.keras.layers.Layer):
   """Utility layer for dotting input with a same-sized variable."""
 
   def __init__(self,
+               bits: List[int],
                initializer: tf.keras.initializers.Initializer = tf.keras
                .initializers.RandomUniform()):
     """Initializes a VariableDot layer.
 
     Args:
+      bits: Unique labels for the bits on which this distribution is supported.
       initializer: A `tf.keras.initializers.Initializer` which specifies how to
         initialize the values of the parameters.
     """
     super().__init__()
-    self._initializer = initializer
-
-  def build(self, input_shape):
-    """Initializes the internal variables."""
-    self.kernel = tf.Variable(
-        initial_value=self._initializer((input_shape[-1],)),
-        name="kernel",
-        trainable=True)
+    self.kernel = tf.Variable(initializer((len(bits),), dtype=float32))
 
   def call(self, inputs):
     """Returns the dot product between the inputs and this layer's variables."""
@@ -83,7 +78,12 @@ class Parity(tf.keras.layers.Layer):
   """Computes the parities of input spins."""
 
   def __init__(self, bits: List[int], order: int):
-    """Initializes a Parity layer."""
+    """Initializes a Parity layer.
+
+    Args:
+      bits: Unique labels for the bits on which this distribution is supported.
+      order: Maximum size of bit groups to take the parity of.
+    """
     super().__init__(trainable=False)
     bits = check_bits(bits)
     order = check_order(order)
