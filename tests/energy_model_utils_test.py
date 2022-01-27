@@ -60,23 +60,28 @@ class SpinsFromBitstringsTest(tf.test.TestCase):
 class VariableDotTest(tf.test.TestCase):
   """Tests the VariableDot layer."""
 
+  def setUp(self):
+    """Initializes test objects."""
+    super().setUp()
+    self.constant = 2.5
+    self.actual_layer_constant = energy_model_utils.VariableDot(
+        tf.keras.initializers.Constant(self.constant))
+
+    self.actual_layer_default = energy_model_utils.VariableDot()
+
   def test_layer(self):
     """Confirms the layer dots with inputs correctly."""
     inputs_list = [[1, 5, 9]]
     inputs = tf.constant(inputs_list, dtype=tf.float32)
-    const = 2.5
-    actual_layer = energy_model_utils.VariableDot(
-        tf.keras.initializers.Constant(const))
-    actual_outputs = actual_layer(inputs)
-    expected_outputs = tf.math.reduce_sum(inputs * const, -1)
+    actual_outputs = self.actual_layer_constant(inputs)
+    expected_outputs = tf.math.reduce_sum(inputs * self.constant, -1)
     self.assertAllEqual(actual_outputs, expected_outputs)
 
-    actual_layer = energy_model_utils.VariableDot()
-    actual_outputs = actual_layer(inputs)
+    actual_outputs = self.actual_layer_default(inputs)
     expected_outputs = []
     for inner in inputs_list:
       inner_sum = []
-      for i, k in zip(inner, actual_layer.kernel.numpy()):
+      for i, k in zip(inner, self.actual_layer_default.kernel.numpy()):
         inner_sum.append(i * k)
       expected_outputs.append(sum(inner_sum))
     self.assertAllClose(actual_outputs, expected_outputs)
