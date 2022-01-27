@@ -64,12 +64,12 @@ class EnergyInferenceTest(tf.test.TestCase):
       """Not implemented in this test class."""
       raise NotImplementedError()
 
-  class ConstantEnergy(energy_model.BitstringEnergy):
-    """Simple constant energy."""
+  class NullEnergy(energy_model.BitstringEnergy):
+    """Simple empty energy."""
   
     def __init__(self, bits):
-      """Initializes a constant energy."""
-      energy_layers = [tf.keras.layers.Dense(1, kernel_initializer=tf.keras.initializers.Constant(0), bias_initializer = tf.keras.initializers.Constant(1)), utils.Squeeze(0)]
+      """Initializes a NullEnergy."""
+      energy_layers = []
       super().__init__(bits, energy_layers)
 
   def setUp(self):
