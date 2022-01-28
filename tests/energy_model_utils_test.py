@@ -62,19 +62,15 @@ class SpinsFromBitstringsTest(parameterized.TestCase, tf.test.TestCase):
 class VariableDotTest(parameterized.TestCase, tf.test.TestCase):
   """Tests the VariableDot layer."""
 
-  def setUp(self):
-    super().setUp()
-    self.bits = [1, 2, 3]
-    self.inputs = tf.constant([[1.0, 5.0, 9.0]])
-    self.constant = 2.5
-    self.actual_layer_constant = energy_model_utils.VariableDot(
-        self.bits, tf.keras.initializers.Constant(self.constant))
-
   @tfp_test_util.test_all_tf_execution_regimes
   def test_layer(self):
     """Confirms the layer dots with inputs correctly."""
-    actual_outputs = self.actual_layer_constant(self.inputs)
-    expected_outputs = tf.math.reduce_sum(self.inputs * self.constant, -1)
+    inputs = tf.constant([[1.0, 5.0, 9.0]])
+    constant = 2.5
+    actual_layer_constant = energy_model_utils.VariableDot(
+        tf.keras.initializers.Constant(constant))
+    actual_outputs = actual_layer_constant(inputs)
+    expected_outputs = tf.math.reduce_sum(inputs * constant, -1)
     self.assertAllEqual(actual_outputs, expected_outputs)
 
 
