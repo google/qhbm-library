@@ -168,7 +168,7 @@ def check_bitstring_exists(bitstring, bitstring_list):
 
 def eager_mode_toggle(func):
   """Parameterizes the given test function to toggle `tf.function` tracing."""
-  
+
   def wrapper(ref):
     tf.config.run_functions_eagerly(True)
     # Ensures eager is turned back off even if first call raises.
@@ -179,5 +179,5 @@ def eager_mode_toggle(func):
     finally:
       tf.config.run_functions_eagerly(False)
     func(ref)
-  return wrapper
 
+  return wrapper

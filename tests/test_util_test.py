@@ -19,7 +19,7 @@ import tensorflow as tf
 from tests import test_util
 
 
-class EagerModeToggle(tf.test.TestCase): 
+class EagerModeToggle(tf.test.TestCase):
   """Tests eager_mode_toggle."""
 
   def test_eager_mode_toggle(self):
@@ -29,7 +29,7 @@ class EagerModeToggle(tf.test.TestCase):
       """Raises AssertionError if run in eager."""
       if tf.config.functions_run_eagerly():
         raise AssertionError()
-      
+
     def fail_out_of_eager(self):
       """Raises AssertionError if run outside of eager."""
       if not tf.config.functions_run_eagerly():
@@ -43,4 +43,3 @@ class EagerModeToggle(tf.test.TestCase):
 
     with self.assertRaises(AssertionError):
       _ = test_util.eager_mode_toggle(fail_out_of_eager)(self)
-

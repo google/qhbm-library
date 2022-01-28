@@ -101,6 +101,7 @@ class ParityTest(tf.test.TestCase):
     expected_outputs = tf.constant([[-1, 1, -1, -1]  # single bit parities
                                     + [-1, 1, 1, -1, -1, 1]  # two bit parities
                                     + [1, 1, -1, 1]])  # three bit parities
+
     @tf.function
     def wrapper(inputs):
       return actual_layer(inputs)

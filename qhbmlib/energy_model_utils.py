@@ -70,7 +70,11 @@ class VariableDot(tf.keras.layers.Layer):
   def build(self, input_shape):
     """Initializes the internal variables."""
     self.kernel = self.add_weight(
-        name="kernel", shape=(input_shape[-1],), dtype=tf.float32, initializer=self._initializer, trainable=True)
+        name="kernel",
+        shape=(input_shape[-1],),
+        dtype=tf.float32,
+        initializer=self._initializer,
+        trainable=True)
 
   def call(self, inputs):
     """Returns the dot product between the inputs and this layer's variables."""
