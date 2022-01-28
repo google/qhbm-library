@@ -14,6 +14,8 @@
 # ==============================================================================
 """Tests for the energy_model_utils module."""
 
+from absl.testing import parameterized
+
 import tensorflow as tf
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
@@ -21,7 +23,7 @@ from qhbmlib import energy_model_utils
 
 
 @tfp_test_util.test_all_tf_execution_regimes
-class CheckHelpersTest(tf.test.TestCase):
+class CheckHelpersTest(parameterized.TestCase, tf.test.TestCase):
   """Tests the input check functions."""
 
   def test_check_bits(self):
@@ -42,7 +44,7 @@ class CheckHelpersTest(tf.test.TestCase):
 
 
 @tfp_test_util.test_all_tf_execution_regimes
-class SpinsFromBitstringsTest(tf.test.TestCase):
+class SpinsFromBitstringsTest(parameterized.TestCase, tf.test.TestCase):
   """Tests the SpinsFromBitstrings layer."""
 
   def test_layer(self):
@@ -57,37 +59,27 @@ class SpinsFromBitstringsTest(tf.test.TestCase):
 # TODO(#136): Get this error in the graph mode decorator test:
 #             ERROR    tensorflow:test_util.py:1911 Could not find
 #             variable variable_dot/kernel.
-@tfp_test_util.test_all_tf_execution_regimes
-class VariableDotTest(tf.test.TestCase):
+class VariableDotTest(parameterized.TestCase, tf.test.TestCase):
   """Tests the VariableDot layer."""
 
+  def setUp(self):
+    super().setUp()
+    self.bits = [1, 2, 3]
+    self.inputs = tf.constant([[1.0, 5.0, 9.0]])
+    self.constant = 2.5
+    self.actual_layer_constant = energy_model_utils.VariableDot(
+        self.bits, tf.keras.initializers.Constant(self.constant))
+
+  @tfp_test_util.test_all_tf_execution_regimes
   def test_layer(self):
     """Confirms the layer dots with inputs correctly."""
-    bits = [1, 2, 3]
-    inputs_list = [[1, 5, 9]]
-    inputs = tf.constant(inputs_list, dtype=tf.float32)
-    const = 2.5
-    actual_layer = energy_model_utils.VariableDot(
-        bits, tf.keras.initializers.Constant(const))
-    actual_layer.build([1, 3])
-    actual_outputs = actual_layer(inputs)
-    expected_outputs = tf.math.reduce_sum(inputs * const, -1)
+    actual_outputs = self.actual_layer_constant(self.inputs)
+    expected_outputs = tf.math.reduce_sum(self.inputs * self.constant, -1)
     self.assertAllEqual(actual_outputs, expected_outputs)
-
-    actual_layer = energy_model_utils.VariableDot(bits)
-    actual_layer.build([1, 3])
-    actual_outputs = actual_layer(inputs)
-    expected_outputs = []
-    for inner in inputs_list:
-      inner_sum = []
-      for i, k in zip(inner, actual_layer.kernel.numpy()):
-        inner_sum.append(i * k)
-      expected_outputs.append(sum(inner_sum))
-    self.assertAllClose(actual_outputs, expected_outputs)
 
 
 @tfp_test_util.test_all_tf_execution_regimes
-class ParityTest(tf.test.TestCase):
+class ParityTest(parameterized.TestCase, tf.test.TestCase):
   """Tests the Parity layer."""
 
   def test_layer(self):

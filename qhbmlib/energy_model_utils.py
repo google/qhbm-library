@@ -58,7 +58,8 @@ class VariableDot(tf.keras.layers.Layer):
   def __init__(self,
                bits: List[int],
                initializer: tf.keras.initializers.Initializer = tf.keras
-               .initializers.RandomUniform()):
+               .initializers.RandomUniform(),
+               name=None):
     """Initializes a VariableDot layer.
 
     Args:
@@ -66,8 +67,8 @@ class VariableDot(tf.keras.layers.Layer):
       initializer: A `tf.keras.initializers.Initializer` which specifies how to
         initialize the values of the parameters.
     """
-    super().__init__()
-    self.kernel = tf.Variable(initializer((len(bits),), dtype=float32))
+    super().__init__(name=name)
+    self.kernel = tf.Variable(initializer((len(bits),), dtype=tf.float32), trainable=True)
 
   def call(self, inputs):
     """Returns the dot product between the inputs and this layer's variables."""
