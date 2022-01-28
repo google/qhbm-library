@@ -68,7 +68,8 @@ class VariableDot(tf.keras.layers.Layer):
         initialize the values of the parameters.
     """
     super().__init__(name=name)
-    self.kernel = tf.Variable(initializer((len(bits),), dtype=tf.float32), trainable=True)
+    self.kernel = tf.Variable(
+        initializer((len(bits),), dtype=tf.float32), trainable=True)
 
   def call(self, inputs):
     """Returns the dot product between the inputs and this layer's variables."""
