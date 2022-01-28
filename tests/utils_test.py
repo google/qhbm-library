@@ -102,7 +102,7 @@ class UniqueBitstringsWithCountsTest(parameterized.TestCase, tf.test.TestCase):
         [1],
         [1],
     ],)
-    
+
     @tf.function
     def wrapper(bitstrings):
       return utils.unique_bitstrings_with_counts(bitstrings)
