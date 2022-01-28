@@ -25,21 +25,21 @@ class EagerModeToggle(tf.test.TestCase):
   def test_eager_mode_toggle(self):
     """Ensure eager mode really gets toggled."""
 
-    def fail_in_eager(self):
+    def fail_in_eager():
       """Raises AssertionError if run in eager."""
       if tf.config.functions_run_eagerly():
         raise AssertionError()
 
-    def fail_out_of_eager(self):
+    def fail_out_of_eager():
       """Raises AssertionError if run outside of eager."""
       if not tf.config.functions_run_eagerly():
         raise AssertionError()
 
     with self.assertRaises(AssertionError):
-      _ = test_util.eager_mode_toggle(fail_in_eager)(self)
+      test_util.eager_mode_toggle(fail_in_eager)()
 
     # Ensure eager mode still turned off even though exception was raised.
     self.assertFalse(tf.config.functions_run_eagerly())
 
     with self.assertRaises(AssertionError):
-      _ = test_util.eager_mode_toggle(fail_out_of_eager)(self)
+      test_util.eager_mode_toggle(fail_out_of_eager)()
