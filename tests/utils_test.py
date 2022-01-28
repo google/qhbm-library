@@ -19,24 +19,32 @@ from absl.testing import parameterized
 import tensorflow as tf
 
 from qhbmlib import utils
+from tests import test_util
 
 
 class SqueezeTest(tf.test.TestCase):
   """Tests the Squeeze layer."""
 
+  @test_util.eager_mode_toggle
   def test_layer(self):
     """Confirms the layer squeezes correctly."""
     inputs = tf.constant([[[1]], [[2]]])
     expected_axis = 1
     expected_outputs = tf.constant([[1], [2]])
     actual_layer = utils.Squeeze(expected_axis)
-    actual_outputs = actual_layer(inputs)
+
+    @tf.function
+    def wrapper(inputs):
+      return actual_layer(inputs)
+
+    actual_outputs = wrapper(inputs)
     self.assertAllEqual(actual_outputs, expected_outputs)
 
 
 class WeightedAverageTest(tf.test.TestCase):
   """Tests the weighted average function."""
 
+  @test_util.eager_mode_toggle
   def test_explicit(self):
     """Uses explicit averaging to test the function."""
     raw_counts = [37, 5]
@@ -48,7 +56,12 @@ class WeightedAverageTest(tf.test.TestCase):
                         (raw_counts[1] / count_sum) * raw_values[1][0],
                         (raw_counts[0] / count_sum) * raw_values[0][1] +
                         (raw_counts[1] / count_sum) * raw_values[1][1]]
-    actual_average = utils.weighted_average(counts, values)
+
+    @tf.function
+    def wrapper(counts, values):
+      return utils.weighted_average(counts, values)
+
+    actual_average = wrapper(counts, values)
     self.assertAllClose(actual_average, expected_average)
 
 
@@ -63,14 +76,20 @@ class UniqueBitstringsWithCountsTest(parameterized.TestCase, tf.test.TestCase):
        for bit_type in
        [tf.dtypes.int8, tf.dtypes.int32, tf.dtypes.int64, tf.dtypes.float32]
        for out_idx in [tf.dtypes.int32, tf.dtypes.int64]])
+  @test_util.eager_mode_toggle
   def test_identity(self, bit_type, out_idx):
     """Case when all entries are unique."""
     test_bitstrings = tf.constant([[1], [0]], dtype=bit_type)
-    test_y, test_count = utils.unique_bitstrings_with_counts(
-        test_bitstrings, out_idx=out_idx)
+
+    @tf.function
+    def wrapper(bitstrings, out_idx):
+      return utils.unique_bitstrings_with_counts(bitstrings, out_idx)
+
+    test_y, test_count = wrapper(test_bitstrings, out_idx=out_idx)
     self.assertAllEqual(test_y, test_bitstrings)
     self.assertAllEqual(test_count, tf.constant([1, 1]))
 
+  @test_util.eager_mode_toggle
   def test_short(self):
     """Case when bitstrings are length 1."""
     test_bitstrings = tf.constant([
@@ -83,10 +102,16 @@ class UniqueBitstringsWithCountsTest(parameterized.TestCase, tf.test.TestCase):
         [1],
         [1],
     ],)
-    test_y, test_count = utils.unique_bitstrings_with_counts(test_bitstrings)
+
+    @tf.function
+    def wrapper(bitstrings):
+      return utils.unique_bitstrings_with_counts(bitstrings)
+
+    test_y, test_count = wrapper(test_bitstrings)
     self.assertAllEqual(test_y, tf.constant([[0], [1]]))
     self.assertAllEqual(test_count, tf.constant([3, 5]))
 
+  @test_util.eager_mode_toggle
   def test_long(self):
     """Case when bitstrings are of length > 1."""
     test_bitstrings = tf.constant([
@@ -99,7 +124,12 @@ class UniqueBitstringsWithCountsTest(parameterized.TestCase, tf.test.TestCase):
         [1, 0, 1],
         [1, 0, 1],
     ],)
-    test_y, test_count = utils.unique_bitstrings_with_counts(test_bitstrings)
+
+    @tf.function
+    def wrapper(bitstrings):
+      return utils.unique_bitstrings_with_counts(bitstrings)
+
+    test_y, test_count = wrapper(test_bitstrings)
     self.assertAllEqual(test_y, tf.constant([[1, 0, 1], [1, 1, 1], [0, 1, 1]]))
     self.assertAllEqual(test_count, tf.constant([4, 2, 2]))
 
