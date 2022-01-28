@@ -49,12 +49,14 @@ class SpinsFromBitstringsTest(tf.test.TestCase):
   def test_layer(self):
     """Confirms the layer outputs correct spins."""
     test_layer = energy_model_utils.SpinsFromBitstrings()
+
     @tf.function
-    def test_layer_wrapper(inputs):
+    def wrapper(inputs):
       return test_layer(inputs)
+
     test_bitstrings = tf.constant([[1, 0, 0], [0, 1, 0]])
     expected_spins = tf.constant([[-1, 1, 1], [1, -1, 1]])
-    actual_spins = test_layer_wrapper(test_bitstrings)
+    actual_spins = wrapper(test_bitstrings)
     self.assertAllEqual(actual_spins, expected_spins)
 
 
@@ -68,11 +70,12 @@ class VariableDotTest(tf.test.TestCase):
     constant = 2.5
     actual_layer_constant = energy_model_utils.VariableDot(
         tf.keras.initializers.Constant(constant))
+
     @tf.function
-    def actual_layer_constant_wrapper(inputs):
+    def wrapper(inputs):
       return actual_layer_constant(inputs)
 
-    actual_outputs = actual_layer_constant_wrapper(inputs)
+    actual_outputs = wrapper(inputs)
     expected_outputs = tf.math.reduce_sum(inputs * constant, -1)
     self.assertAllEqual(actual_outputs, expected_outputs)
 
@@ -99,9 +102,10 @@ class ParityTest(tf.test.TestCase):
                                     + [-1, 1, 1, -1, -1, 1]  # two bit parities
                                     + [1, 1, -1, 1]])  # three bit parities
     @tf.function
-    def actual_layer_wrapper(inputs):
+    def wrapper(inputs):
       return actual_layer(inputs)
-    actual_outputs = actual_layer_wrapper(inputs)
+
+    actual_outputs = wrapper(inputs)
     self.assertAllEqual(actual_outputs, expected_outputs)
 
 
