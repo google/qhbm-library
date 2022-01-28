@@ -69,9 +69,11 @@ class VariableDot(tf.keras.layers.Layer):
 
   def build(self, input_shape):
     """Initializes the internal variables."""
-    self.kernel = tf.Variable(
-        initial_value=self._initializer((input_shape[-1],)),
+    self.kernel = self.add_weight(
         name="kernel",
+        shape=(input_shape[-1],),
+        dtype=tf.float32,
+        initializer=self._initializer,
         trainable=True)
 
   def call(self, inputs):
@@ -83,7 +85,12 @@ class Parity(tf.keras.layers.Layer):
   """Computes the parities of input spins."""
 
   def __init__(self, bits: List[int], order: int):
-    """Initializes a Parity layer."""
+    """Initializes a Parity layer.
+
+    Args:
+      bits: Unique labels for the bits on which this distribution is supported.
+      order: Maximum size of bit groups to take the parity of.
+    """
     super().__init__(trainable=False)
     bits = check_bits(bits)
     order = check_order(order)

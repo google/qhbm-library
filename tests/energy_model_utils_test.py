@@ -17,11 +17,13 @@
 import tensorflow as tf
 
 from qhbmlib import energy_model_utils
+from tests import test_util
 
 
 class CheckHelpersTest(tf.test.TestCase):
   """Tests the input check functions."""
 
+  @test_util.eager_mode_toggle
   def test_check_bits(self):
     """Confirms bad inputs are caught and good inputs pass through."""
     expected_bits = [1, 6, 222, 13223]
@@ -30,6 +32,7 @@ class CheckHelpersTest(tf.test.TestCase):
     with self.assertRaisesRegex(ValueError, expected_regex="must be unique"):
       _ = energy_model_utils.check_bits([1, 1])
 
+  @test_util.eager_mode_toggle
   def test_check_order(self):
     """Confirms bad inputs are caught and good inputs pass through."""
     expected_order = 5
@@ -42,44 +45,45 @@ class CheckHelpersTest(tf.test.TestCase):
 class SpinsFromBitstringsTest(tf.test.TestCase):
   """Tests the SpinsFromBitstrings layer."""
 
+  @test_util.eager_mode_toggle
   def test_layer(self):
     """Confirms the layer outputs correct spins."""
     test_layer = energy_model_utils.SpinsFromBitstrings()
+
+    @tf.function
+    def wrapper(inputs):
+      return test_layer(inputs)
+
     test_bitstrings = tf.constant([[1, 0, 0], [0, 1, 0]])
     expected_spins = tf.constant([[-1, 1, 1], [1, -1, 1]])
-    actual_spins = test_layer(test_bitstrings)
+    actual_spins = wrapper(test_bitstrings)
     self.assertAllEqual(actual_spins, expected_spins)
 
 
 class VariableDotTest(tf.test.TestCase):
   """Tests the VariableDot layer."""
 
+  @test_util.eager_mode_toggle
   def test_layer(self):
     """Confirms the layer dots with inputs correctly."""
-    inputs_list = [[1, 5, 9]]
-    inputs = tf.constant(inputs_list, dtype=tf.float32)
-    const = 2.5
-    actual_layer = energy_model_utils.VariableDot(
-        tf.keras.initializers.Constant(const))
-    actual_outputs = actual_layer(inputs)
-    expected_outputs = tf.math.reduce_sum(inputs * const, -1)
-    print(expected_outputs)
-    self.assertAllEqual(actual_outputs, expected_outputs)
+    inputs = tf.constant([[1.0, 5.0, 9.0]])
+    constant = 2.5
+    actual_layer_constant = energy_model_utils.VariableDot(
+        tf.keras.initializers.Constant(constant))
 
-    actual_layer = energy_model_utils.VariableDot()
-    actual_outputs = actual_layer(inputs)
-    expected_outputs = []
-    for inner in inputs_list:
-      inner_sum = []
-      for i, k in zip(inner, actual_layer.kernel.numpy()):
-        inner_sum.append(i * k)
-      expected_outputs.append(sum(inner_sum))
-    self.assertAllClose(actual_outputs, expected_outputs)
+    @tf.function
+    def wrapper(inputs):
+      return actual_layer_constant(inputs)
+
+    actual_outputs = wrapper(inputs)
+    expected_outputs = tf.math.reduce_sum(inputs * constant, -1)
+    self.assertAllEqual(actual_outputs, expected_outputs)
 
 
 class ParityTest(tf.test.TestCase):
   """Tests the Parity layer."""
 
+  @test_util.eager_mode_toggle
   def test_layer(self):
     """Confirms the layer outputs correct parities."""
     inputs = tf.constant([[-1, 1, -1, -1]])
@@ -97,7 +101,12 @@ class ParityTest(tf.test.TestCase):
     expected_outputs = tf.constant([[-1, 1, -1, -1]  # single bit parities
                                     + [-1, 1, 1, -1, -1, 1]  # two bit parities
                                     + [1, 1, -1, 1]])  # three bit parities
-    actual_outputs = actual_layer(inputs)
+
+    @tf.function
+    def wrapper(inputs):
+      return actual_layer(inputs)
+
+    actual_outputs = wrapper(inputs)
     self.assertAllEqual(actual_outputs, expected_outputs)
 
 
