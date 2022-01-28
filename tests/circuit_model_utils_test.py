@@ -20,6 +20,7 @@ import tensorflow as tf
 import tensorflow_quantum as tfq
 
 from qhbmlib import circuit_model_utils
+from tests import test_util
 
 
 def _pystr(x):
@@ -29,6 +30,7 @@ def _pystr(x):
 class BitCircuitTest(tf.test.TestCase):
   """Tests the bit_circuit function."""
 
+  @test_util.eager_mode_toggle
   def test_bit_circuit(self):
     """Confirms correct bit injector circuit creation."""
     my_qubits = [
