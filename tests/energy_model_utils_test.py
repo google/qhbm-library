@@ -14,18 +14,16 @@
 # ==============================================================================
 """Tests for the energy_model_utils module."""
 
-from absl.testing import parameterized
-
 import tensorflow as tf
-from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from qhbmlib import energy_model_utils
+from tests import test_util
 
 
-@tfp_test_util.test_all_tf_execution_regimes
-class CheckHelpersTest(parameterized.TestCase, tf.test.TestCase):
+class CheckHelpersTest(tf.test.TestCase):
   """Tests the input check functions."""
 
+  @test_util.eager_mode_toggle
   def test_check_bits(self):
     """Confirms bad inputs are caught and good inputs pass through."""
     expected_bits = [1, 6, 222, 13223]
@@ -34,6 +32,7 @@ class CheckHelpersTest(parameterized.TestCase, tf.test.TestCase):
     with self.assertRaisesRegex(ValueError, expected_regex="must be unique"):
       _ = energy_model_utils.check_bits([1, 1])
 
+  @test_util.eager_mode_toggle
   def test_check_order(self):
     """Confirms bad inputs are caught and good inputs pass through."""
     expected_order = 5
@@ -43,41 +42,45 @@ class CheckHelpersTest(parameterized.TestCase, tf.test.TestCase):
       _ = energy_model_utils.check_order(0)
 
 
-@tfp_test_util.test_all_tf_execution_regimes
-class SpinsFromBitstringsTest(parameterized.TestCase, tf.test.TestCase):
+class SpinsFromBitstringsTest(tf.test.TestCase):
   """Tests the SpinsFromBitstrings layer."""
 
+  @test_util.eager_mode_toggle
   def test_layer(self):
     """Confirms the layer outputs correct spins."""
     test_layer = energy_model_utils.SpinsFromBitstrings()
+    @tf.function
+    def test_layer_wrapper(inputs):
+      return test_layer(inputs)
     test_bitstrings = tf.constant([[1, 0, 0], [0, 1, 0]])
     expected_spins = tf.constant([[-1, 1, 1], [1, -1, 1]])
-    actual_spins = test_layer(test_bitstrings)
+    actual_spins = test_layer_wrapper(test_bitstrings)
     self.assertAllEqual(actual_spins, expected_spins)
 
 
-# TODO(#136): Get this error in the graph mode decorator test:
-#             ERROR    tensorflow:test_util.py:1911 Could not find
-#             variable variable_dot/kernel.
-class VariableDotTest(parameterized.TestCase, tf.test.TestCase):
+class VariableDotTest(tf.test.TestCase):
   """Tests the VariableDot layer."""
 
-  @tfp_test_util.test_all_tf_execution_regimes
+  @test_util.eager_mode_toggle
   def test_layer(self):
     """Confirms the layer dots with inputs correctly."""
     inputs = tf.constant([[1.0, 5.0, 9.0]])
     constant = 2.5
     actual_layer_constant = energy_model_utils.VariableDot(
         tf.keras.initializers.Constant(constant))
-    actual_outputs = actual_layer_constant(inputs)
+    @tf.function
+    def actual_layer_constant_wrapper(inputs):
+      return actual_layer_constant(inputs)
+
+    actual_outputs = actual_layer_constant_wrapper(inputs)
     expected_outputs = tf.math.reduce_sum(inputs * constant, -1)
     self.assertAllEqual(actual_outputs, expected_outputs)
 
 
-@tfp_test_util.test_all_tf_execution_regimes
-class ParityTest(parameterized.TestCase, tf.test.TestCase):
+class ParityTest(tf.test.TestCase):
   """Tests the Parity layer."""
 
+  @test_util.eager_mode_toggle
   def test_layer(self):
     """Confirms the layer outputs correct parities."""
     inputs = tf.constant([[-1, 1, -1, -1]])
@@ -95,7 +98,10 @@ class ParityTest(parameterized.TestCase, tf.test.TestCase):
     expected_outputs = tf.constant([[-1, 1, -1, -1]  # single bit parities
                                     + [-1, 1, 1, -1, -1, 1]  # two bit parities
                                     + [1, 1, -1, 1]])  # three bit parities
-    actual_outputs = actual_layer(inputs)
+    @tf.function
+    def actual_layer_wrapper(inputs):
+      return actual_layer(inputs)
+    actual_outputs = actual_layer_wrapper(inputs)
     self.assertAllEqual(actual_outputs, expected_outputs)
 
 
