@@ -72,6 +72,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     self.assertEqual(self.actual_qhbm.q_inference, self.expected_q_inference)
     self.assertEqual(self.actual_qhbm.name, self.expected_name)
 
+  @test_util.eager_mode_toggle
   def test_circuits(self):
     """Confirms correct circuits are sampled."""
     num_samples = int(1e7)
@@ -81,44 +82,44 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
       """Wrapper to test tracing."""
       return self.actual_qhbm.circuits(model, num_samples)
 
-    for func in [self.actual_qhbm.circuits, circuit_func]:
-      actual_circuits, actual_counts = func(self.model, num_samples)
+    actual_circuits, actual_counts = circuit_func(self.model, num_samples)
 
-      # Circuits with the allowed-to-be-sampled bitstrings prepended.
-      u = tfq.from_tensor(self.model.circuit.pqc)[0]
-      qubits = self.model.circuit.qubits
-      expected_circuits_deserialized = [
-          cirq.Circuit(
-              cirq.X(qubits[0])**0,
-              cirq.X(qubits[1])**0,
-              cirq.X(qubits[2]),
-          ) + u,
-          cirq.Circuit(
-              cirq.X(qubits[0])**0,
-              cirq.X(qubits[1]),
-              cirq.X(qubits[2]),
-          ) + u,
-      ]
-      # Check that both circuits are generated.
-      actual_circuits_deserialized = tfq.from_tensor(actual_circuits)
-      self.assertTrue(
-          any([
-              expected_circuits_deserialized[0] ==
-              actual_circuits_deserialized[0],
-              expected_circuits_deserialized[0] ==
-              actual_circuits_deserialized[1],
-          ]))
-      self.assertTrue(
-          any([
-              expected_circuits_deserialized[1] ==
-              actual_circuits_deserialized[0],
-              expected_circuits_deserialized[1] ==
-              actual_circuits_deserialized[1],
-          ]))
-      # Check that the fraction is approximately 0.5 (equal counts)
-      self.assertAllClose(
-          actual_counts[0], actual_counts[1], atol=num_samples / 1000)
+    # Circuits with the allowed-to-be-sampled bitstrings prepended.
+    u = tfq.from_tensor(self.model.circuit.pqc)[0]
+    qubits = self.model.circuit.qubits
+    expected_circuits_deserialized = [
+        cirq.Circuit(
+            cirq.X(qubits[0])**0,
+            cirq.X(qubits[1])**0,
+            cirq.X(qubits[2]),
+        ) + u,
+        cirq.Circuit(
+            cirq.X(qubits[0])**0,
+            cirq.X(qubits[1]),
+            cirq.X(qubits[2]),
+        ) + u,
+    ]
+    # Check that both circuits are generated.
+    actual_circuits_deserialized = tfq.from_tensor(actual_circuits)
+    self.assertTrue(
+        any([
+            expected_circuits_deserialized[0] ==
+            actual_circuits_deserialized[0],
+            expected_circuits_deserialized[0] ==
+            actual_circuits_deserialized[1],
+        ]))
+    self.assertTrue(
+        any([
+            expected_circuits_deserialized[1] ==
+            actual_circuits_deserialized[0],
+            expected_circuits_deserialized[1] ==
+            actual_circuits_deserialized[1],
+        ]))
+    # Check that the fraction is approximately 0.5 (equal counts)
+    self.assertAllClose(
+        actual_counts[0], actual_counts[1], atol=num_samples / 1000)
 
+  @test_util.eager_mode_toggle
   def test_expectation_cirq(self):
     """Compares library expectation values to those from Cirq."""
     # observable
@@ -166,8 +167,12 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     ] for r in bitstring_resolvers]
     expected_expectations = utils.weighted_average(counts, raw_expectation_list)
 
-    actual_expectations = actual_h_infer.expectation(actual_hamiltonian, ops,
-                                                     num_samples)
+    @tf.function
+    def expectation_wrapper(hamiltonian, ops, n_samples):
+      return actual_h_infer.expectation(hamiltonian, ops, n_samples)
+
+    actual_expectations = expectation_wrapper(actual_hamiltonian, ops,
+                                              num_samples)
     self.assertAllClose(actual_expectations, expected_expectations)
 
   @parameterized.parameters({
@@ -175,6 +180,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
       "energy_args": energy_args,
   } for energy_class, energy_args in zip(
       [energy_model.BernoulliEnergy, energy_model.KOBE], [[], [2]]))
+  @test_util.eager_mode_toggle
   def test_expectation_modular_hamiltonian(self, energy_class, energy_args):
     """Confirm expectation of modular Hamiltonians works."""
     # set up the modular Hamiltonian to measure
@@ -230,9 +236,12 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
                             for r in bitstring_resolvers]
     expected_expectations = utils.weighted_average(counts, raw_expectation_list)
 
-    actual_expectations = model_h_infer.expectation(model_hamiltonian,
-                                                    hamiltonian_measure,
-                                                    num_samples)
+    @tf.function
+    def expectation_wrapper(model, ops, n_samples):
+      return model_h_infer.expectation(model, ops, n_samples)
+
+    actual_expectations = expectation_wrapper(model_hamiltonian,
+                                              hamiltonian_measure, num_samples)
     self.assertAllClose(actual_expectations, expected_expectations)
 
 
