@@ -26,6 +26,7 @@ import tensorflow_quantum as tfq
 
 from qhbmlib import circuit_model
 from qhbmlib import utils
+from tests import test_util
 
 
 class QuantumCircuitTest(tf.test.TestCase):
@@ -74,6 +75,7 @@ class QuantumCircuitTest(tf.test.TestCase):
         tfq.from_tensor(self.expected_pqc))
     self.assertEqual(self.actual_layer.name, self.expected_name)
 
+  @test_util.eager_mode_toggle
   def test_call(self):
     """Confirms calling on bitstrings yields correct circuits."""
     inputs = tf.cast(
@@ -86,7 +88,12 @@ class QuantumCircuitTest(tf.test.TestCase):
               cirq.X(q)**b_i for q, b_i in zip(self.expected_qubits, b)))
     combined = [b + self.raw_pqc for b in bit_injectors]
     expected_outputs = tfq.convert_to_tensor(combined)
-    actual_outputs = self.actual_layer(inputs)
+
+    @tf.function
+    def wrapper(inputs):
+      return self.actual_layer(inputs)
+
+    actual_outputs = wrapper(inputs)
     self.assertAllEqual(
         tfq.from_tensor(actual_outputs), tfq.from_tensor(expected_outputs))
 
@@ -147,6 +154,7 @@ class QuantumCircuitTest(tf.test.TestCase):
     self.assertAllClose(actual_sum.trainable_variables[0], var_1)
     self.assertAllClose(actual_sum.trainable_variables[1], var_2)
 
+  @test_util.eager_mode_toggle
   def test_trace_add(self):
     """Confirm addition works under tf.function tracing."""
     var_1 = tf.Variable([5.0])
@@ -194,6 +202,9 @@ class QuantumCircuitTest(tf.test.TestCase):
         errors.InvalidArgumentError,
         expected_regex="must not have symbols in common"):
       _ = qnn_1 + qnn_2
+
+
+# TODO(#130)
 
   def test_pow(self):
     """Confirms inversion of QuantumCircuit works correctly."""
