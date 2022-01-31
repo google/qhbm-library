@@ -214,6 +214,19 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     energy.set_weights([tf.ones_like(w) for w in old_energy_weights])
     altered_energy_expectations = expectation_wrapper(actual_hamiltonian, ops, num_samples)
     self.assertNotAllClose(altered_energy_expectations, actual_expectations, rtol=1e-6)
+    energy.set_weights(old_energy_weights)
+
+    # Ensure circuit parameter update changes the expectation value.
+    old_circuit_weights = circuit.get_weights()
+    circuit.set_weights([tf.ones_like(w) for w in old_circuit_weights])
+    altered_circuit_expectations = expectation_wrapper(actual_hamiltonian, ops, num_samples)
+    self.assertNotAllClose(altered_circuit_expectations, actual_expectations, rtol=1e-6)
+    circuit.set_weights(old_circuit_weights)
+
+    # Check that values return to start.
+    reset_expectations = expectation_wrapper(actual_hamiltonian, ops,
+                                             num_samples)
+    self.assertAllClose(reset_expectations, actual_expectations, rtol=1e-6)
 
   @parameterized.parameters({
       "energy_class": energy_class,
