@@ -51,7 +51,6 @@ class QuantumInferenceTest(tf.test.TestCase):
             minval=-5.0, maxval=5.0),
         name="p_qnn")
 
-  @test_util.eager_mode_toggle
   def test_init(self):
     """Confirms QuantumInference is initialized correctly."""
     expected_backend = "noiseless"
@@ -160,7 +159,7 @@ class QuantumInferenceTest(tf.test.TestCase):
     all_ops = [x_ops, y_ops, z_ops]
 
     # Check with reduce True (this is the default)
-    # TODO(#136): Decoration yields an error seemingly coming from TFQ:
+    # TODO(#71): Decoration yields an error seemingly coming from TFQ:
     #  LookupError: gradient registry has no entry for: TfqAdjointGradient
 
     #@tf.function
@@ -182,7 +181,7 @@ class QuantumInferenceTest(tf.test.TestCase):
       self.assertAllClose(a, e, atol=GRAD_ATOL)
 
     # Check with reduce False
-    # TODO(#136): Decoration yields an error seemingly coming from TFQ:
+    # TODO(#71): Decoration yields an error seemingly coming from TFQ:
     #  LookupError: gradient registry has no entry for: TfqAdjointGradient
 
     #@tf.function
