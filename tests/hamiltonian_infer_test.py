@@ -153,7 +153,6 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     self.assertNotAllEqual(actual_circuits_1, actual_circuits_2)
     self.assertAllEqual(actual_circuits_2, expected_circuits_2)
 
-
   @test_util.eager_mode_toggle
   def test_expectation_cirq(self):
     """Compares library expectation values to those from Cirq."""
@@ -208,7 +207,13 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
 
     actual_expectations = expectation_wrapper(actual_hamiltonian, ops,
                                               num_samples)
-    self.assertAllClose(actual_expectations, expected_expectations)
+    self.assertAllClose(actual_expectations, expected_expectations, rtol=1e-6)
+
+    # Ensure energy parameter update changes the expectation value.
+    old_energy_weights = energy.get_weights()
+    energy.set_weights([tf.ones_like(w) for w in old_energy_weights])
+    altered_energy_expectations = expectation_wrapper(actual_hamiltonian, ops, num_samples)
+    self.assertNotAllClose(altered_energy_expectations, actual_expectations, rtol=1e-6)
 
   @parameterized.parameters({
       "energy_class": energy_class,
