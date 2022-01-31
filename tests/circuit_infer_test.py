@@ -64,6 +64,7 @@ class QuantumInferenceTest(tf.test.TestCase):
     self.assertEqual(actual_exp.backend, expected_backend)
     self.assertEqual(actual_exp.differentiator, expected_differentiator)
 
+  @test_util.eager_mode_toggle
   def test_expectation(self):
     r"""Confirms basic correct expectation values and derivatives.
 
@@ -158,11 +159,17 @@ class QuantumInferenceTest(tf.test.TestCase):
     all_ops = [x_ops, y_ops, z_ops]
 
     # Check with reduce True (this is the default)
+    # TODO(#71): Decoration yields an error seemingly coming from TFQ:
+    #  LookupError: gradient registry has no entry for: TfqAdjointGradient
+
+    #@tf.function
+    def exp_infer_true(qnn, bitstrings, counts, op):
+      return exp_infer.expectation(qnn, bitstrings, counts, op)
+
     with tf.GradientTape(persistent=True) as tape:
       actual_exps = []
       for op in all_ops:
-        actual_exps.append(
-            exp_infer.expectation(self.p_qnn, bitstrings, counts, op))
+        actual_exps.append(exp_infer_true(self.p_qnn, bitstrings, counts, op))
     actual_exps_grad = [
         tf.squeeze(tape.jacobian(exps, self.p_qnn.trainable_variables))
         for exps in actual_exps
@@ -174,11 +181,17 @@ class QuantumInferenceTest(tf.test.TestCase):
       self.assertAllClose(a, e, atol=GRAD_ATOL)
 
     # Check with reduce False
+    # TODO(#71): Decoration yields an error seemingly coming from TFQ:
+    #  LookupError: gradient registry has no entry for: TfqAdjointGradient
+
+    #@tf.function
+    def exp_infer_false(qnn, bitstrings, counts, op):
+      return exp_infer.expectation(qnn, bitstrings, counts, op, False)
+
     with tf.GradientTape(persistent=True) as tape:
       actual_exps = []
       for op in all_ops:
-        actual_exps.append(
-            exp_infer.expectation(self.p_qnn, bitstrings, counts, op, False))
+        actual_exps.append(exp_infer_false(self.p_qnn, bitstrings, counts, op))
     actual_exps_grad = [
         tf.squeeze(tape.jacobian(exps, self.p_qnn.trainable_variables))
         for exps in actual_exps
@@ -189,6 +202,7 @@ class QuantumInferenceTest(tf.test.TestCase):
     for a, e in zip(actual_exps_grad, expected_grad):
       self.assertAllClose(a, e, atol=GRAD_ATOL)
 
+  @test_util.eager_mode_toggle
   def test_sample_basic(self):
     """Confirms correct sampling from identity, bit flip, and GHZ QNNs."""
     bitstrings = tf.constant(
@@ -197,9 +211,13 @@ class QuantumInferenceTest(tf.test.TestCase):
 
     q_infer = circuit_infer.QuantumInference()
 
+    @tf.function
+    def sample_wrapper(qnn, bitstrings, counts):
+      return q_infer.sample(qnn, bitstrings, counts)
+
     ident_qnn = circuit_model.DirectQuantumCircuit(
         cirq.Circuit(cirq.I(q) for q in self.raw_qubits), name="identity")
-    test_samples = q_infer.sample(ident_qnn, bitstrings, counts)
+    test_samples = sample_wrapper(ident_qnn, bitstrings, counts)
     for i, (b, c) in enumerate(zip(bitstrings, counts)):
       self.assertEqual(tf.shape(test_samples[i].to_tensor())[0], c)
       for j in range(c):
@@ -207,7 +225,7 @@ class QuantumInferenceTest(tf.test.TestCase):
 
     flip_qnn = circuit_model.DirectQuantumCircuit(
         cirq.Circuit(cirq.X(q) for q in self.raw_qubits), name="flip")
-    test_samples = q_infer.sample(flip_qnn, bitstrings, counts)
+    test_samples = sample_wrapper(flip_qnn, bitstrings, counts)
     for i, (b, c) in enumerate(zip(bitstrings, counts)):
       self.assertEqual(tf.shape(test_samples[i].to_tensor())[0], c)
       for j in range(c):
@@ -224,7 +242,7 @@ class QuantumInferenceTest(tf.test.TestCase):
         ghz_circuit,
         initializer=tf.keras.initializers.Constant(value=0.5),
         name="ghz")
-    test_samples = q_infer.sample(
+    test_samples = sample_wrapper(
         ghz_qnn,
         tf.expand_dims(tf.constant([0] * self.num_qubits, dtype=tf.int8), 0),
         tf.expand_dims(counts[0], 0))[0].to_tensor()
@@ -236,6 +254,7 @@ class QuantumInferenceTest(tf.test.TestCase):
         test_util.check_bitstring_exists(
             tf.constant([1] * self.num_qubits, dtype=tf.int8), test_samples))
 
+  @test_util.eager_mode_toggle
   def test_sample_uneven(self):
     """Check for discrepancy in samples when count entries differ."""
     max_counts = int(1e7)
@@ -243,8 +262,13 @@ class QuantumInferenceTest(tf.test.TestCase):
     test_qnn = circuit_model.DirectQuantumCircuit(
         cirq.Circuit(cirq.H(cirq.GridQubit(0, 0))))
     test_infer = circuit_infer.QuantumInference()
+
+    @tf.function
+    def sample_wrapper(qnn, bitstrings, counts):
+      return test_infer.sample(qnn, bitstrings, counts)
+
     bitstrings = tf.constant([[0], [0]], dtype=tf.int8)
-    _, samples_counts = test_infer.sample(test_qnn, bitstrings, counts)
+    _, samples_counts = sample_wrapper(test_qnn, bitstrings, counts)
     # QNN samples should be half 0 and half 1.
     self.assertAllClose(
         samples_counts[0], samples_counts[1], atol=max_counts // 1000)
