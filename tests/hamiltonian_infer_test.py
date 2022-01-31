@@ -119,6 +119,41 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     self.assertAllClose(
         actual_counts[0], actual_counts[1], atol=num_samples / 1000)
 
+  def test_circuit_param_update(self):
+    """Confirm circuits are different after updating energy model parameters."""
+    e_infer = energy_infer.BernoulliEnergyInference()
+    q_infer = circuit_infer.QuantumInference()
+    h_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
+
+    @tf.function
+    def circuits_wrapper(model, num_samples):
+      return h_infer.circuits(model, num_samples)
+
+    num_bits = 2
+    energy = energy_model.BernoulliEnergy(list(range(num_bits)))
+    energy.build([None, num_bits])
+    qubits = cirq.GridQubit.rect(1, num_bits)
+    pqc = cirq.Circuit(cirq.Y(q) for q in qubits)
+    circuit = circuit_model.DirectQuantumCircuit(pqc)
+    model = hamiltonian_model.Hamiltonian(energy, circuit)
+
+    # Pin Bernoulli to [0, 1]
+    num_samples = int(1e6)
+    energy.set_weights([tf.constant([-1000, 1000])])
+    expected_circuits_1 = tfq.from_tensor(tfq.convert_to_tensor([cirq.Circuit(cirq.X(qubits[0]) ** 0, cirq.X(qubits[1])) + pqc]))
+    output_circuits, output_counts = circuits_wrapper(model, num_samples)
+    actual_circuits_1 = tfq.from_tensor(output_circuits)
+    self.assertAllEqual(actual_circuits_1, expected_circuits_1)
+
+    # Change pin to [1, 0]
+    energy.set_weights([tf.constant([1000, -1000])])
+    expected_circuits_2 = tfq.from_tensor(tfq.convert_to_tensor([cirq.Circuit(cirq.X(qubits[0]), cirq.X(qubits[1]) ** 0) + pqc]))
+    output_circuits, output_counts = circuits_wrapper(model, num_samples)
+    actual_circuits_2 = tfq.from_tensor(output_circuits)
+    self.assertNotAllEqual(actual_circuits_1, actual_circuits_2)
+    self.assertAllEqual(actual_circuits_2, expected_circuits_2)
+
+
   @test_util.eager_mode_toggle
   def test_expectation_cirq(self):
     """Compares library expectation values to those from Cirq."""
