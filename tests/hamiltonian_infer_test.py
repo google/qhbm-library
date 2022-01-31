@@ -171,7 +171,8 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     def expectation_wrapper(hamiltonian, ops, n_samples):
       return actual_h_infer.expectation(hamiltonian, ops, n_samples)
 
-    actual_expectations = expectation_wrapper(actual_hamiltonian, ops, num_samples)
+    actual_expectations = expectation_wrapper(actual_hamiltonian, ops,
+                                              num_samples)
     self.assertAllClose(actual_expectations, expected_expectations)
 
   @parameterized.parameters({
@@ -240,8 +241,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
       return model_h_infer.expectation(model, ops, n_samples)
 
     actual_expectations = expectation_wrapper(model_hamiltonian,
-                                              hamiltonian_measure,
-                                              num_samples)
+                                              hamiltonian_measure, num_samples)
     self.assertAllClose(actual_expectations, expected_expectations)
 
 

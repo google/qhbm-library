@@ -203,7 +203,9 @@ class QuantumCircuitTest(tf.test.TestCase):
         expected_regex="must not have symbols in common"):
       _ = qnn_1 + qnn_2
 
+
 # TODO(#130)
+
   def test_pow(self):
     """Confirms inversion of QuantumCircuit works correctly."""
     actual_inverse = self.actual_layer**-1

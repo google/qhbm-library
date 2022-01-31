@@ -51,7 +51,7 @@ class BitstringEnergyTest(tf.test.TestCase):
         utils.Squeeze(-1)
     ]
     test_b = energy_model.BitstringEnergy(list(range(num_bits)), energy_layers)
-  
+
     @tf.function
     def test_b_wrapper(bitstrings):
       return test_b(bitstrings)

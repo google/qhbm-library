@@ -136,7 +136,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     one_bit_energy = energy_model.KOBE([0], 1)
     one_bit_energy.build([None, one_bit_energy.num_bits])
     actual_layer = energy_infer.AnalyticEnergyInference(1, seed=seed)
-    
+
     @tf.function
     def sample_wrapper(num_samples):
       return actual_layer.sample(num_samples)
@@ -163,7 +163,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     actual_layer.infer(one_bit_energy)
 
     # TODO(#115): Currently need to redefine wrapper,
-    #             investigate resolving this with auto inference. 
+    #             investigate resolving this with auto inference.
     @tf.function
     def sample_wrapper(num_samples):
       return actual_layer.sample(num_samples)
@@ -209,7 +209,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     actual_layer.infer(three_bit_energy)
 
     # TODO(#115): Currently need to redefine wrapper,
-    #             investigate resolving this with auto inference. 
+    #             investigate resolving this with auto inference.
     @tf.function
     def sample_wrapper(num_samples):
       return actual_layer.sample(num_samples)
@@ -243,7 +243,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     energy.build([None, num_bits])
     actual_layer = energy_infer.AnalyticEnergyInference(num_bits, seed=seed)
     actual_layer.infer(energy)
-    
+
     @tf.function
     def sample_wrapper(n_samples):
       return actual_layer.sample(n_samples)
@@ -256,7 +256,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     actual_layer.seed = None
 
     # TODO(#115): Currently need to redefine wrapper,
-    #             investigate resolving this with auto inference. 
+    #             investigate resolving this with auto inference.
     @tf.function
     def sample_wrapper(num_samples):
       return actual_layer.sample(num_samples)
@@ -381,7 +381,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     actual_layer.infer(energy)
 
     # TODO(#115): Currently need to redefine wrapper,
-    #             investigate resolving this with auto inference. 
+    #             investigate resolving this with auto inference.
     @tf.function
     def sample_wrapper(num_samples):
       return actual_layer.sample(num_samples)
@@ -419,7 +419,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     actual_layer.infer(energy)
 
     # TODO(#115): Currently need to redefine wrapper,
-    #             investigate resolving this with auto inference. 
+    #             investigate resolving this with auto inference.
     @tf.function
     def sample_wrapper(num_samples):
       return actual_layer.sample(num_samples)
@@ -458,7 +458,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     actual_layer.seed = None
 
     # TODO(#115): Currently need to redefine wrapper,
-    #             investigate resolving this with auto inference. 
+    #             investigate resolving this with auto inference.
     @tf.function
     def sample_wrapper(num_samples):
       return actual_layer.sample(num_samples)

@@ -191,8 +191,7 @@ class QuantumInferenceTest(tf.test.TestCase):
     with tf.GradientTape(persistent=True) as tape:
       actual_exps = []
       for op in all_ops:
-        actual_exps.append(
-            exp_infer_false(self.p_qnn, bitstrings, counts, op))
+        actual_exps.append(exp_infer_false(self.p_qnn, bitstrings, counts, op))
     actual_exps_grad = [
         tf.squeeze(tape.jacobian(exps, self.p_qnn.trainable_variables))
         for exps in actual_exps
