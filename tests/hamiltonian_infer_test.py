@@ -201,7 +201,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     ] for r in bitstring_resolvers]
     expected_expectations = utils.weighted_average(counts, raw_expectation_list)
 
-    @tf.function
+#    @tf.function
     def expectation_wrapper(hamiltonian, ops, n_samples):
       return actual_h_infer.expectation(hamiltonian, ops, n_samples)
 
