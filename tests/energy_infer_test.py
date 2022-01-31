@@ -165,10 +165,10 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     # TODO(#115): Currently need to redefine wrapper,
     #             investigate resolving this with auto inference.
     @tf.function
-    def sample_wrapper(num_samples):
+    def sample_wrapper_2(num_samples):
       return actual_layer.sample(num_samples)
 
-    samples = sample_wrapper(n_samples)
+    samples = sample_wrapper_2(n_samples)
     # check that we got only one bitstring
     self.assertFalse(
         test_util.check_bitstring_exists(
@@ -185,10 +185,10 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     actual_layer.infer(three_bit_energy)
 
     @tf.function
-    def sample_wrapper(num_samples):
+    def sample_wrapper_3(num_samples):
       return actual_layer.sample(num_samples)
 
-    samples = sample_wrapper(n_samples)
+    samples = sample_wrapper_3(n_samples)
 
     for b in [[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1], [1, 0, 0], [1, 0, 1],
               [1, 1, 0], [1, 1, 1]]:
@@ -211,10 +211,10 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     # TODO(#115): Currently need to redefine wrapper,
     #             investigate resolving this with auto inference.
     @tf.function
-    def sample_wrapper(num_samples):
+    def sample_wrapper_4(num_samples):
       return actual_layer.sample(num_samples)
 
-    samples = sample_wrapper(n_samples)
+    samples = sample_wrapper_4(n_samples)
     # Confirm we only get the 110 bitstring.
 
     self.assertTrue(
@@ -258,11 +258,11 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     # TODO(#115): Currently need to redefine wrapper,
     #             investigate resolving this with auto inference.
     @tf.function
-    def sample_wrapper(num_samples):
+    def sample_wrapper_2(num_samples):
       return actual_layer.sample(num_samples)
 
-    samples_1 = sample_wrapper(num_samples)
-    samples_2 = sample_wrapper(num_samples)
+    samples_1 = sample_wrapper_2(num_samples)
+    samples_2 = sample_wrapper_2(num_samples)
     self.assertNotAllEqual(samples_1, samples_2)
 
   @test_util.eager_mode_toggle
@@ -383,10 +383,10 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     # TODO(#115): Currently need to redefine wrapper,
     #             investigate resolving this with auto inference.
     @tf.function
-    def sample_wrapper(num_samples):
+    def sample_wrapper_2(num_samples):
       return actual_layer.sample(num_samples)
 
-    samples = sample_wrapper(n_samples)
+    samples = sample_wrapper_2(n_samples)
     # check that we got only one bitstring
     bitstrings, _ = utils.unique_bitstrings_with_counts(samples)
     self.assertAllEqual(bitstrings, [[1]])
@@ -399,10 +399,10 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     actual_layer.infer(energy)
 
     @tf.function
-    def sample_wrapper(num_samples):
+    def sample_wrapper_3(num_samples):
       return actual_layer.sample(num_samples)
 
-    samples = sample_wrapper(n_samples)
+    samples = sample_wrapper_3(n_samples)
     for b in [[0, 0], [0, 1], [1, 0], [1, 1]]:
       b_tf = tf.constant([b], dtype=tf.int8)
       self.assertTrue(test_util.check_bitstring_exists(b_tf, samples))
@@ -421,10 +421,10 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     # TODO(#115): Currently need to redefine wrapper,
     #             investigate resolving this with auto inference.
     @tf.function
-    def sample_wrapper(num_samples):
+    def sample_wrapper_4(num_samples):
       return actual_layer.sample(num_samples)
 
-    samples = sample_wrapper(n_samples)
+    samples = sample_wrapper_4(n_samples)
     # check that we get 00 and 01.
     for b in [[0, 0], [0, 1]]:
       b_tf = tf.constant([b], dtype=tf.int8)
@@ -460,11 +460,11 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     # TODO(#115): Currently need to redefine wrapper,
     #             investigate resolving this with auto inference.
     @tf.function
-    def sample_wrapper(num_samples):
+    def sample_wrapper_2(num_samples):
       return actual_layer.sample(num_samples)
 
-    samples_1 = sample_wrapper(num_samples)
-    samples_2 = sample_wrapper(num_samples)
+    samples_1 = sample_wrapper_2(num_samples)
+    samples_2 = sample_wrapper_2(num_samples)
     self.assertNotAllEqual(samples_1, samples_2)
 
   @test_util.eager_mode_toggle

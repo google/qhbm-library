@@ -70,6 +70,11 @@ class BitstringEnergyTest(tf.test.TestCase):
     test_bitstrings = tf.constant(
         list(itertools.product([0, 1], repeat=num_bits)))
     num_tests = 3
+
+    @tf.function
+    def layer_wrapper(layer, bitstrings):
+      return layer(bitstrings)
+
     for _ in range(num_tests):
       bits = random.sample(range(1000), num_bits)
       units = random.sample(range(1, 100), num_layers)
@@ -89,12 +94,8 @@ class BitstringEnergyTest(tf.test.TestCase):
       expected_mlp.build([None, num_bits])
       expected_mlp.set_weights(actual_mlp.get_weights())
 
-      @tf.function
-      def actual_mlp_wrapper(bitstrings):
-        return actual_mlp(bitstrings)
-
       with tf.GradientTape(persistent=True) as tape:
-        actual_energy = actual_mlp_wrapper(test_bitstrings)
+        actual_energy = layer_wrapper(actual_mlp, test_bitstrings)
         expected_energy = expected_mlp(test_bitstrings)
       self.assertAllClose(actual_energy, expected_energy)
       actual_energy_grad = tape.jacobian(actual_energy,
@@ -157,6 +158,11 @@ class BernoulliEnergyTest(tf.test.TestCase):
         list(itertools.product([0, 1], repeat=num_bits)))
     test_spins = 1 - 2 * test_bitstrings
     num_tests = 5
+
+    @tf.function
+    def layer_wrapper(layer, bitstrings):
+      return layer(bitstrings)
+
     for _ in range(num_tests):
       bits = random.sample(range(1000), num_bits)
       thetas = tf.random.uniform([num_bits], -100, 100, tf.float32)
@@ -164,12 +170,8 @@ class BernoulliEnergyTest(tf.test.TestCase):
       test_b.build([None, num_bits])
       test_b.set_weights([thetas])
 
-      @tf.function
-      def test_b_wrapper(bitstrings):
-        return test_b(bitstrings)
-
       with tf.GradientTape() as tape:
-        actual_energy = test_b_wrapper(test_bitstrings)
+        actual_energy = layer_wrapper(test_b, test_bitstrings)
 
       expected_energy = tf.reduce_sum(
           tf.cast(test_spins, tf.float32) * thetas, -1)
