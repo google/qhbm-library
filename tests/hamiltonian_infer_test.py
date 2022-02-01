@@ -172,6 +172,8 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     for _ in range(num_symbols):
       symbols.add("".join(random.sample(string.ascii_letters, 10)))
     raw_circuits, raw_resolvers = tfq_util.random_symbol_circuit_resolver_batch(qubits, symbols, batch_size, n_moments=n_moments, p=act_fraction)
+    raw_circuit = raw_circuits[0]
+    resolver = {k: resolvers[0].value_of(k) for k in raw_resolvers[0]}
 
     # hamiltonian model and inference
     seed = tf.constant([5, 6], dtype=tf.int32)
@@ -200,10 +202,11 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
 
     # calculate expected values
     total_circuit = bitstring_circuit + raw_circuit
+    total_resolvers = [{**r, **resolver} for r in bitstring_resolvers]
     raw_expectation_list = [[
         cirq.Simulator().simulate_expectation_values(total_circuit, o,
                                                      r)[0].real for o in raw_ops
-    ] for r in bitstring_resolvers]
+    ] for r in total_resolvers]
     expected_expectations = utils.weighted_average(counts, raw_expectation_list)
     # Check that expectations are a reasonable size
     self.assertAllGreater(tf.math.abs(expected_expectations), 1e-3)
