@@ -82,30 +82,34 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
       """Enables derivatives."""
       samples = tf.stop_gradient(self.sample(num_samples))
       bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
-      values = function(bitstrings)
-      average_values = utils.weighted_average(counts, values)
+      with tf.GradientTape() as tape:
+        values = function(bitstrings)
+      function_grads = tape.jacobian(values, thetas)
+      average_of_values = utils.weighted_average(counts, values)
 
       def grad_fn(upstream):
-        """See equation A3 in the QHBM paper appendix for details."""
+        """See equation A4 in the QHBM paper appendix for details.
+
+        # TODO(#119): possibly update discussion.
+        """
         with tf.GradientTape() as tape:
           energies = self.energy(bitstrings)
         energies_grads = tape.jacobian(energies, thetas)
+        average_of_energies_grads = [
+          utils.weighted_average(counts, eg) for eg in energies_grads
+        ]
 
-        # list comprehension since thetas is a list of variables
         products = [eg * values for eg in energies_grads]
+        product_of_averages = [
+            aeg * average_of_values for aeg in average_of_energies_grads
+        ]
         average_of_products = [
             utils.weighted_average(counts, p) for p in products
         ]
-        average_energies_grads = [
-            utils.weighted_average(counts, eg) for eg in energies_grads
-        ]
-        product_of_average = [
-            aeg * average_values for aeg in average_energies_grads
-        ]
 
         return [
-            poa - aop
-            for poa, aop in zip(product_of_averages, average_of_products)
+            poa - aop + fg
+            for poa, aop, fg in zip(product_of_averages, average_of_products, function_grads)
         ]
 
       return average_values, grad_fn
