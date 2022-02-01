@@ -143,7 +143,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     expected_circuits_1 = tfq.from_tensor(
         tfq.convert_to_tensor(
             [cirq.Circuit(cirq.X(qubits[0])**0, cirq.X(qubits[1])) + pqc]))
-    output_circuits, output_counts = circuits_wrapper(model, num_samples)
+    output_circuits, _ = circuits_wrapper(model, num_samples)
     actual_circuits_1 = tfq.from_tensor(output_circuits)
     self.assertAllEqual(actual_circuits_1, expected_circuits_1)
 
@@ -153,7 +153,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
         tfq.convert_to_tensor(
             [cirq.Circuit(cirq.X(qubits[0]),
                           cirq.X(qubits[1])**0) + pqc]))
-    output_circuits, output_counts = circuits_wrapper(model, num_samples)
+    output_circuits, _ = circuits_wrapper(model, num_samples)
     actual_circuits_2 = tfq.from_tensor(output_circuits)
     self.assertNotAllEqual(actual_circuits_1, actual_circuits_2)
     self.assertAllEqual(actual_circuits_2, expected_circuits_2)
