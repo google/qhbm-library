@@ -155,8 +155,10 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
                           cirq.X(qubits[1])**0) + pqc]))
     output_circuits, _ = circuits_wrapper(model, num_samples)
     actual_circuits_2 = tfq.from_tensor(output_circuits)
-    self.assertNotAllEqual(actual_circuits_1, actual_circuits_2)
     self.assertAllEqual(actual_circuits_2, expected_circuits_2)
+
+    # Assumption check, that circuits are actually different
+    self.assertNotAllEqual(actual_circuits_1, actual_circuits_2)
 
   @test_util.eager_mode_toggle
   def test_expectation_cirq(self):
