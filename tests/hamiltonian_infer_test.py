@@ -158,11 +158,6 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     self.assertNotAllEqual(actual_circuits_1, actual_circuits_2)
     self.assertAllEqual(actual_circuits_2, expected_circuits_2)
 
-  @test_util.eager_mode_toggle
-  def test_expectation_cirq(self):
-    """Compares library expectation values to those from Cirq."""
-    # observable
-    num_bits = 4
     qubits = cirq.GridQubit.rect(1, num_bits)
     raw_ops = [
         cirq.PauliSum.from_pauli_strings(
