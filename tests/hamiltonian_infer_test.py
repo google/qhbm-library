@@ -162,7 +162,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
   def test_expectation_cirq(self):
     """Compares library expectation values to those from Cirq."""
     # observable
-    num_bits = 3
+    num_bits = 4
     qubits = cirq.GridQubit.rect(1, num_bits)
     raw_ops = [
         cirq.PauliSum.from_pauli_strings(
@@ -172,8 +172,8 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
 
     # unitary
     batch_size = 1
-    n_moments = 5
-    act_fraction = 1.0
+    n_moments = 10
+    act_fraction = 0.9
     num_symbols = 2
     symbols = set()
     for _ in range(num_symbols):
