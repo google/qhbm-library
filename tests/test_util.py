@@ -164,3 +164,20 @@ def check_bitstring_exists(bitstring, bitstring_list):
   """True if `bitstring` is an entry of `bitstring_list`."""
   return tf.math.reduce_any(
       tf.reduce_all(tf.math.equal(bitstring, bitstring_list), 1))
+
+
+def eager_mode_toggle(func):
+  """Parameterizes the given test function to toggle `tf.function` tracing."""
+
+  def toggled_function(*args, **kwargs):
+    tf.config.run_functions_eagerly(True)
+    # Ensures eager is turned back off even if first call raises.
+    try:
+      func(*args, **kwargs)
+    except Exception as e:
+      raise e
+    finally:
+      tf.config.run_functions_eagerly(False)
+    func(*args, **kwargs)
+
+  return toggled_function
