@@ -281,7 +281,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
   def test_expectation_explicit(self):
     r"""Test expectation value and derivative with simple energy.
 
-    Let $x^*$ be the all ones bitstring.  Then let the energy function be 
+    Let $x^*$ be the all ones bitstring.  Then let the energy function be
     $$ E_\theta(x) = \begin{cases}
                          \theta & x = x^* \\
                          0 & x \ne x^*
@@ -301,7 +301,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
               \end{cases} $$
     Then,
     $$ \mathbb{E}_{x \sim X} [f(x)] = \mu p_\theta(x^*)$$
-    
+
     # TODO(#119)
     From equation A3 in the appendix, we have
     $$ \nabla_\theta p_\theta(x) = p_\theta(x) \left(
@@ -350,7 +350,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     theta = tf.Variable(tf.random.uniform([], -4, -2), name="theta")
     energy_layers = [AllOnes(theta)]
     energy = energy_model.BitstringEnergy(list(range(num_bits)), energy_layers)
-    theta_exp = tf.math.exp(-theta)
+    theta_exp = tf.math.exp(-1.0 * theta)
     partition = tf.math.pow(2.0, num_bits) - 1 + theta_exp
     partition_inverse = tf.math.pow(partition, -1)
     prob_x_star = partition_inverse * theta_exp

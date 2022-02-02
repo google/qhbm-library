@@ -65,11 +65,11 @@ class WeightedAverageTest(tf.test.TestCase):
     self.assertAllClose(actual_average, expected_average)
 
     # test 1D values
-    raw_values_1D = [-5.6, 3.1]
-    values_1D = tf.constant(raw_values_1D, dtype=tf.float32)
-    expected_average = (raw_counts[0] / count_sum) * raw_values_1D[0] + (
-        raw_counts[1] / count_sum) * raw_values_1D[1]
-    actual_average = wrapper(counts, values_1D)
+    raw_values_1d = [-5.6, 3.1]
+    values_1d = tf.constant(raw_values_1d, dtype=tf.float32)
+    expected_average = (raw_counts[0] / count_sum) * raw_values_1d[0] + (
+        raw_counts[1] / count_sum) * raw_values_1d[1]
+    actual_average = wrapper(counts, values_1d)
     self.assertAllClose(actual_average, expected_average)
 
 
