@@ -66,7 +66,7 @@ class EnergyInferenceTest(tf.test.TestCase):
 
   class NullEnergy(energy_model.BitstringEnergy):
     """Simple empty energy."""
-  
+
     def __init__(self, bits):
       """Initializes a NullEnergy."""
       energy_layers = []
@@ -327,6 +327,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     $$ \nabla_\theta \mathbb{E}_{x \sim X} [f(x)] =
            \theta p_\theta(x^*)(p_\theta(x^*) - 1) + p_\theta(x^*)$$
     """
+
     class AllOnes(tf.keras.layers.Layer):
       """Detects all ones."""
 
@@ -341,7 +342,8 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
 
       def call(self, inputs):
         """Return prefactor for scalar"""
-        return self.ones_prefactor * tf.math.reduce_prod(tf.cast(inputs, tf.float32), 1)
+        return self.ones_prefactor * tf.math.reduce_prod(
+            tf.cast(inputs, tf.float32), 1)
 
     num_bits = 3
     # Low theta increases probability, to decrease effect of noise on test
@@ -361,7 +363,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     expected_average = mu * prob_x_star
     expected_gradient_theta = mu * prob_x_star * (prob_x_star - 1)
     expected_gradient_mu = prob_x_star
-    
+
     num_samples = int(1e6)
     with tf.GradientTape(persistent=True) as tape:
       actual_average = e_infer.expectation(f, num_samples)
@@ -369,9 +371,10 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     actual_gradient_mu = tape.gradient(actual_average, mu)
     del tape
     self.assertAllClose(actual_average, expected_average, rtol=1e-3)
-    self.assertAllClose(actual_gradient_theta, expected_gradient_theta, rtol=1e-3)
+    self.assertAllClose(
+        actual_gradient_theta, expected_gradient_theta, rtol=1e-3)
     self.assertAllClose(actual_gradient_mu, expected_gradient_mu, rtol=1e-3)
-  
+
     # Test a function sharing variables with the energy.
     g = AllOnes(theta)
     expected_average = theta * prob_x_star
@@ -382,7 +385,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     actual_gradient = tape.gradient(actual_average, theta)
     self.assertAllClose(actual_average, expected_average, rtol=1e-3)
     self.assertAllClose(actual_gradient, expected_gradient, rtol=1e-3)
-    
+
   @test_util.eager_mode_toggle
   def test_log_partition(self):
     """Confirms correct value of the log partition function."""

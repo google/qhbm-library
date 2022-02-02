@@ -87,22 +87,28 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
         values_tape.watch(self.energy.trainable_variables)
         values = function(bitstrings)
       average_of_values = utils.weighted_average(counts, values)
-          
-      def grad_fn(upstream, variables, values_tape=values_tape):
-        """See equation A4 in the QHBM paper appendix for details.
 
-        # TODO(#119): possibly update discussion.
+      def grad_fn(upstream, variables, values_tape=values_tape):
+        """See equation A5 in the QHBM paper appendix for details.
+
+        # TODO(#119): confirm equation number.
         """
-        function_grads = values_tape.jacobian(values, variables, unconnected_gradients=tf.UnconnectedGradients.ZERO)
+        function_grads = values_tape.jacobian(
+            values,
+            variables,
+            unconnected_gradients=tf.UnconnectedGradients.ZERO)
         average_of_function_grads = [
             utils.weighted_average(counts, fg) for fg in function_grads
         ]
-        
+
         with tf.GradientTape() as tape:
           energies = self.energy(bitstrings)
-        energies_grads = tape.jacobian(energies, variables, unconnected_gradients=tf.UnconnectedGradients.ZERO)
+        energies_grads = tape.jacobian(
+            energies,
+            variables,
+            unconnected_gradients=tf.UnconnectedGradients.ZERO)
         average_of_energies_grads = [
-          utils.weighted_average(counts, eg) for eg in energies_grads
+            utils.weighted_average(counts, eg) for eg in energies_grads
         ]
 
         products = [eg * values for eg in energies_grads]
@@ -112,10 +118,11 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
         average_of_products = [
             utils.weighted_average(counts, p) for p in products
         ]
-        
+
         return tf.zeros_like(unused), [
             upstream * (poa - aop + fg)
-            for poa, aop, fg in zip(product_of_averages, average_of_products, average_of_function_grads)
+            for poa, aop, fg in zip(product_of_averages, average_of_products,
+                                    average_of_function_grads)
         ]
 
       return average_of_values, grad_fn
