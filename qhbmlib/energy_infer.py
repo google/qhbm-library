@@ -112,7 +112,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
             for poa, aop, fg in zip(product_of_averages, average_of_products, function_grads)
         ]
 
-      return average_values, grad_fn
+      return average_of_values, grad_fn
 
     return _inner_expectation(self.energy.trainable_variables)
 

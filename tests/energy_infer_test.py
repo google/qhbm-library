@@ -46,7 +46,7 @@ class EnergyInferenceTest(tf.test.TestCase):
 
     def infer(self, energy):
       """Ignores the energy."""
-      del energy
+      self.energy = energy
 
     def sample(self, n):
       """Deterministically samples bitstrings."""
@@ -80,7 +80,7 @@ class EnergyInferenceTest(tf.test.TestCase):
     self.p_1 = 0.1
     self.e_infer = self.TwoOutcomes(self.bitstring_1, self.bitstring_2,
                                     self.p_1)
-    self.energy = self.ConstantEnergy(list(range(5)))
+    self.energy = self.NullEnergy(list(range(5)))
     self.e_infer.infer(self.energy)
     spins_from_bitstrings = energy_model_utils.SpinsFromBitstrings()
     parity = energy_model_utils.Parity(list(range(5)), 2)
