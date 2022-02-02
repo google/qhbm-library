@@ -43,16 +43,19 @@ class Squeeze(tf.keras.layers.Layer):
 def weighted_average(counts: tf.Tensor, values: tf.Tensor):
   """Returns the weighted average of input values.
 
-  Row `i` of `values` is multiplied by `counts[i]`, resulting in a weighted
+  Subtensor `i` of `values` is multiplied by `counts[i]` resulting in a weighted
   version of values; the mean is then taken across the first dimension.
 
   Args:
     counts: Non-negative integers of shape [batch_size].
-    values: Floats of shape [batch_size, n].
+    values: Floats of shape [batch_size, ...].
+
+  Returns:
+    Tensor of shape [...] which is the weighted average.
   """
-  expanded_counts = tf.expand_dims(tf.cast(counts, tf.float32), -1)
-  weighted_values = expanded_counts * values
-  return tf.reduce_sum(weighted_values, 0) / tf.reduce_sum(expanded_counts)
+  float_counts = tf.cast(counts, tf.float32)
+  weighted_values = tf.einsum("i,i...->...", float_counts, values)
+  return weighted_values / tf.reduce_sum(float_counts)
 
 
 def unique_bitstrings_with_counts(bitstrings, out_idx=tf.dtypes.int32):

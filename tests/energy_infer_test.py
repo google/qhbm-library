@@ -314,11 +314,12 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
         Args:
           ones_prefactor: the scalar to emit when all ones is detected.
         """
+        super().__init__()
         self.ones_prefactor = ones_prefactor
 
       def call(self, inputs):
         """Return prefactor for scalar"""
-        return self.ones_prefactor * tf.math.reduce_prod(inputs, 1)
+        return self.ones_prefactor * tf.math.reduce_prod(tf.cast(inputs, tf.float32), 1)
 
     num_bits = 5
     theta = tf.Variable(tf.random.uniform([], -2, 2))
@@ -329,10 +330,9 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     e_infer = energy_infer.AnalyticEnergyInference(num_bits)
     e_infer.infer(energy)
 
-    mu = tf.random_uniform([], -2, 2)
+    mu = tf.random.uniform([], -2, 2)
     f = AllOnes(mu)
     expected_average = mu * partition * tf.math.exp(-theta)
-
     num_samples = int(1e6)
     actual_average = e_infer.expectation(f, num_samples)
     self.assertAllClose(actual_average, expected_average)
