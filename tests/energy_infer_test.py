@@ -278,6 +278,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     samples_2 = sample_wrapper_2(num_samples)
     self.assertNotAllEqual(samples_1, samples_2)
 
+  @test_util.eager_mode_toggle
   def test_expectation_explicit(self):
     r"""Test expectation value and derivative with simple energy.
 
@@ -358,6 +359,10 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     e_infer = energy_infer.AnalyticEnergyInference(num_bits)
     e_infer.infer(energy)
 
+    @tf.function
+    def expectation_wrapper(function, n_samples):
+      return e_infer.expectation(function, n_samples)
+
     mu = tf.Variable(tf.random.uniform([], -2, 2), name="mu")
     f = AllOnes(mu)
     expected_average = mu * prob_x_star
@@ -366,7 +371,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
 
     num_samples = int(1e6)
     with tf.GradientTape(persistent=True) as tape:
-      actual_average = e_infer.expectation(f, num_samples)
+      actual_average = expectation_wrapper(f, num_samples)
     actual_gradient_theta = tape.gradient(actual_average, theta)
     actual_gradient_mu = tape.gradient(actual_average, mu)
     del tape
@@ -381,7 +386,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     expected_gradient = theta * prob_x_star * (prob_x_star - 1) + prob_x_star
 
     with tf.GradientTape() as tape:
-      actual_average = e_infer.expectation(g, num_samples)
+      actual_average = expectation_wrapper(g, num_samples)
     actual_gradient = tape.gradient(actual_average, theta)
     self.assertAllClose(actual_average, expected_average, rtol=1e-3)
     self.assertAllClose(actual_gradient, expected_gradient, rtol=1e-3)
