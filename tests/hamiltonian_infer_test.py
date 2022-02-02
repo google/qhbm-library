@@ -119,26 +119,80 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     self.assertAllClose(
         actual_counts[0], actual_counts[1], atol=num_samples / 1000)
 
+  def test_circuit_param_update(self):
+    """Confirm circuits are different after updating energy model parameters."""
+    e_infer = energy_infer.BernoulliEnergyInference()
+    q_infer = circuit_infer.QuantumInference()
+    h_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
+
+    @tf.function
+    def circuits_wrapper(model, num_samples):
+      return h_infer.circuits(model, num_samples)
+
+    num_bits = 2
+    energy = energy_model.BernoulliEnergy(list(range(num_bits)))
+    energy.build([None, num_bits])
+    qubits = cirq.GridQubit.rect(1, num_bits)
+    pqc = cirq.Circuit(cirq.Y(q) for q in qubits)
+    circuit = circuit_model.DirectQuantumCircuit(pqc)
+    model = hamiltonian_model.Hamiltonian(energy, circuit)
+
+    # Pin Bernoulli to [0, 1]
+    num_samples = int(1e6)
+    energy.set_weights([tf.constant([-1000, 1000])])
+    expected_circuits_1 = tfq.from_tensor(
+        tfq.convert_to_tensor(
+            [cirq.Circuit(cirq.X(qubits[0])**0, cirq.X(qubits[1])) + pqc]))
+    output_circuits, _ = circuits_wrapper(model, num_samples)
+    actual_circuits_1 = tfq.from_tensor(output_circuits)
+    self.assertAllEqual(actual_circuits_1, expected_circuits_1)
+
+    # Change pin to [1, 0]
+    energy.set_weights([tf.constant([1000, -1000])])
+    expected_circuits_2 = tfq.from_tensor(
+        tfq.convert_to_tensor(
+            [cirq.Circuit(cirq.X(qubits[0]),
+                          cirq.X(qubits[1])**0) + pqc]))
+    output_circuits, _ = circuits_wrapper(model, num_samples)
+    actual_circuits_2 = tfq.from_tensor(output_circuits)
+    self.assertAllEqual(actual_circuits_2, expected_circuits_2)
+
+    # Assumption check, that circuits are actually different
+    self.assertNotAllEqual(actual_circuits_1, actual_circuits_2)
+
   @test_util.eager_mode_toggle
   def test_expectation_cirq(self):
     """Compares library expectation values to those from Cirq."""
     # observable
     num_bits = 4
-    num_ops = 3
     qubits = cirq.GridQubit.rect(1, num_bits)
-    raw_ops = [test_util.get_random_pauli_sum(qubits) for _ in range(num_ops)]
+    raw_ops = [
+        cirq.PauliSum.from_pauli_strings(
+            [cirq.PauliString(cirq.Z(q)) for q in qubits])
+    ]
     ops = tfq.convert_to_tensor(raw_ops)
 
     # unitary
+    batch_size = 1
     n_moments = 10
     act_fraction = 0.9
-    raw_circuit = cirq.testing.random_circuit(qubits, n_moments, act_fraction)
+    num_symbols = 2
+    symbols = set()
+    for _ in range(num_symbols):
+      symbols.add("".join(random.sample(string.ascii_letters, 10)))
+    symbols = sorted(list(symbols))
+    raw_circuits, raw_resolvers = tfq_util.random_symbol_circuit_resolver_batch(
+        qubits, symbols, batch_size, n_moments=n_moments, p=act_fraction)
+    raw_circuit = raw_circuits[0]
+    resolver = {k: raw_resolvers[0].value_of(k) for k in raw_resolvers[0]}
 
     # hamiltonian model and inference
     seed = tf.constant([5, 6], dtype=tf.int32)
     energy = energy_model.BernoulliEnergy(list(range(num_bits)))
     energy.build([None, num_bits])
-    circuit = circuit_model.DirectQuantumCircuit(raw_circuit)
+    circuit = circuit_model.QuantumCircuit(
+        tfq.convert_to_tensor([raw_circuit]), qubits, tf.constant(symbols),
+        [tf.Variable([resolver[s] for s in symbols])], [[]])
     circuit.build([])
     actual_hamiltonian = hamiltonian_model.Hamiltonian(energy, circuit)
     e_infer = energy_infer.BernoulliEnergyInference(seed=seed)
@@ -161,11 +215,14 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
 
     # calculate expected values
     total_circuit = bitstring_circuit + raw_circuit
+    total_resolvers = [{**r, **resolver} for r in bitstring_resolvers]
     raw_expectation_list = [[
         cirq.Simulator().simulate_expectation_values(total_circuit, o,
                                                      r)[0].real for o in raw_ops
-    ] for r in bitstring_resolvers]
+    ] for r in total_resolvers]
     expected_expectations = utils.weighted_average(counts, raw_expectation_list)
+    # Check that expectations are a reasonable size
+    self.assertAllGreater(tf.math.abs(expected_expectations), 1e-3)
 
     @tf.function
     def expectation_wrapper(hamiltonian, ops, n_samples):
@@ -173,7 +230,30 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
 
     actual_expectations = expectation_wrapper(actual_hamiltonian, ops,
                                               num_samples)
-    self.assertAllClose(actual_expectations, expected_expectations)
+    self.assertAllClose(actual_expectations, expected_expectations, rtol=1e-6)
+
+    # Ensure energy parameter update changes the expectation value.
+    old_energy_weights = energy.get_weights()
+    energy.set_weights([tf.ones_like(w) for w in old_energy_weights])
+    altered_energy_expectations = actual_h_infer.expectation(
+        actual_hamiltonian, ops, num_samples)
+    self.assertNotAllClose(
+        altered_energy_expectations, actual_expectations, rtol=1e-5)
+    energy.set_weights(old_energy_weights)
+
+    # Ensure circuit parameter update changes the expectation value.
+    old_circuit_weights = circuit.get_weights()
+    circuit.set_weights([tf.ones_like(w) for w in old_circuit_weights])
+    altered_circuit_expectations = expectation_wrapper(actual_hamiltonian, ops,
+                                                       num_samples)
+    self.assertNotAllClose(
+        altered_circuit_expectations, actual_expectations, rtol=1e-5)
+    circuit.set_weights(old_circuit_weights)
+
+    # Check that values return to start.
+    reset_expectations = expectation_wrapper(actual_hamiltonian, ops,
+                                             num_samples)
+    self.assertAllClose(reset_expectations, actual_expectations, rtol=1e-6)
 
   @parameterized.parameters({
       "energy_class": energy_class,
