@@ -216,11 +216,11 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     # calculate expected values
     total_circuit = bitstring_circuit + raw_circuit
     total_resolvers = [{**r, **resolver} for r in bitstring_resolvers]
-    raw_expectation_list = tf.constant([[
+    raw_expectations = tf.constant([[
         cirq.Simulator().simulate_expectation_values(total_circuit, o,
                                                      r)[0].real for o in raw_ops
-    ] for r in total_resolvers]
-    expected_expectations = utils.weighted_average(counts, raw_expectation_list)
+    ] for r in total_resolvers])
+    expected_expectations = utils.weighted_average(counts, raw_expectations)
     # Check that expectations are a reasonable size
     self.assertAllGreater(tf.math.abs(expected_expectations), 1e-3)
 
