@@ -64,6 +64,13 @@ class WeightedAverageTest(tf.test.TestCase):
     actual_average = wrapper(counts, values)
     self.assertAllClose(actual_average, expected_average)
 
+    # test 1D values
+    raw_values_1D = [-5.6, 3.1]
+    values_1D = tf.constant(raw_values_1D, dtype=tf.float32)
+    expected_average = [(raw_counts[0] / count_sum) * raw_values_1D[0] + (raw_counts[1] / count_sum) * raw_values_1D[1]]
+    actual_average = wrapper(counts, values_1D)
+    self.assertAllClose(actual_average, expected_average)
+
 
 class UniqueBitstringsWithCountsTest(parameterized.TestCase, tf.test.TestCase):
   """Test unique_bitstrings_with_counts from the qhbm library."""
