@@ -161,11 +161,11 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
 
     # calculate expected values
     total_circuit = bitstring_circuit + raw_circuit
-    raw_expectation_list = [[
+    raw_expectations = tf.constant([[
         cirq.Simulator().simulate_expectation_values(total_circuit, o,
                                                      r)[0].real for o in raw_ops
-    ] for r in bitstring_resolvers]
-    expected_expectations = utils.weighted_average(counts, raw_expectation_list)
+    ] for r in bitstring_resolvers])
+    expected_expectations = utils.weighted_average(counts, raw_expectations)
 
     @tf.function
     def expectation_wrapper(hamiltonian, ops, n_samples):
@@ -226,15 +226,15 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
 
     # calculate expected values
     total_circuit = bitstring_circuit + model_raw_circuit + raw_circuit_h**-1
-    raw_expectation_list = [[
+    raw_expectations = tf.stack([tf.stack([
         hamiltonian_measure.energy.operator_expectation([
             cirq.Simulator().simulate_expectation_values(total_circuit, o,
                                                          r)[0].real
             for o in raw_shards
         ])
-    ]
-                            for r in bitstring_resolvers]
-    expected_expectations = utils.weighted_average(counts, raw_expectation_list)
+    ])
+                            for r in bitstring_resolvers])
+    expected_expectations = utils.weighted_average(counts, raw_expectations)
 
     @tf.function
     def expectation_wrapper(model, ops, n_samples):
