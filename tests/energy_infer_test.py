@@ -314,7 +314,18 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     $$ \nabla_\theta p_\theta(x^*) = p_\theta(x^*)(p_\theta(x^*) - 1) $$
     Thus
     $$ \nabla_\theta \mathbb{E}_{x \sim X} [f(x)] =
-           \mu p_\theta(x^*)(p_\theta(x^*) - 1) $$    
+           \mu p_\theta(x^*)(p_\theta(x^*) - 1) $$
+
+    Suppose now the function to average contains the same variable as energy,
+    $$ g(x) = \begin{cases}
+                  \theta & x = x^* \\
+                  0 & x \ne x^*
+              \end{cases} $$
+    Then,
+    $$ \mathbb{E}_{x \sim X} [g(x)] = \theta p_\theta(x^*)$$
+    and the derivative becomes
+    $$ \nabla_\theta \mathbb{E}_{x \sim X} [f(x)] =
+           \theta p_\theta(x^*)(p_\theta(x^*) - 1) + p_\theta(x^*)$$
     """
     class AllOnes(tf.keras.layers.Layer):
       """Detects all ones."""
@@ -334,7 +345,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
 
     num_bits = 3
     # Low theta increases probability, to decrease effect of noise on test
-    theta = tf.Variable(tf.random.uniform([], -4, -2))
+    theta = tf.Variable(tf.random.uniform([], -4, -2), name="theta")
     energy_layers = [AllOnes(theta)]
     energy = energy_model.BitstringEnergy(list(range(num_bits)), energy_layers)
     theta_exp = tf.math.exp(-theta)
@@ -345,14 +356,29 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     e_infer = energy_infer.AnalyticEnergyInference(num_bits)
     e_infer.infer(energy)
 
-    mu = tf.random.uniform([], -2, 2)
+    mu = tf.Variable(tf.random.uniform([], -2, 2), name="mu")
     f = AllOnes(mu)
     expected_average = mu * prob_x_star
-    expected_gradient = mu * prob_x_star * (prob_x_star - 1)
+    expected_gradient_theta = mu * prob_x_star * (prob_x_star - 1)
+    expected_gradient_mu = prob_x_star
     
     num_samples = int(1e6)
-    with tf.GradientTape() as tape:
+    with tf.GradientTape(persistent=True) as tape:
       actual_average = e_infer.expectation(f, num_samples)
+    actual_gradient_theta = tape.gradient(actual_average, theta)
+    actual_gradient_mu = tape.gradient(actual_average, mu)
+    del tape
+    self.assertAllClose(actual_average, expected_average, rtol=1e-3)
+    self.assertAllClose(actual_gradient_theta, expected_gradient_theta, rtol=1e-3)
+    self.assertAllClose(actual_gradient_mu, expected_gradient_mu, rtol=1e-3)
+  
+    # Test a function sharing variables with the energy.
+    g = AllOnes(theta)
+    expected_average = theta * prob_x_star
+    expected_gradient = theta * prob_x_star * (prob_x_star - 1) + prob_x_star
+
+    with tf.GradientTape() as tape:
+      actual_average = e_infer.expectation(g, num_samples)
     actual_gradient = tape.gradient(actual_average, theta)
     self.assertAllClose(actual_average, expected_average, rtol=1e-3)
     self.assertAllClose(actual_gradient, expected_gradient, rtol=1e-3)
