@@ -278,6 +278,65 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     samples_2 = sample_wrapper_2(num_samples)
     self.assertNotAllEqual(samples_1, samples_2)
 
+  def test_expectation_simple(self):
+    r"""Test expectation value and derivative with simple energy.
+
+    Let the energy function be
+    $$ E_\theta(x) = \begin{cases}
+                         \theta & \text{ if input is all ones} \\
+                         0 & \text{ otherwise}
+                     \end{cases} $$
+    Given this energy function, the partition function is
+    $$ Z_\theta = \sum_x e^{-E_\theta (x)} = 2^N - 1 + e^{-\theta}$$
+    Then the corresponding probability distribution is
+    $$ p_\theta(x) = \begin{cases}
+                         Z_\theta^{-1} e^{-\theta} & \text{ if x is all ones}\\
+                         Z_\theta^{-1} & \text{ otherwise}
+                     \end{cases} $$
+
+    Suppose the function to average is
+    $$ f(x) = \begin{cases}
+                  \mu & \text{ if input is all ones} \\
+                  0 & \text{ otherwise}
+              \end{cases} $$
+    Then,
+    $$ \mathbb{E}_{x \sim X} [f(x)] = \mu Z_\theta^{-1} e^{-\theta}$$
+    Leading to a derivative of
+    $$ \nabla_\theta \mathbb{E}_{x \sim X} [f(x)]
+           = -\mu \theta Z_\theta^{-1} e^{-\theta} * (Z_\theta^{-1} - 1) $$
+    """
+    class AllOnes(tf.keras.layers.Layer):
+      """Detects all ones."""
+
+      def __init__(self, ones_prefactor):
+        """ Initializes an AllOnes layer.
+
+        Args:
+          ones_prefactor: the scalar to emit when all ones is detected.
+        """
+        self.ones_prefactor = ones_prefactor
+
+      def call(self, inputs):
+        """Return prefactor for scalar"""
+        return self.ones_prefactor * tf.math.reduce_prod(inputs, 1)
+
+    num_bits = 5
+    theta = tf.Variable(tf.random.uniform([], -2, 2))
+    energy_layers = [AllOnes(theta)]
+    energy = energy_model.BitstringEnergy(list(range(num_bits)), energy_layers)
+    partition = tf.math.pow(2.0, num_bits) - 1 + tf.math.exp(-theta)
+
+    e_infer = energy_infer.AnalyticEnergyInference(num_bits)
+    e_infer.infer(energy)
+
+    mu = tf.random_uniform([], -2, 2)
+    f = AllOnes(mu)
+    expected_average = mu * partition * tf.math.exp(-theta)
+
+    num_samples = int(1e6)
+    actual_average = e_infer.expectation(f, num_samples)
+    self.assertAllClose(actual_average, expected_average)
+    
   @test_util.eager_mode_toggle
   def test_log_partition(self):
     """Confirms correct value of the log partition function."""
