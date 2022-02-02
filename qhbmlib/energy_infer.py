@@ -84,9 +84,16 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
       bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
       with tf.GradientTape() as tape:
         values = function(bitstrings)
-      function_grads = tape.jacobian(values, thetas)
+      print(f"counts: {counts}")
+      print(f"values: {values}")
       average_of_values = utils.weighted_average(counts, values)
-
+      print(f"average_of_values: {average_of_values}")
+      function_grads = tape.jacobian(values, thetas, unconnected_gradients=tf.UnconnectedGradients.ZERO)
+      average_of_function_grads = [
+          utils.weighted_average(counts, fg) for fg in function_grads
+      ]
+      print(f"average_of_function_grads: {average_of_function_grads}")
+      
       def grad_fn(upstream):
         """See equation A4 in the QHBM paper appendix for details.
 
@@ -95,21 +102,26 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
         with tf.GradientTape() as tape:
           energies = self.energy(bitstrings)
         energies_grads = tape.jacobian(energies, thetas)
+        print(f"energies_grads: {energies_grads}")
         average_of_energies_grads = [
           utils.weighted_average(counts, eg) for eg in energies_grads
         ]
+        print(f"average_of_energies_grads: {average_of_energies_grads}")
 
         products = [eg * values for eg in energies_grads]
+        print(f"products: {products}")
         product_of_averages = [
             aeg * average_of_values for aeg in average_of_energies_grads
         ]
+        print(f"product_of_averages: {product_of_averages}")
         average_of_products = [
             utils.weighted_average(counts, p) for p in products
         ]
-
+        print(f"average_of_products: {average_of_products}")
+        
         return [
             poa - aop + fg
-            for poa, aop, fg in zip(product_of_averages, average_of_products, function_grads)
+            for poa, aop, fg in zip(product_of_averages, average_of_products, average_of_function_grads)
         ]
 
       return average_of_values, grad_fn

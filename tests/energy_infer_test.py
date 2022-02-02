@@ -278,32 +278,43 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     samples_2 = sample_wrapper_2(num_samples)
     self.assertNotAllEqual(samples_1, samples_2)
 
-  def test_expectation_simple(self):
+  def test_expectation_explicit(self):
     r"""Test expectation value and derivative with simple energy.
 
-    Let the energy function be
+    Let $x^*$ be the all ones bitstring.  Then let the energy function be 
     $$ E_\theta(x) = \begin{cases}
-                         \theta & \text{ if input is all ones} \\
-                         0 & \text{ otherwise}
+                         \theta & x = x^* \\
+                         0 & x \ne x^*
                      \end{cases} $$
     Given this energy function, the partition function is
     $$ Z_\theta = \sum_x e^{-E_\theta (x)} = 2^N - 1 + e^{-\theta}$$
-    Then the corresponding probability distribution is
+    and the corresponding probability distribution is
     $$ p_\theta(x) = \begin{cases}
-                         Z_\theta^{-1} e^{-\theta} & \text{ if x is all ones}\\
-                         Z_\theta^{-1} & \text{ otherwise}
+                         Z_\theta^{-1} e^{-\theta} & x = x^*\\
+                         Z_\theta^{-1} & x \ne x^*
                      \end{cases} $$
 
     Suppose the function to average is
     $$ f(x) = \begin{cases}
-                  \mu & \text{ if input is all ones} \\
-                  0 & \text{ otherwise}
+                  \mu & x = x^* \\
+                  0 & x \ne x^*
               \end{cases} $$
     Then,
-    $$ \mathbb{E}_{x \sim X} [f(x)] = \mu Z_\theta^{-1} e^{-\theta}$$
-    Leading to a derivative of
-    $$ \nabla_\theta \mathbb{E}_{x \sim X} [f(x)]
-           = -\mu \theta Z_\theta^{-1} e^{-\theta} * (Z_\theta^{-1} - 1) $$
+    $$ \mathbb{E}_{x \sim X} [f(x)] = \mu p_\theta(x^*)$$
+    
+    # TODO(#119)
+    From equation A3 in the appendix, we have
+    $$ \nabla_\theta p_\theta(x) = p_\theta(x) \left(
+         \mathbb{E}_{x\sim X}\left[\nabla_\theta E_\theta(x)\right]
+         - \nabla_\theta E_\theta(x)
+       \right) $$
+    Filling in $\nabla_\theta E_\theta(x^*) = 1$ and
+    $\mathbb{E}_{x\sim X}\left[\nabla_\theta E_\theta(x)\right] = p_\theta(x^*)$
+    we have
+    $$ \nabla_\theta p_\theta(x^*) = p_\theta(x^*)(p_\theta(x^*) - 1) $$
+    Thus
+    $$ \nabla_\theta \mathbb{E}_{x \sim X} [f(x)] =
+           \mu p_\theta(x^*)(p_\theta(x^*) - 1) $$    
     """
     class AllOnes(tf.keras.layers.Layer):
       """Detects all ones."""
@@ -321,21 +332,30 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
         """Return prefactor for scalar"""
         return self.ones_prefactor * tf.math.reduce_prod(tf.cast(inputs, tf.float32), 1)
 
-    num_bits = 5
-    theta = tf.Variable(tf.random.uniform([], -2, 2))
+    num_bits = 3
+    # Low theta increases probability, to decrease effect of noise on test
+    theta = tf.Variable(tf.random.uniform([], -4, -2))
     energy_layers = [AllOnes(theta)]
     energy = energy_model.BitstringEnergy(list(range(num_bits)), energy_layers)
-    partition = tf.math.pow(2.0, num_bits) - 1 + tf.math.exp(-theta)
+    theta_exp = tf.math.exp(-theta)
+    partition = tf.math.pow(2.0, num_bits) - 1 + theta_exp
+    partition_inverse = tf.math.pow(partition, -1)
+    prob_x_star = partition_inverse * theta_exp
 
     e_infer = energy_infer.AnalyticEnergyInference(num_bits)
     e_infer.infer(energy)
 
     mu = tf.random.uniform([], -2, 2)
     f = AllOnes(mu)
-    expected_average = mu * partition * tf.math.exp(-theta)
+    expected_average = mu * prob_x_star
+    expected_gradient = mu * prob_x_star * (prob_x_star - 1)
+    
     num_samples = int(1e6)
-    actual_average = e_infer.expectation(f, num_samples)
-    self.assertAllClose(actual_average, expected_average)
+    with tf.GradientTape() as tape:
+      actual_average = e_infer.expectation(f, num_samples)
+    actual_gradient = tape.gradient(actual_average, theta)
+    self.assertAllClose(actual_average, expected_average, rtol=1e-3)
+    self.assertAllClose(actual_gradient, expected_gradient, rtol=1e-3)
     
   @test_util.eager_mode_toggle
   def test_log_partition(self):
