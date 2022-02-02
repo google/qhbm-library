@@ -88,7 +88,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
         values = function(bitstrings)
       average_of_values = utils.weighted_average(counts, values)
 
-      def grad_fn(upstream, variables, values_tape=values_tape):
+      def grad_fn(upstream, variables):
         """See equation A5 in the QHBM paper appendix for details.
 
         # TODO(#119): confirm equation number.
