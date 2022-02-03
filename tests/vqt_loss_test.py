@@ -47,7 +47,7 @@ class VQTTest(tf.test.TestCase):
 
     def vqt_wrapper(qhbm_infer, model, num_samples, hamiltonian, beta):
       return vqt_loss.vqt(qhbm_infer, model, num_samples, hamiltonian, beta)
-    for num_qubits in [1, 2, 3, 4, 5]:
+    for num_qubits in [2, 3, 4, 5]:
       # model definition
       tf_random_seed = None
       ebm_init = tf.keras.initializers.RandomUniform(
@@ -88,26 +88,30 @@ class VQTTest(tf.test.TestCase):
         tf.math.tanh(test_thetas) * tf.math.sin(test_phis))
       self.assertAllClose(actual_expectation, expected_expectation, rtol=RTOL)
 
-      # actual_entropy = test_qhbm.entropy()
-      # expected_entropy = tf.reduce_sum(
-      #   -test_thetas * tf.math.tanh(test_thetas) +
-      #   tf.math.log(2 * tf.math.cosh(test_thetas)))
-      # self.assertAllClose(actual_entropy, expected_entropy, rtol=RTOL)
+      actual_entropy = qhbm_infer.e_inference.entropy()
+      expected_entropy = tf.reduce_sum(
+        -test_thetas * tf.math.tanh(test_thetas) +
+        tf.math.log(2 * tf.math.cosh(test_thetas)))
+      self.assertAllClose(actual_entropy, expected_entropy, rtol=RTOL)
 
-      # with tf.GradientTape() as tape:
-      #   actual_loss = vqt_func(test_qhbm, test_num_samples, test_h, test_beta)
-      # expected_loss = test_beta * expected_expectation - expected_entropy
-      # self.assertAllClose(actual_loss, expected_loss, rtol=RTOL)
+      with tf.GradientTape() as tape:
+        actual_loss = vqt_wrapper(qhbm_infer, model, test_num_samples, test_h, test_beta)
+      expected_loss = test_beta * expected_expectation - expected_entropy
+      self.assertAllClose(actual_loss, expected_loss, rtol=RTOL)
 
-      # actual_thetas_grads, actual_phis_grads = tape.gradient(
-      #   actual_loss, (test_thetas, test_phis))
-      # expected_thetas_grads = (1 - tf.math.tanh(test_thetas)**2) * (
-      #   test_beta * tf.math.sin(test_phis) + test_thetas)
-      # expected_phis_grads = test_beta * tf.math.tanh(
-      #   test_thetas) * tf.math.cos(test_phis)
-      # self.assertAllClose(
-      #   actual_thetas_grads, expected_thetas_grads, rtol=RTOL)
-      # self.assertAllClose(actual_phis_grads, expected_phis_grads, rtol=RTOL)
+      actual_thetas_grads, actual_phis_grads = tape.gradient(
+        actual_loss, (test_thetas, test_phis))
+      expected_thetas_grads = (1 - tf.math.tanh(test_thetas)**2) * (
+        test_beta * tf.math.sin(test_phis) + test_thetas)
+      expected_phis_grads = test_beta * tf.math.tanh(
+        test_thetas) * tf.math.cos(test_phis)
+      print(f"actual_phis_grads: {actual_phis_grads}")
+      print(f"test_thetas: {test_thetas}")
+      print(f"expected_thetas_grads: {expected_thetas_grads}")
+      print(f"actual_thetas_grads: {actual_thetas_grads}")
+      self.assertAllClose(
+        actual_thetas_grads, expected_thetas_grads, rtol=RTOL)
+      self.assertAllClose(actual_phis_grads, expected_phis_grads, rtol=RTOL)
 
   # def test_hypernetwork(self):
   #   for num_qubits in [1, 2, 3, 4, 5]:

@@ -113,7 +113,10 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
             utils.weighted_average(counts, eg) for eg in energies_grads
         ]
 
-        products = [eg * values for eg in energies_grads]
+        # Einsum lets us control the broadcasting.
+        products = [tf.einsum("i...,i->i...", eg, values) for eg in energies_grads]
+        # TODO(#161): This works because `average_of_values` is always a scalar.
+        #             Might need to change to einsum when input is generalized.
         product_of_averages = [
             aeg * average_of_values for aeg in average_of_energies_grads
         ]

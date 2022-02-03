@@ -51,24 +51,20 @@ def vqt(qhbm_infer: hamiltonian_infer.QHBM,
   def f(bitstrings):
     # Compute the hamiltonian expectation values
     # TODO(#158): counts is required here, but not meaningful.
-    counts = tf.ones([tf.shape(bitstrings)])
+    counts = tf.ones([tf.shape(bitstrings)[0]])
     if isinstance(hamiltonian, tf.Tensor):
-      h_expectations = qhbm_infer.q_inference.expectation(
-          model.circuit, bitstrings, counts, hamiltonian, reduce=False)
+      h_expectations = tf.reshape(qhbm_infer.q_inference.expectation(
+          model.circuit, bitstrings, counts, hamiltonian, reduce=False), tf.shape(counts))
     elif isinstance(hamiltonian.energy, energy_model.PauliMixin):
       u_dagger_u = model.circuit + ops.circuit_dagger
       expectation_shards = self.q_inference.expectation(
-          u_dagger_u, bitstrings, counts, hamiltonian.operator_shards, reduce=True)
-      h_expectations = tf.expand_dims(
-          ops.energy.operator_expectation(expectation_shards), 0)
+          u_dagger_u, bitstrings, counts, hamiltonian.operator_shards, reduce=False)
+      h_expectations = ops.energy.operator_expectation(expectation_shards)
     else:
       raise NotImplementedError(
           "General `BitstringEnergy` hamiltonians not yet supported.")
-
     beta_h_expectations = beta * h_expectations
-
     energies = tf.stop_gradient(model.energy(bitstrings))
-
     return beta_h_expectations - energies
 
   qhbm_infer.e_inference.infer(model.energy)
