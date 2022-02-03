@@ -282,26 +282,26 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
   def test_expectation_explicit(self):
     r"""Test expectation value and derivative with simple energy.
 
-    Let $x^*$ be the all ones bitstring.  Then let the energy function be
+    Let $\bm{1}$ be the all ones bitstring.  Then let the energy function be
     $$ E_\theta(x) = \begin{cases}
-                         \theta, & \text{if}\ x = x^* \\
+                         \theta, & \text{if}\ x = \bm{1} \\
                          0, & \text{otherwise}
                      \end{cases} $$
     Given this energy function, the partition function is
     $$ Z_\theta = \sum_x e^{-E_\theta (x)} = 2^N - 1 + e^{-\theta}$$
     and the corresponding probability distribution is
     $$ p_\theta(x) = \begin{cases}
-                         Z_\theta^{-1} e^{-\theta}, & \text{if}\ x = x^*\\
+                         Z_\theta^{-1} e^{-\theta}, & \text{if}\ x = \bm{1}\\
                          Z_\theta^{-1}, & \text{otherwise}
                      \end{cases} $$
 
     Suppose the function to average is
     $$ f(x) = \begin{cases}
-                  \mu, & \text{if}\ x = x^* \\
+                  \mu, & \text{if}\ x = \bm{1} \\
                   0, & \text{otherwise}
               \end{cases} $$
     and let $X$ be a random variable distributed according to $p_\theta$.  Then,
-    $$ \mathbb{E}_{x \sim X} [f(x)] = \mu p_\theta(x^*)$$
+    $$ \mathbb{E}_{x \sim X} [f(x)] = \mu p_\theta(\bm{1})$$
 
     # TODO(#119)
     From equation A3 in the appendix, we have
@@ -309,24 +309,24 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
          \mathbb{E}_{x\sim X}\left[\nabla_\theta E_\theta(x)\right]
          - \nabla_\theta E_\theta(x)
        \right) $$
-    Filling in $\nabla_\theta E_\theta(x^*) = 1$ and
-    $\mathbb{E}_{x\sim X}\left[\nabla_\theta E_\theta(x)\right] = p_\theta(x^*)$
+    Filling in $\nabla_\theta E_\theta(\bm{1}) = 1$ and
+    $\mathbb{E}_{x\sim X}\left[\nabla_\theta E_\theta(x)\right] = p_\theta(\bm{1})$
     we have
-    $$ \nabla_\theta p_\theta(x^*) = p_\theta(x^*)(p_\theta(x^*) - 1) $$
+    $$ \nabla_\theta p_\theta(\bm{1}) = p_\theta(\bm{1})(p_\theta(\bm{1}) - 1) $$
     Thus
     $$ \nabla_\theta \mathbb{E}_{x \sim X} [f(x)] =
-           \mu p_\theta(x^*)(p_\theta(x^*) - 1) $$
+           \mu p_\theta(\bm{1})(p_\theta(\bm{1}) - 1) $$
 
     Suppose now the function to average contains the same variable as energy,
     $$ g(x) = \begin{cases}
-                  \theta, &\text{if}\ x = x^* \\
+                  \theta, &\text{if}\ x = \bm{1} \\
                   0, & \text{otherwise}
               \end{cases} $$
     Then,
-    $$ \mathbb{E}_{x \sim X} [g(x)] = \theta p_\theta(x^*)$$
+    $$ \mathbb{E}_{x \sim X} [g(x)] = \theta p_\theta(\bm{1})$$
     and the derivative becomes
     $$ \nabla_\theta \mathbb{E}_{x \sim X} [f(x)] =
-           \theta p_\theta(x^*)(p_\theta(x^*) - 1) + p_\theta(x^*)$$
+           \theta p_\theta(\bm{1})(p_\theta(\bm{1}) - 1) + p_\theta(\bm{1})$$
     """
 
     class AllOnes(tf.keras.layers.Layer):
