@@ -389,6 +389,28 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     self.assertAllClose(
         actual_gradient_mu, expected_gradient_mu, atol=closeness_atol)
 
+    # Confirm gradients are connected upstream
+    mul_const = tf.random.uniform([], -2, -1)
+
+    def wrap_f(bitstrings):
+      return mul_const * f(bitstrings)
+
+    mul_expected_average = mul_const * expected_average
+    mul_expected_gradient_theta = mul_const * expected_gradient_theta
+    mul_expected_gradient_mu = mul_const * expected_gradient_mu
+
+    with tf.GradientTape(persistent=True) as tape:
+      actual_average = expectation_wrapper(wrap_f, num_samples)
+    actual_gradient_theta = tape.gradient(actual_average, theta)
+    actual_gradient_mu = tape.gradient(actual_average, mu)
+    del tape
+
+    self.assertAllClose(actual_average, mul_expected_average, atol=closeness_atol)
+    self.assertAllClose(
+        actual_gradient_theta, mul_expected_gradient_theta, atol=closeness_atol)
+    self.assertAllClose(
+        actual_gradient_mu, mul_expected_gradient_mu, atol=closeness_atol)    
+    
     # Test a function sharing variables with the energy.
     g = AllOnes(theta)
     expected_average = theta * prob_x_star
