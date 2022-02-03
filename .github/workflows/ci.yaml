@@ -6,7 +6,7 @@ jobs:
   lint:
     name: Lint check
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
@@ -24,7 +24,7 @@ jobs:
   format:
     name: Formatting check
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
