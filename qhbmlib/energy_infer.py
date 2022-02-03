@@ -78,7 +78,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     """
 
     @tf.custom_gradient
-    def _inner_expectation(unused):
+    def _inner_expectation():
       """Enables derivatives."""
       samples = self.sample(num_samples)
       bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
@@ -119,7 +119,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
             utils.weighted_average(counts, p) for p in products
         ]
 
-        return tf.zeros_like(unused), [
+        return tuple(), [
             upstream * (poa - aop + fg)
             for poa, aop, fg in zip(product_of_averages, average_of_products,
                                     average_of_function_grads)
@@ -127,7 +127,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
 
       return average_of_values, grad_fn
 
-    return _inner_expectation(tf.zeros([]))
+    return _inner_expectation()
 
   @abc.abstractmethod
   def entropy(self):
