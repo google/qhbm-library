@@ -347,7 +347,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
             tf.cast(inputs, tf.float32), 1)
 
     num_bits = 3
-    theta = tf.Variable(-2.3, name="theta")
+    theta = tf.Variable(-2.0, name="theta")
     energy_layers = [AllOnes(theta)]
     energy = energy_model.BitstringEnergy(list(range(num_bits)), energy_layers)
     theta_exp = tf.math.exp(-1.0 * theta)
@@ -369,7 +369,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     expected_gradient_theta = mu * prob_x_star * (prob_x_star - 1)
     expected_gradient_mu = prob_x_star
 
-    num_samples = int(1e6)
+    num_samples = int(5e6)
     with tf.GradientTape(persistent=True) as tape:
       actual_average = expectation_wrapper(f, num_samples)
     actual_gradient_theta = tape.gradient(actual_average, theta)
