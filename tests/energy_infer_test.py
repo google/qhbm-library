@@ -347,7 +347,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
             tf.cast(inputs, tf.float32), 1)
 
     num_bits = 3
-    theta = tf.Variable(-2.0, name="theta")
+    theta = tf.Variable(tf.random.uniform([], -3, -2), name="theta")
     energy_layers = [AllOnes(theta)]
     energy = energy_model.BitstringEnergy(list(range(num_bits)), energy_layers)
     theta_exp = tf.math.exp(-1.0 * theta)
@@ -377,7 +377,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     del tape
 
     # Confirm gradients are not negligible
-    not_negligible_atol = 5e-3
+    not_negligible_atol = 1e-1
     self.assertAllGreater(tf.math.abs(actual_gradient_theta), not_negligible_atol)
     self.assertAllGreater(tf.math.abs(actual_gradient_mu), not_negligible_atol)
 
