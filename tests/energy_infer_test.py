@@ -347,8 +347,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
             tf.cast(inputs, tf.float32), 1)
 
     num_bits = 3
-    # Low theta increases probability, to decrease effect of noise on test
-    theta = tf.Variable(tf.random.uniform([], -4, -2), name="theta")
+    theta = tf.Variable(-2.3, name="theta")
     energy_layers = [AllOnes(theta)]
     energy = energy_model.BitstringEnergy(list(range(num_bits)), energy_layers)
     theta_exp = tf.math.exp(-1.0 * theta)
@@ -356,14 +355,15 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     partition_inverse = tf.math.pow(partition, -1)
     prob_x_star = partition_inverse * theta_exp
 
-    e_infer = energy_infer.AnalyticEnergyInference(num_bits)
+    seed = tf.constant([3, 4], tf.int32)
+    e_infer = energy_infer.AnalyticEnergyInference(num_bits, seed=seed)
     e_infer.infer(energy)
 
     @tf.function
     def expectation_wrapper(function, n_samples):
       return e_infer.expectation(function, n_samples)
 
-    mu = tf.Variable(tf.random.uniform([], -2, 2), name="mu")
+    mu = tf.Variable(tf.random.uniform([], 1, 2), name="mu")
     f = AllOnes(mu)
     expected_average = mu * prob_x_star
     expected_gradient_theta = mu * prob_x_star * (prob_x_star - 1)
@@ -375,22 +375,44 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     actual_gradient_theta = tape.gradient(actual_average, theta)
     actual_gradient_mu = tape.gradient(actual_average, mu)
     del tape
-    self.assertAllClose(actual_average, expected_average, rtol=1e-3)
-    self.assertAllClose(
-        actual_gradient_theta, expected_gradient_theta, rtol=1e-3)
-    self.assertAllClose(actual_gradient_mu, expected_gradient_mu, rtol=1e-3)
 
+    # Confirm gradients are not negligible
+    not_negligible_atol = 5e-3
+    self.assertAllGreater(tf.math.abs(actual_gradient_theta), not_negligible_atol)
+    self.assertAllGreater(tf.math.abs(actual_gradient_mu), not_negligible_atol)
+
+    closeness_rtol = 1e-3
+    self.assertAllClose(actual_average, expected_average, rtol=closeness_rtol)
+    self.assertAllClose(
+        actual_gradient_theta, expected_gradient_theta, rtol=closeness_rtol)
+    self.assertAllClose(actual_gradient_mu, expected_gradient_mu, rtol=closeness_rtol)
+    
     # Test a function sharing variables with the energy.
     g = AllOnes(theta)
     expected_average = theta * prob_x_star
-    expected_gradient = theta * prob_x_star * (prob_x_star - 1) + prob_x_star
+    expected_gradient_theta = theta * prob_x_star * (prob_x_star - 1) + prob_x_star
+    
+    with tf.GradientTape(persistent=True) as tape:
+      actual_average = expectation_wrapper(g, num_samples)
+    actual_gradient_theta = tape.gradient(actual_average, theta)
+    actual_gradient_mu = tape.gradient(actual_average, mu)
+    del tape
 
+    # Confirm gradients are not negligible
+    self.assertAllGreater(tf.math.abs(actual_gradient_theta), not_negligible_atol)
+
+    self.assertAllClose(actual_average, expected_average, rtol=closeness_rtol)
+    self.assertAllClose(actual_gradient_theta, expected_gradient_theta, rtol=closeness_rtol)
+    # Check unconnected gradient
+    self.assertIsNone(actual_gradient_mu)
+
+    # Check unconnected gradient with zeros tape setting
     with tf.GradientTape() as tape:
       actual_average = expectation_wrapper(g, num_samples)
-    actual_gradient = tape.gradient(actual_average, theta)
-    self.assertAllClose(actual_average, expected_average, rtol=1e-3)
-    self.assertAllClose(actual_gradient, expected_gradient, rtol=1e-3)
-
+    actual_gradient_mu = tape.gradient(actual_average, mu, unconnected_gradients=tf.UnconnectedGradients.ZERO)
+    zeros_atol = 1e-6
+    self.assertAllClose(actual_gradient_mu, tf.zeros_like(actual_gradient_mu), atol=zeros_atol)
+    
   @test_util.eager_mode_toggle
   def test_log_partition(self):
     """Confirms correct value of the log partition function."""
