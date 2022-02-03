@@ -82,6 +82,8 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
       """Enables derivatives."""
       samples = self.sample(num_samples)
       bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
+
+      # TODO(#157): try to parameterize the persistence.
       with tf.GradientTape(persistent=True) as values_tape:
         # Adds the variables in `self.energy` to the `variables` argument below.
         values_tape.watch(self.energy.trainable_variables)
