@@ -405,12 +405,13 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     actual_gradient_mu = tape.gradient(actual_average, mu)
     del tape
 
-    self.assertAllClose(actual_average, mul_expected_average, atol=closeness_atol)
+    self.assertAllClose(
+        actual_average, mul_expected_average, atol=closeness_atol)
     self.assertAllClose(
         actual_gradient_theta, mul_expected_gradient_theta, atol=closeness_atol)
     self.assertAllClose(
-        actual_gradient_mu, mul_expected_gradient_mu, atol=closeness_atol)    
-    
+        actual_gradient_mu, mul_expected_gradient_mu, atol=closeness_atol)
+
     # Test a function sharing variables with the energy.
     g = AllOnes(theta)
     expected_average = theta * prob_x_star
