@@ -310,9 +310,9 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
          - \nabla_\theta E_\theta(x)
        \right) $$
     Filling in $\nabla_\theta E_\theta(\bm{1}) = 1$ and
-    $\mathbb{E}_{x\sim X}\left[\nabla_\theta E_\theta(x)\right] = p_\theta(\bm{1})$
+    $\mathbb{E}_{x\sim X}[\nabla_\theta E_\theta(x)] = p_\theta(\bm{1})$
     we have
-    $$ \nabla_\theta p_\theta(\bm{1}) = p_\theta(\bm{1})(p_\theta(\bm{1}) - 1) $$
+    $$\nabla_\theta p_\theta(\bm{1}) = p_\theta(\bm{1})(p_\theta(\bm{1}) - 1)$$
     Thus
     $$ \nabla_\theta \mathbb{E}_{x \sim X} [f(x)] =
            \mu p_\theta(\bm{1})(p_\theta(\bm{1}) - 1) $$
