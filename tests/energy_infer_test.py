@@ -381,11 +381,11 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     self.assertAllGreater(tf.math.abs(actual_gradient_theta), not_negligible_atol)
     self.assertAllGreater(tf.math.abs(actual_gradient_mu), not_negligible_atol)
 
-    closeness_rtol = 1e-3
-    self.assertAllClose(actual_average, expected_average, rtol=closeness_rtol)
+    closeness_atol = 1e-3
+    self.assertAllClose(actual_average, expected_average, atol=closeness_atol)
     self.assertAllClose(
-        actual_gradient_theta, expected_gradient_theta, rtol=closeness_rtol)
-    self.assertAllClose(actual_gradient_mu, expected_gradient_mu, rtol=closeness_rtol)
+        actual_gradient_theta, expected_gradient_theta, atol=closeness_atol)
+    self.assertAllClose(actual_gradient_mu, expected_gradient_mu, atol=closeness_atol)
     
     # Test a function sharing variables with the energy.
     g = AllOnes(theta)
@@ -401,8 +401,8 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     # Confirm gradients are not negligible
     self.assertAllGreater(tf.math.abs(actual_gradient_theta), not_negligible_atol)
 
-    self.assertAllClose(actual_average, expected_average, rtol=closeness_rtol)
-    self.assertAllClose(actual_gradient_theta, expected_gradient_theta, rtol=closeness_rtol)
+    self.assertAllClose(actual_average, expected_average, atol=closeness_atol)
+    self.assertAllClose(actual_gradient_theta, expected_gradient_theta, atol=closeness_atol)
     # Check unconnected gradient
     self.assertIsNone(actual_gradient_mu)
 
