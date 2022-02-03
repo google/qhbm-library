@@ -284,23 +284,23 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
 
     Let $x^*$ be the all ones bitstring.  Then let the energy function be
     $$ E_\theta(x) = \begin{cases}
-                         \theta & x = x^* \\
-                         0 & x \ne x^*
+                         \theta, & \text{if}\ x = x^* \\
+                         0, & \text{otherwise}
                      \end{cases} $$
     Given this energy function, the partition function is
     $$ Z_\theta = \sum_x e^{-E_\theta (x)} = 2^N - 1 + e^{-\theta}$$
     and the corresponding probability distribution is
     $$ p_\theta(x) = \begin{cases}
-                         Z_\theta^{-1} e^{-\theta} & x = x^*\\
-                         Z_\theta^{-1} & x \ne x^*
+                         Z_\theta^{-1} e^{-\theta}, & \text{if}\ x = x^*\\
+                         Z_\theta^{-1}, & \text{otherwise}
                      \end{cases} $$
 
     Suppose the function to average is
     $$ f(x) = \begin{cases}
-                  \mu & x = x^* \\
-                  0 & x \ne x^*
+                  \mu, & \text{if}\ x = x^* \\
+                  0, & \text{otherwise}
               \end{cases} $$
-    Then,
+    and let $X$ be a random variable distributed according to $p_\theta$.  Then,
     $$ \mathbb{E}_{x \sim X} [f(x)] = \mu p_\theta(x^*)$$
 
     # TODO(#119)
@@ -319,8 +319,8 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
 
     Suppose now the function to average contains the same variable as energy,
     $$ g(x) = \begin{cases}
-                  \theta & x = x^* \\
-                  0 & x \ne x^*
+                  \theta, &\text{if}\ x = x^* \\
+                  0, & \text{otherwise}
               \end{cases} $$
     Then,
     $$ \mathbb{E}_{x \sim X} [g(x)] = \theta p_\theta(x^*)$$
