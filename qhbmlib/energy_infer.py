@@ -76,10 +76,60 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     Returns:
       Expectation value of `function`.
     """
-    samples = self.sample(num_samples)
-    bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
-    values = function(bitstrings)
-    return utils.weighted_average(counts, values)
+
+    @tf.custom_gradient
+    def _inner_expectation():
+      """Enables derivatives."""
+      samples = self.sample(num_samples)
+      bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
+
+      # TODO(#157): try to parameterize the persistence.
+      with tf.GradientTape(persistent=True) as values_tape:
+        # Adds the variables in `self.energy` to the `variables` argument below.
+        values_tape.watch(self.energy.trainable_variables)
+        values = function(bitstrings)
+      average_of_values = utils.weighted_average(counts, values)
+
+      def grad_fn(upstream, variables):
+        """See equation A5 in the QHBM paper appendix for details.
+
+        # TODO(#119): confirm equation number.
+        """
+        function_grads = values_tape.jacobian(
+            values,
+            variables,
+            unconnected_gradients=tf.UnconnectedGradients.ZERO)
+        average_of_function_grads = [
+            utils.weighted_average(counts, fg) for fg in function_grads
+        ]
+
+        with tf.GradientTape() as tape:
+          energies = self.energy(bitstrings)
+        energies_grads = tape.jacobian(
+            energies,
+            variables,
+            unconnected_gradients=tf.UnconnectedGradients.ZERO)
+        average_of_energies_grads = [
+            utils.weighted_average(counts, eg) for eg in energies_grads
+        ]
+
+        products = [eg * values for eg in energies_grads]
+        product_of_averages = [
+            aeg * average_of_values for aeg in average_of_energies_grads
+        ]
+        average_of_products = [
+            utils.weighted_average(counts, p) for p in products
+        ]
+
+        return tuple(), [
+            upstream * (poa - aop + fg)
+            for poa, aop, fg in zip(product_of_averages, average_of_products,
+                                    average_of_function_grads)
+        ]
+
+      return average_of_values, grad_fn
+
+    return _inner_expectation()
 
   @abc.abstractmethod
   def entropy(self):

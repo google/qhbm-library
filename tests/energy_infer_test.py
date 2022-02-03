@@ -46,7 +46,7 @@ class EnergyInferenceTest(tf.test.TestCase):
 
     def infer(self, energy):
       """Ignores the energy."""
-      del energy
+      self.energy = energy
 
     def sample(self, n):
       """Deterministically samples bitstrings."""
@@ -64,6 +64,14 @@ class EnergyInferenceTest(tf.test.TestCase):
       """Not implemented in this test class."""
       raise NotImplementedError()
 
+  class NullEnergy(energy_model.BitstringEnergy):
+    """Simple empty energy."""
+
+    def __init__(self, bits):
+      """Initializes a NullEnergy."""
+      energy_layers = []
+      super().__init__(bits, energy_layers)
+
   def setUp(self):
     """Initializes test objects."""
     super().setUp()
@@ -72,6 +80,8 @@ class EnergyInferenceTest(tf.test.TestCase):
     self.p_1 = 0.1
     self.e_infer = self.TwoOutcomes(self.bitstring_1, self.bitstring_2,
                                     self.p_1)
+    self.energy = self.NullEnergy(list(range(5)))
+    self.e_infer.infer(self.energy)
     spins_from_bitstrings = energy_model_utils.SpinsFromBitstrings()
     parity = energy_model_utils.Parity(list(range(5)), 2)
 
@@ -254,6 +264,9 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
 
     # check unseeding lets samples be different again
     actual_layer.seed = None
+    samples_1 = actual_layer.sample(num_samples)
+    samples_2 = actual_layer.sample(num_samples)
+    self.assertNotAllEqual(samples_1, samples_2)
 
     # TODO(#115): Currently need to redefine wrapper,
     #             investigate resolving this with auto inference.
@@ -264,6 +277,171 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     samples_1 = sample_wrapper_2(num_samples)
     samples_2 = sample_wrapper_2(num_samples)
     self.assertNotAllEqual(samples_1, samples_2)
+
+  @test_util.eager_mode_toggle
+  def test_expectation_explicit(self):
+    r"""Test expectation value and derivative with simple energy.
+
+    Let $\bm{1}$ be the all ones bitstring.  Then let the energy function be
+    $$ E_\theta(x) = \begin{cases}
+                         \theta, & \text{if}\ x = \bm{1} \\
+                         0, & \text{otherwise}
+                     \end{cases} $$
+    Given this energy function, the partition function is
+    $$ Z_\theta = \sum_x e^{-E_\theta (x)} = 2^N - 1 + e^{-\theta}$$
+    and the corresponding probability distribution is
+    $$ p_\theta(x) = \begin{cases}
+                         Z_\theta^{-1} e^{-\theta}, & \text{if}\ x = \bm{1}\\
+                         Z_\theta^{-1}, & \text{otherwise}
+                     \end{cases} $$
+
+    Suppose the function to average is
+    $$ f(x) = \begin{cases}
+                  \mu, & \text{if}\ x = \bm{1} \\
+                  0, & \text{otherwise}
+              \end{cases} $$
+    and let $X$ be a random variable distributed according to $p_\theta$.  Then,
+    $$ \mathbb{E}_{x \sim X} [f(x)] = \mu p_\theta(\bm{1})$$
+
+    # TODO(#119)
+    From equation A3 in the appendix, we have
+    $$ \nabla_\theta p_\theta(x) = p_\theta(x) \left(
+         \mathbb{E}_{x\sim X}\left[\nabla_\theta E_\theta(x)\right]
+         - \nabla_\theta E_\theta(x)
+       \right) $$
+    Filling in $\nabla_\theta E_\theta(\bm{1}) = 1$ and
+    $\mathbb{E}_{x\sim X}[\nabla_\theta E_\theta(x)] = p_\theta(\bm{1})$
+    we have
+    $$\nabla_\theta p_\theta(\bm{1}) = p_\theta(\bm{1})(p_\theta(\bm{1}) - 1)$$
+    Thus
+    $$ \nabla_\theta \mathbb{E}_{x \sim X} [f(x)] =
+           \mu p_\theta(\bm{1})(p_\theta(\bm{1}) - 1) $$
+
+    Suppose now the function to average contains the same variable as energy,
+    $$ g(x) = \begin{cases}
+                  \theta, &\text{if}\ x = \bm{1} \\
+                  0, & \text{otherwise}
+              \end{cases} $$
+    Then,
+    $$ \mathbb{E}_{x \sim X} [g(x)] = \theta p_\theta(\bm{1})$$
+    and the derivative becomes
+    $$ \nabla_\theta \mathbb{E}_{x \sim X} [f(x)] =
+           \theta p_\theta(\bm{1})(p_\theta(\bm{1}) - 1) + p_\theta(\bm{1})$$
+    """
+
+    class AllOnes(tf.keras.layers.Layer):
+      """Detects all ones."""
+
+      def __init__(self, ones_prefactor):
+        """ Initializes an AllOnes layer.
+
+        Args:
+          ones_prefactor: the scalar to emit when all ones is detected.
+        """
+        super().__init__()
+        self.ones_prefactor = ones_prefactor
+
+      def call(self, inputs):
+        """Return prefactor for scalar"""
+        return self.ones_prefactor * tf.math.reduce_prod(
+            tf.cast(inputs, tf.float32), 1)
+
+    num_bits = 3
+    theta = tf.Variable(tf.random.uniform([], -3, -2), name="theta")
+    energy_layers = [AllOnes(theta)]
+    energy = energy_model.BitstringEnergy(list(range(num_bits)), energy_layers)
+    theta_exp = tf.math.exp(-1.0 * theta)
+    partition = tf.math.pow(2.0, num_bits) - 1 + theta_exp
+    partition_inverse = tf.math.pow(partition, -1)
+    prob_x_star = partition_inverse * theta_exp
+
+    seed = tf.constant([3, 4], tf.int32)
+    e_infer = energy_infer.AnalyticEnergyInference(num_bits, seed=seed)
+    e_infer.infer(energy)
+
+    @tf.function
+    def expectation_wrapper(function, n_samples):
+      return e_infer.expectation(function, n_samples)
+
+    mu = tf.Variable(tf.random.uniform([], 1, 2), name="mu")
+    f = AllOnes(mu)
+    expected_average = mu * prob_x_star
+    expected_gradient_theta = mu * prob_x_star * (prob_x_star - 1)
+    expected_gradient_mu = prob_x_star
+
+    num_samples = int(5e6)
+    with tf.GradientTape(persistent=True) as tape:
+      actual_average = expectation_wrapper(f, num_samples)
+    actual_gradient_theta = tape.gradient(actual_average, theta)
+    actual_gradient_mu = tape.gradient(actual_average, mu)
+    del tape
+
+    # Confirm gradients are not negligible
+    not_negligible_atol = 1e-1
+    self.assertAllGreater(
+        tf.math.abs(actual_gradient_theta), not_negligible_atol)
+    self.assertAllGreater(tf.math.abs(actual_gradient_mu), not_negligible_atol)
+
+    closeness_atol = 1e-3
+    self.assertAllClose(actual_average, expected_average, atol=closeness_atol)
+    self.assertAllClose(
+        actual_gradient_theta, expected_gradient_theta, atol=closeness_atol)
+    self.assertAllClose(
+        actual_gradient_mu, expected_gradient_mu, atol=closeness_atol)
+
+    # Confirm gradients are connected upstream
+    mul_const = tf.random.uniform([], -2, -1)
+
+    def wrap_f(bitstrings):
+      return mul_const * f(bitstrings)
+
+    mul_expected_average = mul_const * expected_average
+    mul_expected_gradient_theta = mul_const * expected_gradient_theta
+    mul_expected_gradient_mu = mul_const * expected_gradient_mu
+
+    with tf.GradientTape(persistent=True) as tape:
+      actual_average = expectation_wrapper(wrap_f, num_samples)
+    actual_gradient_theta = tape.gradient(actual_average, theta)
+    actual_gradient_mu = tape.gradient(actual_average, mu)
+    del tape
+
+    self.assertAllClose(
+        actual_average, mul_expected_average, atol=closeness_atol)
+    self.assertAllClose(
+        actual_gradient_theta, mul_expected_gradient_theta, atol=closeness_atol)
+    self.assertAllClose(
+        actual_gradient_mu, mul_expected_gradient_mu, atol=closeness_atol)
+
+    # Test a function sharing variables with the energy.
+    g = AllOnes(theta)
+    expected_average = theta * prob_x_star
+    expected_gradient_theta = theta * prob_x_star * (prob_x_star -
+                                                     1) + prob_x_star
+
+    with tf.GradientTape(persistent=True) as tape:
+      actual_average = expectation_wrapper(g, num_samples)
+    actual_gradient_theta = tape.gradient(actual_average, theta)
+    actual_gradient_mu = tape.gradient(actual_average, mu)
+    del tape
+
+    # Confirm gradients are not negligible
+    self.assertAllGreater(
+        tf.math.abs(actual_gradient_theta), not_negligible_atol)
+
+    self.assertAllClose(actual_average, expected_average, atol=closeness_atol)
+    self.assertAllClose(
+        actual_gradient_theta, expected_gradient_theta, atol=closeness_atol)
+    # Check unconnected gradient
+    self.assertIsNone(actual_gradient_mu)
+
+    # Check unconnected gradient with zeros tape setting
+    with tf.GradientTape() as tape:
+      actual_average = expectation_wrapper(g, num_samples)
+    actual_gradient_mu = tape.gradient(
+        actual_average, mu, unconnected_gradients=tf.UnconnectedGradients.ZERO)
+    zeros_atol = 1e-6
+    self.assertAllClose(
+        actual_gradient_mu, tf.zeros_like(actual_gradient_mu), atol=zeros_atol)
 
   @test_util.eager_mode_toggle
   def test_log_partition(self):
