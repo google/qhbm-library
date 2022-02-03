@@ -49,17 +49,20 @@ class VQTTest(tf.test.TestCase):
       return vqt_loss.vqt(qhbm_infer, model, num_samples, hamiltonian, beta)
     for num_qubits in [1, 2, 3, 4, 5]:
       # model definition
+      tf_random_seed = None
       ebm_init = tf.keras.initializers.RandomUniform(
-        minval=-2.0, maxval=2.0, seed=seed)
+        minval=-2.0, maxval=2.0, seed=tf_random_seed)
       energy = energy_model.BernoulliEnergy(list(range(num_qubits)), ebm_init)
+      energy.build([None, num_qubits])
 
       qubits = cirq.GridQubit.rect(1, num_qubits)
       r_symbols = [sympy.Symbol(f"phi_{n}") for n in range(num_qubits)]
       r_circuit = cirq.Circuit(
         cirq.rx(r_s)(q) for r_s, q in zip(r_symbols, qubits))
       qnn_init = tf.keras.initializers.RandomUniform(
-        minval=-6.2, maxval=6.2, seed=seed)
+        minval=-6.2, maxval=6.2, seed=tf_random_seed)
       circuit = circuit_model.DirectQuantumCircuit(r_circuit, qnn_init)
+      circuit.build([None, num_qubits])
 
       model = hamiltonian_model.Hamiltonian(energy, circuit)
 
@@ -73,7 +76,6 @@ class VQTTest(tf.test.TestCase):
       test_num_samples = tf.constant(1e7)
       test_h = tfq.convert_to_tensor(
         [cirq.PauliSum.from_pauli_strings(cirq.Y(q) for q in qubits)])
-      tf_random_seed = None
       test_beta = tf.random.uniform([], minval=0.01, maxval=100.0, seed=tf_random_seed)
 
       # Compute losses
