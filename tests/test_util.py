@@ -108,8 +108,8 @@ def get_random_pauli_sum(qubits):
   coeff_min = -1.0 * coeff_max
 
   num_qubits = len(qubits)
-  num_pauli_terms = num_qubits - 1
-  num_pauli_factors = num_qubits - 1
+  num_pauli_terms = max(1, num_qubits - 1)
+  num_pauli_factors = max(1, num_qubits - 1)
 
   pauli_sum = cirq.PauliSum()
   for _ in range(num_pauli_terms):
