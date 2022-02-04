@@ -36,9 +36,9 @@ class VQTTest(tf.test.TestCase):
     """Initializes test objects."""
     super().setUp()
     self.num_qubits_list = [1, 2, 3, 4]
-    self.tf_random_seed = None
+    self.tf_random_seed = 7
     self.tfp_seed = tf.constant([3, 4], tf.int32)
-    self.close_rtol = 3e-2
+    self.close_rtol = 1e-2
     self.not_zero_atol = 1e-1
 
   @test_util.eager_mode_toggle
@@ -116,12 +116,13 @@ class VQTTest(tf.test.TestCase):
       self.assertAllClose(actual_thetas_grads, expected_thetas_grads, rtol=self.close_rtol)
       self.assertAllClose(actual_phis_grads, expected_phis_grads, rtol=self.close_rtol)
 
+  @test_util.eager_mode_toggle
   def test_value_change(self):
     """Confirms that changing model parameters changes the value of the loss."""
     for num_qubits in self.num_qubits_list:
       qubits = cirq.GridQubit.rect(1, num_qubits)
       num_layers = 1
-      model, infer = test_util.get_random_hamiltonian_and_inference(qubits, num_layers, f"test_value_change_{num_qubits}")
+      model, infer = test_util.get_random_hamiltonian_and_inference(qubits, num_layers, f"test_value_change_{num_qubits}", ebm_seed=self.tfp_seed)
       num_samples = tf.constant(int(5e6))
       raw_h = test_util.get_random_pauli_sum(qubits)
       h = tfq.convert_to_tensor([raw_h])
@@ -137,6 +138,8 @@ class VQTTest(tf.test.TestCase):
       old_energy_weights = model.energy.get_weights()
       model.energy.set_weights([tf.ones_like(o) for o in old_energy_weights])
       energy_mod_value = vqt(infer, model, num_samples, h, beta)
+      print(f"energy_mod_value: {energy_mod_value}")
+      print(f"initial_value: {initial_value}")
       self.assertGreater(tf.abs(energy_mod_value), self.not_zero_atol)
       self.assertNotAllClose(energy_mod_value, initial_value, rtol=self.close_rtol)
       model.energy.set_weights(old_energy_weights)
