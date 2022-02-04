@@ -14,6 +14,7 @@
 # limitations under the License.
 # ==============================================================================
 """Tests for util.py."""
+
 import math
 
 import cirq
@@ -22,6 +23,7 @@ import tensorflow_quantum as tfq
 
 from qhbmlib import util
 from tests import test_util
+
 
 # ============================================================================ #
 # Density matrix utilities.
