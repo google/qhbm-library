@@ -23,10 +23,9 @@ from qhbmlib import hamiltonian_model
 
 
 def vqt(qhbm_infer: hamiltonian_infer.QHBM,
-        model: hamiltonian_model.Hamiltonian,
-        num_samples: tf.Tensor,
-        hamiltonian: Union[tf.Tensor, hamiltonian_model.Hamiltonian],
-        beta: tf.Tensor):
+        model: hamiltonian_model.Hamiltonian, num_samples: tf.Tensor,
+        hamiltonian: Union[tf.Tensor,
+                           hamiltonian_model.Hamiltonian], beta: tf.Tensor):
   """Computes the VQT loss of a given QHBM and Hamiltonian.
 
   This function is differentiable within a `tf.GradientTape` scope.
@@ -53,12 +52,18 @@ def vqt(qhbm_infer: hamiltonian_infer.QHBM,
     # TODO(#158): counts is required here, but not meaningful.
     counts = tf.ones([tf.shape(bitstrings)[0]])
     if isinstance(hamiltonian, tf.Tensor):
-      h_expectations = tf.reshape(qhbm_infer.q_inference.expectation(
-          model.circuit, bitstrings, counts, hamiltonian, reduce=False), tf.shape(counts))
+      h_expectations = tf.reshape(
+          qhbm_infer.q_inference.expectation(
+              model.circuit, bitstrings, counts, hamiltonian, reduce=False),
+          tf.shape(counts))
     elif isinstance(hamiltonian.energy, energy_model.PauliMixin):
       u_dagger_u = model.circuit + ops.circuit_dagger
       expectation_shards = self.q_inference.expectation(
-          u_dagger_u, bitstrings, counts, hamiltonian.operator_shards, reduce=False)
+          u_dagger_u,
+          bitstrings,
+          counts,
+          hamiltonian.operator_shards,
+          reduce=False)
       h_expectations = ops.energy.operator_expectation(expectation_shards)
     else:
       raise NotImplementedError(

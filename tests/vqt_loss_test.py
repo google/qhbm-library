@@ -54,16 +54,16 @@ class VQTTest(tf.test.TestCase):
       # model definition
       tf_random_seed = None
       ebm_init = tf.keras.initializers.RandomUniform(
-        minval=-2.0, maxval=2.0, seed=tf_random_seed)
+          minval=-2.0, maxval=2.0, seed=tf_random_seed)
       energy = energy_model.BernoulliEnergy(list(range(num_qubits)), ebm_init)
       energy.build([None, num_qubits])
 
       qubits = cirq.GridQubit.rect(1, num_qubits)
       r_symbols = [sympy.Symbol(f"phi_{n}") for n in range(num_qubits)]
       r_circuit = cirq.Circuit(
-        cirq.rx(r_s)(q) for r_s, q in zip(r_symbols, qubits))
+          cirq.rx(r_s)(q) for r_s, q in zip(r_symbols, qubits))
       qnn_init = tf.keras.initializers.RandomUniform(
-        minval=-1, maxval=1, seed=tf_random_seed)
+          minval=-1, maxval=1, seed=tf_random_seed)
       circuit = circuit_model.DirectQuantumCircuit(r_circuit, qnn_init)
       circuit.build([None, num_qubits])
 
@@ -78,38 +78,42 @@ class VQTTest(tf.test.TestCase):
       # Generate remaining VQT arguments
       test_num_samples = tf.constant(1e7)
       test_h = tfq.convert_to_tensor(
-        [cirq.PauliSum.from_pauli_strings(cirq.Y(q) for q in qubits)])
-      test_beta = tf.random.uniform([], minval=0.01, maxval=100.0, seed=tf_random_seed)
+          [cirq.PauliSum.from_pauli_strings(cirq.Y(q) for q in qubits)])
+      test_beta = tf.random.uniform([],
+                                    minval=0.01,
+                                    maxval=100.0,
+                                    seed=tf_random_seed)
 
       # Compute losses
       # Bernoulli has only one tf.Variable
       test_thetas = model.energy.trainable_variables[0]
       # QNN has only one tf.Variable
       test_phis = model.circuit.trainable_variables[0]
-      actual_expectation = qhbm_infer.expectation(model, test_h, test_num_samples)[0]
+      actual_expectation = qhbm_infer.expectation(model, test_h,
+                                                  test_num_samples)[0]
       expected_expectation = tf.reduce_sum(
-        tf.math.tanh(test_thetas) * tf.math.sin(test_phis))
+          tf.math.tanh(test_thetas) * tf.math.sin(test_phis))
       self.assertAllClose(actual_expectation, expected_expectation, rtol=RTOL)
 
       actual_entropy = qhbm_infer.e_inference.entropy()
       expected_entropy = tf.reduce_sum(
-        -test_thetas * tf.math.tanh(test_thetas) +
-        tf.math.log(2 * tf.math.cosh(test_thetas)))
+          -test_thetas * tf.math.tanh(test_thetas) +
+          tf.math.log(2 * tf.math.cosh(test_thetas)))
       self.assertAllClose(actual_entropy, expected_entropy, rtol=RTOL)
 
       with tf.GradientTape() as tape:
-        actual_loss = vqt_wrapper(qhbm_infer, model, test_num_samples, test_h, test_beta)
+        actual_loss = vqt_wrapper(qhbm_infer, model, test_num_samples, test_h,
+                                  test_beta)
       expected_loss = test_beta * expected_expectation - expected_entropy
       self.assertAllClose(actual_loss, expected_loss, rtol=RTOL)
 
       actual_thetas_grads, actual_phis_grads = tape.gradient(
-        actual_loss, (test_thetas, test_phis))
+          actual_loss, (test_thetas, test_phis))
       expected_thetas_grads = (1 - tf.math.tanh(test_thetas)**2) * (
-        test_beta * tf.math.sin(test_phis) + test_thetas)
-      expected_phis_grads = test_beta * tf.math.tanh(
-        test_thetas) * tf.math.cos(test_phis)
-      self.assertAllClose(
-        actual_thetas_grads, expected_thetas_grads, rtol=RTOL)
+          test_beta * tf.math.sin(test_phis) + test_thetas)
+      expected_phis_grads = test_beta * tf.math.tanh(test_thetas) * tf.math.cos(
+          test_phis)
+      self.assertAllClose(actual_thetas_grads, expected_thetas_grads, rtol=RTOL)
       self.assertAllClose(actual_phis_grads, expected_phis_grads, rtol=RTOL)
 
   # def test_hypernetwork(self):
@@ -119,7 +123,7 @@ class VQTTest(tf.test.TestCase):
   #         qubits, 1, f"VQTHyperTest{num_qubits}")
   #     ham = test_util.get_random_pauli_sum(qubits)
   #     tf_ham = tfq.convert_to_tensor([ham])
-      
+
   #     # There is only one variable in energy and one in circuit.
   #     energy_trainable_variables_size = tf.size(model.energy.post_process[0].kernel)
   #     circuit_trainable_variables_size = tf.size(model.circuit.value_layers_inputs[0])
