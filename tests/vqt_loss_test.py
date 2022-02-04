@@ -79,7 +79,7 @@ class VQTTest(tf.test.TestCase):
       test_num_samples = tf.constant(1e7)
       test_h = tfq.convert_to_tensor(
           [cirq.PauliSum.from_pauli_strings(cirq.Y(q) for q in qubits)])
-      test_beta = tf.random.uniform([], 0.01, 100.0, seed=tf_random_seed)
+      test_beta = tf.random.uniform([], 0.01, 100.0, tf.float32, tf_random_seed)
 
       # Compute losses
       # Bernoulli has only one tf.Variable
