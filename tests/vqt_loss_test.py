@@ -82,7 +82,8 @@ class VQTTest(tf.test.TestCase):
       test_num_samples = tf.constant(5e6)
       test_h = tfq.convert_to_tensor(
           [cirq.PauliSum.from_pauli_strings(cirq.Y(q) for q in qubits)])
-      test_beta = tf.random.uniform([], 0.01, 100.0, tf.float32, self.tf_random_seed)
+      test_beta = tf.random.uniform([], 0.01, 100.0, tf.float32,
+                                    self.tf_random_seed)
 
       # Compute losses
       # Bernoulli has only one tf.Variable
@@ -93,17 +94,19 @@ class VQTTest(tf.test.TestCase):
                                                   test_num_samples)[0]
       expected_expectation = tf.reduce_sum(
           tf.math.tanh(test_thetas) * tf.math.sin(test_phis))
-      self.assertAllClose(actual_expectation, expected_expectation, rtol=self.close_rtol)
+      self.assertAllClose(
+          actual_expectation, expected_expectation, rtol=self.close_rtol)
 
       actual_entropy = qhbm_infer.e_inference.entropy()
       expected_entropy = tf.reduce_sum(
           -test_thetas * tf.math.tanh(test_thetas) +
           tf.math.log(2 * tf.math.cosh(test_thetas)))
-      self.assertAllClose(actual_entropy, expected_entropy, rtol=self.close_rtol)
+      self.assertAllClose(
+          actual_entropy, expected_entropy, rtol=self.close_rtol)
 
       with tf.GradientTape() as tape:
         actual_loss = vqt(qhbm_infer, model, test_num_samples, test_h,
-                                  test_beta)
+                          test_beta)
       expected_loss = test_beta * expected_expectation - expected_entropy
       self.assertAllClose(actual_loss, expected_loss, rtol=self.close_rtol)
 
@@ -113,8 +116,10 @@ class VQTTest(tf.test.TestCase):
           test_beta * tf.math.sin(test_phis) + test_thetas)
       expected_phis_grads = test_beta * tf.math.tanh(test_thetas) * tf.math.cos(
           test_phis)
-      self.assertAllClose(actual_thetas_grads, expected_thetas_grads, rtol=self.close_rtol)
-      self.assertAllClose(actual_phis_grads, expected_phis_grads, rtol=self.close_rtol)
+      self.assertAllClose(
+          actual_thetas_grads, expected_thetas_grads, rtol=self.close_rtol)
+      self.assertAllClose(
+          actual_phis_grads, expected_phis_grads, rtol=self.close_rtol)
 
   @test_util.eager_mode_toggle
   def test_value_change(self):
@@ -122,7 +127,11 @@ class VQTTest(tf.test.TestCase):
     for num_qubits in self.num_qubits_list:
       qubits = cirq.GridQubit.rect(1, num_qubits)
       num_layers = 1
-      model, infer = test_util.get_random_hamiltonian_and_inference(qubits, num_layers, f"test_value_change_{num_qubits}", ebm_seed=self.tfp_seed)
+      model, infer = test_util.get_random_hamiltonian_and_inference(
+          qubits,
+          num_layers,
+          f"test_value_change_{num_qubits}",
+          ebm_seed=self.tfp_seed)
       num_samples = tf.constant(int(5e6))
       raw_h = test_util.get_random_pauli_sum(qubits)
       h = tfq.convert_to_tensor([raw_h])
@@ -132,7 +141,8 @@ class VQTTest(tf.test.TestCase):
       initial_value = vqt(infer, model, num_samples, h, beta)
       initial_value_retry = vqt(infer, model, num_samples, h, beta)
       self.assertGreater(tf.abs(initial_value), self.not_zero_atol)
-      self.assertAllClose(initial_value, initial_value_retry, rtol=self.close_rtol)
+      self.assertAllClose(
+          initial_value, initial_value_retry, rtol=self.close_rtol)
 
       # change EBM parameters
       old_energy_weights = model.energy.get_weights()
@@ -141,20 +151,24 @@ class VQTTest(tf.test.TestCase):
       print(f"energy_mod_value: {energy_mod_value}")
       print(f"initial_value: {initial_value}")
       self.assertGreater(tf.abs(energy_mod_value), self.not_zero_atol)
-      self.assertNotAllClose(energy_mod_value, initial_value, rtol=self.close_rtol)
+      self.assertNotAllClose(
+          energy_mod_value, initial_value, rtol=self.close_rtol)
       model.energy.set_weights(old_energy_weights)
       energy_reset_value = vqt(infer, model, num_samples, h, beta)
-      self.assertAllClose(energy_reset_value, initial_value, rtol=self.close_rtol)
+      self.assertAllClose(
+          energy_reset_value, initial_value, rtol=self.close_rtol)
 
       # change QNN parameters
       old_circuit_weights = model.circuit.get_weights()
       model.circuit.set_weights([tf.ones_like(o) for o in old_circuit_weights])
       circuit_mod_value = vqt(infer, model, num_samples, h, beta)
       self.assertGreater(tf.abs(circuit_mod_value), self.not_zero_atol)
-      self.assertNotAllClose(circuit_mod_value, initial_value, rtol=self.close_rtol)
+      self.assertNotAllClose(
+          circuit_mod_value, initial_value, rtol=self.close_rtol)
       model.circuit.set_weights(old_circuit_weights)
       circuit_reset_value = vqt(infer, model, num_samples, h, beta)
-      self.assertAllClose(circuit_reset_value, initial_value, rtol=self.close_rtol)
+      self.assertAllClose(
+          circuit_reset_value, initial_value, rtol=self.close_rtol)
 
 
 if __name__ == "__main__":
