@@ -16,15 +16,13 @@
 
 import tensorflow as tf
 
-from qhbmlib import energy_model
 from qhbmlib import hamiltonian_infer
 from qhbmlib import hamiltonian_model
 
 
 def vqt(qhbm_infer: hamiltonian_infer.QHBM,
         model: hamiltonian_model.Hamiltonian, num_samples: tf.Tensor,
-        hamiltonian: tf.Tensor,
-        beta: tf.Tensor):
+        hamiltonian: tf.Tensor, beta: tf.Tensor):
   """Computes the VQT loss of a given QHBM and Hamiltonian.
 
   This function is differentiable within a `tf.GradientTape` scope.
@@ -45,19 +43,17 @@ def vqt(qhbm_infer: hamiltonian_infer.QHBM,
   """
 
   # See equations B4 and B5 in appendix.  TODO(#119): confirm equation number.
-  def f(bitstrings):
-    # Compute the hamiltonian expectation values
+  def f_vqt(bitstrings):
     # TODO(#158): counts is required here, but not meaningful.
     counts = tf.ones([tf.shape(bitstrings)[0]])
-    h_expectations = tf.reshape(
-      qhbm_infer.q_inference.expectation(
-        model.circuit, bitstrings, counts, hamiltonian, reduce=False),
-      tf.shape(counts))
+    h_expectations = tf.squeeze(
+        qhbm_infer.q_inference.expectation(
+            model.circuit, bitstrings, counts, hamiltonian, reduce=False), -1)
     beta_h_expectations = beta * h_expectations
     energies = tf.stop_gradient(model.energy(bitstrings))
     return beta_h_expectations - energies
 
   qhbm_infer.e_inference.infer(model.energy)
-  average_expectation = qhbm_infer.e_inference.expectation(f, num_samples)
+  average_expectation = qhbm_infer.e_inference.expectation(f_vqt, num_samples)
   current_partition = tf.stop_gradient(qhbm_infer.e_inference.log_partition())
   return average_expectation - current_partition
