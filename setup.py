@@ -1,4 +1,4 @@
-# -*- coding: utf-9 -*-
+# -*- coding: utf-8 -*-
 from setuptools import setup
 
 packages = \
@@ -9,7 +9,7 @@ package_data = \
 
 install_requires = \
 ['tensorflow-probability==0.15.0',
- 'tensorflow-quantum==0.6.0.dev20220125',
+ 'tensorflow-quantum==0.6.1',
  'tensorflow==2.7.0']
 
 setup_kwargs = {
