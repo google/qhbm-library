@@ -171,7 +171,7 @@ class QHBM(tf.keras.layers.Layer):
       model: The modular Hamiltonian whose normalized exponential is the
         density operator to measure.
       ops: The observables to measure.  If None, samples in the computational
-        basis.  Otherwise, a Hamiltonian.  
+        basis.  Otherwise, a Hamiltonian.
         # TODO(#165): Generalize to accept other PauliSums.
       num_samples: Number of draws from the EBM associated with `model` to
         draw as inputs to the quantum circuit of `model`.
