@@ -156,3 +156,39 @@ class QHBM(tf.keras.layers.Layer):
     else:
       raise NotImplementedError(
           "General `BitstringEnergy` models not yet supported.")
+
+  def sample(self, model: hamiltonian_model.Hamiltonian,
+             ops: Union[None, hamiltonian_model.Hamiltonian], num_samples: int):
+    """Repeatedly measures the density operator.
+
+    # TODO(#119) align the notation and discussion below with updated paper.
+
+    Implicitly sample `num_samples` pure states from the canonical ensemble
+    corresponding to the thermal state defined by `model`.  For each such state
+    |psi>, projectively measure `ops`.  The results are stacked and returned.
+
+    Args:
+      model: The modular Hamiltonian whose normalized exponential is the
+        density operator to measure.
+      ops: The observables to measure.  If None, samples in the computational
+        basis.  Otherwise, a Hamiltonian.
+        # TODO(#165): Generalize to accept other PauliSums.
+      num_samples: Number of draws from the EBM associated with `model` to
+        draw as inputs to the quantum circuit of `model`.
+
+    Returns:
+      `tf.Tensor` of shape [num_samples, n_ops] containing the results of the
+      measurements of the density operator.
+    """
+    self.e_inference.infer(model.energy)
+    samples = self.e_inference.sample(num_samples)
+    bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
+    if ops is None:
+      circuit = model.circuit
+    else:
+      circuit = model.circuit + ops.circuit_dagger
+    ragged_samples = self.q_inference.sample(circuit, bitstrings, counts)
+    samples = ragged_samples.values.to_tensor()
+    if ops is None:
+      return samples
+    return ops.energy(samples)
