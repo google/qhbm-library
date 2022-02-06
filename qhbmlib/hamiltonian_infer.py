@@ -157,7 +157,8 @@ class QHBM(tf.keras.layers.Layer):
       raise NotImplementedError(
           "General `BitstringEnergy` models not yet supported.")
 
-  def sample(self, model: hamiltonian_model.Hamiltonian, ops: Union[None, hamiltonian_model.Hamiltonian], num_samples: int):
+  def sample(self, model: hamiltonian_model.Hamiltonian,
+             ops: Union[None, hamiltonian_model.Hamiltonian], num_samples: int):
     """Repeatedly measures the density operator.
 
     # TODO(#119) align the notation and discussion below with updated paper.
