@@ -18,3 +18,12 @@ import tensorflow as tf
 
 from qhbmlib import hamiltonian_infer
 from qhbmlib import hamiltonian_model
+from qhbmlib import quantum_data
+
+
+def qmhl(data: quantum_data.QuantumData,
+         infer: hamiltonian
+         model: hamiltonian_model.Hamiltonian):
+  """Calculate """
+  infer.energy.infer(model.energy)
+  return data.expectation(model) + infer.log_partition()

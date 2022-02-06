@@ -34,9 +34,11 @@ class QuantumData(abc.ABC):
     raise NotImplementedError()
 
 
-class QHBMData(abc.ABC):
+class QHBMData(QuantumData):
+  """QuantumData defined by a QHBM."""
 
   def __init__(self, infer, model, num_expectation_samples):
+    """Initializes a QHBMData."""
     self.infer = infer
     self.model = model
     self.num_expectation_samples = num_expectation_samples
