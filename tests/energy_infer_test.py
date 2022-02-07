@@ -60,10 +60,6 @@ class EnergyInferenceTest(tf.test.TestCase):
       """Not implemented in this test class."""
       raise NotImplementedError()
 
-    def log_partition(self):
-      """Not implemented in this test class."""
-      raise NotImplementedError()
-
   class NullEnergy(energy_model.BitstringEnergy):
     """Simple empty energy."""
 
@@ -455,11 +451,10 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     energy.set_weights([test_thetas])
     actual_layer.infer(energy)
 
-    @tf.function
-    def log_partition_wrapper(layer):
-      return layer.log_partition()
+    log_partition = tf.function(actual_layer.log_partition)
 
-    actual_log_partition = log_partition_wrapper(actual_layer)
+    num_samples = int(1e6)
+    actual_log_partition = log_partition(num_samples)
     self.assertAllClose(actual_log_partition, expected_log_partition)
 
   @test_util.eager_mode_toggle
@@ -647,7 +642,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
 
   @test_util.eager_mode_toggle
   def test_log_partition(self):
-    """Confirms correct value of the log partition function."""
+    """Confirms correct value of the log partition function and derivative."""
     all_bitstrings = tf.constant([[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1],
                                   [1, 0, 0], [1, 0, 1], [1, 1, 0], [1, 1, 1]],
                                  dtype=tf.int8)
@@ -657,11 +652,10 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     actual_layer.infer(energy)
     expected_log_partition = tf.reduce_logsumexp(-1.0 * energy(all_bitstrings))
 
-    @tf.function
-    def log_partition_wrapper(layer):
-      return layer.log_partition()
+    log_partition = tf.function(actual_layer.log_partition)
 
-    actual_log_partition = log_partition_wrapper(actual_layer)
+    num_samples = int(1e6)
+    actual_log_partition = log_partition(num_samples)
     self.assertAllClose(actual_log_partition, expected_log_partition)
 
   @test_util.eager_mode_toggle
