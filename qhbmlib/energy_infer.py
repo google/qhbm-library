@@ -163,9 +163,12 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
 
       def energy_grad(bitstrings):
         """Calculates the derivative with respect to the current variables."""
+        print(f"bitstrings: {bitstrings}")
         with tf.GradientTape() as tape:
           energies = self.energy(bitstrings)
-        return tape.jacobian(energies, variables, unconnected_gradients=tf.UnconnectedGradients.ZERO)
+        jac = tape.jacobian(energies, variables, unconnected_gradients=tf.UnconnectedGradients.ZERO)
+        print(f"jac: {jac}")
+        return jac
 
       energy_grad_expectation_list = self.expectation(energy_grad, num_samples)
       return tuple(), [upstream * (-1.0 * ege) for ege in energy_grad_expectation_list]
@@ -180,7 +183,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
       result = self._log_partition(num_samples)
       grad_fn = self._log_partition_grad_generator(num_samples)
       return result, grad_fn
-    return _inner_log_partition()    
+    return _inner_log_partition()
   
   def call(self, inputs):
     """Returns the number of samples specified in the inputs."""
