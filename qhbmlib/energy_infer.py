@@ -69,7 +69,9 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     """Estimates an expectation value using sample averaging.
 
     Args:
-      function: Mapping from a batch of bitstrings to a batch of real numbers.
+      function: Mapping from a 2D tensor of bitstrings to a possibly nested
+        structure.  The structure must have atomic elements all of which are
+        float tensors with the same batch size as the input bitstrings.
       num_samples: The number of bitstring samples to use when estimating the
         expectation value of `function`.
 
@@ -80,7 +82,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     @tf.custom_gradient
     def _inner_expectation():
       """Enables derivatives."""
-      samples = self.sample(num_samples)
+      samples = tf.stop_gradient(self.sample(num_samples))
       bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
 
       # TODO(#157): try to parameterize the persistence.
@@ -88,43 +90,50 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
         # Adds the variables in `self.energy` to the `variables` argument below.
         values_tape.watch(self.energy.trainable_variables)
         values = function(bitstrings)
-      average_of_values = utils.weighted_average(counts, values)
+      average_of_values = tf.nest.map_structure(
+        lambda x: utils.weighted_average(counts, x), values)
 
       def grad_fn(upstream, variables):
         """See equation A5 in the QHBM paper appendix for details.
 
         # TODO(#119): confirm equation number.
         """
-        function_grads = values_tape.jacobian(
-            values,
-            variables,
-            unconnected_gradients=tf.UnconnectedGradients.ZERO)
-        average_of_function_grads = [
-            utils.weighted_average(counts, fg) for fg in function_grads
-        ]
+        # Since average_of_values can go beyond scalars, gradient calculation
+        # implicitly assumes summation over all non-batch dimensions.
+        values_unstack = tf.nest.map_structure(tf.unstack, values)
+        values_unstack_sum = tf.nest.map_structure(tf.math.reduce_sum, values_unstack)
+        values_unstack_sum_stack = tf.nest.map_structure(tf.stack, values_unstack_sum)  # structure whose atoms are tensors of shape [num_bitsrings]
+        values_unstack_sum_stack_flat = tf.stack(tf.nest.flatten(values_unstack_sum_stack))  # tensor of shape [len(flatten(stacked_sum_values)), num_bitstrings]
+        values_sum = tf.reduce_sum(values_unstack_sum_stack_flat, 0)
+        average_of_values_sum = utils.weighted_average(counts, values_sum)
 
+        # Compute grad E terms.
         with tf.GradientTape() as tape:
           energies = self.energy(bitstrings)
         energies_grads = tape.jacobian(
             energies,
             variables,
             unconnected_gradients=tf.UnconnectedGradients.ZERO)
-        average_of_energies_grads = [
-            utils.weighted_average(counts, eg) for eg in energies_grads
-        ]
+        average_of_energies_grads = tf.nest.map_structure(lambda x: utils.weighted_average(counts, x), energies_grads)
+        
+        product_of_averages = tf.nest.map_structure(lambda x: average_of_values_sum * x, average_of_energies_grads)
 
-        products = [eg * values for eg in energies_grads]
-        product_of_averages = [
-            aeg * average_of_values for aeg in average_of_energies_grads
-        ]
-        average_of_products = [
-            utils.weighted_average(counts, p) for p in products
-        ]
+        def batch_multiply(x, y):
+          """Map multiplication over the batch dimension."""
+          unstack_x = tf.unstack(x)
+          unstack_y = tf.unstack(y)
+          multiplied = tf.nest.map_structure(tf.math.multiply, unstack_x, unstack_y)
+          return tf.stack(multiplied)
+
+        products = tf.nest.map_structure(lambda x: batch_multiply(x, values_sum), energies_grads)
+        average_of_products = tf.nest.map_structure(lambda x: utils.weighted_average(counts, x), products)
+
+        function_grads = values_tape.gradient(average_of_values, variables, unconnected_gradients=tf.UnconnectedGradients.ZERO)
 
         return tuple(), [
             upstream * (poa - aop + fg)
             for poa, aop, fg in zip(product_of_averages, average_of_products,
-                                    average_of_function_grads)
+                                    function_grads)
         ]
 
       return average_of_values, grad_fn
