@@ -90,24 +90,25 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
         # Adds the variables in `self.energy` to the `variables` argument below.
         values_tape.watch(self.energy.trainable_variables)
         values = function(bitstrings)
-      average_of_values = tf.nest.map_structure(
-          lambda x: utils.weighted_average(counts, x), values)
+        average_of_values = tf.nest.map_structure(
+            lambda x: utils.weighted_average(counts, x), values)
 
       def grad_fn(upstream, variables):
         """See equation A5 in the QHBM paper appendix for details.
 
         # TODO(#119): confirm equation number.
         """
+
+        function_grads = values_tape.gradient(
+            average_of_values,
+            variables,
+            unconnected_gradients=tf.UnconnectedGradients.ZERO)
+
         # Since average_of_values can go beyond scalars, gradient calculation
         # implicitly assumes summation over all non-batch dimensions.
         values_flat = tf.nest.flatten(values)
-        values_flat_unstack = tf.nest.map_structure(tf.unstack, values_flat)
-        values_flat_unstack_sum = tf.nest.map_structure(tf.math.reduce_sum,
-                                                        values_flat_unstack)
-        values_flat_unstack_sum_stack = tf.stack([
-            tf.stack(x) for x in values_flat_unstack_sum
-        ])  # tensor of shape [len(values_flat), num_bitstrings]
-        values_sum = tf.reduce_sum(values_flat_unstack_sum_stack, 0)
+        values_flat_sum = tf.nest.map_structure(lambda x: tf.map_fn(tf.reduce_sum, x), values_flat)
+        values_sum = tf.reduce_sum(tf.stack(values_flat_sum), 0)
         average_of_values_sum = utils.weighted_average(counts, values_sum)
 
         # Compute grad E terms.
@@ -123,24 +124,11 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
         product_of_averages = tf.nest.map_structure(
             lambda x: average_of_values_sum * x, average_of_energies_grads)
 
-        def batch_multiply(x, y):
-          """Map multiplication over the batch dimension."""
-          unstack_x = tf.unstack(x)
-          unstack_y = tf.unstack(y)
-          multiplied = tf.nest.map_structure(tf.math.multiply, unstack_x,
-                                             unstack_y)
-          return tf.stack(multiplied)
-
         products = tf.nest.map_structure(
-            lambda x: batch_multiply(x, values_sum), energies_grads)
+            lambda x: x * values_sum, energies_grads)
         average_of_products = tf.nest.map_structure(
             lambda x: utils.weighted_average(counts, x), products)
-
-        function_grads = values_tape.gradient(
-            average_of_values,
-            variables,
-            unconnected_gradients=tf.UnconnectedGradients.ZERO)
-
+        
         return tuple(), [
             upstream * (poa - aop + fg) for poa, aop, fg in zip(
                 product_of_averages, average_of_products, function_grads)
