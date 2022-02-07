@@ -661,17 +661,17 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
 
     delta = 1e-4
     old_kernel = energy.post_process[0].kernel.read_value()
-    kernel_len = tf.shape(old_kernel)[0]
+    kernel_len = tf.shape(old_kernel)[0].numpy().tolist()
     derivative_list = []
     for k in range(kernel_len):
       new_kernel = old_kernel + delta * tf.one_hot(k, kernel_len) 
       energy.set_weights([new_kernel])
       delta_expected_log_partition = tf.reduce_logsumexp(-1.0 * energy(all_bitstrings))
-      derivative.append((delta_expected_log_partition - expected_log_partition) / delta)
+      derivative_list.append(((delta_expected_log_partition - expected_log_partition) / delta).numpy())
       energy.set_weights([old_kernel])
     expected_log_partition_grad = tf.constant([derivative_list])
     actual_log_partition_grad = tape.gradient(actual_log_partition, energy.trainable_variables)
-    self.assertAllClose(actual_log_partition_grad, 
+    self.assertAllClose(actual_log_partition_grad, expected_log_partition_grad)
 
   @test_util.eager_mode_toggle
   def test_entropy(self):
