@@ -100,13 +100,13 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
         """
         # Since average_of_values can go beyond scalars, gradient calculation
         # implicitly assumes summation over all non-batch dimensions.
-        values_unstack = tf.nest.map_structure(tf.unstack, values)
-        values_unstack_sum = tf.nest.map_structure(tf.math.reduce_sum, values_unstack)
-        values_unstack_sum_stack = tf.nest.map_structure(tf.stack, values_unstack_sum)  # structure whose atoms are tensors of shape [num_bitsrings]
-        values_unstack_sum_stack_flat = tf.stack(tf.nest.flatten(values_unstack_sum_stack))  # tensor of shape [len(flatten(stacked_sum_values)), num_bitstrings]
-        values_sum = tf.reduce_sum(values_unstack_sum_stack_flat, 0)
+        values_flat = tf.nest.flatten(values)
+        values_flat_unstack = tf.nest.map_structure(tf.unstack, values_flat)
+        values_flat_unstack_sum = tf.nest.map_structure(tf.math.reduce_sum, values_flat_unstack)
+        values_flat_unstack_sum_stack = tf.stack([tf.stack(x) for x in values_flat_unstack_sum])  # tensor of shape [len(values_flat), num_bitstrings]
+        values_sum = tf.reduce_sum(values_flat_unstack_sum_stack, 0)
         average_of_values_sum = utils.weighted_average(counts, values_sum)
-
+        
         # Compute grad E terms.
         with tf.GradientTape() as tape:
           energies = self.energy(bitstrings)
