@@ -14,8 +14,6 @@
 # ==============================================================================
 """Impementation of the QMHL loss function."""
 
-import tensorflow as tf
-
 from qhbmlib import hamiltonian_infer
 from qhbmlib import hamiltonian_model
 from qhbmlib import quantum_data
