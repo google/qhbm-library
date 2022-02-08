@@ -513,7 +513,8 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
 
     derivative_list = []
     for k in range(num_elts):
-      this_derivative = test_util.approximate_derivative(lambda delta: delta_expectation(delta, k))
+      this_derivative = test_util.approximate_derivative(
+          lambda delta: delta_expectation(delta, k))
       derivative_list.append(this_derivative.numpy())
     expected_derivative = tf.constant(derivative_list)
     tf.nest.map_structure(

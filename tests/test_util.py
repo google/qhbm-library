@@ -199,9 +199,8 @@ def approximate_derivative(f, delta=1e-1):
   backward_once = tf.nest.flatten(f(-1.0 * delta))
   backward_twice = tf.nest.flatten(f(-2.0 * delta))
   numerator_flat = tf.nest.map_structure(
-    lambda a, b, c, d: -1.0 * a + 8.0 * b - 8.0 * c + d,
-    forward_twice, forward_once, backward_once, backward_twice)
+      lambda a, b, c, d: -1.0 * a + 8.0 * b - 8.0 * c + d, forward_twice,
+      forward_once, backward_once, backward_twice)
   numerator = tf.reduce_sum(
-    tf.stack(tf.nest.map_structure(tf.reduce_sum, numerator_flat)))
+      tf.stack(tf.nest.map_structure(tf.reduce_sum, numerator_flat)))
   return numerator / (12.0 * delta)
-
