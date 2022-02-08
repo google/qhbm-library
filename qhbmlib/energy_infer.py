@@ -106,12 +106,13 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
 
         flat_upstream = tf.nest.flatten(upstream)
         flat_values = tf.nest.flatten(values)
-        combined_flat = tf.nest.map_structure(lambda x, y: x * y, flat_upstream, flat_values)
+        combined_flat = tf.nest.map_structure(lambda x, y: x * y, flat_upstream,
+                                              flat_values)
         combined_flat_sum = tf.nest.map_structure(
             lambda x: tf.map_fn(tf.reduce_sum, x), combined_flat)
         combined_sum = tf.reduce_sum(tf.stack(combined_flat_sum), 0)
         average_of_combined_sum = utils.weighted_average(counts, combined_sum)
-        
+
         # Compute grad E terms.
         with tf.GradientTape() as tape:
           energies = self.energy(bitstrings)
@@ -125,8 +126,9 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
         product_of_averages = tf.nest.map_structure(
             lambda x: x * average_of_combined_sum, average_of_energies_grads)
 
-        products = tf.nest.map_structure(lambda x: tf.einsum("i...,i->i...", x, combined_sum),
-                                         energies_grads)
+        products = tf.nest.map_structure(
+            lambda x: tf.einsum("i...,i->i...", x, combined_sum),
+            energies_grads)
         average_of_products = tf.nest.map_structure(
             lambda x: utils.weighted_average(counts, x), products)
 
