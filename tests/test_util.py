@@ -56,6 +56,36 @@ def get_random_qhbm(
   return qhbm.QHBM(this_ebm, this_qnn, identifier)
 
 
+def get_random_hamiltonian_and_inference(qubits,
+                                         num_layers,
+                                         identifier,
+                                         minval_thetas=-1.0,
+                                         maxval_thetas=1.0,
+                                         minval_phis=-1.0,
+                                         maxval_phis=1.0,
+                                         ebm_seed=None):
+  """Create a random QHBM for use in testing."""
+  num_qubits = len(qubits)
+  ebm_init = tf.keras.initializers.RandomUniform(
+      minval=minval_thetas, maxval=maxval_thetas)
+  energy = energy_model.KOBE(list(range(num_qubits)), num_qubits, ebm_init)
+  energy.build([None, num_qubits])
+
+  qnn_init = tf.keras.initializers.RandomUniform(
+      minval=minval_phis, maxval=maxval_phis)
+  unitary, _ = architectures.get_hardware_efficient_model_unitary(
+      qubits, num_layers, identifier)
+  circuit = circuit_model.DirectQuantumCircuit(unitary, qnn_init)
+  circuit.build([])
+
+  e_infer = energy_infer.AnalyticEnergyInference(
+      num_qubits, name=identifier, seed=ebm_seed)
+  q_infer = circuit_infer.QuantumInference(name=identifier)
+
+  return hamiltonian_model.Hamiltonian(energy, circuit), hamiltonian_infer.QHBM(
+      e_infer, q_infer)
+
+
 def get_random_pauli_sum(qubits):
   """Test fixture.
 
