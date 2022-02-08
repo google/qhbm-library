@@ -484,7 +484,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     e_infer = energy_infer.AnalyticEnergyInference(num_bits, seed=self.tfp_seed)
     e_infer.infer(energy)
 
-    num_samples = int(1e6)
+    num_samples = int(2e6)
     with tf.GradientTape() as tape:
       actual_expectation = e_infer.expectation(f, num_samples)
     actual_derivative = tape.gradient(actual_expectation, energy_var)
@@ -511,27 +511,10 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
         expected_expectation)
     self.assertAllClose(actual_expectation, expected_expectation)
 
-    def approximate_derivative(delta, k):
-      """Returns a five point stencil approximation to the derivative."""
-      forward_twice = delta_expectation(2.0 * delta, k)
-      forward_once = delta_expectation(delta, k)
-      backward_once = delta_expectation(-1.0 * delta, k)
-      backward_twice = delta_expectation(-2.0 * delta, k)
-      numerator_flat = tf.nest.flatten(
-          tf.nest.map_structure(
-              lambda a, b, c, d: -1.0 * a + 8.0 * b - 8.0 * c + d,
-              forward_twice, forward_once, backward_once, backward_twice))
-      numerator = tf.reduce_sum(
-          tf.stack(tf.nest.map_structure(tf.reduce_sum, numerator_flat)))
-      return numerator / (12.0 * delta)
-
-    # Delta this large is ok since five point stencil has error ~delta ** 4
-    # See wikipedia page on "five point stencil"
-    delta = 2e-1
     derivative_list = []
-
     for k in range(num_elts):
-      derivative_list.append(approximate_derivative(delta, k).numpy())
+      this_derivative = test_util.approximate_derivative(lambda delta: delta_expectation(delta, k))
+      derivative_list.append(this_derivative.numpy())
     expected_derivative = tf.constant(derivative_list)
     tf.nest.map_structure(
         lambda x: self.assertAllGreater(tf.abs(x), self.not_zero_atol),
