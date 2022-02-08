@@ -38,6 +38,7 @@ class VQTTest(tf.test.TestCase):
     self.num_qubits_list = [1, 2, 3, 4]
     self.tf_random_seed = 7
     self.tfp_seed = tf.constant([3, 4], tf.int32)
+    self.tfp_seed_alt = tf.constant([7, 8], tf.int32)
     self.close_rtol = 1e-2
     self.zero_atol = 1e-3
     self.not_zero_atol = 1e-1
@@ -58,7 +59,7 @@ class VQTTest(tf.test.TestCase):
       data_infer.e_inference.infer(data_h.energy)
 
       num_samples = tf.constant(int(1e6))
-      beta = 1.0
+      beta = 1.0  # Data and model are only the same if beta == 1
       vqt = tf.function(vqt_loss.vqt)
 
       # Trained loss is minus log partition of the data.
@@ -73,7 +74,27 @@ class VQTTest(tf.test.TestCase):
       self.assertAllClose(actual_loss, expected_loss, self.close_rtol)
       self.assertAllClose(actual_loss_derivative, expected_loss_derivative, atol=self.zero_atol)
 
-      # Approximate derivate non-zero everywhere shows changing parameters works
+  @test_util.eager_mode_toggle
+  def test_hamiltonian_vqt(self):
+    """Tests derivatives of VQT with respect to both model and data."""
+
+    for num_qubits in self.num_qubits_list:
+      qubits = cirq.GridQubit.rect(1, num_qubits)
+      num_layers = 5
+      data_h, data_infer = test_util.get_random_hamiltonian_and_inference(qubits, num_layers,
+                                                                          f"data_objects_{num_qubits}", ebm_seed=self.tfp_seed)
+      model_h, model_infer = test_util.get_random_hamiltonian_and_inference(qubits, num_layers,
+                                                                            f"hamiltonian_objects_{num_qubits}", ebm_seed=self.tfp_seed_alt)
+
+      num_samples = tf.constant(int(1e6))
+      beta = tf.random.uniform([], 0.01, 100)
+      vqt = tf.function(vqt_loss.vqt)
+
+      with tf.GradientTape(persistent=True) as tape:
+        actual_loss = vqt(model_infer, model_h, num_samples, data_h, beta)
+      actual_derivative_model = tape.gradient(actual_loss, model_h.trainable_variables)
+      actual_derivative_data = tape.gradient(actual_loss, data_h.trainable_variables)
+      
       # TODO(#171): This delta function seems like something general.
       #             Would need to perturb an unrolled version of `var`,
       #             whereas here variables are known to be 1D.
@@ -82,14 +103,28 @@ class VQTTest(tf.test.TestCase):
         num_elts = tf.size(var)
         old_value = var.read_value()
         var.assign(old_value + delta * tf.one_hot(k, num_elts, 1.0, 0.0))
-        data_e_infer.infer(energy)
-      samples = e_infer.sample(num_samples)
-      bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
-      values = f(bitstrings)
-      delta_expectation = tf.nest.map_structure(
-          lambda x: utils.weighted_average(counts, x), values)
-      energy_var.assign(old_value)
-      return delta_expectation
+        model_infer.e_inference.infer(model_h.energy)
+        delta_loss = vqt(model_infer, model_h, num_samples, data_h, beta)
+        var.assign(old_value)
+        model_infer.e_inferece.infer(model_h.energy)
+        return delta_loss
+
+      expected_derivative_model = []
+      for var in model_h.trainable_variables:
+        var_derivative_list = []
+        num_elts = tf.size(var)
+        for n in range(num_elts):
+          this_derivative = test_util.approximate_derivative(
+              functools.partial(delta_expectation, n, var))
+          var_derivative_list.append(this_derivative.numpy())
+        expected_derivative_model.append(tf.constant(var_derivative_list)) 
+      # Changing the model parameters is working if finite difference derivatives
+      # are non-zero.  Also confirms that model_h and data_h are different.
+      tf.nest.map_structure(
+          lambda x: self.assertAllGreater(tf.abs(x), self.not_zero_atol),
+          expected_derivative_model)
+      self.assertAllClose(
+          actual_derivative_model, expected_derivative_model, rtol=self.close_rtol)
 
   @test_util.eager_mode_toggle
   def test_loss_value_x_rot(self):
