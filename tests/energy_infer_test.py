@@ -520,7 +520,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     self.tf_random_seed = 4
     self.tfp_seed = tf.constant([3, 4], tf.int32)
     self.grad_close_rtol = 1e-2
-  
+
   def test_init(self):
     """Tests that components are initialized correctly."""
     expected_name = "test_analytic_dist_name"
@@ -653,7 +653,8 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     all_bitstrings = tf.constant([[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1],
                                   [1, 0, 0], [1, 0, 1], [1, 1, 0], [1, 1, 1]],
                                  dtype=tf.int8)
-    ebm_init = tf.keras.initializers.RandomUniform(-2, -1, seed=self.tf_random_seed)
+    ebm_init = tf.keras.initializers.RandomUniform(
+        -2, -1, seed=self.tf_random_seed)
     energy = energy_model.BernoulliEnergy([5, 6, 7], ebm_init)
     energy.build([None, energy.num_bits])
     actual_layer = energy_infer.BernoulliEnergyInference(seed=self.tfp_seed)
@@ -691,7 +692,8 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     expected_log_partition_grad = tf.constant([derivative_list])
     actual_log_partition_grad = tape.gradient(actual_log_partition,
                                               energy.trainable_variables)
-    self.assertAllClose(actual_log_partition_grad, expected_log_partition_grad, self.grad_close_rtol)
+    self.assertAllClose(actual_log_partition_grad, expected_log_partition_grad,
+                        self.grad_close_rtol)
 
   @test_util.eager_mode_toggle
   def test_entropy(self):

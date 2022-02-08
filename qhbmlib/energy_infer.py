@@ -170,14 +170,12 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
 
       def energy_grad(bitstrings):
         """Calculates the derivative with respect to the current variables."""
-        print(f"bitstrings: {bitstrings}")
         with tf.GradientTape() as tape:
           energies = self.energy(bitstrings)
         jac = tape.jacobian(
             energies,
             variables,
             unconnected_gradients=tf.UnconnectedGradients.ZERO)
-        print(f"jac: {jac}")
         return jac
 
       energy_grad_expectation_list = self.expectation(energy_grad, num_samples)
