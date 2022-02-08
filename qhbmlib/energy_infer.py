@@ -104,15 +104,14 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
             output_gradients=upstream,
             unconnected_gradients=tf.UnconnectedGradients.ZERO)
 
-        # upstream should have the same structure as `values`.
-        combined = tf.nest.map_structure(lambda x, y: x * y, upstream, values)        
-        combined_flat = tf.nest.flatten(combined)
+        flat_upstream = tf.nest.flatten(upstream)
+        flat_values = tf.nest.flatten(values)
+        combined_flat = tf.nest.map_structure(lambda x, y: x * y, flat_upstream, flat_values)
         combined_flat_sum = tf.nest.map_structure(
             lambda x: tf.map_fn(tf.reduce_sum, x), combined_flat)
         combined_sum = tf.reduce_sum(tf.stack(combined_flat_sum), 0)
         average_of_combined_sum = utils.weighted_average(counts, combined_sum)
 
-        print(f"combined: {combined}")
         print(f"combined_flat: {combined_flat}")
         print(f"combined_flat_sum: {combined_flat_sum}")
         print(f"combined_sum: {combined_sum}")
