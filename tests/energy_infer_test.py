@@ -14,6 +14,8 @@
 # ==============================================================================
 """Tests for the energy_infer module."""
 
+import functools
+
 import tensorflow as tf
 import tensorflow_probability as tfp
 
@@ -671,7 +673,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     old_kernel = energy.post_process[0].kernel.read_value()
     kernel_len = tf.shape(old_kernel)[0].numpy().tolist()
 
-    def exact_log_partition(delta, k):
+    def exact_log_partition(k, delta):
       """Perturbs the kth variable and calculates the log partition."""
       new_kernel = old_kernel + delta * tf.one_hot(k, kernel_len, 1.0, 0.0)
       energy.set_weights([new_kernel])
@@ -681,7 +683,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
 
     def set_exact_log_partition(k):
       """Returns exact_log_partition at a fixed k."""
-      return lambda delta: exact_log_partition(delta, k)
+      return functools.partial(exact_log_partition, k)
 
     derivative_list = []
     for k in range(kernel_len):
