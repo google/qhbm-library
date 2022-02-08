@@ -153,7 +153,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
         of the set of samples are used to estimate the log partition function.
     """
     samples = self.sample(num_samples)
-    bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
+    bitstrings, _ = utils.unique_bitstrings_with_counts(samples)
     unique_energies = self.energy(bitstrings)
     return tf.math.reduce_log_sum_exp(-1.0 * unique_energies)
 
@@ -173,25 +173,32 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
         print(f"bitstrings: {bitstrings}")
         with tf.GradientTape() as tape:
           energies = self.energy(bitstrings)
-        jac = tape.jacobian(energies, variables, unconnected_gradients=tf.UnconnectedGradients.ZERO)
+        jac = tape.jacobian(
+            energies,
+            variables,
+            unconnected_gradients=tf.UnconnectedGradients.ZERO)
         print(f"jac: {jac}")
         return jac
 
       energy_grad_expectation_list = self.expectation(energy_grad, num_samples)
-      return tuple(), [upstream * (-1.0 * ege) for ege in energy_grad_expectation_list]
+      return tuple(), [
+          upstream * (-1.0 * ege) for ege in energy_grad_expectation_list
+      ]
 
     return grad_fn
-    
+
   def log_partition(self, num_samples):
     """Estimates the log partition function and its derivative using samples."""
+
     @tf.custom_gradient
     def _inner_log_partition():
       """Wraps forward pass computaton."""
       result = self._log_partition(num_samples)
       grad_fn = self._log_partition_grad_generator(num_samples)
       return result, grad_fn
+
     return _inner_log_partition()
-  
+
   def call(self, inputs):
     """Returns the number of samples specified in the inputs."""
     return self.sample(inputs)
@@ -319,8 +326,8 @@ class BernoulliEnergyInference(EnergyInference):
     thetas = 0.5 * self.energy.logits
     single_log_partitions = tf.math.log(
         tf.math.exp(thetas) + tf.math.exp(-1.0 * thetas))
-    return tf.math.reduce_sum(single_log_partitions)  
-  
+    return tf.math.reduce_sum(single_log_partitions)
+
   def call(self, inputs):
     if self._current_dist is None:
       raise RuntimeError("`infer` must be called at least once.")

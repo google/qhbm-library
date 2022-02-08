@@ -659,18 +659,30 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
       actual_log_partition = log_partition(num_samples)
     self.assertAllClose(actual_log_partition, expected_log_partition)
 
-    delta = 1e-4
     old_kernel = energy.post_process[0].kernel.read_value()
     kernel_len = tf.shape(old_kernel)[0].numpy().tolist()
+
+    def estimate_log_partition(delta, k):
+      """Perturb the kth variable and estimate the log partition."""
+      new_kernel = old_kernel + delta * tf.one_hot(k, kernel_len, 1.0, 0.0)
+      energy.set_weights([new_kernel])
+      delta_log_partition = tf.reduce_logsumexp(-1.0 * energy(all_bitstrings))
+      energy.set_weights([old_kernel])
+      return delta_log_partition
+
+    def set_estimate_log_partition(k):
+      """Returns estimate_log_partition at a fixed k."""
+      return lambda delta: estimate_log_partition(delta, k)
+
     derivative_list = []
     for k in range(kernel_len):
-      new_kernel = old_kernel + delta * tf.one_hot(k, kernel_len) 
-      energy.set_weights([new_kernel])
-      delta_expected_log_partition = tf.reduce_logsumexp(-1.0 * energy(all_bitstrings))
-      derivative_list.append(((delta_expected_log_partition - expected_log_partition) / delta).numpy())
-      energy.set_weights([old_kernel])
+      this_derivative = test_util.approximate_derivative(
+          set_estimate_log_partition(k))
+      derivative_list.append(this_derivative.numpy())
+
     expected_log_partition_grad = tf.constant([derivative_list])
-    actual_log_partition_grad = tape.gradient(actual_log_partition, energy.trainable_variables)
+    actual_log_partition_grad = tape.gradient(actual_log_partition,
+                                              energy.trainable_variables)
     self.assertAllClose(actual_log_partition_grad, expected_log_partition_grad)
 
   @test_util.eager_mode_toggle
