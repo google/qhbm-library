@@ -185,8 +185,11 @@ def eager_mode_toggle(func):
 
 def approximate_derivative(f, delta=1e-1):
   """Approximates the derivative of f using five point stencil.
-  See wikipedia page on "five point stencil".  Note the error of this method
-  scales with delta ** 4.
+
+  See wikipedia page on "five point stencil",
+  https://en.wikipedia.org/wiki/Five-point_stencil
+  Note: the error of this method scales with delta ** 4.
+
   Args:
     f: Function to approximately differentiate.  Should take one input, which
       is a parameter setting the perturbation to the parameter to differentiate.

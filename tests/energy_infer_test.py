@@ -114,6 +114,14 @@ class EnergyInferenceTest(tf.test.TestCase):
 class AnalyticEnergyInferenceTest(tf.test.TestCase):
   """Tests the AnalyticEnergyInference class."""
 
+  def setUp(self):
+    """Initializes test objects."""
+    super().setUp()
+    self.tf_random_seed = 4
+    self.tfp_seed = tf.constant([3, 4], tf.int32)
+    self.grad_close_rtol = 1e-2
+    self.not_zero_atol = 1e-1
+
   def test_init(self):
     """Confirms internal values are set correctly."""
     bits = [0, 1, 3]
@@ -440,6 +448,78 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     zeros_atol = 1e-6
     self.assertAllClose(
         actual_gradient_mu, tf.zeros_like(actual_gradient_mu), atol=zeros_atol)
+
+  def test_expectation_finite_difference(self):
+    """Tests a function with nested structural output."""
+
+    num_bits = 3
+    order = 2
+    nonzero_init = tf.keras.initializers.RandomUniform(
+        1, 2, seed=self.tf_random_seed)
+    energy = energy_model.KOBE(list(range(num_bits)), order, nonzero_init)
+    energy.build([None, num_bits])
+    # Only one trainable variable in KOBE.
+    energy_var = energy.trainable_variables[0]
+
+    scalar_var = tf.Variable(
+        tf.random.uniform([], 1, 2, tf.float32, self.tf_random_seed))
+
+    num_units = 5
+    dense = tf.keras.layers.Dense(
+        num_units,
+        kernel_initializer=nonzero_init,
+        bias_initializer=nonzero_init)
+    dense.build([None, num_bits])
+
+    def f(bitstrings):
+      """Returns nested batched structure which is a function of the inputs."""
+      reduced = tf.cast(tf.reduce_sum(bitstrings, 1), tf.float32)
+      ret_scalar = scalar_var * reduced
+      ret_vector = dense(bitstrings)
+      ret_thetas = [tf.einsum("i,j->ij", reduced, energy_var)]
+      return [ret_scalar, ret_vector, ret_thetas]
+
+    e_infer = energy_infer.AnalyticEnergyInference(num_bits, seed=self.tfp_seed)
+    e_infer.infer(energy)
+
+    num_samples = int(2e6)
+    with tf.GradientTape() as tape:
+      actual_expectation = e_infer.expectation(f, num_samples)
+    actual_derivative = tape.gradient(actual_expectation, energy_var)
+
+    # Trainable variable of KOBE is 1D.
+    num_elts = tf.size(energy_var)
+
+    def delta_expectation(k, delta):
+      """Calculate the expectation with kth variable perturbed."""
+      old_value = energy_var.read_value()
+      energy_var.assign(old_value + delta * tf.one_hot(k, num_elts, 1.0, 0.0))
+      e_infer.infer(energy)
+      samples = e_infer.sample(num_samples)
+      bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
+      values = f(bitstrings)
+      delta_expectation = tf.nest.map_structure(
+          lambda x: utils.weighted_average(counts, x), values)
+      energy_var.assign(old_value)
+      return delta_expectation
+
+    expected_expectation = delta_expectation(0, 0)
+    tf.nest.map_structure(
+        lambda x: self.assertAllGreater(tf.abs(x), self.not_zero_atol),
+        expected_expectation)
+    self.assertAllClose(actual_expectation, expected_expectation)
+
+    derivative_list = []
+    for n in range(num_elts):
+      this_derivative = test_util.approximate_derivative(
+          functools.partial(delta_expectation, n))
+      derivative_list.append(this_derivative.numpy())
+    expected_derivative = tf.constant(derivative_list)
+    tf.nest.map_structure(
+        lambda x: self.assertAllGreater(tf.abs(x), self.not_zero_atol),
+        expected_derivative)
+    self.assertAllClose(
+        actual_derivative, expected_derivative, rtol=self.grad_close_rtol)
 
   @test_util.eager_mode_toggle
   def test_log_partition(self):
