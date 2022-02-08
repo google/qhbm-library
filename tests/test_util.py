@@ -86,6 +86,7 @@ def get_random_hamiltonian_and_inference(qubits,
 
   e_infer = energy_infer.AnalyticEnergyInference(
       num_qubits, name=identifier, seed=ebm_seed)
+  e_infer.infer(energy)
   q_infer = circuit_infer.QuantumInference(name=identifier)
 
   return hamiltonian_model.Hamiltonian(energy, circuit), hamiltonian_infer.QHBM(
