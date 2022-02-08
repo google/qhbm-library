@@ -39,7 +39,7 @@ class VQTTest(tf.test.TestCase):
     self.tf_random_seed = 7
     self.tfp_seed = tf.constant([3, 4], tf.int32)
     self.close_rtol = 1e-2
-    self.zero_atol = 1e-4
+    self.zero_atol = 1e-3
     self.not_zero_atol = 1e-1
 
   @test_util.eager_mode_toggle
@@ -57,14 +57,14 @@ class VQTTest(tf.test.TestCase):
       data_h.set_weights(model_h.get_weights())
       data_infer.e_inference.infer(data_h.energy)
 
-      num_samples = tf.constant(int(5e6))
+      num_samples = tf.constant(int(1e6))
       beta = 1.0
       vqt = tf.function(vqt_loss.vqt)
 
       # Trained loss is minus log partition of the data.
       expected_loss = -1.0 * data_infer.e_inference.log_partition()
       # Since this is the optimum, derivatives should all be zero.
-      expected_loss_derivatives = [
+      expected_loss_derivative = [
         tf.zeros_like(v) for v in model_h.trainable_variables]
 
       with tf.GradientTape() as tape:

@@ -18,6 +18,7 @@ from typing import Union
 
 import tensorflow as tf
 
+from qhbmlib import energy_model
 from qhbmlib import hamiltonian_infer
 from qhbmlib import hamiltonian_model
 
@@ -55,14 +56,14 @@ def vqt(qhbm_infer: hamiltonian_infer.QHBM,
               model.circuit, bitstrings, counts, hamiltonian, reduce=False),
           tf.shape(counts))
     elif isinstance(hamiltonian.energy, energy_model.PauliMixin):
-      u_dagger_u = model.circuit + ops.circuit_dagger
-      expectation_shards = self.q_inference.expectation(
+      u_dagger_u = model.circuit + hamiltonian.circuit_dagger
+      expectation_shards = qhbm_infer.q_inference.expectation(
           u_dagger_u,
           bitstrings,
           counts,
           hamiltonian.operator_shards,
           reduce=False)
-      h_expectations = ops.energy.operator_expectation(expectation_shards)
+      h_expectations = hamiltonian.energy.operator_expectation(expectation_shards)
     else:
       raise NotImplementedError(
           "General `BitstringEnergy` hamiltonians not yet supported.")
