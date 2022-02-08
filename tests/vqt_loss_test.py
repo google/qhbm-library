@@ -44,7 +44,7 @@ class VQTTest(tf.test.TestCase):
 
   @test_util.eager_mode_toggle
   def test_self_vqt(self):
-  """Confirms known value of the VQT loss of a model against itself."""
+    """Confirms known value of the VQT loss of a model against itself."""
     for num_qubits in self.num_qubits_list:
       qubits = cirq.GridQubit.rect(1, num_qubits)
       num_layers = 5
@@ -68,7 +68,7 @@ class VQTTest(tf.test.TestCase):
         tf.zeros_like(v) for v in model_h.trainable_variables]
 
       with tf.GradientTape() as tape:
-        actual_loss = vqt(model_infer, model_h, num_samples, h, beta)
+        actual_loss = vqt(model_infer, model_h, num_samples, data_h, beta)
       actual_loss_derivative = tape.gradient(actual_loss, model_h.trainable_variables)
       self.assertAllClose(actual_loss, expected_loss, self.close_rtol)
       self.assertAllClose(actual_loss_derivative, expected_loss_derivative, atol=self.zero_atol)

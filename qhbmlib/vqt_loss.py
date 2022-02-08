@@ -14,6 +14,8 @@
 # ==============================================================================
 """Impementation of the VQT loss function."""
 
+from typing import Union
+
 import tensorflow as tf
 
 from qhbmlib import hamiltonian_infer
@@ -22,7 +24,7 @@ from qhbmlib import hamiltonian_model
 
 def vqt(qhbm_infer: hamiltonian_infer.QHBM,
         model: hamiltonian_model.Hamiltonian, num_samples: tf.Tensor,
-        hamiltonian: tf.Tensor, beta: tf.Tensor):
+        hamiltonian: Union[tf.Tensor, hamiltonian_model.Hamiltonian], beta: tf.Tensor):
   """Computes the VQT loss of a given QHBM and Hamiltonian.
 
   This function is differentiable within a `tf.GradientTape` scope.
@@ -35,6 +37,7 @@ def vqt(qhbm_infer: hamiltonian_infer.QHBM,
     hamiltonian: The Hamiltonian whose thermal state is to be learned.  If
       it is a `tf.Tensor`, it is of type `tf.string` with shape [1], result of
       calling `tfq.convert_to_tensor` on a list of `cirq.PauliSum`, `[op]`.
+      Otherwise, a Hamiltonian.
     beta: A scalar `tf.Tensor` which is the inverse temperature at which the
       loss is calculated.
 
@@ -46,9 +49,23 @@ def vqt(qhbm_infer: hamiltonian_infer.QHBM,
   def f_vqt(bitstrings):
     # TODO(#158): counts is required here, but not meaningful.
     counts = tf.ones([tf.shape(bitstrings)[0]])
-    h_expectations = tf.squeeze(
-        qhbm_infer.q_inference.expectation(
-            model.circuit, bitstrings, counts, hamiltonian, reduce=False), -1)
+    if isinstance(hamiltonian, tf.Tensor):
+      h_expectations = tf.reshape(
+          qhbm_infer.q_inference.expectation(
+              model.circuit, bitstrings, counts, hamiltonian, reduce=False),
+          tf.shape(counts))
+    elif isinstance(hamiltonian.energy, energy_model.PauliMixin):
+      u_dagger_u = model.circuit + ops.circuit_dagger
+      expectation_shards = self.q_inference.expectation(
+          u_dagger_u,
+          bitstrings,
+          counts,
+          hamiltonian.operator_shards,
+          reduce=False)
+      h_expectations = ops.energy.operator_expectation(expectation_shards)
+    else:
+      raise NotImplementedError(
+          "General `BitstringEnergy` hamiltonians not yet supported.")
     beta_h_expectations = beta * h_expectations
     energies = tf.stop_gradient(model.energy(bitstrings))
     return beta_h_expectations - energies
