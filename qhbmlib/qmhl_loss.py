@@ -24,6 +24,17 @@ from qhbmlib import quantum_data
 def qmhl(data: quantum_data.QuantumData,
          infer: hamiltonian
          model: hamiltonian_model.Hamiltonian):
-  """Calculate """
+  """Calculate the QMHL loss of the QHBM against the quantum data.
+
+  See equation 21 in the appendix.
+
+  Args:
+    data: The data mixed state to learn.
+    infer: Inference engine for the model.
+    model: Hamiltonian whose normalized exponential approxmimates `data`.
+
+  Returns:
+    The quantum cross-entropy between the data and the model.
+  """
   infer.energy.infer(model.energy)
   return data.expectation(model) + infer.log_partition()
