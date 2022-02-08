@@ -60,10 +60,6 @@ class EnergyInferenceTest(tf.test.TestCase):
       """Not implemented in this test class."""
       raise NotImplementedError()
 
-    def log_partition(self):
-      """Not implemented in this test class."""
-      raise NotImplementedError()
-
   class NullEnergy(energy_model.BitstringEnergy):
     """Simple empty energy."""
 
@@ -455,11 +451,10 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     energy.set_weights([test_thetas])
     actual_layer.infer(energy)
 
-    @tf.function
-    def log_partition_wrapper(layer):
-      return layer.log_partition()
+    log_partition = tf.function(actual_layer.log_partition)
 
-    actual_log_partition = log_partition_wrapper(actual_layer)
+    num_samples = int(1e6)
+    actual_log_partition = log_partition(num_samples)
     self.assertAllClose(actual_log_partition, expected_log_partition)
 
   @test_util.eager_mode_toggle
@@ -518,6 +513,13 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
 
 class BernoulliEnergyInferenceTest(tf.test.TestCase):
   """Tests the BernoulliEnergyInference class."""
+
+  def setUp(self):
+    """Initializes test objects."""
+    super().setUp()
+    self.tf_random_seed = 4
+    self.tfp_seed = tf.constant([3, 4], tf.int32)
+    self.grad_close_rtol = 1e-2
 
   def test_init(self):
     """Tests that components are initialized correctly."""
@@ -647,22 +649,51 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
 
   @test_util.eager_mode_toggle
   def test_log_partition(self):
-    """Confirms correct value of the log partition function."""
+    """Confirms correct value of the log partition function and derivative."""
     all_bitstrings = tf.constant([[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1],
                                   [1, 0, 0], [1, 0, 1], [1, 1, 0], [1, 1, 1]],
                                  dtype=tf.int8)
-    energy = energy_model.BernoulliEnergy([5, 6, 7])
+    ebm_init = tf.keras.initializers.RandomUniform(
+        -2, -1, seed=self.tf_random_seed)
+    energy = energy_model.BernoulliEnergy([5, 6, 7], ebm_init)
     energy.build([None, energy.num_bits])
-    actual_layer = energy_infer.BernoulliEnergyInference()
+    actual_layer = energy_infer.BernoulliEnergyInference(seed=self.tfp_seed)
     actual_layer.infer(energy)
     expected_log_partition = tf.reduce_logsumexp(-1.0 * energy(all_bitstrings))
 
-    @tf.function
-    def log_partition_wrapper(layer):
-      return layer.log_partition()
+    log_partition = tf.function(actual_layer.log_partition)
 
-    actual_log_partition = log_partition_wrapper(actual_layer)
+    num_samples = int(1e6)
+    with tf.GradientTape() as tape:
+      actual_log_partition = log_partition(num_samples)
     self.assertAllClose(actual_log_partition, expected_log_partition)
+
+    old_kernel = energy.post_process[0].kernel.read_value()
+    kernel_len = tf.shape(old_kernel)[0].numpy().tolist()
+
+    def exact_log_partition(delta, k):
+      """Perturbs the kth variable and calculates the log partition."""
+      new_kernel = old_kernel + delta * tf.one_hot(k, kernel_len, 1.0, 0.0)
+      energy.set_weights([new_kernel])
+      delta_log_partition = tf.reduce_logsumexp(-1.0 * energy(all_bitstrings))
+      energy.set_weights([old_kernel])
+      return delta_log_partition
+
+    def set_exact_log_partition(k):
+      """Returns exact_log_partition at a fixed k."""
+      return lambda delta: exact_log_partition(delta, k)
+
+    derivative_list = []
+    for k in range(kernel_len):
+      this_derivative = test_util.approximate_derivative(
+          set_exact_log_partition(k))
+      derivative_list.append(this_derivative.numpy())
+
+    expected_log_partition_grad = tf.constant([derivative_list])
+    actual_log_partition_grad = tape.gradient(actual_log_partition,
+                                              energy.trainable_variables)
+    self.assertAllClose(actual_log_partition_grad, expected_log_partition_grad,
+                        self.grad_close_rtol)
 
   @test_util.eager_mode_toggle
   def test_entropy(self):

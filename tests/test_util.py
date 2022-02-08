@@ -181,3 +181,24 @@ def eager_mode_toggle(func):
     func(*args, **kwargs)
 
   return toggled_function
+
+
+def approximate_derivative(f, delta=1e-1):
+  """Approximates the derivative of f using five point stencil.
+  See wikipedia page on "five point stencil".  Note the error of this method
+  scales with delta ** 4.
+  Args:
+    f: Function to approximately differentiate.  Should take one input, which
+      is a parameter setting the perturbation to the parameter to differentiate.
+    delta: size of the fundamental perturbation in the stencil.
+  """
+  forward_twice = tf.nest.flatten(f(2.0 * delta))
+  forward_once = tf.nest.flatten(f(delta))
+  backward_once = tf.nest.flatten(f(-1.0 * delta))
+  backward_twice = tf.nest.flatten(f(-2.0 * delta))
+  numerator_flat = tf.nest.map_structure(
+      lambda a, b, c, d: -1.0 * a + 8.0 * b - 8.0 * c + d, forward_twice,
+      forward_once, backward_once, backward_twice)
+  numerator = tf.reduce_sum(
+      tf.stack(tf.nest.map_structure(tf.reduce_sum, numerator_flat)))
+  return numerator / (12.0 * delta)

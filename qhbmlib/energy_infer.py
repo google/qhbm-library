@@ -67,12 +67,12 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
 
   def expectation(self, function, num_samples: int):
     """Estimates an expectation value using sample averaging.
-
     Args:
-      function: Mapping from a batch of bitstrings to a batch of real numbers.
+      function: Mapping from a 2D tensor of bitstrings to a possibly nested
+        structure.  The structure must have atomic elements all of which are
+        float tensors with the same batch size as the input bitstrings.
       num_samples: The number of bitstring samples to use when estimating the
         expectation value of `function`.
-
     Returns:
       Expectation value of `function`.
     """
@@ -80,51 +80,58 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     @tf.custom_gradient
     def _inner_expectation():
       """Enables derivatives."""
-      samples = self.sample(num_samples)
+      samples = tf.stop_gradient(self.sample(num_samples))
       bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
 
       # TODO(#157): try to parameterize the persistence.
       with tf.GradientTape(persistent=True) as values_tape:
-        # Adds the variables in `self.energy` to the `variables` argument below.
+        # Adds variables in `self.energy` to `variables` argument of `grad_fn`.
         values_tape.watch(self.energy.trainable_variables)
         values = function(bitstrings)
-      average_of_values = utils.weighted_average(counts, values)
+        average_of_values = tf.nest.map_structure(
+            lambda x: utils.weighted_average(counts, x), values)
 
-      def grad_fn(upstream, variables):
+      def grad_fn(*upstream, variables):
         """See equation A5 in the QHBM paper appendix for details.
-
         # TODO(#119): confirm equation number.
         """
-        function_grads = values_tape.jacobian(
-            values,
+        function_grads = values_tape.gradient(
+            average_of_values,
             variables,
+            output_gradients=upstream,
             unconnected_gradients=tf.UnconnectedGradients.ZERO)
-        average_of_function_grads = [
-            utils.weighted_average(counts, fg) for fg in function_grads
-        ]
 
+        flat_upstream = tf.nest.flatten(upstream)
+        flat_values = tf.nest.flatten(values)
+        combined_flat = tf.nest.map_structure(lambda x, y: x * y, flat_upstream,
+                                              flat_values)
+        combined_flat_sum = tf.nest.map_structure(
+            lambda x: tf.map_fn(tf.reduce_sum, x), combined_flat)
+        combined_sum = tf.reduce_sum(tf.stack(combined_flat_sum), 0)
+        average_of_combined_sum = utils.weighted_average(counts, combined_sum)
+
+        # Compute grad E terms.
         with tf.GradientTape() as tape:
           energies = self.energy(bitstrings)
         energies_grads = tape.jacobian(
             energies,
             variables,
             unconnected_gradients=tf.UnconnectedGradients.ZERO)
-        average_of_energies_grads = [
-            utils.weighted_average(counts, eg) for eg in energies_grads
-        ]
+        average_of_energies_grads = tf.nest.map_structure(
+            lambda x: utils.weighted_average(counts, x), energies_grads)
 
-        products = [eg * values for eg in energies_grads]
-        product_of_averages = [
-            aeg * average_of_values for aeg in average_of_energies_grads
-        ]
-        average_of_products = [
-            utils.weighted_average(counts, p) for p in products
-        ]
+        product_of_averages = tf.nest.map_structure(
+            lambda x: x * average_of_combined_sum, average_of_energies_grads)
+
+        products = tf.nest.map_structure(
+            lambda x: tf.einsum("i...,i->i...", x, combined_sum),
+            energies_grads)
+        average_of_products = tf.nest.map_structure(
+            lambda x: utils.weighted_average(counts, x), products)
 
         return tuple(), [
-            upstream * (poa - aop + fg)
-            for poa, aop, fg in zip(product_of_averages, average_of_products,
-                                    average_of_function_grads)
+            poa - aop + fg for poa, aop, fg in zip(
+                product_of_averages, average_of_products, function_grads)
         ]
 
       return average_of_values, grad_fn
@@ -136,10 +143,59 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     """Returns an estimate of the entropy."""
     raise NotImplementedError()
 
-  @abc.abstractmethod
-  def log_partition(self):
-    """Returns an estimate of the log partition function."""
-    raise NotImplementedError()
+  def _log_partition(self, num_samples):
+    """Default estimator for the log partition function.
+
+    See equation C1 in the appendix.  TODO(#119)
+
+    Args:
+      num_samples: Number of samples to draw from the EBM.  The unique elements
+        of the set of samples are used to estimate the log partition function.
+    """
+    samples = self.sample(num_samples)
+    bitstrings, _ = utils.unique_bitstrings_with_counts(samples)
+    unique_energies = self.energy(bitstrings)
+    return tf.math.reduce_log_sum_exp(-1.0 * unique_energies)
+
+  def _log_partition_grad_generator(self, num_samples: int):
+    """Returns default estimator for the log partition function derivative.
+
+    Args:
+      num_samples: Number of EBM samples over which to average the derivative of
+        the energy function.
+    """
+
+    def grad_fn(upstream, variables):
+      """See equation C2 in the appendix.  TODO(#119)"""
+
+      def energy_grad(bitstrings):
+        """Calculates the derivative with respect to the current variables."""
+        with tf.GradientTape() as tape:
+          energies = self.energy(bitstrings)
+        jac = tape.jacobian(
+            energies,
+            variables,
+            unconnected_gradients=tf.UnconnectedGradients.ZERO)
+        return jac
+
+      energy_grad_expectation_list = self.expectation(energy_grad, num_samples)
+      return tuple(), [
+          upstream * (-1.0 * ege) for ege in energy_grad_expectation_list
+      ]
+
+    return grad_fn
+
+  def log_partition(self, num_samples):
+    """Estimates the log partition function and its derivative using samples."""
+
+    @tf.custom_gradient
+    def _inner_log_partition():
+      """Wraps forward pass computaton."""
+      result = self._log_partition(num_samples)
+      grad_fn = self._log_partition_grad_generator(num_samples)
+      return result, grad_fn
+
+    return _inner_log_partition()
 
   def call(self, inputs):
     """Returns the number of samples specified in the inputs."""
@@ -202,9 +258,10 @@ class AnalyticEnergyInference(EnergyInference):
     """See base class docstring"""
     return self._current_dist.entropy()
 
-  def log_partition(self):
-    """See base class docstring"""
+  def _log_partition(self, num_samples):
+    """See base class docstring."""
     # TODO(#115)
+    del num_samples
     return tf.reduce_logsumexp(self._current_dist.logits_parameter())
 
   def call(self, inputs):
@@ -255,7 +312,7 @@ class BernoulliEnergyInference(EnergyInference):
     """
     return tf.reduce_sum(self._current_dist.entropy())
 
-  def log_partition(self):
+  def _log_partition(self, num_samples):
     r"""Returns the exact log partition function.
 
     For a single spin of energy $\theta$, the partition function is
@@ -263,6 +320,7 @@ class BernoulliEnergyInference(EnergyInference):
     Since each spin is independent, the total log partition function is
     the sum of the individual spin log partition functions.
     """
+    del num_samples
     thetas = 0.5 * self.energy.logits
     single_log_partitions = tf.math.log(
         tf.math.exp(thetas) + tf.math.exp(-1.0 * thetas))
