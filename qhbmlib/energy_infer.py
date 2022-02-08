@@ -69,7 +69,9 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     """Estimates an expectation value using sample averaging.
 
     Args:
-      function: Mapping from a batch of bitstrings to a batch of real numbers.
+      function: Mapping from a 2D tensor of bitstrings to a possibly nested
+        structure.  The structure must have atomic elements all of which are
+        float tensors with the same batch size as the input bitstrings.
       num_samples: The number of bitstring samples to use when estimating the
         expectation value of `function`.
 
@@ -80,56 +82,60 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     @tf.custom_gradient
     def _inner_expectation():
       """Enables derivatives."""
-      samples = self.sample(num_samples)
+      samples = tf.stop_gradient(self.sample(num_samples))
       bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
 
       # TODO(#157): try to parameterize the persistence.
       with tf.GradientTape(persistent=True) as values_tape:
-        # Adds the variables in `self.energy` to the `variables` argument below.
+        # Adds variables in `self.energy` to `variables` argument of `grad_fn`.
         values_tape.watch(self.energy.trainable_variables)
         values = function(bitstrings)
-      average_of_values = utils.weighted_average(counts, values)
+        average_of_values = tf.nest.map_structure(
+            lambda x: utils.weighted_average(counts, x), values)
 
-      def grad_fn(upstream, variables):
+      def grad_fn(*upstream, variables):
         """See equation A5 in the QHBM paper appendix for details.
 
         # TODO(#119): confirm equation number.
         """
-        function_grads = values_tape.jacobian(
-            values,
+        function_grads = values_tape.gradient(
+            average_of_values,
             variables,
+            output_gradients=upstream,
             unconnected_gradients=tf.UnconnectedGradients.ZERO)
-        average_of_function_grads = [
-            utils.weighted_average(counts, fg) for fg in function_grads
-        ]
 
+        flat_upstream = tf.nest.flatten(upstream)
+        flat_values = tf.nest.flatten(values)
+        combined_flat = tf.nest.map_structure(lambda x, y: x * y, flat_upstream,
+                                              flat_values)
+        combined_flat_sum = tf.nest.map_structure(
+            lambda x: tf.map_fn(tf.reduce_sum, x), combined_flat)
+        combined_sum = tf.reduce_sum(tf.stack(combined_flat_sum), 0)
+        average_of_combined_sum = utils.weighted_average(counts, combined_sum)
+
+        # Compute grad E terms.
         with tf.GradientTape() as tape:
           energies = self.energy(bitstrings)
         energies_grads = tape.jacobian(
             energies,
             variables,
             unconnected_gradients=tf.UnconnectedGradients.ZERO)
-        average_of_energies_grads = [
-            utils.weighted_average(counts, eg) for eg in energies_grads
-        ]
+        average_of_energies_grads = tf.nest.map_structure(
+            lambda x: utils.weighted_average(counts, x), energies_grads)
 
-        # Einsum lets us control the broadcasting.
-        products = [
-            tf.einsum("i...,i->i...", eg, values) for eg in energies_grads
-        ]
-        # TODO(#161): This works because `average_of_values` is always a scalar.
-        #             Might need to change to einsum when input is generalized.
-        product_of_averages = [
-            aeg * average_of_values for aeg in average_of_energies_grads
-        ]
-        average_of_products = [
-            utils.weighted_average(counts, p) for p in products
-        ]
+        product_of_averages = tf.nest.map_structure(
+            lambda x: x * average_of_combined_sum, average_of_energies_grads)
 
+        products = tf.nest.map_structure(
+            lambda x: tf.einsum("i...,i->i...", x, combined_sum),
+            energies_grads)
+        average_of_products = tf.nest.map_structure(
+            lambda x: utils.weighted_average(counts, x), products)
+
+        # Note: upstream gradient is already a coefficient in poa, aop, and fg.
         return tuple(), [
-            upstream * (poa - aop + fg)
-            for poa, aop, fg in zip(product_of_averages, average_of_products,
-                                    average_of_function_grads)
+            poa - aop + fg for poa, aop, fg in zip(
+                product_of_averages, average_of_products, function_grads)
         ]
 
       return average_of_values, grad_fn
