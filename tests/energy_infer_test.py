@@ -443,6 +443,33 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     self.assertAllClose(
         actual_gradient_mu, tf.zeros_like(actual_gradient_mu), atol=zeros_atol)
 
+  def test_expectation_finite_difference(self):
+    """Tests a function with nested structural output."""
+
+    num_bits = 2
+    scalar_var = tf.Variable(tf.random.uniform([], -2, 2))
+    num_units = 10
+    dense = tf.keras.layers.Dense(10)
+    dense.build([None, num_bits])
+    my_variables = [scalar_var] + dense.trainable_variables
+    
+    def f(bitstrings):
+      """Returns nested batched structure which is a function of the inputs."""
+      ret_scalar = scalar_var * tf.cast(tf.reduce_sum(bitstrings, 1), tf.float32)
+      ret_vector = dense(bitstrings)
+      return [ret_scalar, ret_vector]
+
+    order = 2
+    energy = energy_model.KOBE(list(range(num_bits)), order)
+    seed = tf.constant([3, 4], tf.int32)
+    e_infer = energy_infer.AnalyticEnergyInference(num_bits, seed=seed)
+    e_infer.infer(energy)
+
+    num_samples = int(1e6)
+    with tf.GradientTape() as tape:
+      actual_expectation = e_infer.expectation(f, num_samples)
+    actual_derivative = tape.gradient(actual_expectation, my_variables)
+    
   @test_util.eager_mode_toggle
   def test_log_partition(self):
     """Confirms correct value of the log partition function."""
