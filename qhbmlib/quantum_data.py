@@ -25,20 +25,33 @@ class QuantumData(abc.ABC):
 
   @abc.abstractmethod
   def expectation(self, ops):
-    """Take the expectation value of ops against this dataset."""
-    raise NotImplementedError()
+    """Take the expectation value of ops against this dataset.
 
-  @abc.abstractmethod
-  def sample(self, ops, num_samples):
-    """Take measurements according to ops."""
+    Args:
+      ops: The observables to measure.  If `tf.Tensor`, strings with shape
+        [n_ops], result of calling `tfq.convert_to_tensor` on a list of
+        cirq.PauliSum, `[op1, op2, ...]`.  Otherwise, a Hamiltonian.
+
+    Returns:
+      `tf.Tensor` with shape [n_ops].  Entry `i` is the expectation value of
+        `ops[i]` against this quantum data source.
+    """
     raise NotImplementedError()
 
 
 class QHBMData(QuantumData):
   """QuantumData defined by a QHBM."""
 
-  def __init__(self, infer, model, num_expectation_samples):
-    """Initializes a QHBMData."""
+  def __init__(self, infer: hamiltonian_infer.QHBM, model: hamiltonian_model.Hamiltonian, num_expectation_samples: int):
+    """Initializes a QHBMData.
+
+    Args:
+      infer: An inference engine for a QHBM.
+      model: Hamiltonian whose normalized exponential is the data density
+        operator.
+      num_expectation_samples: Number of draws from the EBM associated with
+        `model` over which to average queries to this data source.
+    """
     self.infer = infer
     self.model = model
     self.num_expectation_samples = num_expectation_samples
@@ -46,7 +59,3 @@ class QHBMData(QuantumData):
   def expectation(self, ops):
     """See base class docstring."""
     return self.infer.expectation(self.model, ops, self.num_expectation_samples)
-
-  def sample(self, ops, num_samples):
-    """See base class docstring."""
-    return self.infer.sample(self.model, ops, num_samples)
