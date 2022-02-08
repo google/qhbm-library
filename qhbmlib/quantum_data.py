@@ -14,6 +14,8 @@
 # ==============================================================================
 """Interface to quantum data sources."""
 
+import abc
+
 import tensorflow as tf
 
 from qhbmlib import hamiltonian_infer

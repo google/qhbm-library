@@ -28,6 +28,12 @@ from qhbmlib import architectures
 from qhbmlib import ebm
 from qhbmlib import qhbm
 from qhbmlib import qnn
+from qhbmlib import circuit_infer
+from qhbmlib import circuit_model
+from qhbmlib import energy_infer
+from qhbmlib import energy_model
+from qhbmlib import hamiltonian_infer
+from qhbmlib import hamiltonian_model
 
 
 def get_random_qhbm(
@@ -80,6 +86,7 @@ def get_random_hamiltonian_and_inference(qubits,
 
   e_infer = energy_infer.AnalyticEnergyInference(
       num_qubits, name=identifier, seed=ebm_seed)
+  e_infer.infer(energy)
   q_infer = circuit_infer.QuantumInference(name=identifier)
 
   return hamiltonian_model.Hamiltonian(energy, circuit), hamiltonian_infer.QHBM(
