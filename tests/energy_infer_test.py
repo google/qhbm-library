@@ -116,6 +116,14 @@ class EnergyInferenceTest(tf.test.TestCase):
 class AnalyticEnergyInferenceTest(tf.test.TestCase):
   """Tests the AnalyticEnergyInference class."""
 
+  def setUp(self):
+    """Initializes test objects."""
+    super().setUp()
+    self.tf_random_seed = 4
+    self.tfp_seed = tf.constant([3, 4], tf.int32)
+    self.grad_close_rtol = 1e-2
+    self.not_zero_atol = 1e-1
+  
   def test_init(self):
     """Confirms internal values are set correctly."""
     bits = [0, 1, 3]
@@ -447,29 +455,70 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     """Tests a function with nested structural output."""
 
     num_bits = 2
-    scalar_var = tf.Variable(tf.random.uniform([], -2, 2))
+    order = 2
+    nonzero_init = tf.keras.initializers.RandomUniform(1, 2, seed=self.tf_random_seed)
+    energy = energy_model.KOBE(list(range(num_bits)), order, nonzero_init)
+    energy.build([None, num_bits])
+    # Only one trainable variable in KOBE.
+    energy_var = energy.trainable_variables[0]
+
+    scalar_var = tf.Variable(tf.random.uniform([], 1, 2, seed=self.tf_random_seed))
+    print(scalar_var)
+
     num_units = 10
-    dense = tf.keras.layers.Dense(10)
+    dense = tf.keras.layers.Dense(10, kernel_initializer=nonzero_init, bias_initializer=nonzero_init)
     dense.build([None, num_bits])
-    my_variables = [scalar_var] + dense.trainable_variables
-    
+
     def f(bitstrings):
       """Returns nested batched structure which is a function of the inputs."""
-      ret_scalar = scalar_var * tf.cast(tf.reduce_sum(bitstrings, 1), tf.float32)
+      reduced = tf.cast(tf.reduce_sum(bitstrings, 1), tf.float32)
+      ret_scalar = scalar_var * reduced
       ret_vector = dense(bitstrings)
-      return [ret_scalar, ret_vector]
+      ret_thetas = [tf.einsum("i,j->ij", reduced, energy_var)]
+      return [ret_scalar, ret_vector, ret_thetas]
 
-    order = 2
-    energy = energy_model.KOBE(list(range(num_bits)), order)
-    seed = tf.constant([3, 4], tf.int32)
-    e_infer = energy_infer.AnalyticEnergyInference(num_bits, seed=seed)
+    e_infer = energy_infer.AnalyticEnergyInference(num_bits, seed=self.tfp_seed)
     e_infer.infer(energy)
 
-    num_samples = int(1e6)
+    num_samples = int(5e7)
     with tf.GradientTape() as tape:
       actual_expectation = e_infer.expectation(f, num_samples)
-    actual_derivative = tape.gradient(actual_expectation, my_variables)
-    
+    actual_derivative = tape.gradient(actual_expectation, energy_var)
+
+    samples = e_infer.sample(num_samples)
+    bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
+    values = f(bitstrings)
+    expected_expectation = tf.nest.map_structure(lambda x: utils.weighted_average(counts, x), values)
+    tf.nest.map_structure(lambda x: self.assertAllGreater(tf.abs(x), self.not_zero_atol), expected_expectation)
+    self.assertAllClose(actual_expectation, expected_expectation)
+
+    delta = 2e-3
+    # Trainable variable of KOBE is 1D.
+    num_elts = tf.size(energy_var)
+    derivative_list = []
+    for k in range(num_elts):
+      old_value = energy_var.read_value()
+      energy_var.assign(old_value + delta * tf.one_hot(k, num_elts))
+      e_infer.infer(energy)
+      samples = e_infer.sample(num_samples)
+      bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
+      values = f(bitstrings)
+      forward_expected_expectation = tf.nest.map_structure(lambda x: utils.weighted_average(counts, x), values)
+
+      energy_var.assign(old_value - delta * tf.one_hot(k, num_elts))
+      e_infer.infer(energy)
+      samples = e_infer.sample(num_samples)
+      bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
+      values = f(bitstrings)
+      backward_expected_expectation = tf.nest.map_structure(lambda x: utils.weighted_average(counts, x), values)
+      expectation_difference = tf.nest.map_structure(tf.math.subtract, forward_expected_expectation, backward_expected_expectation)
+      expectation_difference_sum = tf.reduce_sum(tf.stack(tf.nest.map_structure(tf.reduce_sum, tf.nest.flatten(expectation_difference))))
+      derivative_list.append(expectation_difference_sum.numpy()/(2.0 * delta))
+      energy_var.assign(old_value)
+    expected_derivative = tf.constant(derivative_list)
+    tf.nest.map_structure(lambda x: self.assertAllGreater(tf.abs(x), self.not_zero_atol), expected_derivative)
+    self.assertAllClose(actual_derivative, expected_derivative, rtol=self.grad_close_rtol)
+
   @test_util.eager_mode_toggle
   def test_log_partition(self):
     """Confirms correct value of the log partition function."""

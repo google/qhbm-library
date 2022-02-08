@@ -87,7 +87,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
 
       # TODO(#157): try to parameterize the persistence.
       with tf.GradientTape(persistent=True) as values_tape:
-        # Adds the variables in `self.energy` to the `variables` argument below.
+        # Adds variables in `self.energy` to `variables` argument of `grad_fn`.
         values_tape.watch(self.energy.trainable_variables)
         values = function(bitstrings)
         average_of_values = tf.nest.map_structure(
@@ -111,10 +111,6 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
             lambda x: tf.map_fn(tf.reduce_sum, x), combined_flat)
         combined_sum = tf.reduce_sum(tf.stack(combined_flat_sum), 0)
         average_of_combined_sum = utils.weighted_average(counts, combined_sum)
-
-        print(f"combined_flat: {combined_flat}")
-        print(f"combined_flat_sum: {combined_flat_sum}")
-        print(f"combined_sum: {combined_sum}")
         
         # Compute grad E terms.
         with tf.GradientTape() as tape:
@@ -126,8 +122,6 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
         average_of_energies_grads = tf.nest.map_structure(
             lambda x: utils.weighted_average(counts, x), energies_grads)
 
-        print(f"enegies_grads: {energies_grads}")
-        
         product_of_averages = tf.nest.map_structure(
             lambda x: x * average_of_combined_sum, average_of_energies_grads)
 
