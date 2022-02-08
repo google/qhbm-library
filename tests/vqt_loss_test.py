@@ -73,6 +73,24 @@ class VQTTest(tf.test.TestCase):
       self.assertAllClose(actual_loss, expected_loss, self.close_rtol)
       self.assertAllClose(actual_loss_derivative, expected_loss_derivative, atol=self.zero_atol)
 
+      # Approximate derivate non-zero everywhere shows changing parameters works
+      # TODO(#171): This delta function seems like something general.
+      #             Would need to perturb an unrolled version of `var`,
+      #             whereas here variables are known to be 1D.
+      def delta_vqt(k, var, delta):
+        """Calculate the expectation with kth entry of `var` perturbed."""
+        num_elts = tf.size(var)
+        old_value = var.read_value()
+        var.assign(old_value + delta * tf.one_hot(k, num_elts, 1.0, 0.0))
+        data_e_infer.infer(energy)
+      samples = e_infer.sample(num_samples)
+      bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
+      values = f(bitstrings)
+      delta_expectation = tf.nest.map_structure(
+          lambda x: utils.weighted_average(counts, x), values)
+      energy_var.assign(old_value)
+      return delta_expectation
+
   @test_util.eager_mode_toggle
   def test_loss_value_x_rot(self):
     """Confirms correct values for a single qubit X rotation with H=Y.
@@ -103,6 +121,7 @@ class VQTTest(tf.test.TestCase):
       circuit = circuit_model.DirectQuantumCircuit(r_circuit, qnn_init)
       circuit.build([None, num_qubits])
 
+      # TODO(#171): code around here seems like boilerplate.
       model = hamiltonian_model.Hamiltonian(energy, circuit)
 
       # Inference definition
