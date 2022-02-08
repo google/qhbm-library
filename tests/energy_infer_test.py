@@ -513,14 +513,10 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
         expected_expectation)
     self.assertAllClose(actual_expectation, expected_expectation)
 
-    def set_delta_expectation(k):
-      """Returns delta_expectation with argument `k` fixed."""
-      return functools.partial(delta_expectation, k)
-
     derivative_list = []
     for n in range(num_elts):
       this_derivative = test_util.approximate_derivative(
-          set_delta_expectation(n))
+          functools.partial(delta_expectation, n))
       derivative_list.append(this_derivative.numpy())
     expected_derivative = tf.constant(derivative_list)
     tf.nest.map_structure(
