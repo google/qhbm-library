@@ -465,7 +465,6 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
 
     scalar_var = tf.Variable(
         tf.random.uniform([], 1, 2, tf.float32, self.tf_random_seed))
-    print(scalar_var)
 
     num_units = 5
     dense = tf.keras.layers.Dense(
