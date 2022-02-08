@@ -681,14 +681,10 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
       energy.set_weights([old_kernel])
       return delta_log_partition
 
-    def set_exact_log_partition(k):
-      """Returns exact_log_partition at a fixed k."""
-      return functools.partial(exact_log_partition, k)
-
     derivative_list = []
     for k in range(kernel_len):
       this_derivative = test_util.approximate_derivative(
-          set_exact_log_partition(k))
+          functools.partial(exact_log_partition, k))
       derivative_list.append(this_derivative.numpy())
 
     expected_log_partition_grad = tf.constant([derivative_list])
