@@ -132,6 +132,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
         average_of_products = tf.nest.map_structure(
             lambda x: utils.weighted_average(counts, x), products)
 
+        # Note: upstream gradient is already a coefficient in poa, aop, and fg.
         return tuple(), [
             poa - aop + fg for poa, aop, fg in zip(
                 product_of_averages, average_of_products, function_grads)

@@ -14,6 +14,8 @@
 # ==============================================================================
 """Tests for the energy_infer module."""
 
+import functools
+
 import tensorflow as tf
 import tensorflow_probability as tfp
 
@@ -492,7 +494,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     # Trainable variable of KOBE is 1D.
     num_elts = tf.size(energy_var)
 
-    def delta_expectation(delta, k):
+    def delta_expectation(k, delta):
       """Calculate the expectation with kth variable perturbed."""
       old_value = energy_var.read_value()
       energy_var.assign(old_value + delta * tf.one_hot(k, num_elts, 1.0, 0.0))
@@ -512,8 +514,8 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     self.assertAllClose(actual_expectation, expected_expectation)
 
     def set_delta_expectation(k):
-      """Fixes k in delta_expectation"""
-      return lambda delta: delta_expectation(delta, k)
+      """Returns delta_expectation with argument `k` fixed."""
+      return functools.partial(delta_expectation, k)
 
     derivative_list = []
     for n in range(num_elts):
