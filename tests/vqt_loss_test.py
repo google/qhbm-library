@@ -104,6 +104,8 @@ class VQTTest(tf.test.TestCase):
       model_infer.e_inference.infer(model_h.energy)
       return delta_loss
 
+    num_samples = tf.constant(int(1e7))
+
     for num_qubits in self.num_qubits_list:
       print(f"num_qubits: {num_qubits}")
       qubits = cirq.GridQubit.rect(1, num_qubits)
@@ -119,7 +121,6 @@ class VQTTest(tf.test.TestCase):
           f"hamiltonian_objects_{num_qubits}",
           ebm_seed=self.tfp_seed_alt)
 
-      num_samples = tf.constant(int(1e7))
       beta = tf.random.uniform([], 0.01, 100)
       vqt = tf.function(vqt_loss.vqt)
 
