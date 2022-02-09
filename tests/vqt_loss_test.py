@@ -89,11 +89,26 @@ class VQTTest(tf.test.TestCase):
   def test_hamiltonian_vqt(self):
     """Tests derivatives of VQT with respect to both model and data."""
 
+    # TODO(#171): This delta function seems like something general.
+    #             Would need to perturb an unrolled version of `var`,
+    #             whereas here variables are known to be 1D.
+    def delta_vqt(k, var, model_infer, model_h, data_h, num_samples, beta,
+                  delta):
+      """Calculate the expectation with kth entry of `var` perturbed."""
+      num_elts = tf.size(var)
+      old_value = var.read_value()
+      var.assign(old_value + delta * tf.one_hot(k, num_elts, 1.0, 0.0))
+      model_infer.e_inference.infer(model_h.energy)
+      delta_loss = vqt(model_infer, model_h, num_samples, data_h, beta)
+      var.assign(old_value)
+      model_infer.e_inference.infer(model_h.energy)
+      return delta_loss
+
     for num_qubits in self.num_qubits_list:
       print(f"num_qubits: {num_qubits}")
       qubits = cirq.GridQubit.rect(1, num_qubits)
       num_layers = 1
-      data_h, data_infer = test_util.get_random_hamiltonian_and_inference(
+      data_h, _ = test_util.get_random_hamiltonian_and_inference(
           qubits,
           num_layers,
           f"data_objects_{num_qubits}",
@@ -115,30 +130,18 @@ class VQTTest(tf.test.TestCase):
       actual_derivative_data = tape.gradient(actual_loss,
                                              data_h.trainable_variables)
 
-      # TODO(#171): This delta function seems like something general.
-      #             Would need to perturb an unrolled version of `var`,
-      #             whereas here variables are known to be 1D.
-      def delta_vqt(k, var, delta):
-        """Calculate the expectation with kth entry of `var` perturbed."""
-        num_elts = tf.size(var)
-        old_value = var.read_value()
-        var.assign(old_value + delta * tf.one_hot(k, num_elts, 1.0, 0.0))
-        model_infer.e_inference.infer(model_h.energy)
-        delta_loss = vqt(model_infer, model_h, num_samples, data_h, beta)
-        var.assign(old_value)
-        model_infer.e_inference.infer(model_h.energy)
-        return delta_loss
-
       expected_derivative_model = []
       for var in model_h.trainable_variables:
         var_derivative_list = []
         num_elts = tf.size(var)
         for n in range(num_elts):
           this_derivative = test_util.approximate_derivative(
-              functools.partial(delta_vqt, n, var), delta=2e-1)
+              functools.partial(delta_vqt, n, var, model_infer, model_h, data_h,
+                                num_samples, beta),
+              delta=2e-1)
           var_derivative_list.append(this_derivative.numpy())
         expected_derivative_model.append(tf.constant(var_derivative_list))
-      # Changing the model parameters is working if finite difference derivatives
+      # Changing model parameters is working if finite difference derivatives
       # are non-zero.  Also confirms that model_h and data_h are different.
       tf.nest.map_structure(
           lambda x: self.assertAllGreater(tf.abs(x), self.not_zero_atol),
@@ -146,6 +149,27 @@ class VQTTest(tf.test.TestCase):
       self.assertAllClose(
           actual_derivative_model,
           expected_derivative_model,
+          rtol=self.close_rtol)
+
+      expected_derivative_data = []
+      for var in data_h.trainable_variables:
+        var_derivative_list = []
+        num_elts = tf.size(var)
+        for n in range(num_elts):
+          this_derivative = test_util.approximate_derivative(
+              functools.partial(delta_vqt, n, var, model_infer, model_h, data_h,
+                                num_samples, beta),
+              delta=2e-1)
+          var_derivative_list.append(this_derivative.numpy())
+        expected_derivative_data.append(tf.constant(var_derivative_list))
+      # Changing data parameters is working if finite difference derivatives
+      # are non-zero.  Also confirms that model_h and data_h are different.
+      tf.nest.map_structure(
+          lambda x: self.assertAllGreater(tf.abs(x), self.not_zero_atol),
+          expected_derivative_data)
+      self.assertAllClose(
+          actual_derivative_data,
+          expected_derivative_data,
           rtol=self.close_rtol)
 
   @test_util.eager_mode_toggle
