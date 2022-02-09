@@ -37,13 +37,16 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
   in this class means estimating quantities of interest relative to the EBM.
   """
 
-  def __init__(self, name: Union[None, str] = None):
+  def __init__(self, num_samples: int, name: Union[None, str] = None):
     """Initializes an EnergyInference.
 
     Args:
+      num_samples: Number of samples to use when estimating the log partition
+        function.
       name: Optional name for the model.
     """
     super().__init__(name=name)
+    self.num_samples = num_samples
 
   @abc.abstractmethod
   def infer(self, energy: energy_model.BitstringEnergy):
