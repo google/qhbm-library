@@ -37,13 +37,15 @@ class VQTTest(tf.test.TestCase):
   def setUp(self):
     """Initializes test objects."""
     super().setUp()
-    self.num_qubits_list = [1, 2]
-    self.tf_random_seed = 7
-    self.tfp_seed = tf.constant([3, 4], tf.int32)
-    self.tfp_seed_alt = tf.constant([7, 8], tf.int32)
-    self.close_rtol = 1e-2
+    self.num_qubits_list = [1, 2, 3]
+    self.tf_random_seed = 4
+    self.tf_random_seed_alt = 6
+    self.tfp_seed = tf.constant([7, 8], tf.int32)
+    self.tfp_seed_alt = tf.constant([9, 10], tf.int32)
+    self.num_samples = int(5e6)
+    self.close_rtol = 3e-2  # tolerance depends on samples
     self.zero_atol = 1e-3
-    self.not_zero_atol = 2e-2
+    self.not_zero_atol = 2e-3
 
   @test_util.eager_mode_toggle
   def test_self_vqt(self):
@@ -66,7 +68,6 @@ class VQTTest(tf.test.TestCase):
       data_h.set_weights(model_h.get_weights())
       data_infer.e_inference.infer(data_h.energy)
 
-      num_samples = tf.constant(int(1e6))
       beta = 1.0  # Data and model are only the same if beta == 1
       vqt = tf.function(vqt_loss.vqt)
 
@@ -78,7 +79,7 @@ class VQTTest(tf.test.TestCase):
       ]
 
       with tf.GradientTape() as tape:
-        actual_loss = vqt(model_infer, model_h, num_samples, data_h, beta)
+        actual_loss = vqt(model_infer, model_h, self.num_samples, data_h, beta)
       actual_loss_derivative = tape.gradient(actual_loss,
                                              model_h.trainable_variables)
       self.assertAllClose(actual_loss, expected_loss, self.close_rtol)
@@ -104,8 +105,7 @@ class VQTTest(tf.test.TestCase):
       model_infer.e_inference.infer(model_h.energy)
       return delta_loss
 
-    num_samples = tf.constant(int(2e6))
-    delta = 2e-1
+    delta = 1e-1
     vqt = tf.function(vqt_loss.vqt)
     
     def vqt_derivative(variables_list, model_infer, model_h, data_h, beta):
@@ -117,7 +117,7 @@ class VQTTest(tf.test.TestCase):
         for n in range(num_elts):
           this_derivative = test_util.approximate_derivative(
             functools.partial(delta_vqt, n, var, model_infer, model_h, data_h,
-                              num_samples, beta),
+                              self.num_samples, beta),
             delta=delta)
           var_derivative_list.append(this_derivative.numpy())
         derivatives.append(tf.constant(var_derivative_list))
@@ -130,17 +130,19 @@ class VQTTest(tf.test.TestCase):
           qubits,
           num_layers,
           f"data_objects_{num_qubits}",
+          initializer_seed=self.tf_random_seed,
           ebm_seed=self.tfp_seed)
       model_h, model_infer = test_util.get_random_hamiltonian_and_inference(
           qubits,
           num_layers,
           f"hamiltonian_objects_{num_qubits}",
+          initializer_seed=self.tf_random_seed_alt,
           ebm_seed=self.tfp_seed_alt)
 
-      beta = tf.random.uniform([], 0.01, 100)
+      beta = tf.random.uniform([], 0.1, 10)
 
       with tf.GradientTape() as tape:
-        actual_loss = vqt(model_infer, model_h, num_samples, data_h, beta)
+        actual_loss = vqt(model_infer, model_h, self.num_samples, data_h, beta)
       actual_derivative_model, actual_derivative_data = tape.gradient(actual_loss,
                                                                       (model_h.trainable_variables, data_h.trainable_variables))
 
@@ -202,7 +204,6 @@ class VQTTest(tf.test.TestCase):
       qhbm_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
 
       # Generate remaining VQT arguments
-      test_num_samples = tf.constant(5e6)
       test_h = tfq.convert_to_tensor(
           [cirq.PauliSum.from_pauli_strings(cirq.Y(q) for q in qubits)])
       test_beta = tf.random.uniform([], 0.01, 100.0, tf.float32,
@@ -214,7 +215,7 @@ class VQTTest(tf.test.TestCase):
       # QNN has only one tf.Variable
       test_phis = model.circuit.trainable_variables[0]
       actual_expectation = qhbm_infer.expectation(model, test_h,
-                                                  test_num_samples)[0]
+                                                  self.num_samples)[0]
       expected_expectation = tf.reduce_sum(
           tf.math.tanh(test_thetas) * tf.math.sin(test_phis))
       self.assertAllClose(
@@ -228,7 +229,7 @@ class VQTTest(tf.test.TestCase):
           actual_entropy, expected_entropy, rtol=self.close_rtol)
 
       with tf.GradientTape() as tape:
-        actual_loss = vqt(qhbm_infer, model, test_num_samples, test_h,
+        actual_loss = vqt(qhbm_infer, model, self.num_samples, test_h,
                           test_beta)
       expected_loss = test_beta * expected_expectation - expected_entropy
       self.assertAllClose(actual_loss, expected_loss, rtol=self.close_rtol)

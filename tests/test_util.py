@@ -69,6 +69,7 @@ def get_random_hamiltonian_and_inference(qubits,
                                          maxval_thetas=1.0,
                                          minval_phis=-1.0,
                                          maxval_phis=1.0,
+                                         initializer_seed=None,
                                          ebm_seed=None):
   """Create a random QHBM for use in testing."""
   num_qubits = len(qubits)
