@@ -25,7 +25,8 @@ from qhbmlib import hamiltonian_model
 
 def vqt(qhbm_infer: hamiltonian_infer.QHBM,
         model: hamiltonian_model.Hamiltonian, num_samples: tf.Tensor,
-        hamiltonian: Union[tf.Tensor, hamiltonian_model.Hamiltonian], beta: tf.Tensor):
+        hamiltonian: Union[tf.Tensor,
+                           hamiltonian_model.Hamiltonian], beta: tf.Tensor):
   """Computes the VQT loss of a given QHBM and Hamiltonian.
 
   This function is differentiable within a `tf.GradientTape` scope.
@@ -63,7 +64,8 @@ def vqt(qhbm_infer: hamiltonian_infer.QHBM,
           counts,
           hamiltonian.operator_shards,
           reduce=False)
-      h_expectations = hamiltonian.energy.operator_expectation(expectation_shards)
+      h_expectations = hamiltonian.energy.operator_expectation(
+          expectation_shards)
     else:
       raise NotImplementedError(
           "General `BitstringEnergy` hamiltonians not yet supported.")
