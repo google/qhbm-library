@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Impementation of the QMHL loss function."""
+"""Implementation of the QMHL loss function."""
 
 from qhbmlib import hamiltonian_infer
 from qhbmlib import hamiltonian_model
@@ -29,10 +29,28 @@ def qmhl(data: quantum_data.QuantumData,
   Args:
     data: The data mixed state to learn.
     infer: Inference engine for the model.
-    model: Hamiltonian whose normalized exponential approxmimates `data`.
+    model: Hamiltonian whose normalized exponential approximates `data`.
 
   Returns:
     The quantum cross-entropy between the data and the model.
   """
   infer.e_inference.infer(model.energy)
   return data.expectation(model) + infer.e_inference.log_partition()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
