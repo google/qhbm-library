@@ -51,8 +51,6 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
         after every inference call.  Otherwise, the seed is fixed.
     """
     super().__init__(name=name)
-    self._update_seed = tf.Variable(True)
-    self.seed = initial_seed
     self._energy = input_energy
     self._tracked_variables = input_energy.variables
     if len(self._tracked_variables) == 0:
@@ -63,6 +61,13 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
           for v in self._tracked_variables
       ]
       self._checkpoint = True
+
+    if initial_seed is None:
+      self._update_seed = tf.Variable(True)
+    else:
+      self._update_seed = tf.Variable(False)
+    self._seed = tf.random.sanitize_seed(initial_seed)
+
     self._checkpoint_variables()
     self._ready_inference()
 
@@ -70,7 +75,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
   def seed(self):
     """Current TFP compatible seed controlling sampling behavior."""
     return self._seed
-
+    
   @seed.setter
   def seed(self, initial_seed: Union[None, tf.Tensor]):
     """Sets a new value of the random seed.
