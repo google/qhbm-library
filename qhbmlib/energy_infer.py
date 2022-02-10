@@ -55,7 +55,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     """
     raise NotImplementedError()
 
-  def _if_variables_updated(self, f):
+  def _if_variables_updated(f):
     """Wraps given function to automate inference calls.
 
     This decorator wraps the given function to so it performsd the following
@@ -68,11 +68,15 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     Returns:
       wrapper: The wrapped function.
     """
-    def wrapper(*args, **kwargs):
+    # def true_fn(self):
+    #   self._checkpoint_variables()
+    #   self._ready_inference()
+    def wrapper(self, *args, **kwargs):
+#      tf.cond(self.variables_updated, lambda: true_fn(self), lambda: None)
       if self.variables_updated:
         self._checkpoint_variables()
         self._ready_inference()
-      return f(args, kwargs)
+      return f(self, *args, **kwargs)
     return wrapper
 
   @_if_variables_updated
@@ -109,15 +113,22 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
   @property
   def variables_updated(self):
     """Returns True if tracked variables do not have the checkpointed values."""
-    variables_not_equal_list = tf.nest.map_structure(
-        tf.math.reduce_any(tf.math.not_equal(ev, evc)),
-        self._tracked_variables,
-        self._tracked_variables_checkpoint)
-    return tf.math.reduce_any(tf.stack(variables_not_equal_list))
+    if self._checkpoint:
+      variables_not_equal_list = tf.nest.map_structure(
+          lambda v, vc: tf.math.reduce_any(tf.math.not_equal(v, vc)),
+          self._tracked_variables,
+          self._tracked_variables_checkpoint)
+      return tf.math.reduce_any(tf.stack(variables_not_equal_list))
+    else:
+      return False
 
-  def checkpoint_variables(self):
+  def _checkpoint_variables(self):
     """Checkpoints the currently tracked variables."""
-    self._tracked_variables_checkpoint = [v.read_value() for v in self._tracked_variables]
+    if self._checkpoint:
+      tf.nest.map_structure(
+          lambda v, vc: vc.assign(v),
+          self._tracked_variables,
+          self._tracked_variables_checkpoint)
   
   def update_energy(self, energy: energy_model.BitstringEnergy):
     """Tells the inference engine what energy function to track.
@@ -130,6 +141,14 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     """
     self.energy = energy
     self._tracked_variables = energy.variables
+    if len(self._tracked_variables) == 0:
+      self._checkpoint = False
+    else:
+      self._tracked_variables_checkpoint = [
+          tf.Variable(v.read_value(), trainable=False)
+          for v in self._tracked_variables
+      ]
+      self._checkpoint = True
     self._checkpoint_variables()
     self._ready_inference()
   
@@ -240,10 +259,6 @@ class AnalyticEnergyInference(EnergyInference):
     """
     super().__init__(name=name)
     self.seed = seed
-    self._all_bitstrings = tf.constant(
-        list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
-    self._dist_realization = tfp.layers.DistributionLambda(
-        make_distribution_fn=lambda t: tfd.Categorical(logits=-1 * t))
 
   @property
   def all_bitstrings(self):
@@ -256,34 +271,41 @@ class AnalyticEnergyInference(EnergyInference):
     return self.energy(self.all_bitstrings)
 
   @property
-  def current_dist(self):
+  def distribution(self):
     """Categorical distribution set during `self._ready_inference`."""
-    return self._current_dist
+    return self._distribution
 
   def _ready_inference(self):
     """See base class docstring."""
     x = tf.squeeze(self.all_energies)
-    self._current_dist = self._dist_realization(x)
+    self._logits_variable.assign(-1.0 * x)
 
+  def update_energy(self, energy):
+    self._all_bitstrings = tf.constant(
+        list(itertools.product([0, 1], repeat=energy.num_bits)), dtype=tf.int8)
+    self._logits_variable = tf.Variable(-1.0 * energy(self.all_bitstrings))
+    self._distribution = tfd.Categorical(logits=self._logits_variable)
+    super().update_energy(energy)
+    
   def _sample(self, n):
     """See base class docstring"""
     return tf.gather(
         self.all_bitstrings,
-        self._current_dist.sample(n, seed=self.seed),
+        self._distribution.sample(n, seed=self.seed),
         axis=0)
 
   def _entropy(self):
     """See base class docstring"""
-    return self._current_dist.entropy()
+    return self._distribution.entropy()
 
   def _log_partition(self):
     """See base class docstring"""
     # TODO(#115)
-    return tf.reduce_logsumexp(self._current_dist.logits_parameter())
+    return tf.reduce_logsumexp(self._distribution.logits_parameter())
 
   def call(self, inputs):
     if inputs is None:
-      return self._current_dist
+      return self._distribution
     else:
       return self.sample(inputs)
 
@@ -301,31 +323,34 @@ class BernoulliEnergyInference(EnergyInference):
     """
     super().__init__(name=name)
     self.seed = seed
-    self._dist_realization = tfp.layers.DistributionLambda(
-        make_distribution_fn=lambda t: tfd.Bernoulli(logits=t, dtype=tf.int8))
 
   @property
-  def current_dist(self):
+  def distribution(self):
     """Bernoulli distribution set during `self._ready_inference`."""
-    return self._current_dist
+    return self._distribution
 
-  def _ready_inference(self, energy):
+  def _ready_inference(self):
     """See base class docstring."""
-    self._current_dist = self._dist_realization(self.energy.logits)
+    self._logits_variable.assign(self.energy.logits)
 
-  def sample(self, n):
+  def update_energy(self, energy):
+    self._logits_variable = tf.Variable(energy.logits, trainable=False)
+    self._distribution = tfd.Bernoulli(logits=self._logits_variable, dtype=tf.int8)
+    super().update_energy(energy)
+
+  def _sample(self, n):
     """See base class docstring"""
-    return self._current_dist.sample(n, seed=self.seed)
+    return self._distribution.sample(n, seed=self.seed)
 
-  def entropy(self):
+  def _entropy(self):
     """Returns the exact entropy.
 
     The total entropy of a set of spins is the sum of each individual spin's
     entropies.
     """
-    return tf.reduce_sum(self._current_dist.entropy())
+    return tf.reduce_sum(self._distribution.entropy())
 
-  def log_partition(self):
+  def _log_partition(self):
     r"""Returns the exact log partition function.
 
     For a single spin of energy $\theta$, the partition function is
@@ -340,6 +365,6 @@ class BernoulliEnergyInference(EnergyInference):
 
   def call(self, inputs):
     if inputs is None:
-      return self._current_dist
+      return self._distribution
     else:
       return self.sample(inputs)

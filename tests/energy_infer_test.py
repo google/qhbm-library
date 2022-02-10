@@ -46,11 +46,11 @@ class EnergyInferenceTest(tf.test.TestCase):
       self.bitstring_2 = bitstring_2
       self.p_1 = p_1
 
-    def infer(self, energy):
-      """Ignores the energy."""
-      self.energy = energy
+    def _ready_inference(self):
+      """Does nothing."""
+      pass
 
-    def sample(self, n):
+    def _sample(self, n):
       """Deterministically samples bitstrings."""
       n_1 = round(self.p_1 * n)
       n_2 = n - n_1
@@ -58,14 +58,14 @@ class EnergyInferenceTest(tf.test.TestCase):
       bitstring_2_tile = tf.tile(tf.expand_dims(self.bitstring_2, 0), [n_2, 1])
       return tf.concat([bitstring_1_tile, bitstring_2_tile], 0)
 
-    def entropy(self):
+    def _entropy(self):
       """Not implemented in this test class."""
       raise NotImplementedError()
 
-    def log_partition(self):
+    def _log_partition(self):
       """Not implemented in this test class."""
       raise NotImplementedError()
-
+    
   class NullEnergy(energy_model.BitstringEnergy):
     """Simple empty energy."""
 
@@ -73,6 +73,22 @@ class EnergyInferenceTest(tf.test.TestCase):
       """Initializes a NullEnergy."""
       energy_layers = []
       super().__init__(bits, energy_layers)
+
+  class InferenceCheck(energy_infer.EnergyInference):
+    """Class for checking variable updating."""
+
+    def _sample(self, n):
+      """Default implementation wrapped by `self.sample`."""
+      raise NotImplementedError()
+
+    def _entropy(self):
+      """Default implementation wrapped by `self.entropy`."""
+      raise NotImplementedError()
+
+    def _log_partition(self):
+      """Default implementation wrapped by `self.log_partition`."""
+      raise NotImplementedError()
+
 
   def setUp(self):
     """Initializes test objects."""
@@ -83,7 +99,7 @@ class EnergyInferenceTest(tf.test.TestCase):
     self.e_infer = self.TwoOutcomes(self.bitstring_1, self.bitstring_2,
                                     self.p_1)
     self.energy = self.NullEnergy(list(range(5)))
-    self.e_infer.infer(self.energy)
+    self.e_infer.update_energy(self.energy)
     spins_from_bitstrings = energy_model_utils.SpinsFromBitstrings()
     parity = energy_model_utils.Parity(list(range(5)), 2)
 
@@ -135,15 +151,14 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
         len(bits), expected_name)
     self.assertEqual(actual_layer.name, expected_name)
 
+    energy = energy_model.KOBE(bits, order)
     expected_bitstrings = tf.constant(
         [[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1], [1, 0, 0], [1, 0, 1],
          [1, 1, 0], [1, 1, 1]],
         dtype=tf.int8)
-    self.assertAllEqual(actual_layer.all_bitstrings, expected_bitstrings)
-
-    energy = energy_model.KOBE(bits, order)
     expected_energies = energy(expected_bitstrings)
-    actual_layer.infer(energy)
+    actual_layer.update_energy(energy)
+    self.assertAllEqual(actual_layer.all_bitstrings, expected_bitstrings)
     self.assertAllClose(actual_layer.all_energies, expected_energies)
 
   @test_util.eager_mode_toggle
@@ -165,7 +180,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     one_bit_energy.set_weights([tf.constant([0.0])])
 
     # TODO(#115)
-    actual_layer.infer(one_bit_energy)
+    actual_layer.update_energy(one_bit_energy)
     samples = sample_wrapper(n_samples)
     # check that we got both bitstrings
     self.assertTrue(
@@ -180,7 +195,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
 
     # Large energy penalty pins the bit.
     one_bit_energy.set_weights([tf.constant([100.0])])
-    actual_layer.infer(one_bit_energy)
+    actual_layer.update_energy(one_bit_energy)
 
     # TODO(#115): Currently need to redefine wrapper,
     #             investigate resolving this with auto inference.
@@ -202,7 +217,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     three_bit_energy = energy_model.KOBE([0, 1, 2], 3,
                                          tf.keras.initializers.Constant(0.0))
     actual_layer = energy_infer.AnalyticEnergyInference(3, seed=seed)
-    actual_layer.infer(three_bit_energy)
+    actual_layer.update_energy(three_bit_energy)
 
     @tf.function
     def sample_wrapper_3(num_samples):
@@ -226,7 +241,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     # Confirm correlated spins.
     three_bit_energy.set_weights(
         [tf.constant([100.0, 0.0, 0.0, -100.0, 0.0, 100.0, 0.0])])
-    actual_layer.infer(three_bit_energy)
+    actual_layer.update_energy(three_bit_energy)
 
     # TODO(#115): Currently need to redefine wrapper,
     #             investigate resolving this with auto inference.
@@ -262,7 +277,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     energy = energy_model.KOBE(list(range(num_bits)), 2)
     energy.build([None, num_bits])
     actual_layer = energy_infer.AnalyticEnergyInference(num_bits, seed=seed)
-    actual_layer.infer(energy)
+    actual_layer.update_energy(energy)
 
     @tf.function
     def sample_wrapper(n_samples):
@@ -367,7 +382,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
 
     seed = tf.constant([3, 4], tf.int32)
     e_infer = energy_infer.AnalyticEnergyInference(num_bits, seed=seed)
-    e_infer.infer(energy)
+    e_infer.update_energy(energy)
 
     @tf.function
     def expectation_wrapper(function, n_samples):
@@ -380,11 +395,9 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     expected_gradient_mu = prob_x_star
 
     num_samples = int(5e6)
-    with tf.GradientTape(persistent=True) as tape:
+    with tf.GradientTape() as tape:
       actual_average = expectation_wrapper(f, num_samples)
-    actual_gradient_theta = tape.gradient(actual_average, theta)
-    actual_gradient_mu = tape.gradient(actual_average, mu)
-    del tape
+    actual_gradient_theta, actual_gradient_mu = tape.gradient(actual_average, (theta, mu))
 
     # Confirm gradients are not negligible
     not_negligible_atol = 1e-1
@@ -409,11 +422,9 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     mul_expected_gradient_theta = mul_const * expected_gradient_theta
     mul_expected_gradient_mu = mul_const * expected_gradient_mu
 
-    with tf.GradientTape(persistent=True) as tape:
+    with tf.GradientTape() as tape:
       actual_average = expectation_wrapper(wrap_f, num_samples)
-    actual_gradient_theta = tape.gradient(actual_average, theta)
-    actual_gradient_mu = tape.gradient(actual_average, mu)
-    del tape
+    actual_gradient_theta, actual_gradient_mu = tape.gradient(actual_average, (theta, mu))
 
     self.assertAllClose(
         actual_average, mul_expected_average, atol=closeness_atol)
@@ -428,11 +439,9 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     expected_gradient_theta = theta * prob_x_star * (prob_x_star -
                                                      1) + prob_x_star
 
-    with tf.GradientTape(persistent=True) as tape:
+    with tf.GradientTape() as tape:
       actual_average = expectation_wrapper(g, num_samples)
-    actual_gradient_theta = tape.gradient(actual_average, theta)
-    actual_gradient_mu = tape.gradient(actual_average, mu)
-    del tape
+    actual_gradient_theta, actual_gradient_mu = tape.gradient(actual_average, (theta, mu))
 
     # Confirm gradients are not negligible
     self.assertAllGreater(
@@ -484,7 +493,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
       return [ret_scalar, ret_vector, ret_thetas]
 
     e_infer = energy_infer.AnalyticEnergyInference(num_bits, seed=self.tfp_seed)
-    e_infer.infer(energy)
+    e_infer.update_energy(energy)
 
     num_samples = int(2e6)
     with tf.GradientTape() as tape:
@@ -498,7 +507,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
       """Calculate the expectation with kth variable perturbed."""
       old_value = energy_var.read_value()
       energy_var.assign(old_value + delta * tf.one_hot(k, num_elts, 1.0, 0.0))
-      e_infer.infer(energy)
+      e_infer.update_energy(energy)
       samples = e_infer.sample(num_samples)
       bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
       values = f(bitstrings)
@@ -535,7 +544,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     energy.build([None, energy.num_bits])
     actual_layer = energy_infer.AnalyticEnergyInference(2)
     energy.set_weights([test_thetas])
-    actual_layer.infer(energy)
+    actual_layer.update_energy(energy)
 
     @tf.function
     def log_partition_wrapper(layer):
@@ -554,7 +563,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     energy.build([None, energy.num_bits])
     actual_layer = energy_infer.AnalyticEnergyInference(2)
     energy.set_weights([test_thetas])
-    actual_layer.infer(energy)
+    actual_layer.update_energy(energy)
 
     @tf.function
     def entropy_wrapper(layer):
@@ -570,14 +579,12 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     one_bit_energy = energy_model.KOBE([0], 1,
                                        tf.keras.initializers.Constant(0.0))
     actual_layer = energy_infer.AnalyticEnergyInference(1, seed=seed)
-    self.assertIsNone(actual_layer.current_dist)
     with self.assertRaisesRegex(
-        RuntimeError, expected_regex="`infer` must be called"):
+        AttributeError, expected_regex="_distribution"):
       _ = actual_layer(None)
-    actual_layer.infer(one_bit_energy)
+    actual_layer.update_energy(one_bit_energy)
     actual_dist = actual_layer(None)
-    self.assertIsInstance(actual_dist.tensor_distribution,
-                          tfp.distributions.Categorical)
+    self.assertIsInstance(actual_dist, tfp.distributions.Categorical)
 
     n_samples = 1e7
 
@@ -618,7 +625,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
 
     # For single factor Bernoulli, theta = 0 is 50% chance of 1.
     energy.set_weights([tf.constant([0.0])])
-    actual_layer.infer(energy)
+    actual_layer.update_energy(energy)
 
     @tf.function
     def sample_wrapper(num_samples):
@@ -638,7 +645,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
 
     # Large value of theta pins the bit.
     energy.set_weights([tf.constant([1000.0])])
-    actual_layer.infer(energy)
+    actual_layer.update_energy(energy)
 
     # TODO(#115): Currently need to redefine wrapper,
     #             investigate resolving this with auto inference.
@@ -656,7 +663,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
                                           tf.keras.initializers.Constant(0.0))
     energy.build([None, energy.num_bits])
     actual_layer = energy_infer.BernoulliEnergyInference(seed=seed)
-    actual_layer.infer(energy)
+    actual_layer.update_energy(energy)
 
     @tf.function
     def sample_wrapper_3(num_samples):
@@ -676,7 +683,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
 
     # Test one pinned, one free bit
     energy.set_weights([tf.constant([-1000.0, 0.0])])
-    actual_layer.infer(energy)
+    actual_layer.update_energy(energy)
 
     # TODO(#115): Currently need to redefine wrapper,
     #             investigate resolving this with auto inference.
@@ -704,7 +711,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     energy = energy_model.BernoulliEnergy(list(range(num_bits)))
     energy.build([None, num_bits])
     actual_layer = energy_infer.BernoulliEnergyInference(seed=seed)
-    actual_layer.infer(energy)
+    actual_layer.update_energy(energy)
 
     @tf.function
     def sample_wrapper(num_samples):
@@ -736,7 +743,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     energy = energy_model.BernoulliEnergy([5, 6, 7])
     energy.build([None, energy.num_bits])
     actual_layer = energy_infer.BernoulliEnergyInference()
-    actual_layer.infer(energy)
+    actual_layer.update_energy(energy)
     expected_log_partition = tf.reduce_logsumexp(-1.0 * energy(all_bitstrings))
 
     @tf.function
@@ -776,7 +783,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     energy.build([None, energy.num_bits])
     actual_layer = energy_infer.BernoulliEnergyInference()
     energy.set_weights([test_thetas])
-    actual_layer.infer(energy)
+    actual_layer.update_energy(energy)
 
     @tf.function
     def entropy_wrapper(layer):
@@ -793,14 +800,12 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
                                           tf.keras.initializers.Constant(0.0))
     energy.build([None, energy.num_bits])
     actual_layer = energy_infer.BernoulliEnergyInference(seed=seed)
-    self.assertIsNone(actual_layer.current_dist)
     with self.assertRaisesRegex(
-        RuntimeError, expected_regex="`infer` must be called"):
+        AttributeError, expected_regex="_distribution"):
       _ = actual_layer(None)
-    actual_layer.infer(energy)
+    actual_layer.update_energy(energy)
     actual_dist = actual_layer(None)
-    self.assertIsInstance(actual_dist.tensor_distribution,
-                          tfp.distributions.Bernoulli)
+    self.assertIsInstance(actual_dist, tfp.distributions.Bernoulli)
 
     # For single factor Bernoulli, theta = 0 is 50% chance of 1.
     n_samples = 1e7
