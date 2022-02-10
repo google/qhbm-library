@@ -52,6 +52,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     """
     super().__init__(name=name)
     self._energy = input_energy
+    self._energy.build([None, self._energy.num_bits])
     self._tracked_variables = input_energy.variables
     if len(self._tracked_variables) == 0:
       self._checkpoint = False
@@ -63,10 +64,10 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
       self._checkpoint = True
 
     if initial_seed is None:
-      self._update_seed = tf.Variable(True)
+      self._update_seed = tf.Variable(True, trainable=False)
     else:
-      self._update_seed = tf.Variable(False)
-    self._seed = tf.random.sanitize_seed(initial_seed)
+      self._update_seed = tf.Variable(False, trainable=False)
+    self._seed = tf.Variable(tfp.random.sanitize_seed(initial_seed), trainable=False)
 
     self._checkpoint_variables()
     self._ready_inference()
@@ -89,7 +90,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
       self._update_seed.assign(True)
     else:
       self._update_seed.assign(False)
-    self._seed = tf.random.sanitize_seed(initial_seed)
+    self._seed.assign(tfp.random.sanitize_seed(initial_seed))
 
   @abc.abstractmethod
   def _ready_inference(self):
@@ -101,11 +102,14 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     raise NotImplementedError()
 
   def _preface_every_call(f):
-    """Wraps given function to automate inference calls.
+    """Wraps given function with things to run before every inference call.
 
-    This decorator wraps the given function to so it performsd the following
+    This decorator wraps the given function to so it performs the following
     check: if the values of the variables in `self.energy` have changed since
     the last checkpoint, call `self._ready_inference` before proceeding.
+
+    As well, this decorator wraps the given function so it changes the seed
+    if not set by the user during initialization.
 
     Args:
       f: The method of `EnergyInference` to wrap.
@@ -115,7 +119,8 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     """
     def wrapper(self, *args, **kwargs):
       if self._update_seed:
-        self._seed, _ = tf.random.split_seed(self.seed)
+        new_seed, _ = tfp.random.split_seed(self.seed)
+        self._seed.assign(new_seed)
       if self.variables_updated:
         self._checkpoint_variables()
         self._ready_inference()
@@ -310,8 +315,7 @@ class AnalyticEnergyInference(EnergyInference):
 
   def _ready_inference(self):
     """See base class docstring."""
-    x = tf.squeeze(self.all_energies)
-    self._logits_variable.assign(-1.0 * x)
+    self._logits_variable.assign(-1.0 * self.all_energies)
     
   def _sample(self, n):
     """See base class docstring"""
