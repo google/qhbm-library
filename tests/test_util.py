@@ -28,6 +28,12 @@ from qhbmlib import architectures
 from qhbmlib import ebm
 from qhbmlib import qhbm
 from qhbmlib import qnn
+from qhbmlib import circuit_infer
+from qhbmlib import circuit_model
+from qhbmlib import energy_infer
+from qhbmlib import energy_model
+from qhbmlib import hamiltonian_infer
+from qhbmlib import hamiltonian_model
 
 
 def get_random_qhbm(
@@ -56,6 +62,38 @@ def get_random_qhbm(
   return qhbm.QHBM(this_ebm, this_qnn, identifier)
 
 
+def get_random_hamiltonian_and_inference(qubits,
+                                         num_layers,
+                                         identifier,
+                                         minval_thetas=-1.0,
+                                         maxval_thetas=1.0,
+                                         minval_phis=-1.0,
+                                         maxval_phis=1.0,
+                                         initializer_seed=None,
+                                         ebm_seed=None):
+  """Create a random QHBM for use in testing."""
+  num_qubits = len(qubits)
+  ebm_init = tf.keras.initializers.RandomUniform(
+      minval=minval_thetas, maxval=maxval_thetas)
+  energy = energy_model.KOBE(list(range(num_qubits)), num_qubits, ebm_init)
+  energy.build([None, num_qubits])
+
+  qnn_init = tf.keras.initializers.RandomUniform(
+      minval=minval_phis, maxval=maxval_phis)
+  unitary, _ = architectures.get_hardware_efficient_model_unitary(
+      qubits, num_layers, identifier)
+  circuit = circuit_model.DirectQuantumCircuit(unitary, qnn_init)
+  circuit.build([])
+
+  e_infer = energy_infer.AnalyticEnergyInference(
+      num_qubits, name=identifier, seed=ebm_seed)
+  e_infer.infer(energy)
+  q_infer = circuit_infer.QuantumInference(name=identifier)
+
+  return hamiltonian_model.Hamiltonian(energy, circuit), hamiltonian_infer.QHBM(
+      e_infer, q_infer)
+
+
 def get_random_pauli_sum(qubits):
   """Test fixture.
 
@@ -72,8 +110,8 @@ def get_random_pauli_sum(qubits):
   coeff_min = -1.0 * coeff_max
 
   num_qubits = len(qubits)
-  num_pauli_terms = num_qubits - 1
-  num_pauli_factors = num_qubits - 1
+  num_pauli_terms = max(1, num_qubits - 1)
+  num_pauli_factors = max(1, num_qubits - 1)
 
   pauli_sum = cirq.PauliSum()
   for _ in range(num_pauli_terms):
