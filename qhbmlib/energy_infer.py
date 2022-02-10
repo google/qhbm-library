@@ -37,14 +37,14 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
   in this class means estimating quantities of interest relative to the EBM.
   """
 
-  def __init__(self, name: Union[None, str] = None):
+  def __init__(self, input_energy: energy_model.BitstringEnergy, name: Union[None, str] = None):
     """Initializes an EnergyInference.
 
     Args:
       name: Optional name for the model.
     """
     super().__init__(name=name)
-    self.energy = None
+    self.energy = input_energy
 
   @abc.abstractmethod
   def _ready_inference(self):
@@ -68,11 +68,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     Returns:
       wrapper: The wrapped function.
     """
-    # def true_fn(self):
-    #   self._checkpoint_variables()
-    #   self._ready_inference()
     def wrapper(self, *args, **kwargs):
-#      tf.cond(self.variables_updated, lambda: true_fn(self), lambda: None)
       if self.variables_updated:
         self._checkpoint_variables()
         self._ready_inference()
@@ -129,9 +125,15 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
           lambda v, vc: vc.assign(v),
           self._tracked_variables,
           self._tracked_variables_checkpoint)
-  
-  def update_energy(self, energy: energy_model.BitstringEnergy):
-    """Tells the inference engine what energy function to track.
+
+  @property
+  def energy(self):
+    """The energy function which sets the probabilities for this EBM."""
+    return self._energy
+
+  @energy.setter
+  def energy(self, input_energy: energy_model.BitstringEnergy):
+    """Tells the inference engine which energy function to track.
 
     Args:
       energy: The parameterized energy function which defines this distribution
@@ -139,8 +141,8 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
         all parameters of `energy` are `tf.Variable`s and that they are all
         returned by `energy.variables`.
     """
-    self.energy = energy
-    self._tracked_variables = energy.variables
+    self._energy = input_energy
+    self._tracked_variables = input_energy.variables
     if len(self._tracked_variables) == 0:
       self._checkpoint = False
     else:
@@ -280,6 +282,7 @@ class AnalyticEnergyInference(EnergyInference):
     x = tf.squeeze(self.all_energies)
     self._logits_variable.assign(-1.0 * x)
 
+  @energy.setter
   def update_energy(self, energy):
     self._all_bitstrings = tf.constant(
         list(itertools.product([0, 1], repeat=energy.num_bits)), dtype=tf.int8)

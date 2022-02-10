@@ -87,68 +87,77 @@ class QHBM(tf.keras.layers.Layer):
     """The object used for inference on density operator eigenvectors."""
     return self._q_inference
 
-  def circuits(self, model: hamiltonian_model.Hamiltonian, num_samples: int):
+  @property
+  def model(self):
+    """The modular Hamiltonian defining this QHBM."""
+    return self._model
+
+  def update_model(self, model: hamiltonian_model.Hamiltonian):
+    """Tells the QHBM which Hamiltonian to exponentiate.
+
+    Args:
+      model: The modular Hamiltonian whose normalized exponential is the
+        density operator against which expectation values will be estimated.
+    """
+    self._model = model
+    self.e_inference.update_energy(model.energy)
+    self.q_inference.update_circuit(model.circuit)
+
+  def circuits(self, num_samples: int):
     r"""Draws thermally distributed eigenstates from the model Hamiltonian.
 
     Here we explain the algorithm.  First, construct $X$ to be a classical
     random variable with probability distribution $p_\theta(x)$ set by
-    `model.energy`.  Then, draw $n = $`num\_samples` bitstrings,
+    `self.model.energy`.  Then, draw $n = $`num\_samples` bitstrings,
     $S=\{x_1, \ldots, x_n\}$, from $X$.  For each unique $x_i\in S$, set
     `states[i]` to the TFQ string representation of $U_\phi\ket{x_i}$, where
-    $U_\phi$ is set by `model.circuit`.  Finally, set `counts[i]` equal to the
-    number of times $x_i$ occurs in $S$.
+    $U_\phi$ is set by `self.model.circuit`.  Finally, set `counts[i]` equal to
+    the number of times $x_i$ occurs in $S$.
 
     Args:
-      model: The modular Hamiltonian whose normalized exponential is the
-        density operator governing the ensemble of states from which to sample.
       num_samples: Number of states to draw from the ensemble.
 
     Returns:
       states: 1D `tf.Tensor` of dtype `tf.string`.  Each entry is a TFQ string
-        representation of an eigenstate of the Hamiltonian `model`.
+        representation of an eigenstate of the Hamiltonian `self.model`.
       counts: 1D `tf.Tensor` of dtype `tf.int32`.  `counts[i]` is the number of
         times `states[i]` was drawn from the ensemble.
     """
-    self.e_inference.infer(model.energy)
     samples = self.e_inference.sample(num_samples)
     bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
-    states = model.circuit(bitstrings)
+    states = self.model.circuit(bitstrings)
     return states, counts
 
-  def expectation(self, model: hamiltonian_model.Hamiltonian,
-                  ops: Union[tf.Tensor,
-                             hamiltonian_model.Hamiltonian], num_samples: int):
+  def expectation(self, ops: Union[tf.Tensor,
+                                   hamiltonian_model.Hamiltonian], num_samples: int):
     """Estimates observable expectation values against the density operator.
 
     TODO(#119): add expectation and derivative equations and discussions
                 from updated paper.
 
     Implicitly sample `num_samples` pure states from the canonical ensemble
-    corresponding to the thermal state defined by `model`.  For each such state
-    |psi>, estimate the expectation value <psi|op_j|psi> for each `ops[j]`.
-    Then, average these expectation values over the sampled states.
+    corresponding to the thermal state defined by `self.model`.  For each such
+    state |psi>, estimate the expectation value <psi|op_j|psi> for each
+    `ops[j]`. Then, average these expectation values over the sampled states.
 
     Args:
-      model: The modular Hamiltonian whose normalized exponential is the
-        density operator against which expectation values will be estimated.
       ops: The observables to measure.  If `tf.Tensor`, strings with shape
         [n_ops], result of calling `tfq.convert_to_tensor` on a list of
         cirq.PauliSum, `[op1, op2, ...]`.  Otherwise, a Hamiltonian.
-      num_samples: Number of draws from the EBM associated with `model` to
+      num_samples: Number of draws from the EBM associated with `self.model` to
         average over.
 
     Returns:
       `tf.Tensor` with shape [n_ops] whose entries are are the sample averaged
       expectation values of each entry in `ops`.
     """
-    self.e_inference.infer(model.energy)
     samples = self.e_inference.sample(num_samples)
     bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
     if isinstance(ops, tf.Tensor):
       return self.q_inference.expectation(
-          model.circuit, bitstrings, counts, ops, reduce=True)
+          self.model.circuit, bitstrings, counts, ops, reduce=True)
     elif isinstance(ops.energy, energy_model.PauliMixin):
-      u_dagger_u = model.circuit + ops.circuit_dagger
+      u_dagger_u = self.model.circuit + ops.circuit_dagger
       expectation_shards = self.q_inference.expectation(
           u_dagger_u, bitstrings, counts, ops.operator_shards, reduce=True)
       return tf.expand_dims(

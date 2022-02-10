@@ -81,6 +81,14 @@ class QuantumInference(tf.keras.layers.Layer):
   def differentiator(self):
     return self._differentiator
 
+  @property
+  def circuit(self):
+    
+  
+  def update_circuit(self, circuit: circuit_model.QuantumCircuit):
+    """Tells this class which circuit to run."""
+    self._circuit = circuit
+  
   def expectation(self,
                   qnn: circuit_model.QuantumCircuit,
                   initial_states: tf.Tensor,
