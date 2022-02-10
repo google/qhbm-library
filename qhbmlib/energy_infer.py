@@ -47,48 +47,35 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     self.energy = None
 
   @abc.abstractmethod
-  def _infer(self):
-    """Do the work to ready this layer for use.
+  def _ready_inference(self):
+    """Performs computations common to all inference methods.
 
-    This should be called each time the variables of `self.energy` are updated.
+    Contains inference code that must be run first if the variables of
+    `self.energy` have been updated since the last time inference was performed.
     """
     raise NotImplementedError()
 
-  def _infer_if_variables_updated(self, f):
+  def _if_variables_updated(self, f):
     """Wraps given function to automate inference calls.
 
-    Each time the variables in `self.energy` are updated, `self._infer` needs
-    to be called again.  This wrapper checks if the values of the variables in
-    `self.energy` have been updated since the last time `self._infer` was
-    called.  If so, the wrapped function calls `self._infer` before proceeding.
+    This decorator wraps the given function to so it performsd the following
+    check: if the values of the variables in `self.energy` have changed since
+    the last checkpoint, call `self._ready_inference` before proceeding.
 
     Args:
-      f: The method of EnergyInference to wrap.
+      f: The method of `EnergyInference` to wrap.
 
     Returns:
       wrapper: The wrapped function.
     """
     def wrapper(*args, **kwargs):
-      variables_not_equal_list = tf.nest.map_structure(
-          tf.math.reduce_any(tf.math.not_equal(ev, evc)),
-          self._energy_variables,
-          self._energy_variables_checkpoint)
-      variables_not_equal = tf.math.reduce_any(tf.stack(variables_not_equal_list))
-      if variables_not_equal:
-        self._infer()
-        self._energy_variables_checkpoint = [v.read_value() for v in self._energy_variables]
+      if self.variables_updated:
+        self._checkpoint_variables()
+        self._ready_inference()
       return f(args, kwargs)
     return wrapper
 
-  @abc.abstractmethod
-  def _sample(self, n):
-    """Returns samples from the EBM corresponding to `self.energy`.
-
-    This can be an approximate sampling.
-    """
-    raise NotImplementedError()
-
-  @_infer_if_variables_updated
+  @_if_variables_updated
   def sample(self, n):
     """Returns samples from the EBM corresponding to `self.energy`.
 
@@ -96,42 +83,19 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     """
     return self._sample(n)
   
-  @abc.abstractmethod
-  def _entropy(self):
-    """Returns an estimate of the entropy."""
-    raise NotImplementedError()
-
-  @_infer_if_variables_updated
+  @_if_variables_updated
   def entropy(self):
     """Returns an estimate of the entropy."""
     return self._entropy()
 
-  @abc.abstractmethod
-  def _log_partition(self):
-    """Returns an estimate of the log partition function."""
-    raise NotImplementedError()
-
-  @_infer_if_variables_updated
+  @_if_variables_updated
   def log_partition(self):
     """Returns an estimate of the log partition function."""
     return self._log_partition()
 
-  def update_energy(self, energy: energy_model.BitstringEnergy):
-    """Tells the inference engine what energy function to track.
-
-    Args:
-      energy: The parameterized energy function which defines this distribution
-        via the equations of an energy based model.  Note: for this class to
-        work correctly, all parameters of `energy` must be `tf.Variable`.
-    """
-    self.energy = energy
-    self._energy_variables = energy.variables
-    self._energy_variables_checkpoint = [v.read_value() for v in self._energy_variables]
-    self._infer()
-  
-  @_infer_if_variables_updated
+  @_if_variables_updated
   def expectation(self, function, num_samples: int):
-    """Estimates an expectation value using sample averaging.
+    """Returns the expectation value of the given function.
 
     Args:
       function: Mapping from a 2D tensor of bitstrings to a possibly nested
@@ -139,11 +103,56 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
         float tensors with the same batch size as the input bitstrings.
       num_samples: The number of bitstring samples to use when estimating the
         expectation value of `function`.
-
-    Returns:
-      Expectation value of `function`.
     """
+    return self._expectation(function, num_samples)
 
+  @property
+  def variables_updated(self):
+    """Returns True if tracked variables do not have the checkpointed values."""
+    variables_not_equal_list = tf.nest.map_structure(
+        tf.math.reduce_any(tf.math.not_equal(ev, evc)),
+        self._tracked_variables,
+        self._tracked_variables_checkpoint)
+    return tf.math.reduce_any(tf.stack(variables_not_equal_list))
+
+  def checkpoint_variables(self):
+    """Checkpoints the currently tracked variables."""
+    self._tracked_variables_checkpoint = [v.read_value() for v in self._tracked_variables]
+  
+  def update_energy(self, energy: energy_model.BitstringEnergy):
+    """Tells the inference engine what energy function to track.
+
+    Args:
+      energy: The parameterized energy function which defines this distribution
+        via the equations of an energy based model.  This function assumes that
+        all parameters of `energy` are `tf.Variable`s and that they are all
+        returned by `energy.variables`.
+    """
+    self.energy = energy
+    self._tracked_variables = energy.variables
+    self._checkpoint_variables()
+    self._infer()
+  
+  @abc.abstractmethod
+  def _sample(self, n):
+    """Default implementation wrapped by `self.sample`."""
+    raise NotImplementedError()
+
+  @abc.abstractmethod
+  def _entropy(self):
+    """Default implementation wrapped by `self.entropy`."""
+    raise NotImplementedError()
+
+  @abc.abstractmethod
+  def _log_partition(self):
+    """Default implementation wrapped by `self.log_partition`."""
+    raise NotImplementedError()
+
+  def _expectation(self, function, num_samples: int):
+    """Default implementation wrapped by `self.expectation`.
+
+    Estimates an expectation value using sample averaging.
+    """
     @tf.custom_gradient
     def _inner_expectation():
       """Enables derivatives."""
@@ -207,7 +216,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
 
     return _inner_expectation()
 
-  @_infer_if_variables_updated
+  @_if_variables_updated
   def call(self, inputs):
     """Returns the number of samples specified in the inputs."""
     return self.sample(inputs)
