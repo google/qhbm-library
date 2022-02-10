@@ -37,7 +37,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
   in this class means estimating quantities of interest relative to the EBM.
   """
 
-  def __init__(self, input_energy: energy_model.BitstringEnergy, name: Union[None, str]=None):
+  def __init__(self, input_energy: energy_model.BitstringEnergy, name: Union[None, str]=None, initial_seed: Union[None, tf.Tensor]=None):
     """Initializes an EnergyInference.
 
     Args:
@@ -46,8 +46,13 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
         all parameters of `energy` are `tf.Variable`s and that they are all
         returned by `energy.variables`.
       name: Optional name for the model.
+      initial_seed: PRNG seed; see tfp.random.sanitize_seed for details. This
+        seed will be used in the `sample` method.  If None, the seed is updated
+        after every inference call.  Otherwise, the seed is fixed.
     """
     super().__init__(name=name)
+    self._update_seed = tf.Variable(True)
+    self.seed = initial_seed
     self._energy = input_energy
     self._tracked_variables = input_energy.variables
     if len(self._tracked_variables) == 0:
@@ -61,6 +66,26 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     self._checkpoint_variables()
     self._ready_inference()
 
+  @property
+  def seed(self):
+    """Current TFP compatible seed controlling sampling behavior."""
+    return self._seed
+
+  @seed.setter
+  def seed(self, initial_seed: Union[None, tf.Tensor]):
+    """Sets a new value of the random seed.
+
+    Args:
+      initial_seed: PRNG seed; see tfp.random.sanitize_seed for details. This
+        seed will be used in the `sample` method.  If None, the seed is updated
+        after every inference call.  Otherwise, the seed is fixed.
+    """
+    if initial_seed is None:
+      self._update_seed.assign(True)
+    else:
+      self._update_seed.assign(False)
+    self._seed = tf.random.sanitize_seed(initial_seed)
+
   @abc.abstractmethod
   def _ready_inference(self):
     """Performs computations common to all inference methods.
@@ -70,7 +95,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     """
     raise NotImplementedError()
 
-  def _if_variables_updated(f):
+  def _preface_every_call(f):
     """Wraps given function to automate inference calls.
 
     This decorator wraps the given function to so it performsd the following
@@ -84,13 +109,15 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
       wrapper: The wrapped function.
     """
     def wrapper(self, *args, **kwargs):
+      if self._update_seed:
+        self._seed, _ = tf.random.split_seed(self.seed)
       if self.variables_updated:
         self._checkpoint_variables()
         self._ready_inference()
       return f(self, *args, **kwargs)
     return wrapper
 
-  @_if_variables_updated
+  @_preface_every_call
   def sample(self, n):
     """Returns samples from the EBM corresponding to `self.energy`.
 
@@ -98,17 +125,17 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     """
     return self._sample(n)
   
-  @_if_variables_updated
+  @_preface_every_call
   def entropy(self):
     """Returns an estimate of the entropy."""
     return self._entropy()
 
-  @_if_variables_updated
+  @_preface_every_call
   def log_partition(self):
     """Returns an estimate of the log partition function."""
     return self._log_partition()
 
-  @_if_variables_updated
+  @_preface_every_call
   def expectation(self, function, num_samples: int):
     """Returns the expectation value of the given function.
 
@@ -229,7 +256,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
 
     return _inner_expectation()
 
-  @_if_variables_updated
+  @_preface_every_call
   def call(self, inputs):
     """Returns the number of samples specified in the inputs."""
     return self.sample(inputs)
@@ -238,7 +265,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
 class AnalyticEnergyInference(EnergyInference):
   """Uses an explicit categorical distribution to implement parent functions."""
 
-  def __init__(self, input_energy: energy_model.BitstringEnergy, name: Union[None, str]=None, seed=None):
+  def __init__(self, input_energy: energy_model.BitstringEnergy, name: Union[None, str]=None, initial_seed: Union[None, tf.Tensor]=None):
     """Initializes an AnalyticEnergyInference.
 
     Internally, this class saves all possible bitstrings as a tensor, whose
@@ -251,15 +278,15 @@ class AnalyticEnergyInference(EnergyInference):
         all parameters of `energy` are `tf.Variable`s and that they are all
         returned by `energy.variables`.
       name: Optional name for the model.
-      seed: PRNG seed; see tfp.random.sanitize_seed for details. This seed will
-        be used in the `sample` method.
+      initial_seed: PRNG seed; see tfp.random.sanitize_seed for details. This
+        seed will be used in the `sample` method.  If None, the seed is updated
+        after every inference call.  Otherwise, the seed is fixed.
     """
     self._all_bitstrings = tf.constant(
         list(itertools.product([0, 1], repeat=input_energy.num_bits)), dtype=tf.int8)
     self._logits_variable = tf.Variable(-1.0 * input_energy(self.all_bitstrings))
     self._distribution = tfd.Categorical(logits=self._logits_variable)
-    self.seed = seed
-    super().__init__(input_energy, name=name)
+    super().__init__(input_energy, name, initial_seed)
 
   @property
   def all_bitstrings(self):
@@ -285,20 +312,20 @@ class AnalyticEnergyInference(EnergyInference):
     """See base class docstring"""
     return tf.gather(
         self.all_bitstrings,
-        self._distribution.sample(n, seed=self.seed),
+        self.distribution.sample(n, seed=self.seed),
         axis=0)
 
   def _entropy(self):
     """See base class docstring"""
-    return self._distribution.entropy()
+    return self.distribution.entropy()
 
   def _log_partition(self):
     """See base class docstring"""
-    return tf.reduce_logsumexp(self._distribution.logits_parameter())
+    return tf.reduce_logsumexp(self.distribution.logits_parameter())
 
   def call(self, inputs):
     if inputs is None:
-      return self._distribution
+      return self.distribution
     else:
       return self.sample(inputs)
 
@@ -306,7 +333,7 @@ class AnalyticEnergyInference(EnergyInference):
 class BernoulliEnergyInference(EnergyInference):
   """Manages inference for a Bernoulli defined by spin energies."""
 
-  def __init__(self, input_energy: energy_model.BernoulliEnergy, name: Union[None, str]=None, seed=None):
+  def __init__(self, input_energy: energy_model.BernoulliEnergy, name: Union[None, str]=None, initial_seed: Union[None, tf.Tensor]=None):
     """Initializes a BernoulliEnergyInference.
 
     Args:
@@ -315,13 +342,13 @@ class BernoulliEnergyInference(EnergyInference):
         all parameters of `energy` are `tf.Variable`s and that they are all
         returned by `energy.variables`.
       name: Optional name for the model.
-      seed: PRNG seed; see tfp.random.sanitize_seed for details. This seed will
-        be used in the `sample` method.
+      initial_seed: PRNG seed; see tfp.random.sanitize_seed for details. This
+        seed will be used in the `sample` method.  If None, the seed is updated
+        after every inference call.  Otherwise, the seed is fixed.
     """
     self._logits_variable = tf.Variable(input_energy.logits, trainable=False)
     self._distribution = tfd.Bernoulli(logits=self._logits_variable, dtype=tf.int8)
-    self.seed = seed
-    super().__init__(input_energy, name=name)
+    super().__init__(input_energy, name, initial_seed)
 
   @property
   def distribution(self):
@@ -334,7 +361,7 @@ class BernoulliEnergyInference(EnergyInference):
 
   def _sample(self, n):
     """See base class docstring"""
-    return self._distribution.sample(n, seed=self.seed)
+    return self.distribution.sample(n, seed=self.seed)
 
   def _entropy(self):
     """Returns the exact entropy.
@@ -342,7 +369,7 @@ class BernoulliEnergyInference(EnergyInference):
     The total entropy of a set of spins is the sum of each individual spin's
     entropies.
     """
-    return tf.reduce_sum(self._distribution.entropy())
+    return tf.reduce_sum(self.distribution.entropy())
 
   def _log_partition(self):
     r"""Returns the exact log partition function.
@@ -359,6 +386,6 @@ class BernoulliEnergyInference(EnergyInference):
 
   def call(self, inputs):
     if inputs is None:
-      return self._distribution
+      return self.distribution
     else:
       return self.sample(inputs)
