@@ -27,7 +27,6 @@ from qhbmlib import utils
 from tests import test_util
 
 
-
 class NullEnergy(energy_model.BitstringEnergy):
   """Simple empty energy."""
 

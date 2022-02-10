@@ -37,13 +37,45 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
   in this class means estimating quantities of interest relative to the EBM.
   """
 
-  def __init__(self, name: Union[None, str] = None):
+  def __init__(self, initial_seed: Union[None, tf.Tensor] = None name: Union[None, str] = None):
     """Initializes an EnergyInference.
 
     Args:
+      initial_seed: PRNG seed; see tfp.random.sanitize_seed for details. This
+        seed will be used in the `sample` method.  If None, the seed is updated
+        after every inference call.  Otherwise, the seed is fixed.
       name: Optional name for the model.
     """
     super().__init__(name=name)
+    if initial_seed is None:
+      self._update_seed = tf.Variable(True, trainable=False)
+    else:
+      self._update_seed = tf.Variable(False, trainable=False)
+    self._seed = tf.Variable(tfp.random.sanitize_seed(initial_seed), trainable=False)
+    self._first_inference = tf.Variable(True, trainable=False)
+
+  @property
+  def seed(self):
+    """Current TFP compatible seed controlling sampling behavior.
+
+    PRNG seed; see tfp.random.sanitize_seed for details. This seed will be used
+    in the `sample` method.  If None, the seed is updated after every inference
+    call.  Otherwise, the seed is fixed.
+    """
+    return self._seed
+
+  @seed.setter
+  def seed(self, initial_seed: Union[None, tf.Tensor]):
+    """Sets a new value of the random seed.
+
+    Args:
+      initial_seed: see `self.seed` for details.
+    """
+    if initial_seed is None:
+      self._update_seed.assign(True)
+    else:
+      self._update_seed.assign(False)
+    self._seed.assign(tfp.random.sanitize_seed(initial_seed))
 
   @abc.abstractmethod
   def infer(self, energy: energy_model.BitstringEnergy):
@@ -56,6 +88,30 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
         via the equations of an energy based model.
     """
     raise NotImplementedError()
+
+  def _preface_every_call(f):
+    """Wraps given function with things to run before every inference call.
+
+    This decorator wraps the given function with additional computations to run
+    before continuing.  Currently includes:
+      - run `self.infer` if this is the first call of a wrapped function
+      - change the seed if not set by the user during initialization
+
+    Args:
+      f: The method of `EnergyInference` to wrap.
+
+    Returns:
+      wrapper: The wrapped function.
+    """
+    def wrapper(self, *args, **kwargs):
+      if self._first_inference:
+        self.infer(self.energy)
+        self._first_inference.assign(False)
+      if self._update_seed:
+        new_seed, _ = tfp.random.split_seed(self.seed)
+        self._seed.assign(new_seed)
+      return f(self, *args, **kwargs)
+    return wrapper
 
   @abc.abstractmethod
   def sample(self, n):
