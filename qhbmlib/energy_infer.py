@@ -131,7 +131,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     self.energy = energy
     self._tracked_variables = energy.variables
     self._checkpoint_variables()
-    self._infer()
+    self._ready_inference()
   
   @abc.abstractmethod
   def _sample(self, n):
@@ -244,7 +244,6 @@ class AnalyticEnergyInference(EnergyInference):
         list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
     self._dist_realization = tfp.layers.DistributionLambda(
         make_distribution_fn=lambda t: tfd.Categorical(logits=-1 * t))
-    self._current_dist = None
 
   @property
   def all_bitstrings(self):
@@ -258,34 +257,31 @@ class AnalyticEnergyInference(EnergyInference):
 
   @property
   def current_dist(self):
-    """Bernoulli distribution set during last call to `self.infer`."""
+    """Categorical distribution set during `self._ready_inference`."""
     return self._current_dist
 
-  def infer(self, energy: energy_model.BitstringEnergy):
+  def _ready_inference(self):
     """See base class docstring."""
-    self.energy = energy
     x = tf.squeeze(self.all_energies)
     self._current_dist = self._dist_realization(x)
 
-  def sample(self, n):
+  def _sample(self, n):
     """See base class docstring"""
     return tf.gather(
         self.all_bitstrings,
         self._current_dist.sample(n, seed=self.seed),
         axis=0)
 
-  def entropy(self):
+  def _entropy(self):
     """See base class docstring"""
     return self._current_dist.entropy()
 
-  def log_partition(self):
+  def _log_partition(self):
     """See base class docstring"""
     # TODO(#115)
     return tf.reduce_logsumexp(self._current_dist.logits_parameter())
 
   def call(self, inputs):
-    if self._current_dist is None:
-      raise RuntimeError("`infer` must be called at least once.")
     if inputs is None:
       return self._current_dist
     else:
@@ -307,16 +303,14 @@ class BernoulliEnergyInference(EnergyInference):
     self.seed = seed
     self._dist_realization = tfp.layers.DistributionLambda(
         make_distribution_fn=lambda t: tfd.Bernoulli(logits=t, dtype=tf.int8))
-    self._current_dist = None
 
   @property
   def current_dist(self):
-    """Categorical distribution set during last call to `self.infer`."""
+    """Bernoulli distribution set during `self._ready_inference`."""
     return self._current_dist
 
-  def infer(self, energy: energy_model.BitstringEnergy):
+  def _ready_inference(self, energy):
     """See base class docstring."""
-    self.energy = energy
     self._current_dist = self._dist_realization(self.energy.logits)
 
   def sample(self, n):
@@ -345,8 +339,6 @@ class BernoulliEnergyInference(EnergyInference):
     return tf.math.reduce_sum(single_log_partitions)
 
   def call(self, inputs):
-    if self._current_dist is None:
-      raise RuntimeError("`infer` must be called at least once.")
     if inputs is None:
       return self._current_dist
     else:
