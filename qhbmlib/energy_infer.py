@@ -53,6 +53,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     super().__init__(name=name)
     self._energy = input_energy
     self._energy.build([None, self._energy.num_bits])
+
     self._tracked_variables = input_energy.variables
     if len(self._tracked_variables) == 0:
       self._checkpoint = False
@@ -70,7 +71,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     self._seed = tf.Variable(tfp.random.sanitize_seed(initial_seed), trainable=False)
 
     self._checkpoint_variables()
-    self._ready_inference()
+    self._do_first_inference = tf.Variable(False, trainable=False)
 
   @property
   def seed(self):
@@ -118,6 +119,9 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
       wrapper: The wrapped function.
     """
     def wrapper(self, *args, **kwargs):
+      if self._do_first_inference:
+        self._ready_inference()
+        self._do_first_inference.assign(False)
       if self._update_seed:
         new_seed, _ = tfp.random.split_seed(self.seed)
         self._seed.assign(new_seed)
@@ -292,11 +296,11 @@ class AnalyticEnergyInference(EnergyInference):
         seed will be used in the `sample` method.  If None, the seed is updated
         after every inference call.  Otherwise, the seed is fixed.
     """
+    super().__init__(input_energy, name, initial_seed)
     self._all_bitstrings = tf.constant(
         list(itertools.product([0, 1], repeat=input_energy.num_bits)), dtype=tf.int8)
     self._logits_variable = tf.Variable(-1.0 * input_energy(self.all_bitstrings))
     self._distribution = tfd.Categorical(logits=self._logits_variable)
-    super().__init__(input_energy, name, initial_seed)
 
   @property
   def all_bitstrings(self):
@@ -355,9 +359,9 @@ class BernoulliEnergyInference(EnergyInference):
         seed will be used in the `sample` method.  If None, the seed is updated
         after every inference call.  Otherwise, the seed is fixed.
     """
+    super().__init__(input_energy, name, initial_seed)
     self._logits_variable = tf.Variable(input_energy.logits, trainable=False)
     self._distribution = tfd.Bernoulli(logits=self._logits_variable, dtype=tf.int8)
-    super().__init__(input_energy, name, initial_seed)
 
   @property
   def distribution(self):
