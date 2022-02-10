@@ -83,12 +83,8 @@ class QuantumInference(tf.keras.layers.Layer):
 
   @property
   def circuit(self):
+    return self._circuit
     
-  
-  def update_circuit(self, circuit: circuit_model.QuantumCircuit):
-    """Tells this class which circuit to run."""
-    self._circuit = circuit
-  
   def expectation(self,
                   qnn: circuit_model.QuantumCircuit,
                   initial_states: tf.Tensor,
