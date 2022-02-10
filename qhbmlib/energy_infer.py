@@ -44,27 +44,92 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
       name: Optional name for the model.
     """
     super().__init__(name=name)
+    self.energy = None
 
   @abc.abstractmethod
-  def infer(self, energy: energy_model.BitstringEnergy):
+  def _infer(self):
     """Do the work to ready this layer for use.
 
-    This should be called each time the underlying model is updated.
-
-    Args:
-      energy: The parameterized energy function which defines this distribution
-        via the equations of an energy based model.
+    This should be called each time the variables of `self.energy` are updated.
     """
     raise NotImplementedError()
 
+  def _infer_if_variables_updated(self, f):
+    """Wraps given function to automate inference calls.
+
+    Each time the variables in `self.energy` are updated, `self._infer` needs
+    to be called again.  This wrapper checks if the values of the variables in
+    `self.energy` have been updated since the last time `self._infer` was
+    called.  If so, the wrapped function calls `self._infer` before proceeding.
+
+    Args:
+      f: The method of EnergyInference to wrap.
+
+    Returns:
+      wrapper: The wrapped function.
+    """
+    def wrapper(*args, **kwargs):
+      variables_not_equal_list = tf.nest.map_structure(
+          tf.math.reduce_any(tf.math.not_equal(ev, evc)),
+          self._energy_variables,
+          self._energy_variables_checkpoint)
+      variables_not_equal = tf.math.reduce_any(tf.stack(variables_not_equal_list))
+      if variables_not_equal:
+        self._infer()
+        self._energy_variables_checkpoint = [v.read_value() for v in self._energy_variables]
+      return f(args, kwargs)
+    return wrapper
+
   @abc.abstractmethod
-  def sample(self, n):
+  def _sample(self, n):
     """Returns samples from the EBM corresponding to `self.energy`.
 
     This can be an approximate sampling.
     """
     raise NotImplementedError()
 
+  @_infer_if_variables_updated
+  def sample(self, n):
+    """Returns samples from the EBM corresponding to `self.energy`.
+
+    This can be an approximate sampling.
+    """
+    return self._sample(n)
+  
+  @abc.abstractmethod
+  def _entropy(self):
+    """Returns an estimate of the entropy."""
+    raise NotImplementedError()
+
+  @_infer_if_variables_updated
+  def entropy(self):
+    """Returns an estimate of the entropy."""
+    return self._entropy()
+
+  @abc.abstractmethod
+  def _log_partition(self):
+    """Returns an estimate of the log partition function."""
+    raise NotImplementedError()
+
+  @_infer_if_variables_updated
+  def log_partition(self):
+    """Returns an estimate of the log partition function."""
+    return self._log_partition()
+
+  def update_energy(self, energy: energy_model.BitstringEnergy):
+    """Tells the inference engine what energy function to track.
+
+    Args:
+      energy: The parameterized energy function which defines this distribution
+        via the equations of an energy based model.  Note: for this class to
+        work correctly, all parameters of `energy` must be `tf.Variable`.
+    """
+    self.energy = energy
+    self._energy_variables = energy.variables
+    self._energy_variables_checkpoint = [v.read_value() for v in self._energy_variables]
+    self._infer()
+  
+  @_infer_if_variables_updated
   def expectation(self, function, num_samples: int):
     """Estimates an expectation value using sample averaging.
 
@@ -86,7 +151,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
       bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
 
       # TODO(#157): try to parameterize the persistence.
-      with tf.GradientTape(persistent=True) as values_tape:
+      with tf.GradientTape() as values_tape:
         # Adds variables in `self.energy` to `variables` argument of `grad_fn`.
         values_tape.watch(self.energy.trainable_variables)
         values = function(bitstrings)
@@ -142,16 +207,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
 
     return _inner_expectation()
 
-  @abc.abstractmethod
-  def entropy(self):
-    """Returns an estimate of the entropy."""
-    raise NotImplementedError()
-
-  @abc.abstractmethod
-  def log_partition(self):
-    """Returns an estimate of the log partition function."""
-    raise NotImplementedError()
-
+  @_infer_if_variables_updated
   def call(self, inputs):
     """Returns the number of samples specified in the inputs."""
     return self.sample(inputs)
