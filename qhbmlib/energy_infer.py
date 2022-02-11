@@ -26,8 +26,8 @@ from qhbmlib import energy_model
 from qhbmlib import utils
 
 
-class EnergyInference(tf.keras.layers.Layer, abc.ABC):
-  r"""Sets the methods required for inference on BitstringEnergy objects.
+class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
+  r"""Defines the interface for inference on BitstringEnergy objects.
 
   Let $E$ be the energy function defined by a given `BitstringEnergy`, and let
   $X$ be the set of bitstrings in the domain of $E$.  Associated with $E$ is
@@ -37,8 +37,8 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
   in this class means estimating quantities of interest relative to the EBM.
   """
 
-  def __init__(self, initial_seed: Union[None, tf.Tensor] = None name: Union[None, str] = None):
-    """Initializes an EnergyInference.
+  def __init__(self, initial_seed: Union[None, tf.Tensor] = None, name: Union[None, str] = None):
+    """Initializes an EnergyInferenceABC.
 
     Args:
       initial_seed: PRNG seed; see tfp.random.sanitize_seed for details. This
@@ -53,6 +53,11 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
       self._update_seed = tf.Variable(False, trainable=False)
     self._seed = tf.Variable(tfp.random.sanitize_seed(initial_seed), trainable=False)
     self._first_inference = tf.Variable(True, trainable=False)
+
+  @property
+  def energy(self):
+    """The energy function which sets the probabilities for this EBM."""
+    return self._energy
 
   @property
   def seed(self):
@@ -77,6 +82,68 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
       self._update_seed.assign(False)
     self._seed.assign(tfp.random.sanitize_seed(initial_seed))
 
+  @_preface_inference
+  def call(self, inputs):
+    """Calls this layer on the given inputs."""
+    return self._call(inputs)
+
+  @_preface_inference
+  def entropy(self):
+    """Returns an estimate of the entropy."""
+    return self._entropy()
+
+  @_preface_inference
+  def expectation(self, function, num_samples: int):
+    """Returns an estimate of the expectation value of the given function.
+
+    Args:
+      function: Mapping from a 2D tensor of bitstrings to a possibly nested
+        structure.  The structure must have atomic elements all of which are
+        float tensors with the same batch size as the input bitstrings.
+      num_samples: The number of bitstring samples to use when estimating the
+        expectation value of `function`.
+    """
+    return self._expectation(function, num_samples)
+
+  @_preface_inference
+  def log_partition(self):
+    """Returns an estimate of the log partition function."""
+    return self._log_partition()
+
+  @_preface_inference
+  def sample(self, num_samples: int):
+    """Returns samples from the EBM corresponding to `self.energy`.
+
+    Args:
+      num_samples: Number of samples to draw from the EBM.
+    """
+    return self._sample(num_samples)
+
+  @abc.abstractmethod
+  def _call(self, inputs):
+    """Default implementation wrapped by `self.call`."""
+    raise NotImplementedError()
+
+  @abc.abstractmethod
+  def _entropy(self):
+    """Default implementation wrapped by `self.entropy`."""
+    raise NotImplementedError()
+
+  @abc.abstractmethod
+  def _expectation(self, function, num_samples: int):
+    """Default implementation wrapped by `self.expectation`."""
+    raise NotImplementedError()
+
+  @abc.abstractmethod
+  def _log_partition(self):
+    """Default implementation wrapped by `self.log_partition`."""
+    raise NotImplementedError()
+
+  @abc.abstractmethod
+  def _sample(self, num_samples: int):
+    """Default implementation wrapped by `self.sample`."""
+    raise NotImplementedError()
+
   @abc.abstractmethod
   def infer(self, energy: energy_model.BitstringEnergy):
     """Do the work to ready this layer for use.
@@ -89,7 +156,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     """
     raise NotImplementedError()
 
-  def _preface_every_call(f):
+  def _preface_inference(f):
     """Wraps given function with things to run before every inference call.
 
     This decorator wraps the given function with additional computations to run
@@ -113,63 +180,21 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
       return f(self, *args, **kwargs)
     return wrapper
 
-  @property
-  def energy(self):
-    """The energy function which sets the probabilities for this EBM."""
-    return self._energy
 
-  @_preface_every_call
-  def sample(self, num_samples: int):
-    """Returns samples from the EBM corresponding to `self.energy`.
+class EnergyInference(EnergyInferenceBase):
+  """Provides some default method implementations."""
+
+  def __init__(self, initial_seed: Union[None, tf.Tensor] = None, name: Union[None, str] = None):
+    """Initializes an EnergyInference.
 
     Args:
-      num_samples: Number of samples to draw from the EBM.
+      initial_seed: PRNG seed; see tfp.random.sanitize_seed for details. This
+        seed will be used in the `sample` method.  If None, the seed is updated
+        after every inference call.  Otherwise, the seed is fixed.
+      name: Optional name for the model.
     """
-    return self._sample(num_samples)
-
-  @_preface_every_call
-  def entropy(self):
-    """Returns an estimate of the entropy."""
-    return self._entropy()
-
-  @_preface_every_call
-  def log_partition(self):
-    """Returns an estimate of the log partition function."""
-    return self._log_partition()
-
-  @_preface_every_call
-  def expectation(self, function, num_samples: int):
-    """Returns an estimate of the expectation value of the given function.
-
-    Args:
-      function: Mapping from a 2D tensor of bitstrings to a possibly nested
-        structure.  The structure must have atomic elements all of which are
-        float tensors with the same batch size as the input bitstrings.
-      num_samples: The number of bitstring samples to use when estimating the
-        expectation value of `function`.
-    """
-    return self._expectation(function, num_samples)
-
-  @_preface_every_call
-  def call(self, inputs):
-    """Calls this layer on the given inputs."""
-    return self._call(inputs)
-
-  @abc.abstractmethod
-  def _sample(self, num_samples: int):
-    """Default implementation wrapped by `self.sample`."""
-    raise NotImplementedError()
-
-  @abc.abstractmethod
-  def _entropy(self):
-    """Default implementation wrapped by `self.entropy`."""
-    raise NotImplementedError()
-
-  @abc.abstractmethod
-  def _log_partition(self):
-    """Default implementation wrapped by `self.log_partition`."""
-    raise NotImplementedError()
-
+    super().__init__(initial_seed, name)
+  
   def _expectation(self, function, num_samples: int):
     """Default implementation wrapped by `self.expectation`.
 
@@ -239,16 +264,11 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
 
     return _inner_expectation()
   
-  @abc.abstractmethod
-  def _call(self, inputs):
-    """Default implementation wrapped by `self.call`."""
-    raise NotImplementedError()
-
 
 class AnalyticEnergyInference(EnergyInference):
   """Uses an explicit categorical distribution to implement parent functions."""
 
-  def __init__(self, num_bits: int, name: Union[None, str] = None, seed=None):
+  def __init__(self, num_bits: int, initial_seed: Union[None, tf.Tensor] = None, name: Union[None, str] = None):
     """Initializes an AnalyticEnergyInference.
 
     Internally, this class saves all possible bitstrings as a tensor, whose
@@ -257,12 +277,12 @@ class AnalyticEnergyInference(EnergyInference):
 
     Args:
       num_bits: Number of bits on which this layer acts.
+      initial_seed: PRNG seed; see tfp.random.sanitize_seed for details. This
+        seed will be used in the `sample` method.  If None, the seed is updated
+        after every inference call.  Otherwise, the seed is fixed.
       name: Optional name for the model.
-      seed: PRNG seed; see tfp.random.sanitize_seed for details. This seed will
-        be used in the `sample` method.
     """
-    super().__init__(name=name)
-    self.seed = seed
+    super().__init__(initial_seed, name)
     self._all_bitstrings = tf.constant(
         list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
     self._dist_realization = tfp.layers.DistributionLambda(
@@ -318,16 +338,13 @@ class AnalyticEnergyInference(EnergyInference):
 class BernoulliEnergyInference(EnergyInference):
   """Manages inference for a Bernoulli defined by spin energies."""
 
-  def __init__(self, name: Union[None, str] = None, seed=None):
+  def __init__(self, initial_seed: Union[None, tf.Tensor] = None, name: Union[None, str] = None):
     """Initializes a BernoulliEnergyInference.
 
     Args:
       name: Optional name for the model.
-      seed: PRNG seed; see tfp.random.sanitize_seed for details. This seed will
-        be used in the `sample` method.
     """
-    super().__init__(name=name)
-    self.seed = seed
+    super().__init__(initial_seed, name)
     self._dist_realization = tfp.layers.DistributionLambda(
         make_distribution_fn=lambda t: tfd.Bernoulli(logits=t, dtype=tf.int8))
     self._current_dist = None
