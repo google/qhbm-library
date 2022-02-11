@@ -38,11 +38,11 @@ class VQTTest(tf.test.TestCase):
     """Initializes test objects."""
     super().setUp()
     self.num_qubits_list = [1, 2, 3]
-    self.tf_random_seed = 4
+    self.tf_random_seed = 5
     self.tf_random_seed_alt = 6
     self.tfp_seed = tf.constant([7, 8], tf.int32)
     self.tfp_seed_alt = tf.constant([9, 10], tf.int32)
-    self.num_samples = int(5e6)
+    self.num_samples = int(1e7)
     self.close_rtol = 3e-2  # tolerance depends on samples
     self.zero_atol = 1e-3
     self.not_zero_atol = 2e-3
@@ -139,7 +139,7 @@ class VQTTest(tf.test.TestCase):
           initializer_seed=self.tf_random_seed_alt,
           ebm_seed=self.tfp_seed_alt)
 
-      beta = tf.random.uniform([], 0.1, 10)
+      beta = tf.random.uniform([], 0.1, 10, seed=self.tf_random_seed)
 
       with tf.GradientTape() as tape:
         actual_loss = vqt(model_infer, model_h, self.num_samples, data_h, beta)
