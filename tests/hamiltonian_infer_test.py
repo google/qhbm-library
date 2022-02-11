@@ -121,7 +121,8 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
 
   def test_circuit_param_update(self):
     """Confirm circuits are different after updating energy model parameters."""
-    e_infer = energy_infer.BernoulliEnergyInference()
+    num_bits = 2
+    e_infer = energy_infer.BernoulliEnergyInference(num_bits)
     q_infer = circuit_infer.QuantumInference()
     h_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
 
@@ -129,7 +130,6 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     def circuits_wrapper(model, num_samples):
       return h_infer.circuits(model, num_samples)
 
-    num_bits = 2
     energy = energy_model.BernoulliEnergy(list(range(num_bits)))
     energy.build([None, num_bits])
     qubits = cirq.GridQubit.rect(1, num_bits)
@@ -195,7 +195,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
         [tf.Variable([resolver[s] for s in symbols])], [[]])
     circuit.build([])
     actual_hamiltonian = hamiltonian_model.Hamiltonian(energy, circuit)
-    e_infer = energy_infer.BernoulliEnergyInference(initial_seed=seed)
+    e_infer = energy_infer.BernoulliEnergyInference(num_bits, initial_seed=seed)
     q_infer = circuit_infer.QuantumInference()
     actual_h_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
 
@@ -286,7 +286,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     model_circuit.build([])
     model_hamiltonian = hamiltonian_model.Hamiltonian(model_energy,
                                                       model_circuit)
-    e_infer = energy_infer.BernoulliEnergyInference(initial_seed=seed)
+    e_infer = energy_infer.BernoulliEnergyInference(num_bits, initial_seed=seed)
     q_infer = circuit_infer.QuantumInference()
     model_h_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
 

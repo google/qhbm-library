@@ -205,7 +205,7 @@ class VQTTest(tf.test.TestCase):
 
       # Inference definition
       e_infer = energy_infer.BernoulliEnergyInference(
-          initial_seed=self.tfp_seed)
+          num_qubits, initial_seed=self.tfp_seed)
       q_infer = circuit_infer.QuantumInference()
       qhbm_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
 
