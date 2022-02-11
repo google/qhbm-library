@@ -127,23 +127,21 @@ class QuantumInference(tf.keras.layers.Layer):
       return utils.weighted_average(counts, expectations)
     return expectations
 
-  def sample(self, qnn: circuit_model.QuantumCircuit, initial_states: tf.Tensor,
-             counts: tf.Tensor):
+  def sample(self, qnn: circuit_model.QuantumCircuit, initial_states: tf.Tensor):
     """Returns bitstring samples from the QNN.
 
       Args:
         qnn: The parameterized quantum circuit on which to do inference.
         initial_states: Shape [batch_size, num_qubits] of dtype `tf.int8`.
-          These are the initial states of each qubit in the circuit.
-        counts: Shape [batch_size] of dtype `tf.int32` such that `counts[i]` is
-          the number of samples to draw from `(qnn)|initial_states[i]>`.
+          Each entry is an initial state for the set of qubits.  For each state,
+          `qnn` is applied and a single sample is drawn.
 
       Returns:
-        ragged_samples: `tf.RaggedTensor` of DType `tf.int8` structured such
-          that `ragged_samples[i]` contains `counts[i]` bitstrings drawn from
-          `(qnn)|initial_states[i]>`.
+        samples: 2D `tf.Tensor` of DType `tf.int8` which is the overall set of
+          bitstring samples drawn from `qnn`.
     """
-    circuits = qnn(initial_states)
+    unique_states, counts = utils.unique_bitstrings_with_counts(initial_states)
+    circuits = qnn(unique_states)
     num_circuits = tf.shape(circuits)[0]
     tiled_values = tf.tile(
         tf.expand_dims(qnn.symbol_values, 0), [num_circuits, 1])
