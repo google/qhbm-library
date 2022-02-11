@@ -127,7 +127,7 @@ class QMHLTest(tf.test.TestCase):
         data_probs = tf.random.uniform([num_qubits])
         raw_samples = tfp.distributions.Bernoulli(
             probs=1 - data_probs, dtype=tf.int8).sample(num_data_samples)
-        unique_bitstrings, target_counts = utils.unique_bitstrings_with_counts(
+        unique_bitstrings, _, target_counts = utils.unique_bitstrings_with_counts(
             raw_samples)
         # Flip bits according to the distribution
         target_states_list = []
