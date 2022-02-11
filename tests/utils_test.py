@@ -100,8 +100,10 @@ class UniqueBitstringsWithCountsTest(parameterized.TestCase, tf.test.TestCase):
     self.assertAllEqual(actual_idx, expected_idx)
     self.assertAllEqual(actual_count, expected_count)
 
-    inverse_unique_bitstrings_with_counts_wrapper = tf.function(utils.inverse_unique_bitstrings_with_counts)
-    actual_bitstrings = inverse_unique_bitstrings_with_counts_wrapper(actual_y, actual_idx)
+    inverse_unique_bitstrings_with_counts_wrapper = tf.function(
+        utils.inverse_unique_bitstrings_with_counts)
+    actual_bitstrings = inverse_unique_bitstrings_with_counts_wrapper(
+        actual_y, actual_idx)
     self.assertAllEqual(actual_bitstrings, expected_bitstrings)
 
   @test_util.eager_mode_toggle
@@ -138,8 +140,10 @@ class UniqueBitstringsWithCountsTest(parameterized.TestCase, tf.test.TestCase):
     self.assertAllEqual(actual_idx, expected_idx)
     self.assertAllEqual(actual_count, expected_count)
 
-    inverse_unique_bitstrings_with_counts_wrapper = tf.function(utils.inverse_unique_bitstrings_with_counts)
-    actual_bitstrings = inverse_unique_bitstrings_with_counts_wrapper(actual_y, actual_idx)
+    inverse_unique_bitstrings_with_counts_wrapper = tf.function(
+        utils.inverse_unique_bitstrings_with_counts)
+    actual_bitstrings = inverse_unique_bitstrings_with_counts_wrapper(
+        actual_y, actual_idx)
     self.assertAllEqual(actual_bitstrings, expected_bitstrings)
 
   @test_util.eager_mode_toggle
@@ -167,8 +171,10 @@ class UniqueBitstringsWithCountsTest(parameterized.TestCase, tf.test.TestCase):
     self.assertAllEqual(actual_idx, expected_idx)
     self.assertAllEqual(actual_count, expected_count)
 
-    inverse_unique_bitstrings_with_counts_wrapper = tf.function(utils.inverse_unique_bitstrings_with_counts)
-    actual_bitstrings = inverse_unique_bitstrings_with_counts_wrapper(actual_y, actual_idx)
+    inverse_unique_bitstrings_with_counts_wrapper = tf.function(
+        utils.inverse_unique_bitstrings_with_counts)
+    actual_bitstrings = inverse_unique_bitstrings_with_counts_wrapper(
+        actual_y, actual_idx)
     self.assertAllEqual(actual_bitstrings, expected_bitstrings)
 
 
