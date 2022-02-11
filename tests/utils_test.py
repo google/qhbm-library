@@ -92,54 +92,57 @@ class UniqueBitstringsWithCountsTest(parameterized.TestCase, tf.test.TestCase):
     expected_count = tf.constant([1, 1], dtype=out_idx)
     
     unique_bitstrings_with_counts_wrapper = tf.function(utils.unique_bitstrings_with_counts)
-    actual_y, actual_idx, actual_count = unique_bitstrings_with_counts_wrapper(test_bitstrings, out_idx=out_idx)
+    actual_y, actual_idx, actual_count = unique_bitstrings_with_counts_wrapper(expected_y, out_idx=out_idx)
     self.assertAllEqual(actual_y, expected_y)
     self.assertAllEqual(actual_idx, expected_idx)
     self.assertAllEqual(actual_count, expected_count)
 
-  # @test_util.eager_mode_toggle
-  # def test_short(self):
-  #   """Case when bitstrings are length 1."""
-  #   test_bitstrings = tf.constant([
-  #       [0],
-  #       [1],
-  #       [0],
-  #       [1],
-  #       [1],
-  #       [0],
-  #       [1],
-  #       [1],
-  #   ],)
+  @test_util.eager_mode_toggle
+  def test_short(self):
+    """Case when bitstrings are length 1."""
+    test_bitstrings = tf.constant([
+        [1],
+        [0],
+        [0],
+        [1],
+        [1],
+        [0],
+        [1],
+        [1],
+    ],)
+    expected_y = tf.constant([[1], [0]])
+    expected_idx = tf.constant([0, 1, 1, 0, 0, 1, 0, 0,])
+    expected_count = tf.constant([5, 3])
 
-  #   @tf.function
-  #   def wrapper(bitstrings):
-  #     return utils.unique_bitstrings_with_counts(bitstrings)
+    unique_bitstrings_with_counts_wrapper = tf.function(utils.unique_bitstrings_with_counts)
 
-  #   test_y, test_count = wrapper(test_bitstrings)
-  #   self.assertAllEqual(test_y, tf.constant([[0], [1]]))
-  #   self.assertAllEqual(test_count, tf.constant([3, 5]))
+    actual_y, actual_idx, actual_count = unique_bitstrings_with_counts_wrapper(test_bitstrings)
+    self.assertAllEqual(actual_y, expected_y)
+    self.assertAllEqual(actual_idx, expected_idx)
+    self.assertAllEqual(actual_count, expected_count)
 
-  # @test_util.eager_mode_toggle
-  # def test_long(self):
-  #   """Case when bitstrings are of length > 1."""
-  #   test_bitstrings = tf.constant([
-  #       [1, 0, 1],
-  #       [1, 1, 1],
-  #       [0, 1, 1],
-  #       [1, 0, 1],
-  #       [1, 1, 1],
-  #       [0, 1, 1],
-  #       [1, 0, 1],
-  #       [1, 0, 1],
-  #   ],)
+  @test_util.eager_mode_toggle
+  def test_long(self):
+    """Case when bitstrings are of length > 1."""
+    test_bitstrings = tf.constant([
+        [1, 0, 1],
+        [1, 1, 1],
+        [0, 1, 1],
+        [1, 0, 1],
+        [1, 1, 1],
+        [0, 1, 1],
+        [1, 0, 1],
+        [1, 0, 1],
+    ],)
+    expected_y = tf.constant([[1, 0, 1], [1, 1, 1], [0, 1, 1]])
+    expected_idx = tf.constant([0, 1, 2, 0, 1, 2, 0, 0])
+    expected_count = tf.constant([4, 2, 2])
 
-  #   @tf.function
-  #   def wrapper(bitstrings):
-  #     return utils.unique_bitstrings_with_counts(bitstrings)
-
-  #   test_y, test_count = wrapper(test_bitstrings)
-  #   self.assertAllEqual(test_y, tf.constant([[1, 0, 1], [1, 1, 1], [0, 1, 1]]))
-  #   self.assertAllEqual(test_count, tf.constant([4, 2, 2]))
+    unique_bitstrings_with_counts_wrapper = tf.function(utils.unique_bitstrings_with_counts)
+    actual_y, actual_idx, actual_count = unique_bitstrings_with_counts_wrapper(test_bitstrings)
+    self.assertAllEqual(actual_y, expected_y)
+    self.assertAllEqual(actual_idx, expected_idx)
+    self.assertAllEqual(actual_count, expected_count)
 
 
 if __name__ == "__main__":
