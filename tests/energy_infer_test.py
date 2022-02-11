@@ -175,7 +175,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
         test_util.check_bitstring_exists(
             tf.constant([1], dtype=tf.int8), samples))
     # Check that the fraction is approximately 0.5 (equal counts)
-    _, counts = utils.unique_bitstrings_with_counts(samples)
+    _, _, counts = utils.unique_bitstrings_with_counts(samples)
     self.assertAllClose(1.0, counts[0] / counts[1], atol=1e-3)
 
     # Large energy penalty pins the bit.
@@ -215,7 +215,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
       b_tf = tf.constant([b], dtype=tf.int8)
       self.assertTrue(test_util.check_bitstring_exists(b_tf, samples))
 
-    _, counts = utils.unique_bitstrings_with_counts(samples)
+    _, _, counts = utils.unique_bitstrings_with_counts(samples)
     # Check that the fraction is approximately 0.125 (equal counts)
     self.assertAllClose(
         [0.125] * 8,
@@ -500,7 +500,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
       energy_var.assign(old_value + delta * tf.one_hot(k, num_elts, 1.0, 0.0))
       e_infer.infer(energy)
       samples = e_infer.sample(num_samples)
-      bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
+      bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
       values = f(bitstrings)
       delta_expectation = tf.nest.map_structure(
           lambda x: utils.weighted_average(counts, x), values)
@@ -594,7 +594,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
         test_util.check_bitstring_exists(
             tf.constant([1], dtype=tf.int8), samples))
     # Check that the fraction is approximately 0.5 (equal counts)
-    _, counts = utils.unique_bitstrings_with_counts(samples)
+    _, _, counts = utils.unique_bitstrings_with_counts(samples)
     self.assertAllClose(1.0, counts[0] / counts[1], atol=1e-3)
 
 
@@ -633,7 +633,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
         test_util.check_bitstring_exists(
             tf.constant([1], dtype=tf.int8), samples))
     # Check that the fraction is approximately 0.5 (equal counts)
-    _, counts = utils.unique_bitstrings_with_counts(samples)
+    _, _, counts = utils.unique_bitstrings_with_counts(samples)
     self.assertAllClose(1.0, counts[0] / counts[1], atol=1e-3)
 
     # Large value of theta pins the bit.
@@ -648,7 +648,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
 
     samples = sample_wrapper_2(n_samples)
     # check that we got only one bitstring
-    bitstrings, _ = utils.unique_bitstrings_with_counts(samples)
+    bitstrings, _, _ = utils.unique_bitstrings_with_counts(samples)
     self.assertAllEqual(bitstrings, [[1]])
 
     # Two bit tests.
@@ -667,7 +667,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
       b_tf = tf.constant([b], dtype=tf.int8)
       self.assertTrue(test_util.check_bitstring_exists(b_tf, samples))
     # Check that the fraction is approximately 0.25 (equal counts)
-    _, counts = utils.unique_bitstrings_with_counts(samples)
+    _, _, counts = utils.unique_bitstrings_with_counts(samples)
     self.assertAllClose(
         [0.25] * 4,
         tf.cast(counts, tf.float32) / tf.cast(n_samples, tf.float32),
@@ -692,7 +692,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     for b in [[1, 0], [1, 1]]:
       b_tf = tf.constant([b], dtype=tf.int8)
       self.assertFalse(test_util.check_bitstring_exists(b_tf, samples))
-    _, counts = utils.unique_bitstrings_with_counts(samples)
+    _, _, counts = utils.unique_bitstrings_with_counts(samples)
     self.assertAllClose(counts, [n_samples / 2] * 2, atol=n_samples / 1000)
 
   @test_util.eager_mode_toggle
@@ -818,7 +818,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
         test_util.check_bitstring_exists(
             tf.constant([1], dtype=tf.int8), samples))
     # Check that the fraction is approximately 0.5 (equal counts)
-    _, counts = utils.unique_bitstrings_with_counts(samples)
+    _, _, counts = utils.unique_bitstrings_with_counts(samples)
     self.assertAllClose(1.0, counts[0] / counts[1], atol=1e-3)
 
 
