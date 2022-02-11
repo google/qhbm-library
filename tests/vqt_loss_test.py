@@ -139,7 +139,7 @@ class VQTTest(tf.test.TestCase):
           initializer_seed=self.tf_random_seed_alt,
           ebm_seed=self.tfp_seed_alt)
 
-      beta = tf.random.uniform([], 0.1, 10, seed=self.tf_random_seed)
+      beta = tf.random.uniform([], 0.1, 10, tf.float32, self.tf_random_seed)
 
       with tf.GradientTape() as tape:
         actual_loss = vqt(model_infer, model_h, self.num_samples, data_h, beta)
