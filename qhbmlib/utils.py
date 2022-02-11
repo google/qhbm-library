@@ -78,15 +78,15 @@ def unique_bitstrings_with_counts(bitstrings, out_idx=tf.dtypes.int32):
   return y, idx, count
 
 
-def inverse_unique_bitstrings_with_counts(y, idx):
+def expand_unique_results(y, idx):
   """Inverse of unique_bitstrings_with_counts.
 
   Args:
-    y: 2-D `tf.Tensor`, interpreted as a list of bitstrings.
+    y: Values to pick according to `idx`.
     idx: The index at which to place each value of `y` in the output.
 
   Returns:
-    bitstrings: 2-D `tf.Tensor` such that `bitstrings[i] == y[idx[i]]`.
+    expanded: `tf.Tensor` such that `expanded[i] == y[idx[i]]`.
   """
-  bitstrings = tf.gather(y, idx, axis=0)
-  return bitstrings
+  expanded = tf.gather(y, idx, axis=0)
+  return expanded
