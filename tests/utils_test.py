@@ -100,10 +100,8 @@ class UniqueBitstringsWithCountsTest(parameterized.TestCase, tf.test.TestCase):
     self.assertAllEqual(actual_idx, expected_idx)
     self.assertAllEqual(actual_count, expected_count)
 
-    expand_unique_results_wrapper = tf.function(
-        utils.expand_unique_results)
-    actual_bitstrings = expand_unique_results_wrapper(
-        actual_y, actual_idx)
+    expand_unique_results_wrapper = tf.function(utils.expand_unique_results)
+    actual_bitstrings = expand_unique_results_wrapper(actual_y, actual_idx)
     self.assertAllEqual(actual_bitstrings, expected_bitstrings)
 
   @test_util.eager_mode_toggle
@@ -140,16 +138,15 @@ class UniqueBitstringsWithCountsTest(parameterized.TestCase, tf.test.TestCase):
     self.assertAllEqual(actual_idx, expected_idx)
     self.assertAllEqual(actual_count, expected_count)
 
-    expand_unique_results_wrapper = tf.function(
-        utils.expand_unique_results)
-    actual_bitstrings = expand_unique_results_wrapper(
-        actual_y, actual_idx)
+    expand_unique_results_wrapper = tf.function(utils.expand_unique_results)
+    actual_bitstrings = expand_unique_results_wrapper(actual_y, actual_idx)
     self.assertAllEqual(actual_bitstrings, expected_bitstrings)
 
     compressed_outputs = tf.random.uniform([2])
     expected_outputs = tf.constant(
-      [compressed_outputs.numpy()[j] for j in expected_idx.numpy().tolist()])
-    actual_outputs = expand_unique_results_wrapper(compressed_outputs, actual_idx)
+        [compressed_outputs.numpy()[j] for j in expected_idx.numpy().tolist()])
+    actual_outputs = expand_unique_results_wrapper(compressed_outputs,
+                                                   actual_idx)
     self.assertAllEqual(actual_outputs, expected_outputs)
 
   @test_util.eager_mode_toggle
@@ -177,16 +174,15 @@ class UniqueBitstringsWithCountsTest(parameterized.TestCase, tf.test.TestCase):
     self.assertAllEqual(actual_idx, expected_idx)
     self.assertAllEqual(actual_count, expected_count)
 
-    expand_unique_results_wrapper = tf.function(
-        utils.expand_unique_results)
-    actual_bitstrings = expand_unique_results_wrapper(
-        actual_y, actual_idx)
+    expand_unique_results_wrapper = tf.function(utils.expand_unique_results)
+    actual_bitstrings = expand_unique_results_wrapper(actual_y, actual_idx)
     self.assertAllEqual(actual_bitstrings, expected_bitstrings)
 
     compressed_outputs = tf.random.uniform([3])
     expected_outputs = tf.constant(
-      [compressed_outputs.numpy()[j] for j in expected_idx.numpy().tolist()])
-    actual_outputs = expand_unique_results_wrapper(compressed_outputs, actual_idx)
+        [compressed_outputs.numpy()[j] for j in expected_idx.numpy().tolist()])
+    actual_outputs = expand_unique_results_wrapper(compressed_outputs,
+                                                   actual_idx)
     self.assertAllEqual(actual_outputs, expected_outputs)
 
 
