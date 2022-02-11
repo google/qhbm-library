@@ -119,9 +119,9 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
       self._seed.assign(new_seed)
 
   @preface_inference
-  def call(self, inputs):
+  def call(self, inputs, *args, **kwargs):
     """Calls this layer on the given inputs."""
-    return self._call(inputs)
+    return self._call(inputs, *args, **kwargs)
 
   @preface_inference
   def entropy(self):
@@ -156,7 +156,7 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
     return self._sample(num_samples)
 
   @abc.abstractmethod
-  def _call(self, inputs):
+  def _call(self, inputs, *args, **kwargs):
     """Default implementation wrapped by `self.call`."""
     raise NotImplementedError()
 
@@ -289,9 +289,9 @@ class AnalyticEnergyInference(EnergyInference):
     super().__init__(initial_seed, name)
     self._all_bitstrings = tf.constant(
         list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
-    self._dist_realization = tfp.layers.DistributionLambda(
-        make_distribution_fn=lambda t: tfd.Categorical(logits=-1 * t))
-    self._distribution = None
+    self._logits_variable = tf.Variable(
+        tf.zeros([tf.shape(self._all_bitstrings)[0]]), trainable=False)
+    self._distribution = tfd.Categorical(logits=self._logits_variable)
 
   @property
   def all_bitstrings(self):
@@ -308,10 +308,8 @@ class AnalyticEnergyInference(EnergyInference):
     """Categorical distribution set during last call to `self.infer`."""
     return self._distribution
 
-  def _call(self, inputs):
+  def _call(self, inputs, *args, **kwargs):
     """See base class docstring."""
-    if self.distribution is None:
-      raise RuntimeError("`infer` must be called at least once.")
     if inputs is None:
       return self.distribution
     else:
@@ -335,36 +333,38 @@ class AnalyticEnergyInference(EnergyInference):
 
   def infer(self, energy: energy_model.BitstringEnergy):
     """See base class docstring."""
-    self.energy = energy
-    x = tf.squeeze(self.all_energies)
-    self._distribution = self._dist_realization(x)
+    self._energy = energy
+    self._logits_variable.assign(-1.0 * self.all_energies)
 
 
 class BernoulliEnergyInference(EnergyInference):
   """Manages inference for a Bernoulli defined by spin energies."""
 
   def __init__(self,
+               num_bits: int,
                initial_seed: Union[None, tf.Tensor] = None,
                name: Union[None, str] = None):
     """Initializes a BernoulliEnergyInference.
 
     Args:
+      num_bits: Number of bits on which this layer acts.
+      initial_seed: PRNG seed; see tfp.random.sanitize_seed for details. This
+        seed will be used in the `sample` method.  If None, the seed is updated
+        after every inference call.  Otherwise, the seed is fixed.
       name: Optional name for the model.
     """
     super().__init__(initial_seed, name)
-    self._dist_realization = tfp.layers.DistributionLambda(
-        make_distribution_fn=lambda t: tfd.Bernoulli(logits=t, dtype=tf.int8))
-    self._distribution = None
+    self._logits_variable = tf.Variable(tf.zeros([num_bits]), trainable=False)
+    self._distribution = tfd.Bernoulli(
+        logits=self._logits_variable, dtype=tf.int8)
 
   @property
   def distribution(self):
     """Bernoulli distribution set during last call to `self.infer`."""
     return self._distribution
 
-  def _call(self, inputs):
+  def _call(self, inputs, *args, **kwargs):
     """See base class docstring."""
-    if self.distribution is None:
-      raise RuntimeError("`infer` must be called at least once.")
     if inputs is None:
       return self.distribution
     else:
@@ -397,5 +397,5 @@ class BernoulliEnergyInference(EnergyInference):
 
   def infer(self, energy: energy_model.BitstringEnergy):
     """See base class docstring."""
-    self.energy = energy
-    self._current_dist = self._dist_realization(self.energy.logits)
+    self._energy = energy
+    self._logits_variable.assign(self.energy.logits)
