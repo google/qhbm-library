@@ -40,7 +40,7 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
   def __init__(self,
                initial_seed: Union[None, tf.Tensor] = None,
                name: Union[None, str] = None):
-    """Initializes an EnergyInferenceABC.
+    """Initializes an EnergyInferenceBase.
 
     Args:
       initial_seed: PRNG seed; see tfp.random.sanitize_seed for details. This
@@ -85,17 +85,50 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
       self._update_seed.assign(False)
     self._seed.assign(tfp.random.sanitize_seed(initial_seed))
 
-  @_preface_inference
+  def preface_inference(f):
+    """Wraps given function with things to run before every inference call.
+
+    Args:
+      f: The method of `EnergyInference` to wrap.
+
+    Returns:
+      wrapper: The wrapped function.
+    """
+
+    def wrapper(self, *args, **kwargs):
+      self._preface_inference(*args, **kwargs)
+      return f(self, *args, **kwargs)
+
+    return wrapper
+
+  def _preface_inference(self, *args, **kwargs):
+    """Things all energy inference do before inference.
+
+    Called by `preface_inference` before the wrapped inference method.
+    Currently includes:
+      - run `self.infer` if this is the first call of a wrapped function
+      - change the seed if not set by the user during initialization
+
+    Note: subclasses should take care to call the superclass method.
+    """
+    if self._first_inference:
+      self.infer(self.energy)
+      self._first_inference.assign(False)
+    if self._update_seed:
+      new_seed, _ = tfp.random.split_seed(self.seed)
+      self._seed.assign(new_seed)
+
+  @preface_inference
   def call(self, inputs):
     """Calls this layer on the given inputs."""
     return self._call(inputs)
 
-  @_preface_inference
+  @preface_inference
   def entropy(self):
     """Returns an estimate of the entropy."""
     return self._entropy()
 
-  @_preface_inference
+  @preface_inference
   def expectation(self, function, num_samples: int):
     """Returns an estimate of the expectation value of the given function.
 
@@ -108,12 +141,12 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
     """
     return self._expectation(function, num_samples)
 
-  @_preface_inference
+  @preface_inference
   def log_partition(self):
     """Returns an estimate of the log partition function."""
     return self._log_partition()
 
-  @_preface_inference
+  @preface_inference
   def sample(self, num_samples: int):
     """Returns samples from the EBM corresponding to `self.energy`.
 
@@ -158,32 +191,6 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
         via the equations of an energy based model.
     """
     raise NotImplementedError()
-
-  def _preface_inference(f):
-    """Wraps given function with things to run before every inference call.
-
-    This decorator wraps the given function with additional computations to run
-    before continuing.  Currently includes:
-      - run `self.infer` if this is the first call of a wrapped function
-      - change the seed if not set by the user during initialization
-
-    Args:
-      f: The method of `EnergyInference` to wrap.
-
-    Returns:
-      wrapper: The wrapped function.
-    """
-
-    def wrapper(self, *args, **kwargs):
-      if self._first_inference:
-        self.infer(self.energy)
-        self._first_inference.assign(False)
-      if self._update_seed:
-        new_seed, _ = tfp.random.split_seed(self.seed)
-        self._seed.assign(new_seed)
-      return f(self, *args, **kwargs)
-
-    return wrapper
 
 
 class EnergyInference(EnergyInferenceBase):
