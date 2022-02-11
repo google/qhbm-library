@@ -142,7 +142,7 @@ class UniqueBitstringsWithCountsTest(parameterized.TestCase, tf.test.TestCase):
     actual_bitstrings = expand_unique_results_wrapper(actual_y, actual_idx)
     self.assertAllEqual(actual_bitstrings, expected_bitstrings)
 
-    compressed_outputs = tf.random.uniform([2])
+    compressed_outputs = tf.random.uniform([2], dtype=tf.float32)
     expected_outputs = tf.constant(
         [compressed_outputs.numpy()[j] for j in expected_idx.numpy().tolist()])
     actual_outputs = expand_unique_results_wrapper(compressed_outputs,
@@ -178,7 +178,7 @@ class UniqueBitstringsWithCountsTest(parameterized.TestCase, tf.test.TestCase):
     actual_bitstrings = expand_unique_results_wrapper(actual_y, actual_idx)
     self.assertAllEqual(actual_bitstrings, expected_bitstrings)
 
-    compressed_outputs = tf.random.uniform([3])
+    compressed_outputs = tf.random.uniform([3], dtype=tf.float32)
     expected_outputs = tf.constant(
         [compressed_outputs.numpy()[j] for j in expected_idx.numpy().tolist()])
     actual_outputs = expand_unique_results_wrapper(compressed_outputs,
