@@ -37,7 +37,9 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
   in this class means estimating quantities of interest relative to the EBM.
   """
 
-  def __init__(self, initial_seed: Union[None, tf.Tensor] = None, name: Union[None, str] = None):
+  def __init__(self,
+               initial_seed: Union[None, tf.Tensor] = None,
+               name: Union[None, str] = None):
     """Initializes an EnergyInferenceABC.
 
     Args:
@@ -51,7 +53,8 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
       self._update_seed = tf.Variable(True, trainable=False)
     else:
       self._update_seed = tf.Variable(False, trainable=False)
-    self._seed = tf.Variable(tfp.random.sanitize_seed(initial_seed), trainable=False)
+    self._seed = tf.Variable(
+        tfp.random.sanitize_seed(initial_seed), trainable=False)
     self._first_inference = tf.Variable(True, trainable=False)
 
   @property
@@ -170,6 +173,7 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
     Returns:
       wrapper: The wrapped function.
     """
+
     def wrapper(self, *args, **kwargs):
       if self._first_inference:
         self.infer(self.energy)
@@ -178,13 +182,16 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
         new_seed, _ = tfp.random.split_seed(self.seed)
         self._seed.assign(new_seed)
       return f(self, *args, **kwargs)
+
     return wrapper
 
 
 class EnergyInference(EnergyInferenceBase):
   """Provides some default method implementations."""
 
-  def __init__(self, initial_seed: Union[None, tf.Tensor] = None, name: Union[None, str] = None):
+  def __init__(self,
+               initial_seed: Union[None, tf.Tensor] = None,
+               name: Union[None, str] = None):
     """Initializes an EnergyInference.
 
     Args:
@@ -194,7 +201,7 @@ class EnergyInference(EnergyInferenceBase):
       name: Optional name for the model.
     """
     super().__init__(initial_seed, name)
-  
+
   def _expectation(self, function, num_samples: int):
     """Default implementation wrapped by `self.expectation`.
 
@@ -263,12 +270,15 @@ class EnergyInference(EnergyInferenceBase):
       return average_of_values, grad_fn
 
     return _inner_expectation()
-  
+
 
 class AnalyticEnergyInference(EnergyInference):
   """Uses an explicit categorical distribution to implement parent functions."""
 
-  def __init__(self, num_bits: int, initial_seed: Union[None, tf.Tensor] = None, name: Union[None, str] = None):
+  def __init__(self,
+               num_bits: int,
+               initial_seed: Union[None, tf.Tensor] = None,
+               name: Union[None, str] = None):
     """Initializes an AnalyticEnergyInference.
 
     Internally, this class saves all possible bitstrings as a tensor, whose
@@ -338,7 +348,9 @@ class AnalyticEnergyInference(EnergyInference):
 class BernoulliEnergyInference(EnergyInference):
   """Manages inference for a Bernoulli defined by spin energies."""
 
-  def __init__(self, initial_seed: Union[None, tf.Tensor] = None, name: Union[None, str] = None):
+  def __init__(self,
+               initial_seed: Union[None, tf.Tensor] = None,
+               name: Union[None, str] = None):
     """Initializes a BernoulliEnergyInference.
 
     Args:
