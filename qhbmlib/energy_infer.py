@@ -85,7 +85,7 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
       self._update_seed.assign(False)
     self._seed.assign(tfp.random.sanitize_seed(initial_seed))
 
-  def preface_inference(f):
+  def preface_inference(f):  # pylint: disable=no-self-argument
     """Wraps given function with things to run before every inference call.
 
     Args:
@@ -96,11 +96,12 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
     """
 
     def wrapper(self, *args, **kwargs):
-      self._preface_inference(*args, **kwargs)
+      self._preface_inference()  # pylint: disable=protected-access
       return f(self, *args, **kwargs)
+
     return wrapper
 
-  def _preface_inference(self, *args, **kwargs):
+  def _preface_inference(self):
     """Things all energy inference methods do before proceeding.
 
     Called by `preface_inference` before the wrapped inference method.
@@ -194,19 +195,6 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
 
 class EnergyInference(EnergyInferenceBase):
   """Provides some default method implementations."""
-
-  def __init__(self,
-               initial_seed: Union[None, tf.Tensor] = None,
-               name: Union[None, str] = None):
-    """Initializes an EnergyInference.
-
-    Args:
-      initial_seed: PRNG seed; see tfp.random.sanitize_seed for details. This
-        seed will be used in the `sample` method.  If None, the seed is updated
-        after every inference call.  Otherwise, the seed is fixed.
-      name: Optional name for the model.
-    """
-    super().__init__(initial_seed, name)
 
   def _expectation(self, function, num_samples: int):
     """Default implementation wrapped by `self.expectation`.
@@ -411,4 +399,3 @@ class BernoulliEnergyInference(EnergyInference):
     """See base class docstring."""
     self.energy = energy
     self._current_dist = self._dist_realization(self.energy.logits)
-

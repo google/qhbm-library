@@ -195,7 +195,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
         [tf.Variable([resolver[s] for s in symbols])], [[]])
     circuit.build([])
     actual_hamiltonian = hamiltonian_model.Hamiltonian(energy, circuit)
-    e_infer = energy_infer.BernoulliEnergyInference(seed=seed)
+    e_infer = energy_infer.BernoulliEnergyInference(initial_seed=seed)
     q_infer = circuit_infer.QuantumInference()
     actual_h_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
 
@@ -286,7 +286,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     model_circuit.build([])
     model_hamiltonian = hamiltonian_model.Hamiltonian(model_energy,
                                                       model_circuit)
-    e_infer = energy_infer.BernoulliEnergyInference(seed=seed)
+    e_infer = energy_infer.BernoulliEnergyInference(initial_seed=seed)
     q_infer = circuit_infer.QuantumInference()
     model_h_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
 
