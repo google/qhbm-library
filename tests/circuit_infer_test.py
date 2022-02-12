@@ -151,6 +151,8 @@ class QuantumInferenceTest(tf.test.TestCase):
     for exps in expected_grad:
       expected_grad_reduced.append(
           tf.reduce_sum(exps * e_counts, 0) / total_counts)
+    expected_reduced = tf.stack(expeced_reduced)
+    expected_grad_reduced = tf.stack(expected_grad_reduced)
 
     # Measure operators on every qubit.
     x_ops = tfq.convert_to_tensor([1 * cirq.X(q) for q in self.raw_qubits])
@@ -158,48 +160,23 @@ class QuantumInferenceTest(tf.test.TestCase):
     z_ops = tfq.convert_to_tensor([1 * cirq.Z(q) for q in self.raw_qubits])
     all_ops = [x_ops, y_ops, z_ops]
 
-    # Check with reduce True (this is the default)
-    # TODO(#71): Decoration yields an error seemingly coming from TFQ:
-    #  LookupError: gradient registry has no entry for: TfqAdjointGradient
-
-    #@tf.function
-    def exp_infer_true(qnn, bitstrings, counts, op):
-      return exp_infer.expectation(qnn, bitstrings, counts, op)
-
-    with tf.GradientTape(persistent=True) as tape:
-      actual_exps = []
-      for op in all_ops:
-        actual_exps.append(exp_infer_true(self.p_qnn, bitstrings, counts, op))
-    actual_exps_grad = [
-        tf.squeeze(tape.jacobian(exps, self.p_qnn.trainable_variables))
-        for exps in actual_exps
-    ]
-    del tape
-    for a, e in zip(actual_exps, expected_reduced):
-      self.assertAllClose(a, e, atol=ATOL)
+    expectation_wrapper = tf.function(exp_infer.expectation)
+    actual_reduced = []
+    actual_grad_reduced = []
+    for op in all_ops:
+      with tf.GradientTape() as tape:
+        current_exp = expectation_wrapper(self.p_qnn, bitstrings, op)
+      current_jac = tf.squeeze(tape.jacobian(current_exp, self.p_qnn.trainable_variables))
+      reduced_exp = tf.math.reduce_mean(current_exp, 0)
+      reduced_jac = tf.math.reduce_mean(current_jac, 0)
+      actual_reduced.append(reduced_exp)
+      actual_grad_reduced.append(reduced_jac)
+    actual_reduced = tf.stack(actual_reduced)
+    actual_grad_reduced = tf.stack(actual_grad_reduced)
+      
+    self.assertAllClose(actual_exps_reduced, expected_reduced, atol=ATOL)
+    self.assertAllClose(actual_exps_grad_reduced, expected_grad_reduced)
     for a, e in zip(actual_exps_grad, expected_grad_reduced):
-      self.assertAllClose(a, e, atol=GRAD_ATOL)
-
-    # Check with reduce False
-    # TODO(#71): Decoration yields an error seemingly coming from TFQ:
-    #  LookupError: gradient registry has no entry for: TfqAdjointGradient
-
-    #@tf.function
-    def exp_infer_false(qnn, bitstrings, counts, op):
-      return exp_infer.expectation(qnn, bitstrings, counts, op, False)
-
-    with tf.GradientTape(persistent=True) as tape:
-      actual_exps = []
-      for op in all_ops:
-        actual_exps.append(exp_infer_false(self.p_qnn, bitstrings, counts, op))
-    actual_exps_grad = [
-        tf.squeeze(tape.jacobian(exps, self.p_qnn.trainable_variables))
-        for exps in actual_exps
-    ]
-    del tape
-    for a, e in zip(actual_exps, expected):
-      self.assertAllClose(a, e, atol=ATOL)
-    for a, e in zip(actual_exps_grad, expected_grad):
       self.assertAllClose(a, e, atol=GRAD_ATOL)
 
   @test_util.eager_mode_toggle
