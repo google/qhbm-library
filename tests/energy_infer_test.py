@@ -631,7 +631,8 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
       b_tf = tf.constant([b], dtype=tf.int8)
       self.assertFalse(test_util.check_bitstring_exists(b_tf, samples))
     _, _, counts = utils.unique_bitstrings_with_counts(samples)
-    self.assertAllClose(counts, [n_samples / 2] * 2, atol=self.num_samples / 1000)
+    self.assertAllClose(
+        counts, [self.num_samples / 2] * 2, atol=self.num_samples / 1000)
 
   @test_util.eager_mode_toggle
   def test_samples_seeded(self):
