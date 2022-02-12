@@ -14,6 +14,7 @@
 # limitations under the License.
 # ==============================================================================
 """Tests for util.py."""
+
 import math
 
 import cirq
