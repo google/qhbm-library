@@ -102,7 +102,7 @@ class QuantumInference(tf.keras.layers.Layer):
         unaveraged expectation values of each `operator` against each
         transformed initial state.
       """
-    unique_states, idx, counts = utils.unique_with_counts(initial_states)
+    unique_states, idx, counts = utils.unique_bitstrings_with_counts(initial_states)
     circuits = qnn(unique_states)
     num_circuits = tf.shape(circuits)[0]
     num_operators = tf.shape(operators)[0]

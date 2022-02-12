@@ -26,6 +26,7 @@ import tensorflow_quantum as tfq
 
 from qhbmlib import circuit_infer
 from qhbmlib import circuit_model
+from qhbmlib import utils
 from tests import test_util
 
 # Global tolerance, set for float32.
@@ -108,10 +109,10 @@ class QuantumInferenceTest(tf.test.TestCase):
     exp_infer = circuit_infer.QuantumInference()
 
     # Choose some bitstrings.
-    num_bitstrings = 10
-    bitstrings = tfp.distributions.Bernoulli(
+    num_bitstrings = int(1e6)
+    initial_states = tfp.distributions.Bernoulli(
         probs=[0.5] * self.num_qubits, dtype=tf.int8).sample(num_bitstrings)
-    counts = tf.random.uniform([num_bitstrings], 1, 1000, tf.int32)
+    bitstrings, _, counts = utils.unique_bitstrings_with_counts(initial_states)
 
     # Get true expectation values based on the bitstrings.
     expected_x_exps = []
@@ -151,7 +152,7 @@ class QuantumInferenceTest(tf.test.TestCase):
     for exps in expected_grad:
       expected_grad_reduced.append(
           tf.reduce_sum(exps * e_counts, 0) / total_counts)
-    expected_reduced = tf.stack(expeced_reduced)
+    expected_reduced = tf.stack(expected_reduced)
     expected_grad_reduced = tf.stack(expected_grad_reduced)
 
     # Measure operators on every qubit.
@@ -165,19 +166,16 @@ class QuantumInferenceTest(tf.test.TestCase):
     actual_grad_reduced = []
     for op in all_ops:
       with tf.GradientTape() as tape:
-        current_exp = expectation_wrapper(self.p_qnn, bitstrings, op)
-      current_jac = tf.squeeze(tape.jacobian(current_exp, self.p_qnn.trainable_variables))
-      reduced_exp = tf.math.reduce_mean(current_exp, 0)
-      reduced_jac = tf.math.reduce_mean(current_jac, 0)
+        current_exp = expectation_wrapper(self.p_qnn, initial_states, op)
+        reduced_exp = tf.math.reduce_mean(current_exp, 0)
+      reduced_grad = tape.gradient(reduced_exp, self.p_qnn.trainable_variables)
       actual_reduced.append(reduced_exp)
-      actual_grad_reduced.append(reduced_jac)
+      actual_grad_reduced.append(reduced_grad)
     actual_reduced = tf.stack(actual_reduced)
     actual_grad_reduced = tf.stack(actual_grad_reduced)
       
-    self.assertAllClose(actual_exps_reduced, expected_reduced, atol=ATOL)
-    self.assertAllClose(actual_exps_grad_reduced, expected_grad_reduced)
-    for a, e in zip(actual_exps_grad, expected_grad_reduced):
-      self.assertAllClose(a, e, atol=GRAD_ATOL)
+    self.assertAllClose(actual_reduced, expected_reduced, atol=ATOL)
+    self.assertAllClose(actual_grad_reduced, expected_grad_reduced, atol=GRAD_ATOL)
 
   @test_util.eager_mode_toggle
   def test_sample_basic(self):
