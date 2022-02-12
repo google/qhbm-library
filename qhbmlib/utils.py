@@ -61,17 +61,32 @@ def weighted_average(counts: tf.Tensor, values: tf.Tensor):
 def unique_bitstrings_with_counts(bitstrings, out_idx=tf.dtypes.int32):
   """Extract the unique bitstrings in the given bitstring tensor.
 
-    Args:
-      bitstrings: 2-D `tf.Tensor`, interpreted as a list of bitstrings.
-      out_idx: An optional `tf.DType` from: `tf.int32`, `tf.int64`. Defaults to
-        `tf.int32`.  Specifies the type of `count` output.
+  Args:
+    bitstrings: 2-D `tf.Tensor`, interpreted as a list of bitstrings.
+    out_idx: An optional `tf.DType` from: `tf.int32`, `tf.int64`. Defaults to
+      `tf.int32`.  Specifies the type of `count` output.
 
-    Returns:
-      y: 2-D `tf.Tensor` of same dtype as `bitstrings`, containing the unique
-        0-axis entries of `bitstrings`.
-      count: 1-D `tf.Tensor` of dtype `out_idx` such that `count[i]` is the
-        number of occurences of `y[i]` in `bitstrings`.
+  Returns:
+    y: 2-D `tf.Tensor` of same dtype as `bitstrings`, containing the unique
+      0-axis entries of `bitstrings`.
+    idx: The index of each value of the input in the unique output `y`.
+    count: 1-D `tf.Tensor` of dtype `out_idx` such that `count[i]` is the
+      number of occurences of `y[i]` in `bitstrings`.
   """
-  y, _, counts = tf.raw_ops.UniqueWithCountsV2(
+  y, idx, count = tf.raw_ops.UniqueWithCountsV2(
       x=bitstrings, axis=[0], out_idx=out_idx)
-  return y, counts
+  return y, idx, count
+
+
+def expand_unique_results(y, idx):
+  """Inverse of unique_bitstrings_with_counts.
+
+  Args:
+    y: Values to pick according to `idx`.
+    idx: The index at which to place each value of `y` in the output.
+
+  Returns:
+    expanded: `tf.Tensor` such that `expanded[i] == y[idx[i]]`.
+  """
+  expanded = tf.gather(y, idx, axis=0)
+  return expanded

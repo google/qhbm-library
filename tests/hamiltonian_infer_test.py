@@ -203,7 +203,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     num_samples = 1e6
     e_infer.infer(energy)
     samples = e_infer.sample(num_samples)
-    bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
+    bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
     bit_list = bitstrings.numpy().tolist()
 
     # bitstring injectors
@@ -294,7 +294,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     num_samples = 1e6
     e_infer.infer(model_energy)
     samples = e_infer.sample(num_samples)
-    bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
+    bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
     bit_list = bitstrings.numpy().tolist()
 
     # bitstring injectors

@@ -173,7 +173,9 @@ class QNN(tf.keras.Model):
       samples = tf.ragged.boolean_mask(samples, num_samples_mask)
     if unique:
       samples = samples.values.to_tensor()
-      return utils.unique_bitstrings_with_counts(samples)
+      unique_bitstrings, _, counts = utils.unique_bitstrings_with_counts(
+          samples)
+      return unique_bitstrings, counts
     elif reduce:
       samples = samples.values.to_tensor()
     return samples
