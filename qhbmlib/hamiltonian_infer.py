@@ -111,7 +111,7 @@ class QHBM(tf.keras.layers.Layer):
     """
     self.e_inference.infer(model.energy)
     samples = self.e_inference.sample(num_samples)
-    bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
+    bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
     states = model.circuit(bitstrings)
     return states, counts
 
@@ -143,7 +143,7 @@ class QHBM(tf.keras.layers.Layer):
     """
     self.e_inference.infer(model.energy)
     samples = self.e_inference.sample(num_samples)
-    bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
+    bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
     if isinstance(ops, tf.Tensor):
       return self.q_inference.expectation(
           model.circuit, bitstrings, counts, ops, reduce=True)
