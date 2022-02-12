@@ -124,7 +124,7 @@ class QHBM(tf.keras.layers.Layer):
         times `states[i]` was drawn from the ensemble.
     """
     samples = self.e_inference.sample(num_samples)
-    bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
+    bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
     states = self.model.circuit(bitstrings)
     return states, counts
 
@@ -152,7 +152,7 @@ class QHBM(tf.keras.layers.Layer):
       expectation values of each entry in `ops`.
     """
     samples = self.e_inference.sample(num_samples)
-    bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
+    bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
     if isinstance(ops, tf.Tensor):
       return self.q_inference.expectation(
           self.model.circuit, bitstrings, counts, ops, reduce=True)

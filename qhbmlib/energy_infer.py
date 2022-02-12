@@ -211,7 +211,7 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     def _inner_expectation():
       """Enables derivatives."""
       samples = tf.stop_gradient(self.sample(num_samples))
-      bitstrings, counts = utils.unique_bitstrings_with_counts(samples)
+      bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
 
       # TODO(#157): try to parameterize the persistence.
       with tf.GradientTape() as values_tape:
