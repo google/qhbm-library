@@ -498,7 +498,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
 
     energy = energy_model.KOBE([0, 1], 2)
     energy.build([None, energy.num_bits])
-    actual_layer = energy_infer.AnalyticEnergyInference(2)
+    actual_layer = energy_infer.AnalyticEnergyInference(2, self.num_samples)
     energy.set_weights([test_thetas])
     actual_layer.infer(energy)
 
@@ -514,7 +514,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
 
     energy = energy_model.KOBE([0, 1], 2)
     energy.build([None, energy.num_bits])
-    actual_layer = energy_infer.AnalyticEnergyInference(2)
+    actual_layer = energy_infer.AnalyticEnergyInference(2, self.num_samples)
     energy.set_weights([test_thetas])
     actual_layer.infer(energy)
 
@@ -528,7 +528,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     one_bit_energy = energy_model.KOBE([0], 1,
                                        tf.keras.initializers.Constant(0.0))
     actual_layer = energy_infer.AnalyticEnergyInference(
-        1, initial_seed=self.tfp_seed)
+        1, self.num_samples, initial_seed=self.tfp_seed)
     actual_layer.infer(one_bit_energy)
     actual_dist = actual_layer(None)
     self.assertIsInstance(actual_dist, tfp.distributions.Categorical)

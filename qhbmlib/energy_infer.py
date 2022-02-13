@@ -213,6 +213,8 @@ class EnergyInference(EnergyInferenceBase):
         after every inference call.  Otherwise, the seed is fixed.
       name: Optional name for the model.
     """
+    super().__init__(initial_seed, name)
+    self.num_expectation_samples = num_expectation_samples
 
   def _expectation(self, function):
     """Default implementation wrapped by `self.expectation`.
