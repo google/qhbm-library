@@ -143,14 +143,14 @@ class QHBM(tf.keras.layers.Layer):
     """
     self.e_inference.infer(model.energy)
     samples = self.e_inference.sample(num_samples)
-    bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
     if isinstance(ops, tf.Tensor):
-      return self.q_inference.expectation(
-          model.circuit, bitstrings, counts, ops, reduce=True)
+      expectations = self.q_inference.expectation(model.circuit, samples, ops)
+      return tf.math.reduce_mean(expectations, 0)
     elif isinstance(ops.energy, energy_model.PauliMixin):
       u_dagger_u = model.circuit + ops.circuit_dagger
       expectation_shards = self.q_inference.expectation(
-          u_dagger_u, bitstrings, counts, ops.operator_shards, reduce=True)
+          u_dagger_u, samples, ops.operator_shards)
+      expectation_shards = tf.math.reduce_mean(expectation_shards, 0)
       return tf.expand_dims(
           ops.energy.operator_expectation(expectation_shards), 0)
     else:
