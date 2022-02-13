@@ -139,8 +139,6 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
       function: Mapping from a 2D tensor of bitstrings to a possibly nested
         structure.  The structure must have atomic elements all of which are
         float tensors with the same batch size as the input bitstrings.
-      num_samples: The number of bitstring samples to use when estimating the
-        expectation value of `function`.
     """
     return self._expectation(function)
 
