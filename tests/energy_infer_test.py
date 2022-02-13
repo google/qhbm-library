@@ -42,7 +42,8 @@ class EnergyInferenceTest(tf.test.TestCase):
   class TwoOutcomes(energy_infer.EnergyInference):
     """EnergyInference which is independent of the input energy."""
 
-    def __init__(self, null_energy, num_expectation_samples, bitstring_1, bitstring_2, p_1):
+    def __init__(self, null_energy, num_expectation_samples, bitstring_1,
+                 bitstring_2, p_1):
       """Initializes a simple inference class.
 
       Args:
@@ -90,8 +91,9 @@ class EnergyInferenceTest(tf.test.TestCase):
     self.bitstring_2 = tf.constant([0, 0, 0, 1, 1], dtype=tf.int8)
     self.p_1 = 0.1
     self.energy = NullEnergy(list(range(5)))
-    self.e_infer = self.TwoOutcomes(self.energy, self.num_samples, self.bitstring_1,
-                                    self.bitstring_2, self.p_1)
+    self.e_infer = self.TwoOutcomes(self.energy, self.num_samples,
+                                    self.bitstring_1, self.bitstring_2,
+                                    self.p_1)
     spins_from_bitstrings = energy_model_utils.SpinsFromBitstrings()
     parity = energy_model_utils.Parity(list(range(5)), 2)
 
@@ -142,7 +144,9 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
         dtype=tf.int8)
     expected_seed = tf.constant([44, 22], tf.int32)
     expected_energies = energy(expected_bitstrings)
-    actual_layer = energy_infer.AnalyticEnergyInference(energy, self.num_samples, expected_seed,
+    actual_layer = energy_infer.AnalyticEnergyInference(energy,
+                                                        self.num_samples,
+                                                        expected_seed,
                                                         expected_name)
     self.assertEqual(actual_layer.name, expected_name)
     self.assertAllEqual(actual_layer.seed, expected_seed)
@@ -331,7 +335,6 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
         energy, self.num_samples, initial_seed=self.tfp_seed)
     expectation_wrapper = tf.function(e_infer.expectation)
 
-
     mu = tf.Variable(tf.random.uniform([], 1, 2), name="mu")
     f = AllOnes(mu)
     expected_average = mu * prob_x_star
@@ -485,7 +488,8 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     expected_log_partition = tf.math.log(tf.constant(3641.8353))
 
     energy = energy_model.KOBE([0, 1], 2)
-    actual_layer = energy_infer.AnalyticEnergyInference(energy, self.num_samples)
+    actual_layer = energy_infer.AnalyticEnergyInference(energy,
+                                                        self.num_samples)
     energy.set_weights([test_thetas])
 
     log_partition_wrapper = tf.function(actual_layer.log_partition)
@@ -499,7 +503,8 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     expected_entropy = tf.constant(0.00233551808)
 
     energy = energy_model.KOBE([0, 1], 2)
-    actual_layer = energy_infer.AnalyticEnergyInference(energy, self.num_samples)
+    actual_layer = energy_infer.AnalyticEnergyInference(energy,
+                                                        self.num_samples)
     energy.set_weights([test_thetas])
 
     entropy_wrapper = tf.function(actual_layer.entropy)
@@ -642,7 +647,8 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
                                   [1, 0, 0], [1, 0, 1], [1, 1, 0], [1, 1, 1]],
                                  dtype=tf.int8)
     energy = energy_model.BernoulliEnergy([5, 6, 7])
-    actual_layer = energy_infer.BernoulliEnergyInference(energy, self.num_samples)
+    actual_layer = energy_infer.BernoulliEnergyInference(
+        energy, self.num_samples)
 
     expected_log_partition = tf.reduce_logsumexp(-1.0 * energy(all_bitstrings))
 
@@ -677,7 +683,8 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     expected_entropy = -1.0 * tf.reduce_sum(all_probs * tf.math.log(all_probs))
 
     energy = energy_model.BernoulliEnergy([0, 1, 2])
-    actual_layer = energy_infer.BernoulliEnergyInference(energy, self.num_samples)
+    actual_layer = energy_infer.BernoulliEnergyInference(
+        energy, self.num_samples)
     energy.set_weights([test_thetas])
 
     entropy_wrapper = tf.function(actual_layer.entropy)

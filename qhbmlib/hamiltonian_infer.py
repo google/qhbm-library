@@ -76,7 +76,8 @@ class QHBM(tf.keras.layers.Layer):
     super().__init__(name=name)
     self._e_inference = e_inference
     self._q_inference = q_inference
-    self._model = hamiltonian_model.Hamiltonian(e_inference.energy, q_inference.circuit)
+    self._model = hamiltonian_model.Hamiltonian(e_inference.energy,
+                                                q_inference.circuit)
 
   @property
   def e_inference(self):
