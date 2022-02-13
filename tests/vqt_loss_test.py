@@ -142,7 +142,7 @@ class VQTTest(tf.test.TestCase):
       beta = tf.random.uniform([], 0.1, 10, tf.float32, self.tf_random_seed)
 
       with tf.GradientTape() as tape:
-        actual_loss = vqt(model_infer, model_h, self.num_samples, data_h, beta)
+ actual_loss = vqt(model_infer, model_h, self.num_samples, data_h, beta)
       actual_derivative_model, actual_derivative_data = tape.gradient(
           actual_loss,
           (model_h.trainable_variables, data_h.trainable_variables))
