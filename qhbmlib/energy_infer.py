@@ -56,7 +56,10 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
   in this class means estimating quantities of interest relative to the EBM.
   """
 
-  def __init__(self, input_energy: energy_model.BitstringEnergy, name: Union[None, str]=None, initial_seed: Union[None, tf.Tensor]=None):
+  def __init__(self,
+               input_energy: energy_model.BitstringEnergy,
+               name: Union[None, str] = None,
+               initial_seed: Union[None, tf.Tensor] = None):
     """Initializes an EnergyInferenceBase.
 
     Args:
@@ -87,7 +90,8 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
       self._update_seed = tf.Variable(True, trainable=False)
     else:
       self._update_seed = tf.Variable(False, trainable=False)
-    self._seed = tf.Variable(tfp.random.sanitize_seed(initial_seed), trainable=False)
+    self._seed = tf.Variable(
+        tfp.random.sanitize_seed(initial_seed), trainable=False)
 
     self._checkpoint_variables()
     self._do_first_inference = tf.Variable(False, trainable=False)
@@ -126,8 +130,7 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
     if self._checkpoint:
       variables_not_equal_list = tf.nest.map_structure(
           lambda v, vc: tf.math.reduce_any(tf.math.not_equal(v, vc)),
-          self._tracked_variables,
-          self._tracked_variables_checkpoint)
+          self._tracked_variables, self._tracked_variables_checkpoint)
       return tf.math.reduce_any(tf.stack(variables_not_equal_list))
     else:
       return False
@@ -135,10 +138,8 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
   def _checkpoint_variables(self):
     """Checkpoints the currently tracked variables."""
     if self._checkpoint:
-      tf.nest.map_structure(
-          lambda v, vc: vc.assign(v),
-          self._tracked_variables,
-          self._tracked_variables_checkpoint)
+      tf.nest.map_structure(lambda v, vc: vc.assign(v), self._tracked_variables,
+                            self._tracked_variables_checkpoint)
 
   def _preface_inference(self):
     """Things all energy inference methods do before proceeding.
@@ -256,6 +257,7 @@ class EnergyInference(EnergyInferenceBase):
 
     Estimates an expectation value using sample averaging.
     """
+
     @tf.custom_gradient
     def _inner_expectation():
       """Enables derivatives."""
@@ -345,8 +347,10 @@ class AnalyticEnergyInference(EnergyInference):
     """
     super().__init__(input_energy, initial_seed, name)
     self._all_bitstrings = tf.constant(
-        list(itertools.product([0, 1], repeat=input_energy.num_bits)), dtype=tf.int8)
-    self._logits_variable = tf.Variable(-1.0 * input_energy(self.all_bitstrings))
+        list(itertools.product([0, 1], repeat=input_energy.num_bits)),
+        dtype=tf.int8)
+    self._logits_variable = tf.Variable(-1.0 *
+                                        input_energy(self.all_bitstrings))
     self._distribution = tfd.Categorical(logits=self._logits_variable)
 
   @property
@@ -391,7 +395,10 @@ class AnalyticEnergyInference(EnergyInference):
 class BernoulliEnergyInference(EnergyInference):
   """Manages inference for a Bernoulli defined by spin energies."""
 
-  def __init__(self, input_energy: energy_model.BernoulliEnergy, name: Union[None, str]=None, initial_seed: Union[None, tf.Tensor]=None):
+  def __init__(self,
+               input_energy: energy_model.BernoulliEnergy,
+               name: Union[None, str] = None,
+               initial_seed: Union[None, tf.Tensor] = None):
     """Initializes a BernoulliEnergyInference.
 
     Args:
@@ -406,7 +413,8 @@ class BernoulliEnergyInference(EnergyInference):
     """
     super().__init__(input_energy, name, initial_seed)
     self._logits_variable = tf.Variable(input_energy.logits, trainable=False)
-    self._distribution = tfd.Bernoulli(logits=self._logits_variable, dtype=tf.int8)
+    self._distribution = tfd.Bernoulli(
+        logits=self._logits_variable, dtype=tf.int8)
 
   @property
   def distribution(self):

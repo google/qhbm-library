@@ -84,7 +84,7 @@ class QuantumInference(tf.keras.layers.Layer):
   @property
   def circuit(self):
     return self._circuit
-    
+
   def expectation(self,
                   qnn: circuit_model.QuantumCircuit,
                   initial_states: tf.Tensor,
