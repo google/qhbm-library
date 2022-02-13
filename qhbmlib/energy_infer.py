@@ -15,6 +15,7 @@
 """Tools for inference on energy functions represented by a BitstringEnergy."""
 
 import abc
+import functools
 import itertools
 from typing import Union
 
@@ -24,6 +25,22 @@ from tensorflow_probability import distributions as tfd
 
 from qhbmlib import energy_model
 from qhbmlib import utils
+
+
+def preface_inference(f):
+  """Wraps given function with things to run before every inference call.
+
+  Args:
+    f: The method of `EnergyInference` to wrap.
+
+  Returns:
+    wrapper: The wrapped function.
+  """
+  @functools.wraps(f)
+  def wrapper(self, *args, **kwargs):
+    self._preface_inference()  # pylint: disable=protected-access
+    return f(self, *args, **kwargs)
+  return wrapper
 
 
 class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
@@ -84,22 +101,6 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
     else:
       self._update_seed.assign(False)
     self._seed.assign(tfp.random.sanitize_seed(initial_seed))
-
-  def preface_inference(f):  # pylint: disable=no-self-argument
-    """Wraps given function with things to run before every inference call.
-
-    Args:
-      f: The method of `EnergyInference` to wrap.
-
-    Returns:
-      wrapper: The wrapped function.
-    """
-
-    def wrapper(self, *args, **kwargs):
-      self._preface_inference()  # pylint: disable=protected-access
-      return f(self, *args, **kwargs)
-
-    return wrapper
 
   def _preface_inference(self):
     """Things all energy inference methods do before proceeding.
