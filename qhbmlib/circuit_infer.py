@@ -43,6 +43,7 @@ class QuantumInference(tf.keras.layers.Layer):
       differentiator: Specifies how to take the derivative of a quantum circuit.
       name: Identifier for this inference engine.
     """
+    circuit.build([])
     self._circuit = circuit
     self._differentiator = differentiator
     self._backend = backend
