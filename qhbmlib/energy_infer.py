@@ -26,8 +26,8 @@ from qhbmlib import energy_model
 from qhbmlib import utils
 
 
-class EnergyInference(tf.keras.layers.Layer, abc.ABC):
-  r"""Sets the methods required for inference on BitstringEnergy objects.
+class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
+  r"""Defines the interface for inference on BitstringEnergy objects.
 
   Let $E$ be the energy function defined by a given `BitstringEnergy`, and let
   $X$ be the set of bitstrings in the domain of $E$.  Associated with $E$ is
@@ -38,11 +38,11 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
   """
 
   def __init__(self, input_energy: energy_model.BitstringEnergy, name: Union[None, str]=None, initial_seed: Union[None, tf.Tensor]=None):
-    """Initializes an EnergyInference.
+    """Initializes an EnergyInferenceBase.
 
     Args:
       input_energy: The parameterized energy function which defines this distribution
-        via the equations of an energy based model.  This function assumes that
+        via the equations of an energy based model.  This class assumes that
         all parameters of `energy` are `tf.Variable`s and that they are all
         returned by `energy.variables`.
       name: Optional name for the model.
@@ -74,93 +74,32 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     self._do_first_inference = tf.Variable(False, trainable=False)
 
   @property
+  def energy(self):
+    """The energy function which sets the probabilities for this EBM."""
+    return self._energy
+
+  @property
   def seed(self):
-    """Current TFP compatible seed controlling sampling behavior."""
+    """Current TFP compatible seed controlling sampling behavior.
+
+    PRNG seed; see tfp.random.sanitize_seed for details. This seed will be used
+    in the `sample` method.  If None, the seed is updated after every inference
+    call.  Otherwise, the seed is fixed.
+    """
     return self._seed
-    
+
   @seed.setter
   def seed(self, initial_seed: Union[None, tf.Tensor]):
     """Sets a new value of the random seed.
 
     Args:
-      initial_seed: PRNG seed; see tfp.random.sanitize_seed for details. This
-        seed will be used in the `sample` method.  If None, the seed is updated
-        after every inference call.  Otherwise, the seed is fixed.
+      initial_seed: see `self.seed` for details.
     """
     if initial_seed is None:
       self._update_seed.assign(True)
     else:
       self._update_seed.assign(False)
     self._seed.assign(tfp.random.sanitize_seed(initial_seed))
-
-  @abc.abstractmethod
-  def _ready_inference(self):
-    """Performs computations common to all inference methods.
-
-    Contains inference code that must be run first if the variables of
-    `self.energy` have been updated since the last time inference was performed.
-    """
-    raise NotImplementedError()
-
-  def _preface_every_call(f):
-    """Wraps given function with things to run before every inference call.
-
-    This decorator wraps the given function to so it performs the following
-    check: if the values of the variables in `self.energy` have changed since
-    the last checkpoint, call `self._ready_inference` before proceeding.
-
-    As well, this decorator wraps the given function so it changes the seed
-    if not set by the user during initialization.
-
-    Args:
-      f: The method of `EnergyInference` to wrap.
-
-    Returns:
-      wrapper: The wrapped function.
-    """
-    def wrapper(self, *args, **kwargs):
-      if self._do_first_inference:
-        self._ready_inference()
-        self._do_first_inference.assign(False)
-      if self._update_seed:
-        new_seed, _ = tfp.random.split_seed(self.seed)
-        self._seed.assign(new_seed)
-      if self.variables_updated:
-        self._checkpoint_variables()
-        self._ready_inference()
-      return f(self, *args, **kwargs)
-    return wrapper
-
-  @_preface_every_call
-  def sample(self, n):
-    """Returns samples from the EBM corresponding to `self.energy`.
-
-    This can be an approximate sampling.
-    """
-    return self._sample(n)
-  
-  @_preface_every_call
-  def entropy(self):
-    """Returns an estimate of the entropy."""
-    return self._entropy()
-
-  @_preface_every_call
-  def log_partition(self):
-    """Returns an estimate of the log partition function."""
-    return self._log_partition()
-
-  @_preface_every_call
-  def expectation(self, function, num_samples: int):
-    """Returns the expectation value of the given function.
-
-    Args:
-      function: Mapping from a 2D tensor of bitstrings to a possibly nested
-        structure.  The structure must have atomic elements all of which are
-        float tensors with the same batch size as the input bitstrings.
-      num_samples: The number of bitstring samples to use when estimating the
-        expectation value of `function`.
-    """
-    return self._expectation(function, num_samples)
 
   @property
   def variables_updated(self):
@@ -182,14 +121,90 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
           self._tracked_variables,
           self._tracked_variables_checkpoint)
 
-  @property
-  def energy(self):
-    """The energy function which sets the probabilities for this EBM."""
-    return self._energy
-  
+  def preface_inference(f):  # pylint: disable=no-self-argument
+    """Wraps given function with things to run before every inference call.
+
+    Args:
+      f: The method of `EnergyInference` to wrap.
+
+    Returns:
+      wrapper: The wrapped function.
+    """
+    def wrapper(self, *args, **kwargs):
+      self._preface_inference()  # pylint: disable=protected-access
+      return f(self, *args, **kwargs)
+    return wrapper
+
+  def _preface_inference(self):
+    """Things all energy inference methods do before proceeding.
+
+    Called by `preface_inference` before the wrapped inference method.
+    Currently includes:
+      - run `self._ready_inference` if this is first call of wrapped function
+      - change the seed if not set by the user during initialization
+      - run `self._ready_inference` if tracked energy parameters changed
+
+    Note: subclasses should take care to call the superclass method.
+    """
+    if self._first_inference:
+      self._ready_inference()
+      self._first_inference.assign(False)
+    if self._update_seed:
+      new_seed, _ = tfp.random.split_seed(self.seed)
+      self._seed.assign(new_seed)
+    if self.variables_updated:
+      self._checkpoint_variables()
+      self._ready_inference()
+
   @abc.abstractmethod
-  def _sample(self, n):
-    """Default implementation wrapped by `self.sample`."""
+  def _ready_inference(self):
+    """Performs computations common to all inference methods.
+
+    Contains inference code that must be run first if the variables of
+    `self.energy` have been updated since the last time inference was performed.
+    """
+    raise NotImplementedError()
+
+  @preface_inference
+  def call(self, inputs, *args, **kwargs):
+    """Calls this layer on the given inputs."""
+    return self._call(inputs, *args, **kwargs)
+
+  @preface_inference
+  def entropy(self):
+    """Returns an estimate of the entropy."""
+    return self._entropy()
+
+  @preface_inference
+  def expectation(self, function, num_samples: int):
+    """Returns an estimate of the expectation value of the given function.
+
+    Args:
+      function: Mapping from a 2D tensor of bitstrings to a possibly nested
+        structure.  The structure must have atomic elements all of which are
+        float tensors with the same batch size as the input bitstrings.
+      num_samples: The number of bitstring samples to use when estimating the
+        expectation value of `function`.
+    """
+    return self._expectation(function, num_samples)
+
+  @preface_inference
+  def log_partition(self):
+    """Returns an estimate of the log partition function."""
+    return self._log_partition()
+
+  @preface_inference
+  def sample(self, num_samples: int):
+    """Returns samples from the EBM corresponding to `self.energy`.
+
+    Args:
+      num_samples: Number of samples to draw from the EBM.
+    """
+    return self._sample(num_samples)
+
+  @abc.abstractmethod
+  def _call(self, inputs, *args, **kwargs):
+    """Default implementation wrapped by `self.call`."""
     raise NotImplementedError()
 
   @abc.abstractmethod
@@ -198,9 +213,23 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
     raise NotImplementedError()
 
   @abc.abstractmethod
+  def _expectation(self, function, num_samples: int):
+    """Default implementation wrapped by `self.expectation`."""
+    raise NotImplementedError()
+
+  @abc.abstractmethod
   def _log_partition(self):
     """Default implementation wrapped by `self.log_partition`."""
     raise NotImplementedError()
+
+  @abc.abstractmethod
+  def _sample(self, num_samples: int):
+    """Default implementation wrapped by `self.sample`."""
+    raise NotImplementedError()
+
+
+class EnergyInference(EnergyInferenceBase):
+  """Provides some default method implementations."""
 
   def _expectation(self, function, num_samples: int):
     """Default implementation wrapped by `self.expectation`.
@@ -270,16 +299,14 @@ class EnergyInference(tf.keras.layers.Layer, abc.ABC):
 
     return _inner_expectation()
 
-  @_preface_every_call
-  def call(self, inputs):
-    """Returns the number of samples specified in the inputs."""
-    return self.sample(inputs)
-
 
 class AnalyticEnergyInference(EnergyInference):
   """Uses an explicit categorical distribution to implement parent functions."""
 
-  def __init__(self, input_energy: energy_model.BitstringEnergy, name: Union[None, str]=None, initial_seed: Union[None, tf.Tensor]=None):
+  def __init__(self,
+               input_energy: energy_model.BitstringEnergy,
+               initial_seed: Union[None, tf.Tensor] = None,
+               name: Union[None, str] = None):
     """Initializes an AnalyticEnergyInference.
 
     Internally, this class saves all possible bitstrings as a tensor, whose
@@ -296,7 +323,7 @@ class AnalyticEnergyInference(EnergyInference):
         seed will be used in the `sample` method.  If None, the seed is updated
         after every inference call.  Otherwise, the seed is fixed.
     """
-    super().__init__(input_energy, name, initial_seed)
+    super().__init__(input_energy, initial_seed, name)
     self._all_bitstrings = tf.constant(
         list(itertools.product([0, 1], repeat=input_energy.num_bits)), dtype=tf.int8)
     self._logits_variable = tf.Variable(-1.0 * input_energy(self.all_bitstrings))
@@ -317,30 +344,28 @@ class AnalyticEnergyInference(EnergyInference):
     """Categorical distribution set during `self._ready_inference`."""
     return self._distribution
 
-  def _ready_inference(self):
+  def _call(self, inputs, *args, **kwargs):
     """See base class docstring."""
-    self._logits_variable.assign(-1.0 * self.all_energies)
-    
-  def _sample(self, n):
-    """See base class docstring"""
-    return tf.gather(
-        self.all_bitstrings,
-        self.distribution.sample(n, seed=self.seed),
-        axis=0)
-
-  def _entropy(self):
-    """See base class docstring"""
-    return self.distribution.entropy()
-
-  def _log_partition(self):
-    """See base class docstring"""
-    return tf.reduce_logsumexp(self.distribution.logits_parameter())
-
-  def call(self, inputs):
     if inputs is None:
       return self.distribution
     else:
       return self.sample(inputs)
+
+  def _entropy(self):
+    """See base class docstring."""
+    return self.distribution.entropy()
+
+  def _log_partition(self):
+    """See base class docstring."""
+    # TODO(#115)
+    return tf.reduce_logsumexp(self.distribution.logits_parameter())
+
+  def _sample(self, num_samples: int):
+    """See base class docstring."""
+    return tf.gather(
+        self.all_bitstrings,
+        self.distribution.sample(num_samples, seed=self.seed),
+        axis=0)
 
 
 class BernoulliEnergyInference(EnergyInference):
@@ -365,16 +390,15 @@ class BernoulliEnergyInference(EnergyInference):
 
   @property
   def distribution(self):
-    """Bernoulli distribution set during `self._ready_inference`."""
+    """Bernoulli distribution set during last call to `self.infer`."""
     return self._distribution
 
-  def _ready_inference(self):
+  def _call(self, inputs, *args, **kwargs):
     """See base class docstring."""
-    self._logits_variable.assign(self.energy.logits)
-
-  def _sample(self, n):
-    """See base class docstring"""
-    return self.distribution.sample(n, seed=self.seed)
+    if inputs is None:
+      return self.distribution
+    else:
+      return self.sample(inputs)
 
   def _entropy(self):
     """Returns the exact entropy.
@@ -397,8 +421,7 @@ class BernoulliEnergyInference(EnergyInference):
         tf.math.exp(thetas) + tf.math.exp(-1.0 * thetas))
     return tf.math.reduce_sum(single_log_partitions)
 
-  def call(self, inputs):
-    if inputs is None:
-      return self.distribution
-    else:
-      return self.sample(inputs)
+  def _sample(self, num_samples: int):
+    """See base class docstring"""
+    return self.distribution.sample(num_samples, seed=self.seed)
+
