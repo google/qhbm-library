@@ -92,7 +92,7 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
       self._update_seed = tf.Variable(False, trainable=False)
     self._seed = tf.Variable(
         tfp.random.sanitize_seed(initial_seed), trainable=False)
-    self._first_inference = tf.Variable(False, trainable=False)
+    self._first_inference = tf.Variable(True, trainable=False)
 
   @property
   def energy(self):
@@ -323,10 +323,10 @@ class AnalyticEnergyInference(EnergyInference):
         via the equations of an energy based model.  This function assumes that
         all parameters of `energy` are `tf.Variable`s and that they are all
         returned by `energy.variables`.
-      name: Optional name for the model.
       initial_seed: PRNG seed; see tfp.random.sanitize_seed for details. This
         seed will be used in the `sample` method.  If None, the seed is updated
         after every inference call.  Otherwise, the seed is fixed.
+      name: Optional name for the model.
     """
     super().__init__(input_energy, initial_seed, name)
     self._all_bitstrings = tf.constant(
@@ -350,6 +350,14 @@ class AnalyticEnergyInference(EnergyInference):
   def distribution(self):
     """Categorical distribution set during `self._ready_inference`."""
     return self._distribution
+
+  def _ready_inference(self):
+    """Performs computations common to all inference methods.
+
+    Contains inference code that must be run first if the variables of
+    `self.energy` have been updated since the last time inference was performed.
+    """
+    self._logits_variable.assign(-1.0 * self.all_energies)
 
   def _call(self, inputs, *args, **kwargs):
     """See base class docstring."""
@@ -380,8 +388,8 @@ class BernoulliEnergyInference(EnergyInference):
 
   def __init__(self,
                input_energy: energy_model.BernoulliEnergy,
-               name: Union[None, str] = None,
-               initial_seed: Union[None, tf.Tensor] = None):
+               initial_seed: Union[None, tf.Tensor] = None,
+               name: Union[None, str] = None):
     """Initializes a BernoulliEnergyInference.
 
     Args:
@@ -389,10 +397,10 @@ class BernoulliEnergyInference(EnergyInference):
         via the equations of an energy based model.  This function assumes that
         all parameters of `energy` are `tf.Variable`s and that they are all
         returned by `energy.variables`.
-      name: Optional name for the model.
       initial_seed: PRNG seed; see tfp.random.sanitize_seed for details. This
         seed will be used in the `sample` method.  If None, the seed is updated
         after every inference call.  Otherwise, the seed is fixed.
+      name: Optional name for the model.
     """
     super().__init__(input_energy, name, initial_seed)
     self._logits_variable = tf.Variable(input_energy.logits, trainable=False)
@@ -403,6 +411,14 @@ class BernoulliEnergyInference(EnergyInference):
   def distribution(self):
     """Bernoulli distribution set during last call to `self.infer`."""
     return self._distribution
+
+  def _ready_inference(self):
+    """Performs computations common to all inference methods.
+
+    Contains inference code that must be run first if the variables of
+    `self.energy` have been updated since the last time inference was performed.
+    """
+    self._logits_variable.assign(self.energy.logits)
 
   def _call(self, inputs, *args, **kwargs):
     """See base class docstring."""
