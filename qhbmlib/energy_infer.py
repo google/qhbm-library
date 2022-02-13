@@ -201,7 +201,7 @@ class EnergyInference(EnergyInferenceBase):
                num_expectation_samples: int,
                initial_seed: Union[None, tf.Tensor] = None,
                name: Union[None, str] = None):
-    """Initializes an EnergyInferenceBase.
+    """Initializes an EnergyInference.
 
     Args:
       num_expectation_samples: Number of samples to draw and use for estimating
