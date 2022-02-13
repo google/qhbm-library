@@ -402,7 +402,7 @@ class BernoulliEnergyInference(EnergyInference):
         after every inference call.  Otherwise, the seed is fixed.
       name: Optional name for the model.
     """
-    super().__init__(input_energy, name, initial_seed)
+    super().__init__(input_energy, initial_seed, name)
     self._logits_variable = tf.Variable(input_energy.logits, trainable=False)
     self._distribution = tfd.Bernoulli(
         logits=self._logits_variable, dtype=tf.int8)
