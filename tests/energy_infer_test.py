@@ -59,14 +59,6 @@ class EnergyInferenceTest(tf.test.TestCase):
       """Does nothing."""
       pass
 
-    def _sample(self, n):
-      """Deterministically samples bitstrings."""
-      n_1 = round(self.p_1 * n)
-      n_2 = n - n_1
-      bitstring_1_tile = tf.tile(tf.expand_dims(self.bitstring_1, 0), [n_1, 1])
-      bitstring_2_tile = tf.tile(tf.expand_dims(self.bitstring_2, 0), [n_2, 1])
-      return tf.concat([bitstring_1_tile, bitstring_2_tile], 0)
-
     def _entropy(self):
       """Not implemented in this test class."""
       raise NotImplementedError()
@@ -74,7 +66,14 @@ class EnergyInferenceTest(tf.test.TestCase):
     def _log_partition(self):
       """Not implemented in this test class."""
       raise NotImplementedError()
-    
+
+    def _sample(self, num_samples: int):
+      """Deterministically samples bitstrings."""
+      n_1 = round(self.p_1 * num_samples)
+      n_2 = num_samples - n_1
+      bitstring_1_tile = tf.tile(tf.expand_dims(self.bitstring_1, 0), [n_1, 1])
+      bitstring_2_tile = tf.tile(tf.expand_dims(self.bitstring_2, 0), [n_2, 1])
+      return tf.concat([bitstring_1_tile, bitstring_2_tile], 0)
 
   def setUp(self):
     """Initializes test objects."""
@@ -150,8 +149,6 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     # Single bit test.
     one_bit_energy = energy_model.KOBE([0], 1)
     actual_layer = energy_infer.AnalyticEnergyInference(one_bit_energy, initial_seed=self.tfp_seed)
-    actual_layer = energy_infer.AnalyticEnergyInference(
-        1, initial_seed=self.tfp_seed)
 
     # For single factor Bernoulli, theta=0 is 50% chance of 1.
     one_bit_energy.set_weights([tf.constant([0.0])])
@@ -171,7 +168,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
 
     # Large energy penalty pins the bit.
     one_bit_energy.set_weights([tf.constant([100.0])])
-    samples = sample_wrapper(n_samples)
+    samples = sample_wrapper(self.num_samples)
     # check that we got only one bitstring
     self.assertFalse(
         test_util.check_bitstring_exists(
@@ -546,7 +543,6 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
 
     # For single factor Bernoulli, theta = 0 is 50% chance of 1.
     energy.set_weights([tf.constant([0.0])])
-
     sample_wrapper = tf.function(actual_layer.sample)
     samples = sample_wrapper(self.num_samples)
     # check that we got both bitstrings
@@ -562,7 +558,6 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
 
     # Large value of theta pins the bit.
     energy.set_weights([tf.constant([1000.0])])
-
     samples = sample_wrapper(self.num_samples)
     # check that we got only one bitstring
     bitstrings, _, _ = utils.unique_bitstrings_with_counts(samples)
