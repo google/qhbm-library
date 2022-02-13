@@ -162,7 +162,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     # Single bit test.
     one_bit_energy = energy_model.KOBE([0], 1)
     actual_layer = energy_infer.AnalyticEnergyInference(
-        one_bit_energy, self.num_samppes, initial_seed=self.tfp_seed)
+        one_bit_energy, self.num_samples, initial_seed=self.tfp_seed)
 
     # For single factor Bernoulli, theta=0 is 50% chance of 1.
     one_bit_energy.set_weights([tf.constant([0.0])])

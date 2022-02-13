@@ -63,10 +63,10 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
     """Initializes an EnergyInferenceBase.
 
     Args:
-      input_energy: The parameterized energy function which defines this distribution
-        via the equations of an energy based model.  This class assumes that
-        all parameters of `energy` are `tf.Variable`s and that they are all
-        returned by `energy.variables`.
+      input_energy: The parameterized energy function which defines this
+        distribution via the equations of an energy based model.  This class
+        assumes that all parameters of `energy` are `tf.Variable`s and that
+        they are all returned by `energy.variables`.
       initial_seed: PRNG seed; see tfp.random.sanitize_seed for details. This
         seed will be used in the `sample` method.  If None, the seed is updated
         after every inference call.  Otherwise, the seed is fixed.
@@ -234,12 +234,17 @@ class EnergyInference(EnergyInferenceBase):
   """Provides some default method implementations."""
 
   def __init__(self,
+               input_energy: energy_model.BitstringEnergy,
                num_expectation_samples: int,
                initial_seed: Union[None, tf.Tensor] = None,
                name: Union[None, str] = None):
     """Initializes an EnergyInference.
 
     Args:
+      input_energy: The parameterized energy function which defines this
+        distribution via the equations of an energy based model.  This class
+        assumes that all parameters of `energy` are `tf.Variable`s and that
+        they are all returned by `energy.variables`.
       num_expectation_samples: Number of samples to draw and use for estimating
         the expectation value.
       initial_seed: PRNG seed; see tfp.random.sanitize_seed for details. This
@@ -247,7 +252,7 @@ class EnergyInference(EnergyInferenceBase):
         after every inference call.  Otherwise, the seed is fixed.
       name: Optional name for the model.
     """
-    super().__init__(initial_seed, name)
+    super().__init__(input_energy, initial_seed, name)
     self.num_expectation_samples = num_expectation_samples
 
   def _expectation(self, function):
@@ -335,10 +340,10 @@ class AnalyticEnergyInference(EnergyInference):
     and other inference tasks.
 
     Args:
-      input_energy: The parameterized energy function which defines this distribution
-        via the equations of an energy based model.  This function assumes that
-        all parameters of `energy` are `tf.Variable`s and that they are all
-        returned by `energy.variables`.
+      input_energy: The parameterized energy function which defines this
+        distribution via the equations of an energy based model.  This class
+        assumes that all parameters of `energy` are `tf.Variable`s and that
+        they are all returned by `energy.variables`.
       num_expectation_samples: Number of samples to draw and use for estimating
         the expectation value.
       initial_seed: PRNG seed; see tfp.random.sanitize_seed for details. This
@@ -412,10 +417,10 @@ class BernoulliEnergyInference(EnergyInference):
     """Initializes a BernoulliEnergyInference.
 
     Args:
-      input_energy: The parameterized energy function which defines this distribution
-        via the equations of an energy based model.  This function assumes that
-        all parameters of `energy` are `tf.Variable`s and that they are all
-        returned by `energy.variables`.
+      input_energy: The parameterized energy function which defines this
+        distribution via the equations of an energy based model.  This class
+        assumes that all parameters of `energy` are `tf.Variable`s and that
+        they are all returned by `energy.variables`.
       num_expectation_samples: Number of samples to draw and use for estimating
         the expectation value.
       initial_seed: PRNG seed; see tfp.random.sanitize_seed for details. This
