@@ -140,7 +140,8 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
         dtype=tf.int8)
     expected_seed = tf.constant([44, 22], tf.int32)
     expected_energies = energy(expected_bitstrings)
-    actual_layer = energy_infer.AnalyticEnergyInference(energy, expected_seed, expected_name)
+    actual_layer = energy_infer.AnalyticEnergyInference(energy, expected_seed,
+                                                        expected_name)
     self.assertEqual(actual_layer.name, expected_name)
     self.assertAllEqual(actual_layer.seed, expected_seed)
     self.assertAllEqual(actual_layer.all_bitstrings, expected_bitstrings)
@@ -544,7 +545,8 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     expected_name = "test_bernoulli_dist_name"
     energy = energy_model.BernoulliEnergy(bits)
     expected_seed = tf.constant([4, 12], dtype=tf.int32)
-    actual_layer = energy_infer.BernoulliEnergyInference(energy, expected_seed, expected_name)
+    actual_layer = energy_infer.BernoulliEnergyInference(
+        energy, expected_seed, expected_name)
     self.assertEqual(actual_layer.name, expected_name)
     self.assertAllEqual(actual_layer.seed, expected_seed)
     self.assertIsInstance(actual_layer.distribution,
