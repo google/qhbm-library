@@ -81,10 +81,8 @@ class QuantumInference(tf.keras.layers.Layer):
   def differentiator(self):
     return self._differentiator
 
-  def expectation(self,
-                  qnn: circuit_model.QuantumCircuit,
-                  initial_states: tf.Tensor,
-                  operators: tf.Tensor):
+  def expectation(self, qnn: circuit_model.QuantumCircuit,
+                  initial_states: tf.Tensor, operators: tf.Tensor):
     """Returns the expectation values of the operators against the QNN.
 
       Args:
@@ -102,7 +100,8 @@ class QuantumInference(tf.keras.layers.Layer):
         unaveraged expectation values of each `operator` against each
         transformed initial state.
       """
-    unique_states, idx, counts = utils.unique_bitstrings_with_counts(initial_states)
+    unique_states, idx, counts = utils.unique_bitstrings_with_counts(
+        initial_states)
     circuits = qnn(unique_states)
     num_circuits = tf.shape(circuits)[0]
     num_operators = tf.shape(operators)[0]

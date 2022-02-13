@@ -148,8 +148,8 @@ class QHBM(tf.keras.layers.Layer):
       return tf.math.reduce_mean(expectations, 0)
     elif isinstance(ops.energy, energy_model.PauliMixin):
       u_dagger_u = model.circuit + ops.circuit_dagger
-      expectation_shards = self.q_inference.expectation(
-          u_dagger_u, samples, ops.operator_shards)
+      expectation_shards = self.q_inference.expectation(u_dagger_u, samples,
+                                                        ops.operator_shards)
       expectation_shards = tf.math.reduce_mean(expectation_shards, 0)
       return tf.expand_dims(
           ops.energy.operator_expectation(expectation_shards), 0)
