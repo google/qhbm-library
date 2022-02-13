@@ -118,8 +118,7 @@ class QHBM(tf.keras.layers.Layer):
     states = self.model.circuit(bitstrings)
     return states, counts
 
-  def expectation(self, ops: Union[tf.Tensor, hamiltonian_model.Hamiltonian],
-                  num_samples: int):
+  def expectation(self, ops: Union[tf.Tensor, hamiltonian_model.Hamiltonian]):
     """Estimates observable expectation values against the density operator.
 
     TODO(#119): add expectation and derivative equations and discussions
@@ -134,24 +133,24 @@ class QHBM(tf.keras.layers.Layer):
       ops: The observables to measure.  If `tf.Tensor`, strings with shape
         [n_ops], result of calling `tfq.convert_to_tensor` on a list of
         cirq.PauliSum, `[op1, op2, ...]`.  Otherwise, a Hamiltonian.
-      num_samples: Number of draws from the EBM associated with `self.model` to
-        average over.
 
     Returns:
       `tf.Tensor` with shape [n_ops] whose entries are are the sample averaged
       expectation values of each entry in `ops`.
     """
-    samples = self.e_inference.sample(num_samples)
-    bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
-    if isinstance(ops, tf.Tensor):
-      return self.q_inference.expectation(
-          self.model.circuit, bitstrings, counts, ops, reduce=True)
-    elif isinstance(ops.energy, energy_model.PauliMixin):
-      u_dagger_u = self.model.circuit + ops.circuit_dagger
-      expectation_shards = self.q_inference.expectation(
-          u_dagger_u, bitstrings, counts, ops.operator_shards, reduce=True)
-      return tf.expand_dims(
-          ops.energy.operator_expectation(expectation_shards), 0)
-    else:
-      raise NotImplementedError(
-          "General `BitstringEnergy` models not yet supported.")
+
+    def expectation_f(bitstrings):
+      if isinstance(ops, tf.Tensor):
+        return self.q_inference.expectation(self.model.circuit, bitstrings, ops)
+      elif isinstance(ops.energy, energy_model.PauliMixin):
+        u_dagger_u = self.model.circuit + ops.circuit_dagger
+        expectation_shards = self.q_inference.expectation(
+            u_dagger_u, bitstrings, ops.operator_shards)
+        return tf.map_fn(
+            lambda x: tf.expand_dims(ops.energy.operator_expectation(x), 0),
+            expectation_shards)
+      else:
+        raise NotImplementedError(
+            "General `BitstringEnergy` models not yet supported.")
+
+    return self.e_inference.expectation(expectation_f)

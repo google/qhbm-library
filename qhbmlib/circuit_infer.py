@@ -81,36 +81,28 @@ class QuantumInference(tf.keras.layers.Layer):
   def differentiator(self):
     return self._differentiator
 
-  def expectation(self,
-                  qnn: circuit_model.QuantumCircuit,
-                  initial_states: tf.Tensor,
-                  counts: tf.Tensor,
-                  operators: tf.Tensor,
-                  reduce: bool = True):
+  def expectation(self, qnn: circuit_model.QuantumCircuit,
+                  initial_states: tf.Tensor, operators: tf.Tensor):
     """Returns the expectation values of the operators against the QNN.
 
       Args:
         qnn: The parameterized quantum circuit on which to do inference.
         initial_states: Shape [batch_size, num_qubits] of dtype `tf.int8`.
-          These are the initial states of each qubit in the circuit.
-        counts: Shape [batch_size] of dtype `tf.int32` such that `counts[i]` is
-          the weight of `initial_states[i]` when computing expectations.
-          Additionally, if `self.backend != "noiseless", `counts[i]` samples
-          are drawn from `(qnn)|initial_states[i]>` and used to compute
-          the the corresponding expectation.
+          Each entry is an initial state for the set of qubits.  For each state,
+          `qnn` is applied and the pure state expectation value is calculated.
         operators: `tf.Tensor` of strings with shape [n_ops], result of calling
           `tfq.convert_to_tensor` on a list of cirq.PauliSum, `[op1, op2, ...]`.
           Will be tiled to measure `<op_j>_((qnn)|initial_states[i]>)`
           for each i and j.
-        reduce: bool flag for whether or not to average over i.
 
       Returns:
-        If `reduce` is true, a `tf.Tensor` with shape [n_ops] whose entries are
-        are the batch-averaged expectation values of `operators`.
-        Else, a `tf.Tensor` with shape [batch_size, n_ops] whose entries are the
-        unaveraged expectation values of each `operator` against each `circuit`.
+        `tf.Tensor` with shape [batch_size, n_ops] whose entries are the
+        unaveraged expectation values of each `operator` against each
+        transformed initial state.
       """
-    circuits = qnn(initial_states)
+    unique_states, idx, counts = utils.unique_bitstrings_with_counts(
+        initial_states)
+    circuits = qnn(unique_states)
     num_circuits = tf.shape(circuits)[0]
     num_operators = tf.shape(operators)[0]
     tiled_values = tf.tile(
@@ -123,9 +115,7 @@ class QuantumInference(tf.keras.layers.Layer):
         tiled_operators,
         tf.tile(tf.expand_dims(counts, 1), [1, num_operators]),
     )
-    if reduce:
-      return utils.weighted_average(counts, expectations)
-    return expectations
+    return utils.expand_unique_results(expectations, idx)
 
   def sample(self, qnn: circuit_model.QuantumCircuit, initial_states: tf.Tensor,
              counts: tf.Tensor):

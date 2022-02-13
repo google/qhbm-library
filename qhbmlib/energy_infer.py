@@ -180,17 +180,15 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
     return self._entropy()
 
   @preface_inference
-  def expectation(self, function, num_samples: int):
+  def expectation(self, function):
     """Returns an estimate of the expectation value of the given function.
 
     Args:
       function: Mapping from a 2D tensor of bitstrings to a possibly nested
         structure.  The structure must have atomic elements all of which are
         float tensors with the same batch size as the input bitstrings.
-      num_samples: The number of bitstring samples to use when estimating the
-        expectation value of `function`.
     """
-    return self._expectation(function, num_samples)
+    return self._expectation(function)
 
   @preface_inference
   def log_partition(self):
@@ -217,7 +215,7 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
     raise NotImplementedError()
 
   @abc.abstractmethod
-  def _expectation(self, function, num_samples: int):
+  def _expectation(self, function):
     """Default implementation wrapped by `self.expectation`."""
     raise NotImplementedError()
 
@@ -235,7 +233,24 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
 class EnergyInference(EnergyInferenceBase):
   """Provides some default method implementations."""
 
-  def _expectation(self, function, num_samples: int):
+  def __init__(self,
+               num_expectation_samples: int,
+               initial_seed: Union[None, tf.Tensor] = None,
+               name: Union[None, str] = None):
+    """Initializes an EnergyInference.
+
+    Args:
+      num_expectation_samples: Number of samples to draw and use for estimating
+        the expectation value.
+      initial_seed: PRNG seed; see tfp.random.sanitize_seed for details. This
+        seed will be used in the `sample` method.  If None, the seed is updated
+        after every inference call.  Otherwise, the seed is fixed.
+      name: Optional name for the model.
+    """
+    super().__init__(initial_seed, name)
+    self.num_expectation_samples = num_expectation_samples
+
+  def _expectation(self, function):
     """Default implementation wrapped by `self.expectation`.
 
     Estimates an expectation value using sample averaging.
@@ -244,7 +259,7 @@ class EnergyInference(EnergyInferenceBase):
     @tf.custom_gradient
     def _inner_expectation():
       """Enables derivatives."""
-      samples = tf.stop_gradient(self.sample(num_samples))
+      samples = tf.stop_gradient(self.sample(self.num_expectation_samples))
       bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
 
       # TODO(#157): try to parameterize the persistence.
@@ -310,6 +325,7 @@ class AnalyticEnergyInference(EnergyInference):
 
   def __init__(self,
                input_energy: energy_model.BitstringEnergy,
+               num_expectation_samples: int,
                initial_seed: Union[None, tf.Tensor] = None,
                name: Union[None, str] = None):
     """Initializes an AnalyticEnergyInference.
@@ -323,12 +339,14 @@ class AnalyticEnergyInference(EnergyInference):
         via the equations of an energy based model.  This function assumes that
         all parameters of `energy` are `tf.Variable`s and that they are all
         returned by `energy.variables`.
+      num_expectation_samples: Number of samples to draw and use for estimating
+        the expectation value.
       initial_seed: PRNG seed; see tfp.random.sanitize_seed for details. This
         seed will be used in the `sample` method.  If None, the seed is updated
         after every inference call.  Otherwise, the seed is fixed.
       name: Optional name for the model.
     """
-    super().__init__(input_energy, initial_seed, name)
+    super().__init__(input_energy, num_expectation_samples, initial_seed, name)
     self._all_bitstrings = tf.constant(
         list(itertools.product([0, 1], repeat=input_energy.num_bits)),
         dtype=tf.int8)
@@ -388,6 +406,7 @@ class BernoulliEnergyInference(EnergyInference):
 
   def __init__(self,
                input_energy: energy_model.BernoulliEnergy,
+               num_expectation_samples: int,
                initial_seed: Union[None, tf.Tensor] = None,
                name: Union[None, str] = None):
     """Initializes a BernoulliEnergyInference.
@@ -397,12 +416,14 @@ class BernoulliEnergyInference(EnergyInference):
         via the equations of an energy based model.  This function assumes that
         all parameters of `energy` are `tf.Variable`s and that they are all
         returned by `energy.variables`.
+      num_expectation_samples: Number of samples to draw and use for estimating
+        the expectation value.
       initial_seed: PRNG seed; see tfp.random.sanitize_seed for details. This
         seed will be used in the `sample` method.  If None, the seed is updated
         after every inference call.  Otherwise, the seed is fixed.
       name: Optional name for the model.
     """
-    super().__init__(input_energy, initial_seed, name)
+    super().__init__(input_energy, num_expectation_samples, initial_seed, name)
     self._logits_variable = tf.Variable(input_energy.logits, trainable=False)
     self._distribution = tfd.Bernoulli(
         logits=self._logits_variable, dtype=tf.int8)
