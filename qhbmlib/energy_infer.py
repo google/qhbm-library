@@ -58,8 +58,8 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
 
   def __init__(self,
                input_energy: energy_model.BitstringEnergy,
-               name: Union[None, str] = None,
-               initial_seed: Union[None, tf.Tensor] = None):
+               initial_seed: Union[None, tf.Tensor] = None,
+               name: Union[None, str] = None):
     """Initializes an EnergyInferenceBase.
 
     Args:
@@ -67,10 +67,10 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
         via the equations of an energy based model.  This class assumes that
         all parameters of `energy` are `tf.Variable`s and that they are all
         returned by `energy.variables`.
-      name: Optional name for the model.
       initial_seed: PRNG seed; see tfp.random.sanitize_seed for details. This
         seed will be used in the `sample` method.  If None, the seed is updated
         after every inference call.  Otherwise, the seed is fixed.
+      name: Optional name for the model.
     """
     super().__init__(name=name)
     self._energy = input_energy
@@ -92,9 +92,7 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
       self._update_seed = tf.Variable(False, trainable=False)
     self._seed = tf.Variable(
         tfp.random.sanitize_seed(initial_seed), trainable=False)
-
-    self._checkpoint_variables()
-    self._do_first_inference = tf.Variable(False, trainable=False)
+    self._first_inference = tf.Variable(False, trainable=False)
 
   @property
   def energy(self):
@@ -153,6 +151,7 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
     Note: subclasses should take care to call the superclass method.
     """
     if self._first_inference:
+      self._checkpoint_variables()
       self._ready_inference()
       self._first_inference.assign(False)
     if self._update_seed:
@@ -169,22 +168,6 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
     Contains inference code that must be run first if the variables of
     `self.energy` have been updated since the last time inference was performed.
     """
-    if self._first_inference:
-      self.infer(self.energy)
-      self._first_inference.assign(False)
-    if self._update_seed:
-      new_seed, _ = tfp.random.split_seed(self.seed)
-      self._seed.assign(new_seed)
-
-  @preface_inference
-  def call(self, inputs, *args, **kwargs):
-    """Calls this layer on the given inputs."""
-    return self._call(inputs, *args, **kwargs)
-
-  @preface_inference
-  def entropy(self):
-    """Returns an estimate of the entropy."""
-    return self._entropy()
 
   @preface_inference
   def call(self, inputs, *args, **kwargs):
