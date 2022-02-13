@@ -36,10 +36,12 @@ def preface_inference(f):
   Returns:
     wrapper: The wrapped function.
   """
+
   @functools.wraps(f)
   def wrapper(self, *args, **kwargs):
     self._preface_inference()  # pylint: disable=protected-access
     return f(self, *args, **kwargs)
+
   return wrapper
 
 
