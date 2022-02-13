@@ -76,6 +76,7 @@ class QHBM(tf.keras.layers.Layer):
     super().__init__(name=name)
     self._e_inference = e_inference
     self._q_inference = q_inference
+    self._model = hamiltonian_model.Hamiltonian(e_inference.energy, q_inference.circuit)
 
   @property
   def e_inference(self):
@@ -91,17 +92,6 @@ class QHBM(tf.keras.layers.Layer):
   def model(self):
     """The modular Hamiltonian defining this QHBM."""
     return self._model
-
-  def update_model(self, model: hamiltonian_model.Hamiltonian):
-    """Tells the QHBM which Hamiltonian to exponentiate.
-
-    Args:
-      model: The modular Hamiltonian whose normalized exponential is the
-        density operator against which expectation values will be estimated.
-    """
-    self._model = model
-    self.e_inference.update_energy(model.energy)
-    self.q_inference.update_circuit(model.circuit)
 
   def circuits(self, num_samples: int):
     r"""Draws thermally distributed eigenstates from the model Hamiltonian.
