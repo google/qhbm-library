@@ -48,16 +48,17 @@ def vqt(qhbm_infer: hamiltonian_infer.QHBM,
   # See equations B4 and B5 in appendix.  TODO(#119): confirm equation number.
   def f_vqt(bitstrings):
     if isinstance(hamiltonian, tf.Tensor):
-      h_expectations = qhbm_infer.q_inference.expectation(model.circuit, bitstrings, hamiltonian)
+      h_expectations = qhbm_infer.q_inference.expectation(
+          model.circuit, bitstrings, hamiltonian)
     elif isinstance(hamiltonian.energy, energy_model.PauliMixin):
       u_dagger_u = model.circuit + hamiltonian.circuit_dagger
-      expectation_shards = qhbm_infer.q_inference.expectation(u_dagger_u, bitstrings,
-                                                        hamiltonian.operator_shards)
-      h_expectations = tf.map_fn(lambda x: tf.expand_dims(
-        hamiltonian.energy.operator_expectation(x), 0), expectation_shards)
+      expectation_shards = qhbm_infer.q_inference.expectation(
+          u_dagger_u, bitstrings, hamiltonian.operator_shards)
+      h_expectations = hamiltonian.energy.operator_expectation(
+          expectation_shards)
     else:
       raise NotImplementedError(
-          "General `BitstringEnergy` models not yet supported.")
+          "General `BitstringEnergy` hamiltonians not yet supported.")
     beta_h_expectations = beta * h_expectations
     energies = tf.stop_gradient(model.energy(bitstrings))
     return beta_h_expectations - energies

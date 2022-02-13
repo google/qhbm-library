@@ -60,7 +60,8 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     self.model = hamiltonian_model.Hamiltonian(self.energy, circuit)
 
     # Inference
-    self.expected_e_inference = energy_infer.AnalyticEnergyInference(3, self.num_samples)
+    self.expected_e_inference = energy_infer.AnalyticEnergyInference(
+        3, self.num_samples)
     self.expected_q_inference = circuit_infer.QuantumInference()
     self.expected_name = "nameforaQHBM"
     self.actual_qhbm = hamiltonian_infer.QHBM(self.expected_e_inference,
@@ -77,7 +78,8 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
   def test_circuits(self):
     """Confirms correct circuits are sampled."""
     circuits_wrapper = tf.function(self.actual_qhbm.circuits)
-    actual_circuits, actual_counts = circuits_wrapper(self.model, self.num_samples)
+    actual_circuits, actual_counts = circuits_wrapper(self.model,
+                                                      self.num_samples)
 
     # Circuits with the allowed-to-be-sampled bitstrings prepended.
     u = tfq.from_tensor(self.model.circuit.pqc)[0]
@@ -186,7 +188,8 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
         [tf.Variable([resolver[s] for s in symbols])], [[]])
     circuit.build([])
     actual_hamiltonian = hamiltonian_model.Hamiltonian(energy, circuit)
-    e_infer = energy_infer.BernoulliEnergyInference(num_bits, self.num_samples, seed)
+    e_infer = energy_infer.BernoulliEnergyInference(num_bits, self.num_samples,
+                                                    seed)
     q_infer = circuit_infer.QuantumInference()
     actual_h_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
 
@@ -270,7 +273,8 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     model_circuit.build([])
     model_hamiltonian = hamiltonian_model.Hamiltonian(model_energy,
                                                       model_circuit)
-    e_infer = energy_infer.BernoulliEnergyInference(num_bits, self.num_samples, seed)
+    e_infer = energy_infer.BernoulliEnergyInference(num_bits, self.num_samples,
+                                                    seed)
     q_infer = circuit_infer.QuantumInference()
     model_h_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
 

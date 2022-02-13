@@ -117,7 +117,8 @@ class VQTTest(tf.test.TestCase):
         num_elts = tf.size(var)  # Assumes variable is 1D
         for n in range(num_elts):
           this_derivative = test_util.approximate_derivative(
-              functools.partial(delta_vqt, n, var, model_infer, model_h, data_h, beta),
+              functools.partial(delta_vqt, n, var, model_infer, model_h, data_h,
+                                beta),
               delta=delta)
           var_derivative_list.append(this_derivative.numpy())
         derivatives.append(tf.constant(var_derivative_list))
@@ -236,8 +237,7 @@ class VQTTest(tf.test.TestCase):
           actual_entropy, expected_entropy, rtol=self.close_rtol)
 
       with tf.GradientTape() as tape:
-        actual_loss = vqt(qhbm_infer, model, test_h,
-                          test_beta)
+        actual_loss = vqt(qhbm_infer, model, test_h, test_beta)
       expected_loss = test_beta * expected_expectation - expected_entropy
       self.assertAllClose(actual_loss, expected_loss, rtol=self.close_rtol)
 
