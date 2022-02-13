@@ -95,14 +95,13 @@ class VQTTest(tf.test.TestCase):
     # TODO(#171): This delta function seems like something general.
     #             Would need to perturb an unrolled version of `var`,
     #             whereas here variables are known to be 1D.
-    def delta_vqt(k, var, model_infer, model_h, data_h, num_samples, beta,
-                  delta):
+    def delta_vqt(k, var, model_infer, model_h, data_h, beta, delta):
       """Calculate the expectation with kth entry of `var` perturbed."""
       num_elts = tf.size(var)
       old_value = var.read_value()
       var.assign(old_value + delta * tf.one_hot(k, num_elts, 1.0, 0.0))
       model_infer.e_inference.infer(model_h.energy)
-      delta_loss = vqt(model_infer, model_h, num_samples, data_h, beta)
+      delta_loss = vqt(model_infer, model_h, data_h, beta)
       var.assign(old_value)
       model_infer.e_inference.infer(model_h.energy)
       return delta_loss
@@ -118,8 +117,7 @@ class VQTTest(tf.test.TestCase):
         num_elts = tf.size(var)  # Assumes variable is 1D
         for n in range(num_elts):
           this_derivative = test_util.approximate_derivative(
-              functools.partial(delta_vqt, n, var, model_infer, model_h, data_h,
-                                self.num_samples, beta),
+              functools.partial(delta_vqt, n, var, model_infer, model_h, data_h, beta),
               delta=delta)
           var_derivative_list.append(this_derivative.numpy())
         derivatives.append(tf.constant(var_derivative_list))
