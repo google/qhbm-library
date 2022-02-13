@@ -48,8 +48,8 @@ def vqt(qhbm_infer: hamiltonian_infer.QHBM,
   # See equations B4 and B5 in appendix.  TODO(#119): confirm equation number.
   def f_vqt(bitstrings):
     if isinstance(hamiltonian, tf.Tensor):
-      h_expectations = qhbm_infer.q_inference.expectation(
-          model.circuit, bitstrings, hamiltonian)
+      h_expectations = tf.squeeze(qhbm_infer.q_inference.expectation(
+          model.circuit, bitstrings, hamiltonian), 1)
     elif isinstance(hamiltonian.energy, energy_model.PauliMixin):
       u_dagger_u = model.circuit + hamiltonian.circuit_dagger
       expectation_shards = qhbm_infer.q_inference.expectation(
