@@ -65,6 +65,6 @@ def vqt(qhbm_infer: hamiltonian_infer.QHBM,
     return beta_h_expectations - energies
 
   qhbm_infer.e_inference.infer(model.energy)
-  average_expectation = qhbm_infer.e_inference.expectation(f_vqt, num_samples)
+  average_expectation = qhbm_infer.e_inference.expectation(f_vqt)
   current_partition = tf.stop_gradient(qhbm_infer.e_inference.log_partition())
   return average_expectation - current_partition

@@ -65,6 +65,7 @@ def get_random_qhbm(
 def get_random_hamiltonian_and_inference(qubits,
                                          num_layers,
                                          identifier,
+                                         num_samples,
                                          minval_thetas=-1.0,
                                          maxval_thetas=1.0,
                                          minval_phis=-1.0,
@@ -86,7 +87,7 @@ def get_random_hamiltonian_and_inference(qubits,
   circuit.build([])
 
   e_infer = energy_infer.AnalyticEnergyInference(
-      num_qubits, name=identifier, initial_seed=ebm_seed)
+      num_qubits, num_samples, name=identifier, initial_seed=ebm_seed)
   e_infer.infer(energy)
   q_infer = circuit_infer.QuantumInference(name=identifier)
 
