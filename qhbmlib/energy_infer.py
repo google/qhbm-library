@@ -291,7 +291,7 @@ class EnergyInference(EnergyInferenceBase):
       """Wraps forward pass computaton."""
       result = self._log_partition_forward_pass()
       # Adds variables in `self.energy` to `variables` argument of `grad_fn`.
-      [tf.identity(x) for x in self.energy.trainable_variables]
+      _ = [tf.identity(x) for x in self.energy.trainable_variables]
       grad_fn = self._log_partition_grad_generator()
       return result, grad_fn
 
@@ -301,7 +301,7 @@ class EnergyInference(EnergyInferenceBase):
     """Returns estimate of log partition function.
 
     See equation C1 in the appendix.  TODO(#119)
-  
+
     Sample approximation to the log partition function.  After drawing samples
     from the EBM, the unique samples are used to calculate the estimate.
     """
