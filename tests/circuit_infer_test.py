@@ -109,10 +109,10 @@ class QuantumInferenceTest(tf.test.TestCase):
     exp_infer = circuit_infer.QuantumInference()
 
     # Choose some bitstrings.
-    num_bitstrings = 10
-    bitstrings = tfp.distributions.Bernoulli(
+    num_bitstrings = int(1e6)
+    initial_states = tfp.distributions.Bernoulli(
         probs=[0.5] * self.num_qubits, dtype=tf.int8).sample(num_bitstrings)
-    counts = tf.random.uniform([num_bitstrings], 1, 1000, tf.int32)
+    bitstrings, _, counts = utils.unique_bitstrings_with_counts(initial_states)
 
     # Get true expectation values based on the bitstrings.
     expected_x_exps = []
@@ -166,7 +166,7 @@ class QuantumInferenceTest(tf.test.TestCase):
     actual_grad_reduced = []
     for op in all_ops:
       with tf.GradientTape() as tape:
-        current_exp = expectation_wrapper(self.p_qnn.trainable_variables, initial_states, op)
+        current_exp = expectation_wrapper(self.p_qnn, initial_states, op)
         reduced_exp = tf.math.reduce_mean(current_exp, 0)
       reduced_grad = tf.squeeze(
           tape.jacobian(reduced_exp, self.p_qnn.trainable_variables))
@@ -178,7 +178,6 @@ class QuantumInferenceTest(tf.test.TestCase):
     self.assertAllClose(actual_reduced, expected_reduced, atol=ATOL)
     self.assertAllClose(
         actual_grad_reduced, expected_grad_reduced, atol=GRAD_ATOL)
-
 
   @test_util.eager_mode_toggle
   def test_sample_basic(self):

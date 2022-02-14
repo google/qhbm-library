@@ -21,8 +21,6 @@ import tensorflow as tf
 import tensorflow_quantum as tfq
 
 from qhbmlib import circuit_model
-from qhbmlib import energy_model
-from qhbmlib import hamiltonian_model
 from qhbmlib import utils
 
 
@@ -83,66 +81,40 @@ class QuantumInference(tf.keras.layers.Layer):
   def differentiator(self):
     return self._differentiator
 
-  def expectation(self,
-                  qnn: circuit_model.QuantumCircuit,
-                  initial_states: tf.Tensor,
-                  counts: tf.Tensor,
-                  operators: Union[tf.Tensor, hamiltonian_model.Hamiltonian]):
+  def expectation(self, qnn: circuit_model.QuantumCircuit,
+                  initial_states: tf.Tensor, operators: tf.Tensor):
     """Returns the expectation values of the operators against the QNN.
 
-    Args:
-      qnn: The parameterized quantum circuit on which to do inference.
-      initial_states: Shape [batch_size, num_qubits] of dtype `tf.int8`.
-        These are the initial states of each qubit in the circuit.
-      counts: Shape [batch_size] of dtype `tf.int32` such that `counts[i]` is
-        the weight of `initial_states[i]` when computing expectations.
-        Additionally, if `self.backend != "noiseless", `counts[i]` samples
-        are drawn from `(qnn)|initial_states[i]>` and used to compute
-        the the corresponding expectation.
-      operators: The observables to measure.  If `tf.Tensor`, strings with shape
-        [n_ops], result of calling `tfq.convert_to_tensor` on a list of
-        cirq.PauliSum, `[op1, op2, ...]`.  Otherwise, a Hamiltonian.
-        Will be tiled to measure `<op_j>_((qnn)|initial_states[i]>)`
-        for each i and j.
-      reduce: bool flag for whether or not to average over i.
+      Args:
+        qnn: The parameterized quantum circuit on which to do inference.
+        initial_states: Shape [batch_size, num_qubits] of dtype `tf.int8`.
+          Each entry is an initial state for the set of qubits.  For each state,
+          `qnn` is applied and the pure state expectation value is calculated.
+        operators: `tf.Tensor` of strings with shape [n_ops], result of calling
+          `tfq.convert_to_tensor` on a list of cirq.PauliSum, `[op1, op2, ...]`.
+          Will be tiled to measure `<op_j>_((qnn)|initial_states[i]>)`
+          for each i and j.
 
-    Returns:
-      `tf.Tensor` with shape [batch_size, n_ops] whose entries are the
+      Returns:
+        `tf.Tensor` with shape [batch_size, n_ops] whose entries are the
         unaveraged expectation values of each `operator` against each
         transformed initial state.
-    """
-    if isinstance(operators, tf.Tensor):
-      u = qnn
-      ops = operators
-    elif isinstance(operators.energy, energy_model.PauliMixin):
-      u = self.circuit + operators.circuit_dagger
-      ops = operators.operator_shards
-    else:
-      raise NotImplementedError(
-        "General `BitstringEnergy` models not yet supported.")
-
+      """
     unique_states, idx, counts = utils.unique_bitstrings_with_counts(
         initial_states)
-    circuits = u(unique_states)
+    circuits = qnn(unique_states)
     num_circuits = tf.shape(circuits)[0]
     num_operators = tf.shape(operators)[0]
     tiled_values = tf.tile(
-        tf.expand_dims(u.symbol_values, 0), [num_circuits, 1])
+        tf.expand_dims(qnn.symbol_values, 0), [num_circuits, 1])
     tiled_operators = tf.tile(tf.expand_dims(operators, 0), [num_circuits, 1])
     expectations = self._expectation_function(
         circuits,
-        u.symbol_names,
+        qnn.symbol_names,
         tiled_values,
         tiled_operators,
         tf.tile(tf.expand_dims(counts, 1), [1, num_operators]),
     )
-    if isinstance(operators, tf.Tensor):
-      pass 
-    elif isinstance(operators.energy, energy_model.PauliMixin):
-      expectations = tf.map_fn(
-          lambda x: tf.expand_dims(ops.energy.operator_expectation(x), 0),
-          expectations)
-
     return utils.expand_unique_results(expectations, idx)
 
   def sample(self, qnn: circuit_model.QuantumCircuit, initial_states: tf.Tensor,
