@@ -42,7 +42,9 @@ class QuantumData(abc.ABC):
 class QHBMData(QuantumData):
   """QuantumData defined by a QHBM."""
 
-  def __init__(self, infer: hamiltonian_infer.QHBM, model: hamiltonian_model.Hamiltonian, num_expectation_samples: int):
+  def __init__(self, infer: hamiltonian_infer.QHBM,
+               model: hamiltonian_model.Hamiltonian,
+               num_expectation_samples: int):
     """Initializes a QHBMData.
     Args:
       infer: An inference engine for a QHBM.

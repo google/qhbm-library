@@ -19,8 +19,7 @@ from qhbmlib import hamiltonian_model
 from qhbmlib import quantum_data
 
 
-def qmhl(data: quantum_data.QuantumData,
-         infer: hamiltonian_infer.QHBM,
+def qmhl(data: quantum_data.QuantumData, infer: hamiltonian_infer.QHBM,
          model: hamiltonian_model.Hamiltonian):
   """Calculate the QMHL loss of the QHBM against the quantum data.
   See equation 21 in the appendix.
