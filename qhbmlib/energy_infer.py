@@ -299,14 +299,14 @@ class EnergyInference(EnergyInferenceBase):
     """Returns estimate of log partition function.
 
     See equation C1 in the appendix.  TODO(#119)
-
+  
     Sample approximation to the log partition function.  After drawing samples
     from the EBM, the unique samples are used to calculate the estimate.
     """
-    samples = self.sample(self.num_log_partition_samples)
+    samples = self.sample(self.num_expectation_samples)
     unique_bitstrings, _, _ = utils.unique_bitstrings_with_counts(samples)
     unique_energies = self.energy(unique_bitstrings)
-    return tf.math.reduce_log_sum_exp(-1.0 * unique_energies)
+    return tf.math.reduce_logsumexp(-1.0 * unique_energies)
 
   def _log_partition_grad_generator(self):
     """Returns default estimator for the log partition function derivative."""

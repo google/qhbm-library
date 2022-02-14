@@ -15,9 +15,12 @@
 """Tests for the energy_infer module."""
 
 import functools
+import itertools
+from typing import Union
 
 import tensorflow as tf
 import tensorflow_probability as tfp
+from tensorflow_probability import distributions as tfd
 
 from qhbmlib import energy_infer
 from qhbmlib import energy_model
@@ -81,6 +84,57 @@ class EnergyInferenceTest(tf.test.TestCase):
       bitstring_2_tile = tf.tile(tf.expand_dims(self.bitstring_2, 0), [n_2, 1])
       return tf.concat([bitstring_1_tile, bitstring_2_tile], 0)
 
+  class AnalyticEnergyInferenceDefaultPassthrough(energy_infer.EnergyInference):
+    """energy_infer.AnalyticEnergyInference but with default log partition."""
+
+    def __init__(self,
+                 num_bits: int,
+                 num_expectation_samples: int,
+                 initial_seed: Union[None, tf.Tensor] = None,
+                 name: Union[None, str] = None):
+      """Initializes an AnalyticEnergyInferenceDefaultPassthrough."""
+      super().__init__(num_expectation_samples, initial_seed, name)
+      self._all_bitstrings = tf.constant(
+          list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
+      self._logits_variable = tf.Variable(
+          tf.zeros([tf.shape(self._all_bitstrings)[0]]), trainable=False)
+      self._distribution = tfd.Categorical(logits=self._logits_variable)
+
+    @property
+    def all_bitstrings(self):
+      """Returns every bitstring."""
+      return self._all_bitstrings
+
+    @property
+    def all_energies(self):
+      """Returns the energy of every bitstring."""
+      return self.energy(self.all_bitstrings)
+
+    @property
+    def distribution(self):
+      """Categorical distribution set during last call to `self.infer`."""
+      return self._distribution
+
+    def _call(self, inputs):
+      """Pass through to sample."""
+      return self.sample(inputs)
+
+    def _entropy(self):
+      """See base class docstring."""
+      return self.distribution.entropy()
+
+    def _sample(self, num_samples: int):
+      """See base class docstring."""
+      return tf.gather(
+          self.all_bitstrings,
+          self.distribution.sample(num_samples, seed=self.seed),
+          axis=0)
+
+    def infer(self, energy: energy_model.BitstringEnergy):
+      """See base class docstring."""
+      self._energy = energy
+      self._logits_variable.assign(-1.0 * self.all_energies)
+
   def setUp(self):
     """Initializes test objects."""
     super().setUp()
@@ -101,6 +155,9 @@ class EnergyInferenceTest(tf.test.TestCase):
 
     self.test_function = test_function
 
+    self.tf_random_seed = 4
+    self.close_rtol = 1e-2
+
   @test_util.eager_mode_toggle
   def test_expectation(self):
     """Confirms correct averaging over input function."""
@@ -117,8 +174,34 @@ class EnergyInferenceTest(tf.test.TestCase):
     self.assertAllClose(actual_expectation, expected_expectation)
 
   def test_log_partition(self):
-    """Test default forward pass and derivative."""
-    pass
+    """Compares default behavior against analytic behavior."""
+    num_bits = 7
+    # Number of unique samples no more than half the possible bitstrings.
+    # This suggests the approximation is ok.
+    num_samples = 2 ** (num_bits - 2)
+    ebm_init = tf.keras.initializers.RandomUniform(-1.0, 1.0, seed=self.tf_random_seed)
+    energy = energy_model.KOBE(list(range(num_bits)), num_bits // 2, ebm_init)
+    energy.build([None, energy.num_bits])
+
+    actual_layer = self.AnalyticEnergyInferenceDefaultPassthrough(num_bits, num_samples)
+    exact_layer = energy_infer.AnalyticEnergyInference(num_bits, num_samples)
+    actual_layer.infer(energy)
+    exact_layer.infer(energy)
+    expected_log_partition = exact_layer.log_partition()
+    log_partition_wrapper = tf.function(actual_layer.log_partition)
+    actual_log_partition = log_partition_wrapper()
+    self.assertAllClose(actual_log_partition, expected_log_partition, rtol=self.close_rtol)
+
+    # Confirm using too few samples prevents closeness.
+    num_samples = num_samples // 10
+    actual_layer = self.AnalyticEnergyInferenceDefaultPassthrough(num_bits, num_samples)
+    exact_layer = energy_infer.AnalyticEnergyInference(num_bits, num_samples)
+    actual_layer.infer(energy)
+    exact_layer.infer(energy)
+    expected_log_partition = exact_layer.log_partition()
+    log_partition_wrapper = tf.function(actual_layer.log_partition)
+    actual_log_partition = log_partition_wrapper()
+    self.assertNotAllClose(actual_log_partition, expected_log_partition, rtol=self.close_rtol)
 
 
 class AnalyticEnergyInferenceTest(tf.test.TestCase):
@@ -532,7 +615,6 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     expected_log_partition_grad = tf.constant([derivative_list])
     actual_log_partition_grad = tape.gradient(actual_log_partition,
                                               energy.trainable_variables)
-    print(f"actual_log_partition_grad: {actual_log_partition_grad}")
     self.assertAllClose(actual_log_partition_grad, expected_log_partition_grad,
                         self.close_rtol)
 
