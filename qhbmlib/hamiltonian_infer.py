@@ -117,8 +117,7 @@ class QHBM(tf.keras.layers.Layer):
     return states, counts
 
   def expectation(self, model: hamiltonian_model.Hamiltonian,
-                  observables: Union[tf.Tensor,
-                             hamiltonian_model.Hamiltonian]):
+                  observables: Union[tf.Tensor, hamiltonian_model.Hamiltonian]):
     """Estimates observable expectation values against the density operator.
 
     TODO(#119): add expectation and derivative equations and discussions
@@ -139,4 +138,8 @@ class QHBM(tf.keras.layers.Layer):
       `tf.Tensor` with shape [n_ops] whose entries are are the sample averaged
       expectation values of each entry in `ops`.
     """
-    return self.e_inference.expectation(functools.partial(self.q_inference.expectation, model.circuit, observables=observables))
+    return self.e_inference.expectation(
+        functools.partial(
+            self.q_inference.expectation,
+            model.circuit,
+            observables=observables))

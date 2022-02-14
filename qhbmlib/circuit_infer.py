@@ -111,10 +111,11 @@ class QuantumInference(tf.keras.layers.Layer):
       u = qnn + observables.circuit_dagger
       ops = observables.operator_shards
       post_process = lambda y: tf.map_fn(
-          lambda x: tf.expand_dims(observables.energy.operator_expectation(x), 0), y)
+          lambda x: tf.expand_dims(
+              observables.energy.operator_expectation(x), 0), y)
     else:
       raise NotImplementedError(
-        "General `BitstringEnergy` models not yet supported.")
+          "General `BitstringEnergy` models not yet supported.")
 
     unique_states, idx, counts = utils.unique_bitstrings_with_counts(
         initial_states)
