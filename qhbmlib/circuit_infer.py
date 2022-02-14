@@ -21,6 +21,7 @@ import tensorflow as tf
 import tensorflow_quantum as tfq
 
 from qhbmlib import circuit_model
+from qhbmlib import energy_model
 from qhbmlib import hamiltonian_model
 from qhbmlib import utils
 
@@ -92,7 +93,7 @@ class QuantumInference(tf.keras.layers.Layer):
 
   def expectation(self,
                   initial_states: tf.Tensor,
-                  operators: Union[tf.Tensor, hamiltionian_model.Hamiltonian]):
+                  operators: Union[tf.Tensor, hamiltonian_model.Hamiltonian]):
     """Returns the expectation values of the operators against the QNN.
 
       Args:
@@ -135,8 +136,9 @@ class QuantumInference(tf.keras.layers.Layer):
         tiled_operators,
         tf.tile(tf.expand_dims(counts, 1), [1, num_operators]),
     )
-
-    if isinstance(operators.energy, energy_model.PauliMixin):
+    if isinstance(operators, tf.Tensor):
+      pass 
+    elif isinstance(operators.energy, energy_model.PauliMixin):
       expectations = tf.map_fn(
           lambda x: tf.expand_dims(ops.energy.operator_expectation(x), 0),
           expectations)
