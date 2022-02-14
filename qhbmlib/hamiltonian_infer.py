@@ -134,8 +134,6 @@ class QHBM(tf.keras.layers.Layer):
         density operator against which expectation values will be estimated.
       obervables: Hermitian operators to measure.  See docstring of
         `QuantumInference.expectation` for details.
-      num_samples: Number of draws from the EBM associated with `model` to
-        average over.
 
     Returns:
       `tf.Tensor` with shape [n_ops] whose entries are are the sample averaged

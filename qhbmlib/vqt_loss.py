@@ -24,7 +24,7 @@ from qhbmlib import hamiltonian_model
 
 
 def vqt(qhbm_infer: hamiltonian_infer.QHBM,
-        model: hamiltonian_model.Hamiltonian, num_samples: tf.Tensor,
+        model: hamiltonian_model.Hamiltonian,
         hamiltonian: Union[tf.Tensor,
                            hamiltonian_model.Hamiltonian], beta: tf.Tensor):
   """Computes the VQT loss of a given QHBM and Hamiltonian.
@@ -34,8 +34,6 @@ def vqt(qhbm_infer: hamiltonian_infer.QHBM,
   Args:
     qhbm_infer: Inference methods for the model.
     model: The modular Hamiltonian being trained to model the thermal state.
-    num_samples: A scalar `tf.Tensor` specifying the number of samples to draw
-      from the EBM of `model` when estimating the loss and its gradients.
     hamiltonian: The Hamiltonian whose thermal state is to be learned.  If
       it is a `tf.Tensor`, it is of type `tf.string` with shape [1], result of
       calling `tfq.convert_to_tensor` on a list of `cirq.PauliSum`, `[op]`.
@@ -49,21 +47,14 @@ def vqt(qhbm_infer: hamiltonian_infer.QHBM,
 
   # See equations B4 and B5 in appendix.  TODO(#119): confirm equation number.
   def f_vqt(bitstrings):
-    # TODO(#158): counts is required here, but not meaningful.
-    counts = tf.ones([tf.shape(bitstrings)[0]])
     if isinstance(hamiltonian, tf.Tensor):
-      h_expectations = tf.reshape(
-          qhbm_infer.q_inference.expectation(
-              model.circuit, bitstrings, counts, hamiltonian, reduce=False),
-          tf.shape(counts))
+      h_expectations = tf.squeeze(
+          qhbm_infer.q_inference.expectation(model.circuit, bitstrings,
+                                             hamiltonian), 1)
     elif isinstance(hamiltonian.energy, energy_model.PauliMixin):
       u_dagger_u = model.circuit + hamiltonian.circuit_dagger
       expectation_shards = qhbm_infer.q_inference.expectation(
-          u_dagger_u,
-          bitstrings,
-          counts,
-          hamiltonian.operator_shards,
-          reduce=False)
+          u_dagger_u, bitstrings, hamiltonian.operator_shards)
       h_expectations = hamiltonian.energy.operator_expectation(
           expectation_shards)
     else:
@@ -74,6 +65,6 @@ def vqt(qhbm_infer: hamiltonian_infer.QHBM,
     return beta_h_expectations - energies
 
   qhbm_infer.e_inference.infer(model.energy)
-  average_expectation = qhbm_infer.e_inference.expectation(f_vqt, num_samples)
+  average_expectation = qhbm_infer.e_inference.expectation(f_vqt)
   current_partition = tf.stop_gradient(qhbm_infer.e_inference.log_partition())
   return average_expectation - current_partition
