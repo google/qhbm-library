@@ -42,15 +42,17 @@ class EnergyInferenceTest(tf.test.TestCase):
   class TwoOutcomes(energy_infer.EnergyInference):
     """EnergyInference which is independent of the input energy."""
 
-    def __init__(self, bitstring_1, bitstring_2, p_1):
+    def __init__(self, num_expectation_samples, bitstring_1, bitstring_2, p_1):
       """Initializes a simple inference class.
 
       Args:
+        num_expectation_samples: Number of samples to draw and use for
+          estimating the expectation value.
         bitstring_1: First bitstring to sample.
         bitstring_2: Second bitstring to sample.
         p_1: probability of sampling the first bitstring.
       """
-      super().__init__()
+      super().__init__(num_expectation_samples)
       self.bitstring_1 = bitstring_1
       self.bitstring_2 = bitstring_2
       self.p_1 = p_1
@@ -86,8 +88,8 @@ class EnergyInferenceTest(tf.test.TestCase):
     self.bitstring_1 = tf.constant([1, 1, 0, 1, 0], dtype=tf.int8)
     self.bitstring_2 = tf.constant([0, 0, 0, 1, 1], dtype=tf.int8)
     self.p_1 = 0.1
-    self.e_infer = self.TwoOutcomes(self.bitstring_1, self.bitstring_2,
-                                    self.p_1)
+    self.e_infer = self.TwoOutcomes(self.num_samples, self.bitstring_1,
+                                    self.bitstring_2, self.p_1)
     self.energy = NullEnergy(list(range(5)))
     self.e_infer.infer(self.energy)
     spins_from_bitstrings = energy_model_utils.SpinsFromBitstrings()
@@ -111,8 +113,7 @@ class EnergyInferenceTest(tf.test.TestCase):
     expected_expectation = self.p_1 * values[0] + (1 - self.p_1) * values[1]
 
     expectation_wrapper = tf.function(self.e_infer.expectation)
-    actual_expectation = expectation_wrapper(self.test_function,
-                                             self.num_samples)
+    actual_expectation = expectation_wrapper(self.test_function)
     self.assertAllClose(actual_expectation, expected_expectation)
 
 
@@ -135,7 +136,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     order = 2
     expected_name = "test_analytic_dist_name"
     actual_layer = energy_infer.AnalyticEnergyInference(
-        len(bits), name=expected_name)
+        len(bits), self.num_samples, name=expected_name)
     self.assertEqual(actual_layer.name, expected_name)
 
     expected_bitstrings = tf.constant(
@@ -157,7 +158,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     one_bit_energy = energy_model.KOBE([0], 1)
     one_bit_energy.build([None, one_bit_energy.num_bits])
     actual_layer = energy_infer.AnalyticEnergyInference(
-        1, initial_seed=self.tfp_seed)
+        1, self.num_samples, initial_seed=self.tfp_seed)
     sample_wrapper = tf.function(actual_layer.sample)
 
     # For single factor Bernoulli, theta=0 is 50% chance of 1.
@@ -195,7 +196,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     three_bit_energy = energy_model.KOBE([0, 1, 2], 3,
                                          tf.keras.initializers.Constant(0.0))
     actual_layer = energy_infer.AnalyticEnergyInference(
-        3, initial_seed=self.tfp_seed)
+        3, self.num_samples, initial_seed=self.tfp_seed)
     actual_layer.infer(three_bit_energy)
     sample_wrapper_3bit = tf.function(actual_layer.sample)
     samples = sample_wrapper_3bit(self.num_samples)
@@ -242,7 +243,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     energy = energy_model.KOBE(list(range(num_bits)), 2)
     energy.build([None, num_bits])
     actual_layer = energy_infer.AnalyticEnergyInference(
-        num_bits, initial_seed=self.tfp_seed)
+        num_bits, self.num_samples, initial_seed=self.tfp_seed)
     actual_layer.infer(energy)
 
     sample_wrapper = tf.function(actual_layer.sample)
@@ -338,7 +339,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     prob_x_star = partition_inverse * theta_exp
 
     e_infer = energy_infer.AnalyticEnergyInference(
-        num_bits, initial_seed=self.tfp_seed)
+        num_bits, self.num_samples, initial_seed=self.tfp_seed)
     e_infer.infer(energy)
 
     mu = tf.Variable(tf.random.uniform([], 1, 2), name="mu")
@@ -349,7 +350,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
 
     expectation_wrapper = tf.function(e_infer.expectation)
     with tf.GradientTape() as tape:
-      actual_average = expectation_wrapper(f, self.num_samples)
+      actual_average = expectation_wrapper(f)
     actual_gradient_theta, actual_gradient_mu = tape.gradient(
         actual_average, (theta, mu))
 
@@ -376,7 +377,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     mul_expected_gradient_mu = mul_const * expected_gradient_mu
 
     with tf.GradientTape() as tape:
-      actual_average = expectation_wrapper(wrap_f, self.num_samples)
+      actual_average = expectation_wrapper(wrap_f)
     actual_gradient_theta, actual_gradient_mu = tape.gradient(
         actual_average, (theta, mu))
 
@@ -396,7 +397,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
                                                      1) + prob_x_star
 
     with tf.GradientTape() as tape:
-      actual_average = expectation_wrapper(g, self.num_samples)
+      actual_average = expectation_wrapper(g)
     actual_gradient_theta, actual_gradient_mu = tape.gradient(
         actual_average, (theta, mu))
 
@@ -412,7 +413,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
 
     # Check unconnected gradient with zeros tape setting
     with tf.GradientTape() as tape:
-      actual_average = expectation_wrapper(g, self.num_samples)
+      actual_average = expectation_wrapper(g)
     actual_gradient_mu = tape.gradient(
         actual_average, mu, unconnected_gradients=tf.UnconnectedGradients.ZERO)
     self.assertAllLess(tf.math.abs(actual_gradient_mu), self.zero_atol)
@@ -448,11 +449,11 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
       return [ret_scalar, ret_vector, ret_thetas]
 
     e_infer = energy_infer.AnalyticEnergyInference(
-        num_bits, initial_seed=self.tfp_seed)
+        num_bits, self.num_samples, initial_seed=self.tfp_seed)
     e_infer.infer(energy)
 
     with tf.GradientTape() as tape:
-      actual_expectation = e_infer.expectation(f, self.num_samples)
+      actual_expectation = e_infer.expectation(f)
     actual_derivative = tape.gradient(actual_expectation, energy_var)
 
     # Trainable variable of KOBE is 1D.
@@ -497,7 +498,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
 
     energy = energy_model.KOBE([0, 1], 2)
     energy.build([None, energy.num_bits])
-    actual_layer = energy_infer.AnalyticEnergyInference(2)
+    actual_layer = energy_infer.AnalyticEnergyInference(2, self.num_samples)
     energy.set_weights([test_thetas])
     actual_layer.infer(energy)
 
@@ -513,7 +514,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
 
     energy = energy_model.KOBE([0, 1], 2)
     energy.build([None, energy.num_bits])
-    actual_layer = energy_infer.AnalyticEnergyInference(2)
+    actual_layer = energy_infer.AnalyticEnergyInference(2, self.num_samples)
     energy.set_weights([test_thetas])
     actual_layer.infer(energy)
 
@@ -527,7 +528,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     one_bit_energy = energy_model.KOBE([0], 1,
                                        tf.keras.initializers.Constant(0.0))
     actual_layer = energy_infer.AnalyticEnergyInference(
-        1, initial_seed=self.tfp_seed)
+        1, self.num_samples, initial_seed=self.tfp_seed)
     actual_layer.infer(one_bit_energy)
     actual_dist = actual_layer(None)
     self.assertIsInstance(actual_dist, tfp.distributions.Categorical)
@@ -561,7 +562,8 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
   def test_init(self):
     """Tests that components are initialized correctly."""
     expected_name = "test_analytic_dist_name"
-    actual_layer = energy_infer.BernoulliEnergyInference(1, name=expected_name)
+    actual_layer = energy_infer.BernoulliEnergyInference(
+        1, self.num_samples, name=expected_name)
     self.assertEqual(actual_layer.name, expected_name)
 
   @test_util.eager_mode_toggle
@@ -570,7 +572,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     energy = energy_model.BernoulliEnergy([1])
     energy.build([None, energy.num_bits])
     actual_layer = energy_infer.BernoulliEnergyInference(
-        1, initial_seed=self.tfp_seed)
+        1, self.num_samples, initial_seed=self.tfp_seed)
 
     # For single factor Bernoulli, theta = 0 is 50% chance of 1.
     energy.set_weights([tf.constant([0.0])])
@@ -603,7 +605,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
                                           tf.keras.initializers.Constant(0.0))
     energy.build([None, energy.num_bits])
     actual_layer = energy_infer.BernoulliEnergyInference(
-        2, initial_seed=self.tfp_seed)
+        2, self.num_samples, initial_seed=self.tfp_seed)
     actual_layer.infer(energy)
 
     sample_wrapper_2bits = tf.function(actual_layer.sample)
@@ -641,7 +643,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     energy = energy_model.BernoulliEnergy(list(range(num_bits)))
     energy.build([None, num_bits])
     actual_layer = energy_infer.BernoulliEnergyInference(
-        num_bits, initial_seed=self.tfp_seed)
+        num_bits, self.num_samples, initial_seed=self.tfp_seed)
     actual_layer.infer(energy)
 
     sample_wrapper = tf.function(actual_layer.sample)
@@ -663,7 +665,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
                                  dtype=tf.int8)
     energy = energy_model.BernoulliEnergy([5, 6, 7])
     energy.build([None, energy.num_bits])
-    actual_layer = energy_infer.BernoulliEnergyInference(3)
+    actual_layer = energy_infer.BernoulliEnergyInference(3, self.num_samples)
     actual_layer.infer(energy)
     expected_log_partition = tf.reduce_logsumexp(-1.0 * energy(all_bitstrings))
 
@@ -699,7 +701,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
 
     energy = energy_model.BernoulliEnergy([0, 1, 2])
     energy.build([None, energy.num_bits])
-    actual_layer = energy_infer.BernoulliEnergyInference(3)
+    actual_layer = energy_infer.BernoulliEnergyInference(3, self.num_samples)
     energy.set_weights([test_thetas])
     actual_layer.infer(energy)
 
@@ -714,7 +716,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
                                           tf.keras.initializers.Constant(0.0))
     energy.build([None, energy.num_bits])
     actual_layer = energy_infer.BernoulliEnergyInference(
-        1, initial_seed=self.tfp_seed)
+        1, self.num_samples, initial_seed=self.tfp_seed)
     actual_layer.infer(energy)
     actual_dist = actual_layer(None)
     self.assertIsInstance(actual_dist, tfp.distributions.Bernoulli)
