@@ -284,6 +284,7 @@ class EnergyInference(EnergyInferenceBase):
     return _inner_expectation()
 
   def _log_partition(self):
+    """Default implementation wrapped by `self.log_partition`."""
     @tf.custom_gradient
     def _inner_log_partition():
       """Wraps forward pass computaton."""
@@ -293,7 +294,7 @@ class EnergyInference(EnergyInferenceBase):
     return _inner_log_partition()
 
   def _log_partition_forward_pass(self):
-    """Default estimator for the log partition function.
+    """Returns estimate of log partition function.
 
     See equation C1 in the appendix.  TODO(#119)
 
@@ -385,7 +386,7 @@ class AnalyticEnergyInference(EnergyInference):
     """See base class docstring."""
     return self.distribution.entropy()
 
-  def _log_partition(self):
+  def _log_partition_forward_pass(self):
     """See base class docstring."""
     # TODO(#115)
     return tf.reduce_logsumexp(self.distribution.logits_parameter())
@@ -447,7 +448,7 @@ class BernoulliEnergyInference(EnergyInference):
     """
     return tf.reduce_sum(self.distribution.entropy())
 
-  def _log_partition(self):
+  def _log_partition_forward_pass(self):
     r"""Returns the exact log partition function.
 
     For a single spin of energy $\theta$, the partition function is
