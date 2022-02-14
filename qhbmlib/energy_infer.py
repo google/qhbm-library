@@ -268,6 +268,51 @@ class EnergyInference(EnergyInferenceBase):
 
     return _inner_expectation()
 
+  def _log_partition(self):
+    @tf.custom_gradient
+    def _inner_log_partition():
+      """Wraps forward pass computaton."""
+      result = self._log_partition_forward_pass()
+      grad_fn = self._log_partition_grad_generator()
+      return result, grad_fn
+    return _inner_log_partition()
+
+  def _log_partition_forward_pass(self):
+    """Default estimator for the log partition function.
+
+    See equation C1 in the appendix.  TODO(#119)
+
+    Sample approximation to the log partition function.  After drawing samples
+    from the EBM, the unique samples are used to calculate the estimate.
+    """
+    samples = self.sample(self.num_log_partition_samples)
+    unique_bitstrings, _, _ = utils.unique_bitstrings_with_counts(samples)
+    unique_energies = self.energy(unique_bitstrings)
+    return tf.math.reduce_log_sum_exp(-1.0 * unique_energies)
+
+  def _log_partition_grad_generator(self):
+    """Returns default estimator for the log partition function derivative."""
+
+    def grad_fn(upstream, variables):
+      """See equation C2 in the appendix.  TODO(#119)"""
+
+      def energy_grad(bitstrings):
+        """Calculates the derivative with respect to the current variables."""
+        with tf.GradientTape() as tape:
+          energies = self.energy(bitstrings)
+        jac = tape.jacobian(
+            energies,
+            variables,
+            unconnected_gradients=tf.UnconnectedGradients.ZERO)
+        return jac
+
+      energy_grad_expectation_list = self.expectation(energy_grad)
+      return tuple(), [
+          upstream * (-1.0 * ege) for ege in energy_grad_expectation_list
+      ]
+
+    return grad_fn
+
 
 class AnalyticEnergyInference(EnergyInference):
   """Uses an explicit categorical distribution to implement parent functions."""
