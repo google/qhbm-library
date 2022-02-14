@@ -86,7 +86,7 @@ class QuantumInference(tf.keras.layers.Layer):
   def expectation(self, qnn: circuit_model.QuantumCircuit,
                   initial_states: tf.Tensor,
                   observables: Union[tf.Tensor, hamiltonian_model.Hamiltonian]):
-    """Returns the expectation values of the operators against the QNN.
+    """Returns the expectation values of the observables against the QNN.
 
     Args:
       qnn: The parameterized quantum circuit on which to do inference.
@@ -103,12 +103,15 @@ class QuantumInference(tf.keras.layers.Layer):
       unaveraged expectation values of each `operator` against each
       transformed initial state.
     """
-    if isinstance(operators, tf.Tensor):
-      u = self.circuit
-      ops = operators
-    elif isinstance(operators.energy, energy_model.PauliMixin):
-      u = self.circuit + operators.circuit_dagger
-      ops = operators.operator_shards
+    if isinstance(observables, tf.Tensor):
+      u = qnn
+      ops = observables
+      post_process = lambda x: x
+    elif isinstance(observables.energy, energy_model.PauliMixin):
+      u = qnn + observables.circuit_dagger
+      ops = observables.operator_shards
+      post_process = lambda y: tf.map_fn(
+          lambda x: tf.expand_dims(observables.energy.operator_expectation(x), 0), y)
     else:
       raise NotImplementedError(
         "General `BitstringEnergy` models not yet supported.")
@@ -117,25 +120,18 @@ class QuantumInference(tf.keras.layers.Layer):
         initial_states)
     circuits = u(unique_states)
     num_circuits = tf.shape(circuits)[0]
-    num_operators = tf.shape(operators)[0]
+    num_ops = tf.shape(ops)[0]
     tiled_values = tf.tile(
         tf.expand_dims(u.symbol_values, 0), [num_circuits, 1])
-    tiled_operators = tf.tile(tf.expand_dims(operators, 0), [num_circuits, 1])
+    tiled_ops = tf.tile(tf.expand_dims(ops, 0), [num_circuits, 1])
     expectations = self._expectation_function(
         circuits,
         u.symbol_names,
         tiled_values,
-        tiled_operators,
-        tf.tile(tf.expand_dims(counts, 1), [1, num_operators]),
+        tiled_ops,
+        tf.tile(tf.expand_dims(counts, 1), [1, num_ops]),
     )
-    if isinstance(operators, tf.Tensor):
-      pass 
-    elif isinstance(operators.energy, energy_model.PauliMixin):
-      expectations = tf.map_fn(
-          lambda x: tf.expand_dims(ops.energy.operator_expectation(x), 0),
-          expectations)
-
-    return utils.expand_unique_results(expectations, idx)
+    return utils.expand_unique_results(post_process(expectations), idx)
 
   def sample(self, qnn: circuit_model.QuantumCircuit, initial_states: tf.Tensor,
              counts: tf.Tensor):

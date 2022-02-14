@@ -131,9 +131,8 @@ class QHBM(tf.keras.layers.Layer):
     Args:
       model: The modular Hamiltonian whose normalized exponential is the
         density operator against which expectation values will be estimated.
-      ops: The observables to measure.  If `tf.Tensor`, strings with shape
-        [n_ops], result of calling `tfq.convert_to_tensor` on a list of
-        cirq.PauliSum, `[op1, op2, ...]`.  Otherwise, a Hamiltonian.
+      obervables: Hermitian operators to measure.  See docstring of
+        `QuantumInference.expectation` for details.
       num_samples: Number of draws from the EBM associated with `model` to
         average over.
 
@@ -141,18 +140,4 @@ class QHBM(tf.keras.layers.Layer):
       `tf.Tensor` with shape [n_ops] whose entries are are the sample averaged
       expectation values of each entry in `ops`.
     """
-    self.e_inference.infer(model.energy)
-    samples = self.e_inference.sample(num_samples)
-    bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
-    if isinstance(ops, tf.Tensor):
-      return self.q_inference.expectation(
-          model.circuit, bitstrings, counts, ops, reduce=True)
-    elif isinstance(ops.energy, energy_model.PauliMixin):
-      u_dagger_u = model.circuit + ops.circuit_dagger
-      expectation_shards = self.q_inference.expectation(
-          u_dagger_u, bitstrings, counts, ops.operator_shards, reduce=True)
-      return tf.expand_dims(
-          ops.energy.operator_expectation(expectation_shards), 0)
-    else:
-      raise NotImplementedError(
-          "General `BitstringEnergy` models not yet supported.")
+    return self.e_inference.expectation(functools.partial(self.q_inference.expectation, model.circuit, operators=operators))
