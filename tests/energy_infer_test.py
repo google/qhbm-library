@@ -659,19 +659,45 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
 
   @test_util.eager_mode_toggle
   def test_log_partition(self):
-    """Confirms correct value of the log partition function."""
+    """Confirms correct value of the log partition function and derivative."""
     all_bitstrings = tf.constant([[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1],
                                   [1, 0, 0], [1, 0, 1], [1, 1, 0], [1, 1, 1]],
                                  dtype=tf.int8)
-    energy = energy_model.BernoulliEnergy([5, 6, 7])
+    ebm_init = tf.keras.initializers.RandomUniform(
+        -2, -1, seed=self.tf_random_seed)
+    energy = energy_model.BernoulliEnergy([5, 6, 7], ebm_init)
     energy.build([None, energy.num_bits])
-    actual_layer = energy_infer.BernoulliEnergyInference(3, self.num_samples)
+    actual_layer = energy_infer.BernoulliEnergyInference(3, self.num_samples, self.tfp_seed)
     actual_layer.infer(energy)
     expected_log_partition = tf.reduce_logsumexp(-1.0 * energy(all_bitstrings))
 
     log_partition_wrapper = tf.function(actual_layer.log_partition)
-    actual_log_partition = log_partition_wrapper()
+    with tf.GradientTape() as tape:
+      actual_log_partition = log_partition_wrapper()
     self.assertAllClose(actual_log_partition, expected_log_partition)
+
+    old_kernel = energy.post_process[0].kernel.read_value()
+    kernel_len = tf.shape(old_kernel)[0].numpy().tolist()
+
+    def exact_log_partition(k, delta):
+      """Perturbs the kth variable and calculates the log partition."""
+      new_kernel = old_kernel + delta * tf.one_hot(k, kernel_len, 1.0, 0.0)
+      energy.set_weights([new_kernel])
+      delta_log_partition = tf.reduce_logsumexp(-1.0 * energy(all_bitstrings))
+      energy.set_weights([old_kernel])
+      return delta_log_partition
+
+    derivative_list = []
+    for k in range(kernel_len):
+      this_derivative = test_util.approximate_derivative(
+          functools.partial(exact_log_partition, k))
+      derivative_list.append(this_derivative.numpy())
+
+    expected_log_partition_grad = tf.constant([derivative_list])
+    actual_log_partition_grad = tape.gradient(actual_log_partition,
+                                              energy.trainable_variables)
+    self.assertAllClose(actual_log_partition_grad, expected_log_partition_grad,
+                        self.close_rtol)
 
   @test_util.eager_mode_toggle
   def test_entropy(self):
