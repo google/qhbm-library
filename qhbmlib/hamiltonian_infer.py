@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tools for inference on quantum Hamiltonians."""
 
+import functools
 from typing import Union
 
 import tensorflow as tf
@@ -116,8 +117,8 @@ class QHBM(tf.keras.layers.Layer):
     return states, counts
 
   def expectation(self, model: hamiltonian_model.Hamiltonian,
-                  ops: Union[tf.Tensor,
-                             hamiltonian_model.Hamiltonian], num_samples: int):
+                  observables: Union[tf.Tensor,
+                             hamiltonian_model.Hamiltonian]):
     """Estimates observable expectation values against the density operator.
 
     TODO(#119): add expectation and derivative equations and discussions
@@ -140,4 +141,4 @@ class QHBM(tf.keras.layers.Layer):
       `tf.Tensor` with shape [n_ops] whose entries are are the sample averaged
       expectation values of each entry in `ops`.
     """
-    return self.e_inference.expectation(functools.partial(self.q_inference.expectation, model.circuit, operators=operators))
+    return self.e_inference.expectation(functools.partial(self.q_inference.expectation, model.circuit, observables=observables))
