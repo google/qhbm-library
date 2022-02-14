@@ -139,19 +139,4 @@ class QHBM(tf.keras.layers.Layer):
       `tf.Tensor` with shape [n_ops] whose entries are are the sample averaged
       expectation values of each entry in `ops`.
     """
-
-    def expectation_f(bitstrings):
-      if isinstance(ops, tf.Tensor):
-        return self.q_inference.expectation(bitstrings, ops)
-      elif isinstance(ops.energy, energy_model.PauliMixin):
-        u_dagger_u = self.hamiltonian.circuit + ops.circuit_dagger
-        expectation_shards = self.q_inference.expectation(
-            u_dagger_u, bitstrings, ops.operator_shards)
-        return tf.map_fn(
-            lambda x: tf.expand_dims(ops.energy.operator_expectation(x), 0),
-            expectation_shards)
-      else:
-        raise NotImplementedError(
-            "General `BitstringEnergy` models not yet supported.")
-
-    return self.e_inference.expectation(expectation_f)
+    return self.e_inference.expectation(functools.partial(self.q_inference.expectation, operators=ops))

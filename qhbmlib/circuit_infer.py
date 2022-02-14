@@ -21,6 +21,7 @@ import tensorflow as tf
 import tensorflow_quantum as tfq
 
 from qhbmlib import circuit_model
+from qhbmlib import hamiltonian_model
 from qhbmlib import utils
 
 
@@ -89,15 +90,18 @@ class QuantumInference(tf.keras.layers.Layer):
   def differentiator(self):
     return self._differentiator
 
-  def expectation(self, initial_states: tf.Tensor, operators: tf.Tensor):
+  def expectation(self,
+                  initial_states: tf.Tensor,
+                  operators: Union[tf.Tensor, hamiltionian_model.Hamiltonian]):
     """Returns the expectation values of the operators against the QNN.
 
       Args:
         initial_states: Shape [batch_size, num_qubits] of dtype `tf.int8`.
           Each entry is an initial state for the set of qubits.  For each state,
           `qnn` is applied and the pure state expectation value is calculated.
-        operators: `tf.Tensor` of strings with shape [n_ops], result of calling
-          `tfq.convert_to_tensor` on a list of cirq.PauliSum, `[op1, op2, ...]`.
+        operators: The observables to measure.  If `tf.Tensor`, strings with shape
+          [n_ops], result of calling `tfq.convert_to_tensor` on a list of
+          cirq.PauliSum, `[op1, op2, ...]`.  Otherwise, a Hamiltonian.
           Will be tiled to measure `<op_j>_((qnn)|initial_states[i]>)`
           for each i and j.
 
@@ -106,21 +110,37 @@ class QuantumInference(tf.keras.layers.Layer):
         unaveraged expectation values of each `operator` against each
         transformed initial state.
       """
+    if isinstance(operators, tf.Tensor):
+      u = self.circuit
+      ops = operators
+    elif isinstance(operators.energy, energy_model.PauliMixin):
+      u = self.circuit + operators.circuit_dagger
+      ops = operators.operator_shards
+    else:
+      raise NotImplementedError(
+        "General `BitstringEnergy` models not yet supported.")
+
     unique_states, idx, counts = utils.unique_bitstrings_with_counts(
         initial_states)
-    circuits = self.circuit(unique_states)
+    circuits = u(unique_states)
     num_circuits = tf.shape(circuits)[0]
     num_operators = tf.shape(operators)[0]
     tiled_values = tf.tile(
-        tf.expand_dims(self.circuit.symbol_values, 0), [num_circuits, 1])
+        tf.expand_dims(u.symbol_values, 0), [num_circuits, 1])
     tiled_operators = tf.tile(tf.expand_dims(operators, 0), [num_circuits, 1])
     expectations = self._expectation_function(
         circuits,
-        self.circuit.symbol_names,
+        u.symbol_names,
         tiled_values,
         tiled_operators,
         tf.tile(tf.expand_dims(counts, 1), [1, num_operators]),
     )
+
+    if isinstance(operators.energy, energy_model.PauliMixin):
+      expectations = tf.map_fn(
+          lambda x: tf.expand_dims(ops.energy.operator_expectation(x), 0),
+          expectations)
+
     return utils.expand_unique_results(expectations, idx)
 
   def sample(self, initial_states: tf.Tensor, counts: tf.Tensor):
