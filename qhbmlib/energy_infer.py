@@ -289,6 +289,8 @@ class EnergyInference(EnergyInferenceBase):
     def _inner_log_partition():
       """Wraps forward pass computaton."""
       result = self._log_partition_forward_pass()
+      # Adds variables in `self.energy` to `variables` argument of `grad_fn`.
+      [tf.identity(x) for x in self.energy.trainable_variables]
       grad_fn = self._log_partition_grad_generator()
       return result, grad_fn
     return _inner_log_partition()
