@@ -166,7 +166,7 @@ class QuantumInferenceTest(tf.test.TestCase):
     actual_grad_reduced = []
     for op in all_ops:
       with tf.GradientTape() as tape:
-        current_exp = expectation_wrapper(initial_states, op)
+        current_exp = expectation_wrapper(self.p_qnn.trainable_variables, initial_states, op)
         reduced_exp = tf.math.reduce_mean(current_exp, 0)
       reduced_grad = tf.squeeze(
           tape.jacobian(reduced_exp, self.p_qnn.trainable_variables))
