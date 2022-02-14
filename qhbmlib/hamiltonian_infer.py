@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tools for inference on quantum Hamiltonians."""
 
+import functools
 from typing import Union
 
 import tensorflow as tf

@@ -242,71 +242,71 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     reset_expectations = expectation_wrapper(ops)
     self.assertAllClose(reset_expectations, actual_expectations, rtol=1e-6)
 
-  # @parameterized.parameters({
-  #     "energy_class": energy_class,
-  #     "energy_args": energy_args,
-  # } for energy_class, energy_args in zip(
-  #     [energy_model.BernoulliEnergy, energy_model.KOBE], [[], [2]]))
-  # @test_util.eager_mode_toggle
-  # def test_expectation_modular_hamiltonian(self, energy_class, energy_args):
-  #   """Confirm expectation of modular Hamiltonians works."""
-  #   # set up the modular Hamiltonian to measure
-  #   num_bits = 3
-  #   n_moments = 5
-  #   act_fraction = 1.0
-  #   qubits = cirq.GridQubit.rect(1, num_bits)
-  #   energy_h = energy_class(*([list(range(num_bits))] + energy_args))
-  #   energy_h.build([None, num_bits])
-  #   raw_circuit_h = cirq.testing.random_circuit(qubits, n_moments, act_fraction)
-  #   circuit_h = circuit_model.DirectQuantumCircuit(raw_circuit_h)
-  #   circuit_h.build([])
-  #   hamiltonian_measure = hamiltonian_model.Hamiltonian(energy_h, circuit_h)
-  #   raw_shards = tfq.from_tensor(hamiltonian_measure.operator_shards)
+  @parameterized.parameters({
+      "energy_class": energy_class,
+      "energy_args": energy_args,
+  } for energy_class, energy_args in zip(
+      [energy_model.BernoulliEnergy, energy_model.KOBE], [[], [2]]))
+  @test_util.eager_mode_toggle
+  def test_expectation_modular_hamiltonian(self, energy_class, energy_args):
+    """Confirm expectation of modular Hamiltonians works."""
+    # set up the modular Hamiltonian to measure
+    num_bits = 3
+    n_moments = 5
+    act_fraction = 1.0
+    qubits = cirq.GridQubit.rect(1, num_bits)
+    energy_h = energy_class(*([list(range(num_bits))] + energy_args))
+    energy_h.build([None, num_bits])
+    raw_circuit_h = cirq.testing.random_circuit(qubits, n_moments, act_fraction)
+    circuit_h = circuit_model.DirectQuantumCircuit(raw_circuit_h)
+    circuit_h.build([])
+    hamiltonian_measure = hamiltonian_model.Hamiltonian(energy_h, circuit_h)
+    raw_shards = tfq.from_tensor(hamiltonian_measure.operator_shards)
 
-  #   # hamiltonian model and inference
-  #   seed = tf.constant([5, 6], dtype=tf.int32)
-  #   model_energy = energy_model.BernoulliEnergy(list(range(num_bits)))
-  #   model_energy.build([None, num_bits])
-  #   model_raw_circuit = cirq.testing.random_circuit(qubits, n_moments,
-  #                                                   act_fraction)
-  #   model_circuit = circuit_model.DirectQuantumCircuit(model_raw_circuit)
-  #   model_circuit.build([])
-  #   model_hamiltonian = hamiltonian_model.Hamiltonian(model_energy,
-  #                                                     model_circuit)
-  #   e_infer = energy_infer.BernoulliEnergyInference(num_bits, self.num_samples,
-  #                                                   seed)
-  #   q_infer = circuit_infer.QuantumInference()
-  #   model_h_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
+    # hamiltonian model and inference
+    seed = tf.constant([5, 6], dtype=tf.int32)
+    model_energy = energy_model.BernoulliEnergy(list(range(num_bits)))
+    model_energy.build([None, num_bits])
+    model_raw_circuit = cirq.testing.random_circuit(qubits, n_moments,
+                                                    act_fraction)
+    model_circuit = circuit_model.DirectQuantumCircuit(model_raw_circuit)
+    model_circuit.build([])
+    model_hamiltonian = hamiltonian_model.Hamiltonian(model_energy,
+                                                      model_circuit)
+    e_infer = energy_infer.BernoulliEnergyInference(num_bits, self.num_samples,
+                                                    seed)
+    q_infer = circuit_infer.QuantumInference()
+    model_h_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
 
-  #   # sample bitstrings
-  #   e_infer.infer(model_energy)
-  #   samples = e_infer.sample(self.num_samples)
-  #   bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
-  #   bit_list = bitstrings.numpy().tolist()
+    # sample bitstrings
+    e_infer.infer(model_energy)
+    samples = e_infer.sample(self.num_samples)
+    bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
+    bit_list = bitstrings.numpy().tolist()
 
-  #   # bitstring injectors
-  #   bitstring_circuit = circuit_model_utils.bit_circuit(qubits)
-  #   bitstring_symbols = sorted(tfq.util.get_circuit_symbols(bitstring_circuit))
-  #   bitstring_resolvers = [
-  #       dict(zip(bitstring_symbols, bstr)) for bstr in bit_list
-  #   ]
+    # bitstring injectors
+    bitstring_circuit = circuit_model_utils.bit_circuit(qubits)
+    bitstring_symbols = sorted(tfq.util.get_circuit_symbols(bitstring_circuit))
+    bitstring_resolvers = [
+        dict(zip(bitstring_symbols, bstr)) for bstr in bit_list
+    ]
 
-  #   # calculate expected values
-  #   total_circuit = bitstring_circuit + model_raw_circuit + raw_circuit_h**-1
-  #   raw_expectations = tf.stack([
-  #       tf.stack([
-  #           hamiltonian_measure.energy.operator_expectation([
-  #               cirq.Simulator().simulate_expectation_values(
-  #                   total_circuit, o, r)[0].real for o in raw_shards
-  #           ])
-  #       ]) for r in bitstring_resolvers
-  #   ])
-  #   expected_expectations = utils.weighted_average(counts, raw_expectations)
+    # calculate expected values
+    total_circuit = bitstring_circuit + model_raw_circuit + raw_circuit_h**-1
+    raw_expectations = tf.stack([
+        tf.stack([
+            hamiltonian_measure.energy.operator_expectation([
+                cirq.Simulator().simulate_expectation_values(
+                    total_circuit, o, r)[0].real for o in raw_shards
+            ])
+        ]) for r in bitstring_resolvers
+    ])
+    expected_expectations = utils.weighted_average(counts, raw_expectations)
 
-  #   expectation_wrapper = tf.function(model_h_infer.expectation)
-  #   actual_expectations = expectation_wrapper(model_hamiltonian,
-  #                                             hamiltonian_measure)
-  #   self.assertAllClose(actual_expectations, expected_expectations)
+    expectation_wrapper = tf.function(model_h_infer.expectation)
+    actual_expectations = expectation_wrapper(model_hamiltonian,
+                                              hamiltonian_measure)
+    self.assertAllClose(actual_expectations, expected_expectations)
 
 
 if __name__ == "__main__":
