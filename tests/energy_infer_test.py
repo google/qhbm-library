@@ -178,30 +178,35 @@ class EnergyInferenceTest(tf.test.TestCase):
     num_bits = 7
     # Number of unique samples no more than half the possible bitstrings.
     # This suggests the approximation is ok.
-    num_samples = 2 ** (num_bits - 2)
-    ebm_init = tf.keras.initializers.RandomUniform(-1.0, 1.0, seed=self.tf_random_seed)
+    num_samples = 2**(num_bits - 2)
+    ebm_init = tf.keras.initializers.RandomUniform(
+        -1.0, 1.0, seed=self.tf_random_seed)
     energy = energy_model.KOBE(list(range(num_bits)), num_bits // 2, ebm_init)
     energy.build([None, energy.num_bits])
 
-    actual_layer = self.AnalyticEnergyInferenceDefaultPassthrough(num_bits, num_samples)
+    actual_layer = self.AnalyticEnergyInferenceDefaultPassthrough(
+        num_bits, num_samples)
     exact_layer = energy_infer.AnalyticEnergyInference(num_bits, num_samples)
     actual_layer.infer(energy)
     exact_layer.infer(energy)
     expected_log_partition = exact_layer.log_partition()
     log_partition_wrapper = tf.function(actual_layer.log_partition)
     actual_log_partition = log_partition_wrapper()
-    self.assertAllClose(actual_log_partition, expected_log_partition, rtol=self.close_rtol)
+    self.assertAllClose(
+        actual_log_partition, expected_log_partition, rtol=self.close_rtol)
 
     # Confirm using too few samples prevents closeness.
     num_samples = num_samples // 10
-    actual_layer = self.AnalyticEnergyInferenceDefaultPassthrough(num_bits, num_samples)
+    actual_layer = self.AnalyticEnergyInferenceDefaultPassthrough(
+        num_bits, num_samples)
     exact_layer = energy_infer.AnalyticEnergyInference(num_bits, num_samples)
     actual_layer.infer(energy)
     exact_layer.infer(energy)
     expected_log_partition = exact_layer.log_partition()
     log_partition_wrapper = tf.function(actual_layer.log_partition)
     actual_log_partition = log_partition_wrapper()
-    self.assertNotAllClose(actual_log_partition, expected_log_partition, rtol=self.close_rtol)
+    self.assertNotAllClose(
+        actual_log_partition, expected_log_partition, rtol=self.close_rtol)
 
 
 class AnalyticEnergyInferenceTest(tf.test.TestCase):
@@ -598,6 +603,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     kernel_len = tf.shape(old_kernel)[0].numpy().tolist()
     all_bitstrings = tf.constant([[0, 0], [0, 1], [1, 0], [1, 1]],
                                  dtype=tf.int8)
+
     def exact_log_partition(k, delta):
       """Perturbs the kth variable and calculates the log partition."""
       new_kernel = old_kernel + delta * tf.one_hot(k, kernel_len, 1.0, 0.0)
@@ -779,7 +785,8 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
         -2, -1, seed=self.tf_random_seed)
     energy = energy_model.BernoulliEnergy([5, 6, 7], ebm_init)
     energy.build([None, energy.num_bits])
-    actual_layer = energy_infer.BernoulliEnergyInference(3, self.num_samples, self.tfp_seed)
+    actual_layer = energy_infer.BernoulliEnergyInference(
+        3, self.num_samples, self.tfp_seed)
     actual_layer.infer(energy)
     expected_log_partition = tf.reduce_logsumexp(-1.0 * energy(all_bitstrings))
 
