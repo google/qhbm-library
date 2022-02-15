@@ -47,9 +47,9 @@ def vqt(qhbm_infer: hamiltonian_infer.QHBM,
 
   # See equations B4 and B5 in appendix.  TODO(#119): confirm equation number.
   def f_vqt(bitstrings):
-    h_expectations = tf.squeeze(qhbm_infer.q_inference.expectation(model.circuit,
-                                                                   bitstrings, hamiltonian), 1)
-    print(f"h_expectations: {h_expectations}")
+    h_expectations = tf.squeeze(
+        qhbm_infer.q_inference.expectation(model.circuit, bitstrings,
+                                           hamiltonian), 1)
     beta_h_expectations = beta * h_expectations
     energies = tf.stop_gradient(model.energy(bitstrings))
     return beta_h_expectations - energies
