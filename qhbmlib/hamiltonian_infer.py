@@ -116,7 +116,6 @@ class QHBM(tf.keras.layers.Layer):
       counts: 1D `tf.Tensor` of dtype `tf.int32`.  `counts[i]` is the number of
         times `states[i]` was drawn from the ensemble.
     """
-    self.e_inference.infer(model.energy)
     samples = self.e_inference.sample(num_samples)
     bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
     states = self.hamiltonian.circuit(bitstrings)
