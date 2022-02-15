@@ -15,12 +15,9 @@
 """Tests for the energy_infer module."""
 
 import functools
-import itertools
-from typing import Union
 
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow_probability import distributions as tfd
 
 from qhbmlib import energy_infer
 from qhbmlib import energy_model
@@ -72,7 +69,7 @@ class EnergyInferenceTest(tf.test.TestCase):
       """Not implemented in this test class."""
       raise NotImplementedError()
 
-    def _log_partition(self):
+    def _log_partition_forward_pass(self):
       """Not implemented in this test class."""
       raise NotImplementedError()
 
