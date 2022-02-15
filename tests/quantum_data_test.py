@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests quantum data sources."""
 
+import cirq
 import tensorflow as tf
 
 from qhbmlib import quantum_data
