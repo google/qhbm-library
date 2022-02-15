@@ -216,8 +216,9 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     raw_circuits, _ = tfq_util.random_symbol_circuit_resolver_batch(
         qubits, symbols, batch_size, n_moments=n_moments, p=act_fraction)
     raw_circuit = raw_circuits[0]
-    random_values = tf.random.uniform([len(symbols)], -1, 1, tf.float32, self.tf_random_seed).numpy().tolist()
-    resolver = {k: v for k, v in zip(symbols, random_values)}
+    random_values = tf.random.uniform([len(symbols)], -1, 1, tf.float32,
+                                      self.tf_random_seed).numpy().tolist()
+    resolver = dict(zip(symbols, random_values))
 
     # hamiltonian model and inference
     circuit = circuit_model.QuantumCircuit(
