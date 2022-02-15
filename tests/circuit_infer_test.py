@@ -16,6 +16,8 @@
 
 import itertools
 from absl import logging
+import random
+import string
 
 import cirq
 import math
@@ -23,9 +25,11 @@ import sympy
 import tensorflow as tf
 import tensorflow_probability as tfp
 import tensorflow_quantum as tfq
+from tensorflow_quantum.python import util as tfq_util
 
 from qhbmlib import circuit_infer
 from qhbmlib import circuit_model
+from qhbmlib import circuit_model_utils
 from qhbmlib import utils
 from tests import test_util
 
@@ -51,6 +55,10 @@ class QuantumInferenceTest(tf.test.TestCase):
         initializer=tf.keras.initializers.RandomUniform(
             minval=-5.0, maxval=5.0),
         name="p_qnn")
+    self.tfp_seed = tf.constant([5, 6], dtype=tf.int32)
+
+    self.close_rtol = 1e-2
+    self.not_zero_atol = 1e-3
 
   def test_init(self):
     """Confirms QuantumInference is initialized correctly."""
@@ -178,6 +186,74 @@ class QuantumInferenceTest(tf.test.TestCase):
     self.assertAllClose(actual_reduced, expected_reduced, atol=ATOL)
     self.assertAllClose(
         actual_grad_reduced, expected_grad_reduced, atol=GRAD_ATOL)
+
+  @test_util.eager_mode_toggle
+  def test_expectation_cirq(self):
+    """Compares library expectation values to those from Cirq."""
+    # observable
+    num_bits = 4
+    qubits = cirq.GridQubit.rect(1, num_bits)
+    raw_ops = [
+        cirq.PauliSum.from_pauli_strings(
+            [cirq.PauliString(cirq.Z(q)) for q in qubits])
+    ]
+    ops = tfq.convert_to_tensor(raw_ops)
+
+    # unitary
+    batch_size = 1
+    n_moments = 10
+    act_fraction = 0.9
+    num_symbols = 2
+    symbols = set()
+    for _ in range(num_symbols):
+      symbols.add("".join(random.sample(string.ascii_letters, 10)))
+    symbols = sorted(list(symbols))
+    raw_circuits, raw_resolvers = tfq_util.random_symbol_circuit_resolver_batch(
+        qubits, symbols, batch_size, n_moments=n_moments, p=act_fraction)
+    raw_circuit = raw_circuits[0]
+    resolver = {k: raw_resolvers[0].value_of(k) for k in raw_resolvers[0]}
+
+    # hamiltonian model and inference
+    circuit = circuit_model.QuantumCircuit(
+        tfq.convert_to_tensor([raw_circuit]), qubits, tf.constant(symbols),
+        [tf.Variable([resolver[s] for s in symbols])], [[]])
+    circuit.build([])
+    q_infer = circuit_infer.QuantumInference()
+
+    # bitstring injectors
+    all_bitstrings = list(itertools.product([0, 1], repeat=num_bits))
+    bitstring_circuit = circuit_model_utils.bit_circuit(qubits)
+    bitstring_symbols = sorted(tfq.util.get_circuit_symbols(bitstring_circuit))
+    bitstring_resolvers = [
+        dict(zip(bitstring_symbols, b)) for b in all_bitstrings
+    ]
+
+    # calculate expected values
+    total_circuit = bitstring_circuit + raw_circuit
+    total_resolvers = [{**r, **resolver} for r in bitstring_resolvers]
+    raw_expectations = tf.constant([[
+        cirq.Simulator().simulate_expectation_values(total_circuit, o,
+                                                     r)[0].real for o in raw_ops
+    ] for r in total_resolvers])
+    expected_expectations = tf.constant(raw_expectations)
+    # Check that expectations are a reasonable size
+    self.assertAllGreater(tf.math.abs(expected_expectations), self.not_zero_atol)
+
+    expectation_wrapper = tf.function(q_infer.expectation)
+    actual_expectations = expectation_wrapper(circuit, all_bitstrings, ops)
+    self.assertAllClose(actual_expectations, expected_expectations, rtol=self.close_rtol)
+
+    # Ensure circuit parameter update changes the expectation value.
+    old_circuit_weights = circuit.get_weights()
+    circuit.set_weights([tf.ones_like(w) for w in old_circuit_weights])
+    altered_circuit_expectations = expectation_wrapper(circuit, all_bitstrings, ops)
+    self.assertNotAllClose(
+        altered_circuit_expectations, actual_expectations, rtol=self.close_rtol)
+    circuit.set_weights(old_circuit_weights)
+
+    # Check that values return to start.
+    reset_expectations = expectation_wrapper(circuit, all_bitstrings, ops)
+    self.assertAllClose(reset_expectations, actual_expectations, self.close_rtol)
 
   @test_util.eager_mode_toggle
   def test_sample_basic(self):
