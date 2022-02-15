@@ -228,50 +228,24 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     circuit_h = circuit_model.DirectQuantumCircuit(raw_circuit_h)
     circuit_h.build([])
     hamiltonian_measure = hamiltonian_model.Hamiltonian(energy_h, circuit_h)
-    raw_shards = tfq.from_tensor(hamiltonian_measure.operator_shards)
 
-    # hamiltonian model and inference
-    seed = tf.constant([5, 6], dtype=tf.int32)
-    model_energy = energy_model.BernoulliEnergy(list(range(num_bits)))
-    model_energy.build([None, num_bits])
-    model_raw_circuit = cirq.testing.random_circuit(qubits, n_moments,
-                                                    act_fraction)
-    model_circuit = circuit_model.DirectQuantumCircuit(model_raw_circuit)
-    model_circuit.build([])
-    model_hamiltonian = hamiltonian_model.Hamiltonian(model_energy,
-                                                      model_circuit)
-    e_infer = energy_infer.BernoulliEnergyInference(num_bits, self.num_samples,
-                                                    seed)
-    q_infer = circuit_infer.QuantumInference()
-    model_h_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
+    # unitary
+    num_layers = 3
+    actual_h, actual_h_infer = test_util.get_random_hamiltonian_and_inference(
+        qubits, num_layers, "expectation_test", self.num_samples, ebm_seed=self.tfp_seed)
 
     # sample bitstrings
-    e_infer.infer(model_energy)
-    samples = e_infer.sample(self.num_samples)
+    samples = actual_h_infer.e_inference.sample(self.num_samples)
     bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
-    bit_list = bitstrings.numpy().tolist()
-
-    # bitstring injectors
-    bitstring_circuit = circuit_model_utils.bit_circuit(qubits)
-    bitstring_symbols = sorted(tfq.util.get_circuit_symbols(bitstring_circuit))
-    bitstring_resolvers = [
-        dict(zip(bitstring_symbols, bstr)) for bstr in bit_list
-    ]
 
     # calculate expected values
-    total_circuit = bitstring_circuit + model_raw_circuit + raw_circuit_h**-1
-    raw_expectations = tf.stack([
-        tf.stack([
-            hamiltonian_measure.energy.operator_expectation([
-                cirq.Simulator().simulate_expectation_values(
-                    total_circuit, o, r)[0].real for o in raw_shards
-            ])
-        ]) for r in bitstring_resolvers
-    ])
+    raw_expectations = actual_h_infer.q_inference.expectation(actual_h.circuit, bitstrings, hamiltonian_measure)
     expected_expectations = utils.weighted_average(counts, raw_expectations)
+    # Check that expectations are a reasonable size
+    self.assertAllGreater(tf.math.abs(expected_expectations), 1e-3)
 
-    expectation_wrapper = tf.function(model_h_infer.expectation)
-    actual_expectations = expectation_wrapper(model_hamiltonian,
+    expectation_wrapper = tf.function(actual_h_infer.expectation)
+    actual_expectations = expectation_wrapper(actual_h,
                                               hamiltonian_measure)
     self.assertAllClose(actual_expectations, expected_expectations)
 
