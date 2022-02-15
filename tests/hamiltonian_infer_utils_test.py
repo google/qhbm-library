@@ -21,11 +21,13 @@ from qhbmlib import circuit_model
 from qhbmlib import energy_model
 from qhbmlib import hamiltonian_model
 from qhbmlib import hamiltonian_infer_utils
+from tests import test_util
 
 
 class DensityMatrixTest(tf.test.TestCase):
   """Tests the density_matrix function."""
 
+  @test_util.eager_mode_toggle
   def test_density_matrix(self):
     """Confirms the density matrix represented by the QHBM is correct."""
 
@@ -39,10 +41,29 @@ class DensityMatrixTest(tf.test.TestCase):
     test_u = cirq.Circuit([cirq.H(qubits[0]), cirq.CNOT(qubits[0], qubits[1])])
     circuit = circuit_model.DirectQuantumCircuit(test_u)
 
-    model = hamiltonian_model.Hamiltonian(energy, circuit)
-    expected_dm = tf.constant(
-        [[0.5, 0, 0, 0.5], [0, 0, 0, 0], [0, 0, 0, 0], [0.5, 0, 0, 0.5]],
-        tf.complex64,
-    )
-    actual_dm = hamiltonian_infer_utils.density_matrix(model)
-    self.assertAllClose(actual_dm, expected_dm, atol=1e-3)
+
+class FidelityTest(tf.test.TestCase):
+  """Tests the fidelity function."""
+
+  def setUp(self):
+    """Initializes test objects."""
+    super().setUp()
+    self.close_rtol = 1e-4
+
+  @test_util.eager_mode_toggle
+  def test_fidelity_self(self):
+    """Confirms the fidelity of a model with itself is 1."""
+    num_bits = 4
+    num_samples = 1  # required but not used
+    qubits = cirq.GridQubit.rect(1, num_bits)
+    num_layers = 3
+    model, _ = test_util.get_random_hamiltonian_and_inference(
+      qubits, num_layers, "test_fidelity", num_samples)
+
+    density_matrix_wrapper = tf.function(hamiltonian_infer_utils.density_matrix)
+    model_dm = density_matrix_wrapper(model)
+    fidelity_wrapper = tf.function(hamiltonian_infer_utils.fidelity)
+    actual_fidelity = fidelity_wrapper(model, model_dm)
+    
+    expected_fidelity = 1.0
+    self.assertAllClose(actual_fidelity, expected_fidelity, rtol=self.close_rtol)

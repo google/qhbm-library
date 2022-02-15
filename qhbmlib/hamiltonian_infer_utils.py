@@ -37,28 +37,28 @@ def density_matrix(model: hamiltonian_model.Hamiltonian):
   return tf.matmul(unitary_probs, tf.linalg.adjoint(unitary_matrix))
 
 def fidelity(model: hamiltonian_model.Hamiltonian, sigma: tf.Tensor):
-    """Calculate the fidelity between a QHBM and a density matrix.
+  """Calculate the fidelity between a QHBM and a density matrix.
 
-    Args:
-      model: Modular Hamiltonian whose corresponding thermal state is to be
-        compared to `sigma`, as the left density matrix in fidelity.
-      sigma: 2-D `tf.Tensor` of dtype `complex64` representing the right
-        density matrix in the fidelity calculation.
+  Args:
+    model: Modular Hamiltonian whose corresponding thermal state is to be
+      compared to `sigma`, as the left density matrix in fidelity.
+    sigma: 2-D `tf.Tensor` of dtype `complex64` representing the right
+      density matrix in the fidelity calculation.
 
-    Returns:
-      A scalar `tf.Tensor` which is the fidelity between the density matrix
-        represented by this QHBM and `sigma`.
-    """
-    e_rho = tf.cast(energy_infer_utils.probabilities(model.energy), tf.complex64)
-    v_rho = circuit_infer_utils.unitary(model.circuit)
-    sqrt_e_rho = tf.sqrt(e_rho)
-    v_rho_sqrt_e_rho = tf.multiply(
-        v_rho, tf.tile(tf.expand_dims(sqrt_e_rho, 0), (tf.shape(v_rho)[0], 1)))
-    rho_sqrt = tf.linalg.matmul(v_rho_sqrt_e_rho, tf.linalg.adjoint(v_rho))
-    omega = tf.linalg.matmul(
-        tf.linalg.matmul(rho_sqrt, tf.cast(sigma, tf.complex64)), rho_sqrt)
-    # TODO(zaqqwerty): find convincing proof that omega is hermitian,
-    # in order to go back to eigvalsh.
-    e_omega = tf.linalg.eigvals(omega)
-    return tf.cast(
-        tf.math.abs(tf.math.reduce_sum(tf.math.sqrt(e_omega)))**2, tf.float32)
+  Returns:
+    A scalar `tf.Tensor` which is the fidelity between the density matrix
+      represented by this QHBM and `sigma`.
+  """
+  e_rho = tf.cast(energy_infer_utils.probabilities(model.energy), tf.complex64)
+  v_rho = circuit_infer_utils.unitary(model.circuit)
+  sqrt_e_rho = tf.sqrt(e_rho)
+  v_rho_sqrt_e_rho = tf.multiply(
+      v_rho, tf.tile(tf.expand_dims(sqrt_e_rho, 0), (tf.shape(v_rho)[0], 1)))
+  rho_sqrt = tf.linalg.matmul(v_rho_sqrt_e_rho, tf.linalg.adjoint(v_rho))
+  omega = tf.linalg.matmul(
+      tf.linalg.matmul(rho_sqrt, tf.cast(sigma, tf.complex64)), rho_sqrt)
+  # TODO(zaqqwerty): find convincing proof that omega is hermitian,
+  # in order to go back to eigvalsh.
+  e_omega = tf.linalg.eigvals(omega)
+  return tf.cast(
+      tf.math.abs(tf.math.reduce_sum(tf.math.sqrt(e_omega)))**2, tf.float32)
