@@ -58,6 +58,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         initializer=tf.keras.initializers.RandomUniform(
             minval=-5.0, maxval=5.0),
         name="p_qnn")
+
+    self.tf_random_seed = 10
     self.tfp_seed = tf.constant([5, 6], dtype=tf.int32)
 
     self.close_rtol = 1e-2
@@ -211,10 +213,11 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     for _ in range(num_symbols):
       symbols.add("".join(random.sample(string.ascii_letters, 10)))
     symbols = sorted(list(symbols))
-    raw_circuits, raw_resolvers = tfq_util.random_symbol_circuit_resolver_batch(
+    raw_circuits, _ = tfq_util.random_symbol_circuit_resolver_batch(
         qubits, symbols, batch_size, n_moments=n_moments, p=act_fraction)
     raw_circuit = raw_circuits[0]
-    resolver = {k: raw_resolvers[0].value_of(k) for k in raw_resolvers[0]}
+    random_values = tf.random.uniform([len(symbols)], -1, 1, tf.float32, self.tf_random_seed).numpy().tolist()
+    resolver = {k: v for k, v in zip(symbols, random_values)}
 
     # hamiltonian model and inference
     circuit = circuit_model.QuantumCircuit(
