@@ -76,6 +76,8 @@ class QHBM(tf.keras.layers.Layer):
     super().__init__(name=name)
     self._e_inference = e_inference
     self._q_inference = q_inference
+    self._hamiltonian = hamiltonian_model.Hamiltonian(e_inference.energy,
+                                                      q_inference.circuit)
 
   @property
   def e_inference(self):
@@ -87,16 +89,21 @@ class QHBM(tf.keras.layers.Layer):
     """The object used for inference on density operator eigenvectors."""
     return self._q_inference
 
-  def circuits(self, model: hamiltonian_model.Hamiltonian, num_samples: int):
+  @property
+  def hamiltonian(self):
+    """The modular Hamiltonian defining this QHBM."""
+    return self._hamiltonian
+
+  def circuits(self, num_samples: int):
     r"""Draws thermally distributed eigenstates from the model Hamiltonian.
 
     Here we explain the algorithm.  First, construct $X$ to be a classical
     random variable with probability distribution $p_\theta(x)$ set by
-    `model.energy`.  Then, draw $n = $`num\_samples` bitstrings,
+    `model.hamiltonian.energy`.  Then, draw $n = $`num\_samples` bitstrings,
     $S=\{x_1, \ldots, x_n\}$, from $X$.  For each unique $x_i\in S$, set
     `states[i]` to the TFQ string representation of $U_\phi\ket{x_i}$, where
-    $U_\phi$ is set by `model.circuit`.  Finally, set `counts[i]` equal to the
-    number of times $x_i$ occurs in $S$.
+    $U_\phi$ is set by `self.hamiltonian.circuit`.  Finally, set `counts[i]`
+    equal to the number of times $x_i$ occurs in $S$.
 
     Args:
       model: The modular Hamiltonian whose normalized exponential is the
@@ -105,27 +112,26 @@ class QHBM(tf.keras.layers.Layer):
 
     Returns:
       states: 1D `tf.Tensor` of dtype `tf.string`.  Each entry is a TFQ string
-        representation of an eigenstate of the Hamiltonian `model`.
+        representation of an eigenstate of the Hamiltonian `self.hamiltonian`.
       counts: 1D `tf.Tensor` of dtype `tf.int32`.  `counts[i]` is the number of
         times `states[i]` was drawn from the ensemble.
     """
-    self.e_inference.infer(model.energy)
     samples = self.e_inference.sample(num_samples)
     bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
-    states = model.circuit(bitstrings)
+    states = self.hamiltonian.circuit(bitstrings)
     return states, counts
 
-  def expectation(self, model: hamiltonian_model.Hamiltonian,
-                  observables: Union[tf.Tensor, hamiltonian_model.Hamiltonian]):
+  def expectation(self, observables: Union[tf.Tensor,
+                                           hamiltonian_model.Hamiltonian]):
     """Estimates observable expectation values against the density operator.
 
     TODO(#119): add expectation and derivative equations and discussions
                 from updated paper.
 
     Implicitly sample `num_samples` pure states from the canonical ensemble
-    corresponding to the thermal state defined by `model`.  For each such state
-    |psi>, estimate the expectation value <psi|op_j|psi> for each `ops[j]`.
-    Then, average these expectation values over the sampled states.
+    corresponding to the thermal state defined by `self.hamiltonian`.  For each
+    such state |psi>, estimate the expectation value <psi|op_j|psi> for each
+    `ops[j]`. Then, average these expectation values over the sampled states.
 
     Args:
       model: The modular Hamiltonian whose normalized exponential is the
@@ -139,6 +145,4 @@ class QHBM(tf.keras.layers.Layer):
     """
     return self.e_inference.expectation(
         functools.partial(
-            self.q_inference.expectation,
-            model.circuit,
-            observables=observables))
+            self.q_inference.expectation, observables=observables))
