@@ -57,17 +57,35 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
   """
 
   def __init__(self,
+               input_energy: energy_model.BitstringEnergy,
                initial_seed: Union[None, tf.Tensor] = None,
                name: Union[None, str] = None):
     """Initializes an EnergyInferenceBase.
 
     Args:
+      input_energy: The parameterized energy function which defines this
+        distribution via the equations of an energy based model.  This class
+        assumes that all parameters of `energy` are `tf.Variable`s and that
+        they are all returned by `energy.variables`.
       initial_seed: PRNG seed; see tfp.random.sanitize_seed for details. This
         seed will be used in the `sample` method.  If None, the seed is updated
         after every inference call.  Otherwise, the seed is fixed.
       name: Optional name for the model.
     """
     super().__init__(name=name)
+    self._energy = input_energy
+    self._energy.build([None, self._energy.num_bits])
+
+    self._tracked_variables = input_energy.variables
+    if len(self._tracked_variables) == 0:
+      self._checkpoint = False
+    else:
+      self._tracked_variables_checkpoint = [
+          tf.Variable(v.read_value(), trainable=False)
+          for v in self._tracked_variables
+      ]
+      self._checkpoint = True
+      
     if initial_seed is None:
       self._update_seed = tf.Variable(True, trainable=False)
     else:
@@ -103,6 +121,23 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
     else:
       self._update_seed.assign(False)
     self._seed.assign(tfp.random.sanitize_seed(initial_seed))
+
+  @property
+  def variables_updated(self):
+    """Returns True if tracked variables do not have the checkpointed values."""
+    if self._checkpoint:
+      variables_not_equal_list = tf.nest.map_structure(
+          lambda v, vc: tf.math.reduce_any(tf.math.not_equal(v, vc)),
+          self._tracked_variables, self._tracked_variables_checkpoint)
+      return tf.math.reduce_any(tf.stack(variables_not_equal_list))
+    else:
+      return False
+
+  def _checkpoint_variables(self):
+    """Checkpoints the currently tracked variables."""
+    if self._checkpoint:
+      tf.nest.map_structure(lambda v, vc: vc.assign(v), self._tracked_variables,
+                            self._tracked_variables_checkpoint)
 
   def _preface_inference(self):
     """Things all energy inference methods do before proceeding.
