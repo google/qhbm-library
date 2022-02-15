@@ -18,7 +18,6 @@ from typing import Union
 
 import tensorflow as tf
 
-from qhbmlib import energy_model
 from qhbmlib import hamiltonian_infer
 from qhbmlib import hamiltonian_model
 
