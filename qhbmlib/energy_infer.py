@@ -300,6 +300,7 @@ class EnergyInference(EnergyInferenceBase):
   @abc.abstractmethod
   def _log_partition_forward_pass(self):
     """Returns approximation to the log partition function."""
+    raise NotImplementedError()
 
   def _log_partition_grad_generator(self):
     """Returns default estimator for the log partition function derivative."""
