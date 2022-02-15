@@ -45,7 +45,8 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     # Model hamiltonian
     num_bits = 3
     self.energy = energy_model.BernoulliEnergy(list(range(num_bits)))
-    self.energy.build([None, num_bits])
+    self.expected_e_inference = energy_infer.AnalyticEnergyInference(
+        self.energy, self.num_samples)
     # pin first and last bits, middle bit free.
     self.energy.set_weights([tf.constant([-23, 0, 17])])
     qubits = cirq.GridQubit.rect(1, num_bits)
@@ -56,12 +57,9 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     self.pqc = tfq_util.random_symbol_circuit(qubits, symbols)
     circuit = circuit_model.DirectQuantumCircuit(self.pqc)
     circuit.build([])
-    self.model = hamiltonian_model.Hamiltonian(self.energy, circuit)
+    self.expected_q_inference = circuit_infer.QuantumInference(circuit)
 
     # Inference
-    self.expected_e_inference = energy_infer.AnalyticEnergyInference(
-        3, self.num_samples)
-    self.expected_q_inference = circuit_infer.QuantumInference()
     self.expected_name = "nameforaQHBM"
     self.actual_qhbm = hamiltonian_infer.QHBM(self.expected_e_inference,
                                               self.expected_q_inference,
@@ -79,8 +77,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
   def test_circuits(self):
     """Confirms correct circuits are sampled."""
     circuits_wrapper = tf.function(self.actual_qhbm.circuits)
-    actual_circuits, actual_counts = circuits_wrapper(self.model,
-                                                      self.num_samples)
+    actual_circuits, actual_counts = circuits_wrapper(self.num_samples)
 
     # Circuits with the allowed-to-be-sampled bitstrings prepended.
     u = tfq.from_tensor(self.model.circuit.pqc)[0]
