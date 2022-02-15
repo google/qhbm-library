@@ -176,8 +176,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
 
     # calculate expected values
-    raw_expectations = actual_h_infer.q_inference.expectation(
-        bitstrings, ops)
+    raw_expectations = actual_h_infer.q_inference.expectation(bitstrings, ops)
     expected_expectations = utils.weighted_average(counts, raw_expectations)
     # Check that expectations are a reasonable size
     self.assertAllGreater(tf.math.abs(expected_expectations), 1e-3)

@@ -192,7 +192,8 @@ class VQTTest(tf.test.TestCase):
       ebm_init = tf.keras.initializers.RandomUniform(
           minval=-2.0, maxval=2.0, seed=self.tf_random_seed)
       energy = energy_model.BernoulliEnergy(list(range(num_qubits)), ebm_init)
-      energy.build([None, num_qubits])
+      e_infer = energy_infer.BernoulliEnergyInference(
+          energy, self.num_samples, initial_seed=self.tfp_seed)
 
       qubits = cirq.GridQubit.rect(1, num_qubits)
       r_symbols = [sympy.Symbol(f"phi_{n}") for n in range(num_qubits)]
@@ -201,17 +202,11 @@ class VQTTest(tf.test.TestCase):
       qnn_init = tf.keras.initializers.RandomUniform(
           minval=-1, maxval=1, seed=self.tf_random_seed)
       circuit = circuit_model.DirectQuantumCircuit(r_circuit, qnn_init)
-      circuit.build([None, num_qubits])
+      q_infer = circuit_infer.QuantumInference(circuit)
+      qhbm_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
 
       # TODO(#171): code around here seems like boilerplate.
-      model = hamiltonian_model.Hamiltonian(energy, circuit)
-
-      # Inference definition
-      e_infer = energy_infer.BernoulliEnergyInference(
-          num_qubits, self.num_samples, initial_seed=self.tfp_seed)
-      e_infer.infer(energy)
-      q_infer = circuit_infer.QuantumInference()
-      qhbm_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
+      model = qhbm_infer.hamiltonian
 
       # Generate remaining VQT arguments
       test_h = tfq.convert_to_tensor(
@@ -224,7 +219,7 @@ class VQTTest(tf.test.TestCase):
       test_thetas = model.energy.trainable_variables[0]
       # QNN has only one tf.Variable
       test_phis = model.circuit.trainable_variables[0]
-      actual_expectation = qhbm_infer.expectation(model, test_h)[0]
+      actual_expectation = qhbm_infer.expectation(test_h)[0]
       expected_expectation = tf.reduce_sum(
           tf.math.tanh(test_thetas) * tf.math.sin(test_phis))
       self.assertAllClose(
@@ -238,7 +233,7 @@ class VQTTest(tf.test.TestCase):
           actual_entropy, expected_entropy, rtol=self.close_rtol)
 
       with tf.GradientTape() as tape:
-        actual_loss = vqt(qhbm_infer, model, test_h, test_beta)
+        actual_loss = vqt(qhbm_infer, test_h, test_beta)
       expected_loss = test_beta * expected_expectation - expected_entropy
       self.assertAllClose(actual_loss, expected_loss, rtol=self.close_rtol)
 

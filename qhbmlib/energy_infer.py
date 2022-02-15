@@ -85,7 +85,7 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
           for v in self._tracked_variables
       ]
       self._checkpoint = True
-      
+
     if initial_seed is None:
       self._update_seed = tf.Variable(True, trainable=False)
     else:
@@ -144,7 +144,7 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
 
     Called by `preface_inference` before the wrapped inference method.
     Currently includes:
-      - run `self._ready_inference` if this is the first call of a wrapped function
+      - run `self._ready_inference` if this is first call of a wrapped function
       - change the seed if not set by the user during initialization
       - run `self._ready_inference` if tracked energy parameters changed
 
@@ -395,8 +395,10 @@ class AnalyticEnergyInference(EnergyInference):
     """
     super().__init__(input_energy, num_expectation_samples, initial_seed, name)
     self._all_bitstrings = tf.constant(
-        list(itertools.product([0, 1], repeat=input_energy.num_bits)), dtype=tf.int8)
-    self._logits_variable = tf.Variable(-1.0 * input_energy(self.all_bitstrings), trainable=False)
+        list(itertools.product([0, 1], repeat=input_energy.num_bits)),
+        dtype=tf.int8)
+    self._logits_variable = tf.Variable(
+        -1.0 * input_energy(self.all_bitstrings), trainable=False)
     self._distribution = tfd.Categorical(logits=self._logits_variable)
 
   @property
@@ -477,7 +479,7 @@ class BernoulliEnergyInference(EnergyInference):
   def _ready_inference(self):
     """See base class docstring."""
     self._logits_variable.assign(self.energy.logits)
-  
+
   def _call(self, inputs, *args, **kwargs):
     """See base class docstring."""
     if inputs is None:
