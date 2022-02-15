@@ -182,8 +182,6 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
 
     # Large energy penalty pins the bit.
     one_bit_energy.set_weights([tf.constant([100.0])])
-    actual_layer.infer(one_bit_energy)
-
     samples = sample_wrapper(self.num_samples)
     # check that we got only one bitstring
     self.assertFalse(
@@ -455,7 +453,6 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
       """Calculate the expectation with kth variable perturbed."""
       old_value = energy_var.read_value()
       energy_var.assign(old_value + delta * tf.one_hot(k, num_elts, 1.0, 0.0))
-      e_infer.infer(energy)
       samples = e_infer.sample(self.num_samples)
       bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
       values = f(bitstrings)
@@ -529,10 +526,8 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     expected_entropy = tf.constant(0.00233551808)
 
     energy = energy_model.KOBE([0, 1], 2)
-    energy.build([None, energy.num_bits])
-    actual_layer = energy_infer.AnalyticEnergyInference(2, self.num_samples)
+    actual_layer = energy_infer.AnalyticEnergyInference(energy, self.num_samples)
     energy.set_weights([test_thetas])
-    actual_layer.infer(energy)
 
     entropy_wrapper = tf.function(actual_layer.entropy)
     actual_entropy = entropy_wrapper()

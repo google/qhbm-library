@@ -229,18 +229,6 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
     """Default implementation wrapped by `self.sample`."""
     raise NotImplementedError()
 
-  @abc.abstractmethod
-  def infer(self, energy: energy_model.BitstringEnergy):
-    """Do the work to ready this layer for use.
-
-    This should be called each time the underlying model is updated.
-
-    Args:
-      energy: The parameterized energy function which defines this distribution
-        via the equations of an energy based model.
-    """
-    raise NotImplementedError()
-
 
 class EnergyInference(EnergyInferenceBase):
   """Provides some default method implementations."""
