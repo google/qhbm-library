@@ -170,14 +170,19 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     # unitary
     num_layers = 3
     actual_h, actual_h_infer = test_util.get_random_hamiltonian_and_inference(
-        qubits, num_layers, "expectation_test", self.num_samples, ebm_seed=self.tfp_seed)
+        qubits,
+        num_layers,
+        "expectation_test",
+        self.num_samples,
+        ebm_seed=self.tfp_seed)
 
     # sample bitstrings
     samples = actual_h_infer.e_inference.sample(self.num_samples)
     bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
 
     # calculate expected values
-    raw_expectations = actual_h_infer.q_inference.expectation(actual_h.circuit, bitstrings, ops)
+    raw_expectations = actual_h_infer.q_inference.expectation(
+        actual_h.circuit, bitstrings, ops)
     expected_expectations = utils.weighted_average(counts, raw_expectations)
     # Check that expectations are a reasonable size
     self.assertAllGreater(tf.math.abs(expected_expectations), 1e-3)
@@ -190,8 +195,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     old_energy_weights = actual_h.energy.get_weights()
     actual_h.energy.set_weights([tf.ones_like(w) for w in old_energy_weights])
     actual_h_infer.e_inference.infer(actual_h.energy)
-    altered_energy_expectations = actual_h_infer.expectation(
-        actual_h, ops)
+    altered_energy_expectations = actual_h_infer.expectation(actual_h, ops)
     self.assertNotAllClose(
         altered_energy_expectations, actual_expectations, rtol=1e-5)
     actual_h.energy.set_weights(old_energy_weights)
@@ -232,21 +236,25 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     # unitary
     num_layers = 3
     actual_h, actual_h_infer = test_util.get_random_hamiltonian_and_inference(
-        qubits, num_layers, "expectation_test", self.num_samples, ebm_seed=self.tfp_seed)
+        qubits,
+        num_layers,
+        "expectation_test",
+        self.num_samples,
+        ebm_seed=self.tfp_seed)
 
     # sample bitstrings
     samples = actual_h_infer.e_inference.sample(self.num_samples)
     bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
 
     # calculate expected values
-    raw_expectations = actual_h_infer.q_inference.expectation(actual_h.circuit, bitstrings, hamiltonian_measure)
+    raw_expectations = actual_h_infer.q_inference.expectation(
+        actual_h.circuit, bitstrings, hamiltonian_measure)
     expected_expectations = utils.weighted_average(counts, raw_expectations)
     # Check that expectations are a reasonable size
     self.assertAllGreater(tf.math.abs(expected_expectations), 1e-3)
 
     expectation_wrapper = tf.function(actual_h_infer.expectation)
-    actual_expectations = expectation_wrapper(actual_h,
-                                              hamiltonian_measure)
+    actual_expectations = expectation_wrapper(actual_h, hamiltonian_measure)
     self.assertAllClose(actual_expectations, expected_expectations)
 
 
