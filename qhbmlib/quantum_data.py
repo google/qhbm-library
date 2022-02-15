@@ -15,6 +15,7 @@
 """Interface to quantum data sources."""
 
 import abc
+from typing import Union
 
 import tensorflow as tf
 
@@ -26,17 +27,18 @@ class QuantumData(abc.ABC):
   """Interface for quantum datasets."""
 
   @abc.abstractmethod
-  def expectation(self, ops):
-    """Take the expectation value of ops against this dataset.
+  def expectation(self, observable: Union[tf.Tensor,
+                                          hamiltonian_model.Hamiltonian]):
+    """Take the expectation value of an observable against this dataset.
 
     Args:
-      ops: The observables to measure.  If `tf.Tensor`, strings with shape
-        [n_ops], result of calling `tfq.convert_to_tensor` on a list of
-        cirq.PauliSum, `[op1, op2, ...]`.  Otherwise, a Hamiltonian.
+      observable: Hermitian operator to measure.  If `tf.Tensor`, it is of type
+        `tf.string` with shape [1], result of  calling `tfq.convert_to_tensor`
+        on a list of `cirq.PauliSum`, `[op]`.  Otherwise, a Hamiltonian.
 
     Returns:
-      `tf.Tensor` with shape [n_ops].  Entry `i` is the expectation value of
-        `ops[i]` against this quantum data source.
+      Scalar `tf.Tensor` which is the expectation value of `observable` against
+        this quantum data source.
     """
     raise NotImplementedError()
 
@@ -52,6 +54,6 @@ class QHBMData(QuantumData):
     """
     self.infer = infer
 
-  def expectation(self, ops):
+  def expectation(self, observable):
     """See base class docstring."""
-    return self.infer.expectation(ops)
+    return tf.squeeze(self.infer.expectation(observable), 0)

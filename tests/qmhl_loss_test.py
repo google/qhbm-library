@@ -31,6 +31,7 @@ class QMHLTest(tf.test.TestCase):
     self.num_qubits_list = [1, 2, 3, 4]
     self.tf_random_seed = 7
     self.tfp_seed = tf.constant([3, 4], tf.int32)
+    self.num_samples = int(1e6)
     self.close_rtol = 1e-2
     self.not_zero_atol = 1e-1
 
@@ -40,13 +41,13 @@ class QMHLTest(tf.test.TestCase):
     for num_qubits in self.num_qubits_list:
       qubits = cirq.GridQubit.rect(1, num_qubits)
       data_h, data_infer = test_util.get_random_hamiltonian_and_inference(
-          qubits, num_layers, f"data_objects_{num_qubits}")
+          qubits, num_layers, f"data_objects_{num_qubits}", self.num_samples)
       model_h, model_infer = test_util.get_random_hamiltonian_and_inference(
-          qubits, num_layers, f"hamiltonian_objects_{num_qubits}")
+          qubits, num_layers, f"hamiltonian_objects_{num_qubits}",
+          self.num_samples)
       # Set data equal to the model
-      num_expectation_samples = int(1e6)
       data_h.set_weights(model_h.get_weights())
-      data = quantum_data.QHBMData(data_infer, data_h, num_expectation_samples)
+      data = quantum_data.QHBMData(data_infer)
 
       # Trained loss is the entropy.
       expected_loss = model_infer.e_inference.entropy()
@@ -56,12 +57,15 @@ class QMHLTest(tf.test.TestCase):
       ]
 
       with tf.GradientTape() as tape:
-        actual_loss = qmhl_loss.qmhl(data, model_infer, model_h)
+        actual_loss = qmhl_loss.qmhl(data, model_infer)
       actual_loss_derivative = tape.gradient(actual_loss,
                                              model_h.trainable_variables)
 
-      self.assertAllClose(actual_loss, expected_loss)
-      self.assertAllClose(actual_loss_derivative, expected_loss_derivative)
+      self.assertAllClose(actual_loss, expected_loss, rtol=self.close_rtol)
+      self.assertAllClose(
+          actual_loss_derivative,
+          expected_loss_derivative,
+          rtol=self.close_rtol)
 
   # def test_loss_value_x_rot(self):
   #   """Confirms correct values for a single qubit X rotation QHBM.
