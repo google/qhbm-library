@@ -14,13 +14,13 @@
 # ==============================================================================
 """Tools for inference on quantum Hamiltonians."""
 
+import functools
 from typing import Union
 
 import tensorflow as tf
 
 from qhbmlib import circuit_infer
 from qhbmlib import energy_infer
-from qhbmlib import energy_model
 from qhbmlib import hamiltonian_model
 from qhbmlib import utils
 
@@ -116,7 +116,7 @@ class QHBM(tf.keras.layers.Layer):
     return states, counts
 
   def expectation(self, model: hamiltonian_model.Hamiltonian,
-                  ops: Union[tf.Tensor, hamiltonian_model.Hamiltonian]):
+                  observables: Union[tf.Tensor, hamiltonian_model.Hamiltonian]):
     """Estimates observable expectation values against the density operator.
 
     TODO(#119): add expectation and derivative equations and discussions
@@ -130,28 +130,15 @@ class QHBM(tf.keras.layers.Layer):
     Args:
       model: The modular Hamiltonian whose normalized exponential is the
         density operator against which expectation values will be estimated.
-      ops: The observables to measure.  If `tf.Tensor`, strings with shape
-        [n_ops], result of calling `tfq.convert_to_tensor` on a list of
-        cirq.PauliSum, `[op1, op2, ...]`.  Otherwise, a Hamiltonian.
+      obervables: Hermitian operators to measure.  See docstring of
+        `QuantumInference.expectation` for details.
 
     Returns:
       `tf.Tensor` with shape [n_ops] whose entries are are the sample averaged
       expectation values of each entry in `ops`.
     """
-
-    def expectation_f(bitstrings):
-      if isinstance(ops, tf.Tensor):
-        return self.q_inference.expectation(model.circuit, bitstrings, ops)
-      elif isinstance(ops.energy, energy_model.PauliMixin):
-        u_dagger_u = model.circuit + ops.circuit_dagger
-        expectation_shards = self.q_inference.expectation(
-            u_dagger_u, bitstrings, ops.operator_shards)
-        return tf.map_fn(
-            lambda x: tf.expand_dims(ops.energy.operator_expectation(x), 0),
-            expectation_shards)
-      else:
-        raise NotImplementedError(
-            "General `BitstringEnergy` models not yet supported.")
-
-    self.e_inference.infer(model.energy)
-    return self.e_inference.expectation(expectation_f)
+    return self.e_inference.expectation(
+        functools.partial(
+            self.q_inference.expectation,
+            model.circuit,
+            observables=observables))
