@@ -68,3 +68,8 @@ class FidelityTest(tf.test.TestCase):
     expected_fidelity = 1.0
     self.assertAllClose(
         actual_fidelity, expected_fidelity, rtol=self.close_rtol)
+
+
+if __name__ == "__main__":
+  print("Running hamiltonian_infer_utils_test.py ...")
+  tf.test.main()
