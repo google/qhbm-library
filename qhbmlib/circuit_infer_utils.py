@@ -14,6 +14,7 @@
 # ==============================================================================
 """Utilities for metrics on QuantumCircuit."""
 
+import tensorflow as tf
 import tensorflow_quantum as tfq
 
 from qhbmlib import circuit_model
@@ -25,4 +26,4 @@ def unitary(circuit: circuit_model.QuantumCircuit):
   Args:
     circuit: Quantum circuit whose unitary matrix is to be calculated.
   """
-  return tfq.layers.Unitary(circuit.pqc, symbol_names=circuit.symbol_names, symbol_values=circuit.symbol_values).to_tensor()[0]
+  return tfq.layers.Unitary()(circuit.pqc, symbol_names=circuit.symbol_names, symbol_values=tf.expand_dims(circuit.symbol_values, 0)).to_tensor()[0]

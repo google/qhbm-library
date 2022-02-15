@@ -14,3 +14,35 @@
 # ==============================================================================
 """Tests for the hamiltonian_infer_utils module."""
 
+import cirq
+import tensorflow as tf
+
+from qhbmlib import circuit_model
+from qhbmlib import energy_model
+from qhbmlib import hamiltonian_model
+from qhbmlib import hamiltonian_infer_utils
+
+
+class DensityMatrixTest(tf.test.TestCase):
+  """Tests the density_matrix function."""
+
+  def test_density_matrix(self):
+    """Confirms the density matrix represented by the QHBM is correct."""
+
+    # Check density matrix of Bell state.
+    num_bits = 2
+    energy = energy_model.BernoulliEnergy(list(range(num_bits)))
+    energy.build([None, num_bits])
+    energy.set_weights([tf.constant([-10.0, -10.0])])  # pin at |00>
+
+    qubits = cirq.GridQubit.rect(1, num_bits)
+    test_u = cirq.Circuit([cirq.H(qubits[0]), cirq.CNOT(qubits[0], qubits[1])])
+    circuit = circuit_model.DirectQuantumCircuit(test_u)
+
+    model = hamiltonian_model.Hamiltonian(energy, circuit)
+    expected_dm = tf.constant(
+        [[0.5, 0, 0, 0.5], [0, 0, 0, 0], [0, 0, 0, 0], [0.5, 0, 0, 0.5]],
+        tf.complex64,
+    )
+    actual_dm = hamiltonian_infer_utils.density_matrix(model)
+    self.assertAllClose(actual_dm, expected_dm, atol=1e-3)
