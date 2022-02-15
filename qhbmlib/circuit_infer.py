@@ -91,8 +91,7 @@ class QuantumInference(tf.keras.layers.Layer):
   def differentiator(self):
     return self._differentiator
 
-  def expectation(self,
-                  initial_states: tf.Tensor,
+  def expectation(self, initial_states: tf.Tensor,
                   observables: Union[tf.Tensor, hamiltonian_model.Hamiltonian]):
     """Returns the expectation values of the observables against the QNN.
 
