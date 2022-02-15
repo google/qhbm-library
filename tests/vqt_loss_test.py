@@ -36,7 +36,7 @@ class VQTTest(tf.test.TestCase):
   def setUp(self):
     """Initializes test objects."""
     super().setUp()
-    self.num_qubits_list = [1, 2, 3]
+    self.num_qubits_list = [1, 2]
     self.tf_random_seed = 5
     self.tf_random_seed_alt = 6
     self.tfp_seed = tf.constant([7, 8], tf.int32)
