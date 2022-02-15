@@ -63,7 +63,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     self.tfp_seed = tf.constant([5, 6], dtype=tf.int32)
 
     self.close_rtol = 1e-2
-    self.not_zero_atol = 1e-3
+    self.not_zero_atol = 1e-4
 
   def test_init(self):
     """Confirms QuantumInference is initialized correctly."""
