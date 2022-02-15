@@ -30,7 +30,7 @@ class QHBMDataTest(tf.test.TestCase):
     self.tfp_seed = tf.constant([7, 8], tf.int32)
     self.num_samples = int(1e6)
     self.close_rtol = 3e-2
-    
+
   def test_expectation(self):
     """Confirms initialization."""
     for num_qubits in self.num_qubits_list:
@@ -43,12 +43,9 @@ class QHBMDataTest(tf.test.TestCase):
           self.num_samples,
           ebm_seed=self.tfp_seed)
       hamiltonian, _ = test_util.get_random_hamiltonian_and_inference(
-          qubits,
-          num_layers,
-          f"observable_{num_qubits}",
-          self.num_samples)
+          qubits, num_layers, f"observable_{num_qubits}", self.num_samples)
       expected_expectation = tf.squeeze(qhbm.expectation(hamiltonian))
-      
+
       data = quantum_data.QHBMData(qhbm)
       actual_expectation = data.expectation(hamiltonian)
 
