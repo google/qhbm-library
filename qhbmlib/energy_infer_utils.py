@@ -16,6 +16,8 @@
 
 import itertools
 
+import tensorflow as tf
+
 from qhbmlib import energy_model
 
 

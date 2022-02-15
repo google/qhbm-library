@@ -16,6 +16,8 @@
 
 import tensorflow_quantum as tfq
 
+from qhbmlib import circuit_model
+
 
 def unitary(circuit: circuit_model.QuantumCircuit):
   """Returns the unitary matrix corresponding to the given circuit.

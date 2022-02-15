@@ -14,6 +14,8 @@
 # ==============================================================================
 """Utilities for metrics on Hamiltonian."""
 
+import tensorflow as tf
+
 from qhbmlib import circuit_infer_utils
 from qhbmlib import energy_infer_utils
 from qhbmlib import hamiltonian_model
