@@ -398,7 +398,7 @@ class AnalyticEnergyInference(EnergyInference):
         list(itertools.product([0, 1], repeat=input_energy.num_bits)),
         dtype=tf.int8)
     self._logits_variable = tf.Variable(
-        -1.0 * input_energy(self.all_bitstrings), trainable=False)
+        -input_energy(self.all_bitstrings), trainable=False)
     self._distribution = tfd.Categorical(logits=self._logits_variable)
 
   @property
@@ -418,7 +418,7 @@ class AnalyticEnergyInference(EnergyInference):
 
   def _ready_inference(self):
     """See base class docstring."""
-    self._logits_variable.assign(-1.0 * self.all_energies)
+    self._logits_variable.assign(-self.all_energies)
 
   def _call(self, inputs, *args, **kwargs):
     """See base class docstring."""
@@ -505,7 +505,7 @@ class BernoulliEnergyInference(EnergyInference):
     """
     thetas = 0.5 * self.energy.logits
     single_log_partitions = tf.math.log(
-        tf.math.exp(thetas) + tf.math.exp(-1.0 * thetas))
+        tf.math.exp(thetas) + tf.math.exp(-thetas))
     return tf.math.reduce_sum(single_log_partitions)
 
   def _sample(self, num_samples: int):
