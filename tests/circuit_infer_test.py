@@ -16,6 +16,7 @@
 
 import itertools
 from absl import logging
+from absl.testing import parameterized
 import random
 import string
 
@@ -30,6 +31,8 @@ from tensorflow_quantum.python import util as tfq_util
 from qhbmlib import circuit_infer
 from qhbmlib import circuit_model
 from qhbmlib import circuit_model_utils
+from qhbmlib import energy_model
+from qhbmlib import hamiltonian_model
 from qhbmlib import utils
 from tests import test_util
 
@@ -38,7 +41,7 @@ ATOL = 1e-5
 GRAD_ATOL = 2e-4
 
 
-class QuantumInferenceTest(tf.test.TestCase):
+class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
   """Tests the QuantumInference class."""
 
   def setUp(self):
@@ -237,23 +240,79 @@ class QuantumInferenceTest(tf.test.TestCase):
     ] for r in total_resolvers])
     expected_expectations = tf.constant(raw_expectations)
     # Check that expectations are a reasonable size
-    self.assertAllGreater(tf.math.abs(expected_expectations), self.not_zero_atol)
+    self.assertAllGreater(
+        tf.math.abs(expected_expectations), self.not_zero_atol)
 
     expectation_wrapper = tf.function(q_infer.expectation)
     actual_expectations = expectation_wrapper(circuit, all_bitstrings, ops)
-    self.assertAllClose(actual_expectations, expected_expectations, rtol=self.close_rtol)
+    self.assertAllClose(
+        actual_expectations, expected_expectations, rtol=self.close_rtol)
 
     # Ensure circuit parameter update changes the expectation value.
     old_circuit_weights = circuit.get_weights()
     circuit.set_weights([tf.ones_like(w) for w in old_circuit_weights])
-    altered_circuit_expectations = expectation_wrapper(circuit, all_bitstrings, ops)
+    altered_circuit_expectations = expectation_wrapper(circuit, all_bitstrings,
+                                                       ops)
     self.assertNotAllClose(
         altered_circuit_expectations, actual_expectations, rtol=self.close_rtol)
     circuit.set_weights(old_circuit_weights)
 
     # Check that values return to start.
     reset_expectations = expectation_wrapper(circuit, all_bitstrings, ops)
-    self.assertAllClose(reset_expectations, actual_expectations, self.close_rtol)
+    self.assertAllClose(reset_expectations, actual_expectations,
+                        self.close_rtol)
+
+  @parameterized.parameters({
+      "energy_class": energy_class,
+      "energy_args": energy_args,
+  } for energy_class, energy_args in zip(
+      [energy_model.BernoulliEnergy, energy_model.KOBE], [[], [2]]))
+  @test_util.eager_mode_toggle
+  def test_expectation_modular_hamiltonian(self, energy_class, energy_args):
+    """Confirm expectation of modular Hamiltonians works."""
+    # set up the modular Hamiltonian to measure
+    num_bits = 3
+    n_moments = 5
+    act_fraction = 1.0
+    qubits = cirq.GridQubit.rect(1, num_bits)
+    energy_h = energy_class(*([list(range(num_bits))] + energy_args))
+    energy_h.build([None, num_bits])
+    raw_circuit_h = cirq.testing.random_circuit(qubits, n_moments, act_fraction)
+    circuit_h = circuit_model.DirectQuantumCircuit(raw_circuit_h)
+    circuit_h.build([])
+    hamiltonian_measure = hamiltonian_model.Hamiltonian(energy_h, circuit_h)
+    raw_shards = tfq.from_tensor(hamiltonian_measure.operator_shards)
+
+    # set up the circuit and inference
+    model_raw_circuit = cirq.testing.random_circuit(qubits, n_moments,
+                                                    act_fraction)
+    model_circuit = circuit_model.DirectQuantumCircuit(model_raw_circuit)
+    model_circuit.build([])
+    model_infer = circuit_infer.QuantumInference()
+
+    # bitstring injectors
+    all_bitstrings = list(itertools.product([0, 1], repeat=num_bits))
+    bitstring_circuit = circuit_model_utils.bit_circuit(qubits)
+    bitstring_symbols = sorted(tfq.util.get_circuit_symbols(bitstring_circuit))
+    bitstring_resolvers = [
+        dict(zip(bitstring_symbols, b)) for b in all_bitstrings
+    ]
+
+    # calculate expected values
+    total_circuit = bitstring_circuit + model_raw_circuit + raw_circuit_h**-1
+    expected_expectations = tf.stack([
+        tf.stack([
+            hamiltonian_measure.energy.operator_expectation([
+                cirq.Simulator().simulate_expectation_values(
+                    total_circuit, o, r)[0].real for o in raw_shards
+            ])
+        ]) for r in bitstring_resolvers
+    ])
+
+    expectation_wrapper = tf.function(model_infer.expectation)
+    actual_expectations = expectation_wrapper(model_circuit, all_bitstrings,
+                                              hamiltonian_measure)
+    self.assertAllClose(actual_expectations, expected_expectations)
 
   @test_util.eager_mode_toggle
   def test_sample_basic(self):
@@ -315,11 +374,7 @@ class QuantumInferenceTest(tf.test.TestCase):
     test_qnn = circuit_model.DirectQuantumCircuit(
         cirq.Circuit(cirq.H(cirq.GridQubit(0, 0))))
     test_infer = circuit_infer.QuantumInference()
-
-    @tf.function
-    def sample_wrapper(qnn, bitstrings, counts):
-      return test_infer.sample(qnn, bitstrings, counts)
-
+    sample_wrapper = tf.function(test_infer.sample)
     bitstrings = tf.constant([[0], [0]], dtype=tf.int8)
     _, samples_counts = sample_wrapper(test_qnn, bitstrings, counts)
     # QNN samples should be half 0 and half 1.
