@@ -227,7 +227,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
 
     # unitary
     num_layers = 3
-    actual_h, actual_h_infer = test_util.get_random_hamiltonian_and_inference(
+    _, actual_h_infer = test_util.get_random_hamiltonian_and_inference(
         qubits,
         num_layers,
         "expectation_test",

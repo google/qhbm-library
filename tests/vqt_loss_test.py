@@ -26,7 +26,6 @@ from qhbmlib import circuit_model
 from qhbmlib import energy_infer
 from qhbmlib import energy_model
 from qhbmlib import hamiltonian_infer
-from qhbmlib import hamiltonian_model
 from qhbmlib import vqt_loss
 from tests import test_util
 
