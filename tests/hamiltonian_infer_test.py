@@ -45,7 +45,8 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     # Model hamiltonian
     num_bits = 3
     self.energy = energy_model.BernoulliEnergy(list(range(num_bits)))
-    self.energy.build([None, num_bits])
+    self.expected_e_inference = energy_infer.AnalyticEnergyInference(
+        self.energy, self.num_samples)
     # pin first and last bits, middle bit free.
     self.energy.set_weights([tf.constant([-23, 0, 17])])
     qubits = cirq.GridQubit.rect(1, num_bits)
@@ -56,12 +57,9 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     self.pqc = tfq_util.random_symbol_circuit(qubits, symbols)
     circuit = circuit_model.DirectQuantumCircuit(self.pqc)
     circuit.build([])
-    self.model = hamiltonian_model.Hamiltonian(self.energy, circuit)
+    self.expected_q_inference = circuit_infer.QuantumInference(circuit)
 
     # Inference
-    self.expected_e_inference = energy_infer.AnalyticEnergyInference(
-        3, self.num_samples)
-    self.expected_q_inference = circuit_infer.QuantumInference()
     self.expected_name = "nameforaQHBM"
     self.actual_qhbm = hamiltonian_infer.QHBM(self.expected_e_inference,
                                               self.expected_q_inference,
@@ -79,12 +77,11 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
   def test_circuits(self):
     """Confirms correct circuits are sampled."""
     circuits_wrapper = tf.function(self.actual_qhbm.circuits)
-    actual_circuits, actual_counts = circuits_wrapper(self.model,
-                                                      self.num_samples)
+    actual_circuits, actual_counts = circuits_wrapper(self.num_samples)
 
     # Circuits with the allowed-to-be-sampled bitstrings prepended.
-    u = tfq.from_tensor(self.model.circuit.pqc)[0]
-    qubits = self.model.circuit.qubits
+    u = tfq.from_tensor(self.actual_qhbm.hamiltonian.circuit.pqc)[0]
+    qubits = self.actual_qhbm.hamiltonian.circuit.qubits
     expected_circuits_deserialized = [
         cirq.Circuit(
             cirq.X(qubits[0])**0,
@@ -120,24 +117,23 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
   def test_circuit_param_update(self):
     """Confirm circuits are different after updating energy model parameters."""
     num_bits = 2
-    e_infer = energy_infer.BernoulliEnergyInference(num_bits, self.num_samples)
-    q_infer = circuit_infer.QuantumInference()
-    h_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
-
-    circuits_wrapper = tf.function(h_infer.circuits)
     energy = energy_model.BernoulliEnergy(list(range(num_bits)))
-    energy.build([None, num_bits])
+    e_infer = energy_infer.BernoulliEnergyInference(energy, self.num_samples)
+
     qubits = cirq.GridQubit.rect(1, num_bits)
     pqc = cirq.Circuit(cirq.Y(q) for q in qubits)
     circuit = circuit_model.DirectQuantumCircuit(pqc)
-    model = hamiltonian_model.Hamiltonian(energy, circuit)
+    q_infer = circuit_infer.QuantumInference(circuit)
+
+    h_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
+    circuits_wrapper = tf.function(h_infer.circuits)
 
     # Pin Bernoulli to [0, 1]
     energy.set_weights([tf.constant([-1000, 1000])])
     expected_circuits_1 = tfq.from_tensor(
         tfq.convert_to_tensor(
             [cirq.Circuit(cirq.X(qubits[0])**0, cirq.X(qubits[1])) + pqc]))
-    output_circuits, _ = circuits_wrapper(model, self.num_samples)
+    output_circuits, _ = circuits_wrapper(self.num_samples)
     actual_circuits_1 = tfq.from_tensor(output_circuits)
     self.assertAllEqual(actual_circuits_1, expected_circuits_1)
 
@@ -147,7 +143,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
         tfq.convert_to_tensor(
             [cirq.Circuit(cirq.X(qubits[0]),
                           cirq.X(qubits[1])**0) + pqc]))
-    output_circuits, _ = circuits_wrapper(model, self.num_samples)
+    output_circuits, _ = circuits_wrapper(self.num_samples)
     actual_circuits_2 = tfq.from_tensor(output_circuits)
     self.assertAllEqual(actual_circuits_2, expected_circuits_2)
 
@@ -180,36 +176,33 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
 
     # calculate expected values
-    raw_expectations = actual_h_infer.q_inference.expectation(
-        actual_h.circuit, bitstrings, ops)
+    raw_expectations = actual_h_infer.q_inference.expectation(bitstrings, ops)
     expected_expectations = utils.weighted_average(counts, raw_expectations)
     # Check that expectations are a reasonable size
     self.assertAllGreater(tf.math.abs(expected_expectations), 1e-3)
 
     expectation_wrapper = tf.function(actual_h_infer.expectation)
-    actual_expectations = expectation_wrapper(actual_h, ops)
+    actual_expectations = expectation_wrapper(ops)
     self.assertAllClose(actual_expectations, expected_expectations, rtol=1e-6)
 
     # Ensure energy parameter update changes the expectation value.
     old_energy_weights = actual_h.energy.get_weights()
     actual_h.energy.set_weights([tf.ones_like(w) for w in old_energy_weights])
-    actual_h_infer.e_inference.infer(actual_h.energy)
-    altered_energy_expectations = actual_h_infer.expectation(actual_h, ops)
+    altered_energy_expectations = actual_h_infer.expectation(ops)
     self.assertNotAllClose(
         altered_energy_expectations, actual_expectations, rtol=1e-5)
     actual_h.energy.set_weights(old_energy_weights)
-    actual_h_infer.e_inference.infer(actual_h.energy)
 
     # Ensure circuit parameter update changes the expectation value.
     old_circuit_weights = actual_h.circuit.get_weights()
     actual_h.circuit.set_weights([tf.ones_like(w) for w in old_circuit_weights])
-    altered_circuit_expectations = expectation_wrapper(actual_h, ops)
+    altered_circuit_expectations = expectation_wrapper(ops)
     self.assertNotAllClose(
         altered_circuit_expectations, actual_expectations, rtol=1e-5)
     actual_h.circuit.set_weights(old_circuit_weights)
 
     # Check that values return to start.
-    reset_expectations = expectation_wrapper(actual_h, ops)
+    reset_expectations = expectation_wrapper(ops)
     self.assertAllClose(reset_expectations, actual_expectations, rtol=1e-6)
 
   @parameterized.parameters({
@@ -234,7 +227,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
 
     # unitary
     num_layers = 3
-    actual_h, actual_h_infer = test_util.get_random_hamiltonian_and_inference(
+    _, actual_h_infer = test_util.get_random_hamiltonian_and_inference(
         qubits,
         num_layers,
         "expectation_test",
@@ -247,13 +240,13 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
 
     # calculate expected values
     raw_expectations = actual_h_infer.q_inference.expectation(
-        actual_h.circuit, bitstrings, hamiltonian_measure)
+        bitstrings, hamiltonian_measure)
     expected_expectations = utils.weighted_average(counts, raw_expectations)
     # Check that expectations are a reasonable size
     self.assertAllGreater(tf.math.abs(expected_expectations), 1e-3)
 
     expectation_wrapper = tf.function(actual_h_infer.expectation)
-    actual_expectations = expectation_wrapper(actual_h, hamiltonian_measure)
+    actual_expectations = expectation_wrapper(hamiltonian_measure)
     self.assertAllClose(actual_expectations, expected_expectations)
 
 

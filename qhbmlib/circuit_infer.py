@@ -30,6 +30,7 @@ class QuantumInference(tf.keras.layers.Layer):
   """Methods for inference on QuantumCircuit objects."""
 
   def __init__(self,
+               circuit: circuit_model.QuantumCircuit,
                backend: Union[str, cirq.Sampler] = "noiseless",
                differentiator: Union[None,
                                      tfq.differentiators.Differentiator] = None,
@@ -37,12 +38,15 @@ class QuantumInference(tf.keras.layers.Layer):
     """Initialize a QuantumInference layer.
 
     Args:
+      circuit: The parameterized quantum circuit on which to do inference.
       backend: Specifies what backend TFQ will use to compute expectation
         values. `str` options are {"noisy", "noiseless"}; users may also specify
         a preconfigured cirq execution object to use instead.
       differentiator: Specifies how to take the derivative of a quantum circuit.
       name: Identifier for this inference engine.
     """
+    circuit.build([])
+    self._circuit = circuit
     self._differentiator = differentiator
     self._backend = backend
     self._sample_layer = tfq.layers.Sample(backend=backend)
@@ -80,16 +84,18 @@ class QuantumInference(tf.keras.layers.Layer):
     return self._backend
 
   @property
+  def circuit(self):
+    return self._circuit
+
+  @property
   def differentiator(self):
     return self._differentiator
 
-  def expectation(self, qnn: circuit_model.QuantumCircuit,
-                  initial_states: tf.Tensor,
+  def expectation(self, initial_states: tf.Tensor,
                   observables: Union[tf.Tensor, hamiltonian_model.Hamiltonian]):
     """Returns the expectation values of the observables against the QNN.
 
     Args:
-      qnn: The parameterized quantum circuit on which to do inference.
       initial_states: Shape [batch_size, num_qubits] of dtype `tf.int8`.
         Each entry is an initial state for the set of qubits.  For each state,
         `qnn` is applied and the pure state expectation value is calculated.
@@ -104,11 +110,11 @@ class QuantumInference(tf.keras.layers.Layer):
       transformed initial state.
     """
     if isinstance(observables, tf.Tensor):
-      u = qnn
+      u = self.circuit
       ops = observables
       post_process = lambda x: x
     elif isinstance(observables.energy, energy_model.PauliMixin):
-      u = qnn + observables.circuit_dagger
+      u = self.circuit + observables.circuit_dagger
       ops = observables.operator_shards
       post_process = lambda y: tf.map_fn(
           lambda x: tf.expand_dims(
@@ -134,12 +140,10 @@ class QuantumInference(tf.keras.layers.Layer):
     )
     return utils.expand_unique_results(post_process(expectations), idx)
 
-  def sample(self, qnn: circuit_model.QuantumCircuit, initial_states: tf.Tensor,
-             counts: tf.Tensor):
+  def sample(self, initial_states: tf.Tensor, counts: tf.Tensor):
     """Returns bitstring samples from the QNN.
 
       Args:
-        qnn: The parameterized quantum circuit on which to do inference.
         initial_states: Shape [batch_size, num_qubits] of dtype `tf.int8`.
           These are the initial states of each qubit in the circuit.
         counts: Shape [batch_size] of dtype `tf.int32` such that `counts[i]` is
@@ -150,16 +154,16 @@ class QuantumInference(tf.keras.layers.Layer):
           that `ragged_samples[i]` contains `counts[i]` bitstrings drawn from
           `(qnn)|initial_states[i]>`.
     """
-    circuits = qnn(initial_states)
+    circuits = self.circuit(initial_states)
     num_circuits = tf.shape(circuits)[0]
     tiled_values = tf.tile(
-        tf.expand_dims(qnn.symbol_values, 0), [num_circuits, 1])
+        tf.expand_dims(self.circuit.symbol_values, 0), [num_circuits, 1])
     num_samples_mask = tf.cast((tf.ragged.range(counts) + 1).to_tensor(),
                                tf.bool)
     num_samples_mask = tf.map_fn(tf.random.shuffle, num_samples_mask)
     samples = self._sample_layer(
         circuits,
-        symbol_names=qnn.symbol_names,
+        symbol_names=self.circuit.symbol_names,
         symbol_values=tiled_values,
         repetitions=tf.expand_dims(tf.math.reduce_max(counts), 0))
     return tf.ragged.boolean_mask(samples, num_samples_mask)
