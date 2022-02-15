@@ -46,14 +46,14 @@ class QuantumData(abc.ABC):
 class QHBMData(QuantumData):
   """QuantumData defined by a QHBM."""
 
-  def __init__(self, infer: hamiltonian_infer.QHBM):
+  def __init__(self, qhbm: hamiltonian_infer.QHBM):
     """Initializes a QHBMData.
 
     Args:
       qhbm: An inference engine for a QHBM.
     """
-    self.infer = infer
+    self.qhbm = qhbm
 
   def expectation(self, observable):
     """See base class docstring."""
-    return tf.squeeze(self.infer.expectation(observable), 0)
+    return tf.squeeze(self.qhbm.expectation(observable), 0)
