@@ -113,8 +113,7 @@ class VQTTest(tf.test.TestCase):
         num_elts = tf.size(var)  # Assumes variable is 1D
         for n in range(num_elts):
           this_derivative = test_util.approximate_derivative(
-              functools.partial(delta_vqt, n, var, model_infer, data_h,
-                                beta),
+              functools.partial(delta_vqt, n, var, model_infer, data_h, beta),
               delta=delta)
           var_derivative_list.append(this_derivative.numpy())
         derivatives.append(tf.constant(var_derivative_list))
@@ -147,11 +146,9 @@ class VQTTest(tf.test.TestCase):
           (model_h.trainable_variables, data_h.trainable_variables))
 
       expected_derivative_model = vqt_derivative(model_h.trainable_variables,
-                                                 model_infer, data_h,
-                                                 beta)
+                                                 model_infer, data_h, beta)
       expected_derivative_data = vqt_derivative(data_h.trainable_variables,
-                                                model_infer, data_h,
-                                                beta)
+                                                model_infer, data_h, beta)
       # Changing model parameters is working if finite difference derivatives
       # are non-zero.  Also confirms that model_h and data_h are different.
       tf.nest.map_structure(
