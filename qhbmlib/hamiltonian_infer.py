@@ -76,6 +76,7 @@ class QHBM(tf.keras.layers.Layer):
     super().__init__(name=name)
     self._e_inference = e_inference
     self._q_inference = q_inference
+    
 
   @property
   def e_inference(self):
