@@ -26,7 +26,6 @@ from tensorflow_quantum.python import util as tfq_util
 
 from qhbmlib import circuit_infer
 from qhbmlib import circuit_model
-from qhbmlib import circuit_model_utils
 from qhbmlib import energy_infer
 from qhbmlib import energy_model
 from qhbmlib import hamiltonian_model
