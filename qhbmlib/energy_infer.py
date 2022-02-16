@@ -78,13 +78,13 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
 
     self._tracked_variables = input_energy.variables
     if len(self._tracked_variables) == 0:
-      self._checkpoint = tf.Variable(False, trainable=False)
+      self._checkpoint = False
     else:
       self._tracked_variables_checkpoint = [
           tf.Variable(v.read_value(), trainable=False)
           for v in self._tracked_variables
       ]
-      self._checkpoint = tf.Variable(True, trainable=False)
+      self._checkpoint = True
 
     if initial_seed is None:
       self._update_seed = tf.Variable(True, trainable=False)
