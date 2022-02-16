@@ -21,6 +21,28 @@ from qhbmlib import energy_infer_utils
 from qhbmlib import hamiltonian_model
 
 
+def trace_matmul(matrix_a, matrix_b):
+  r"""Returns value of tf.linalg.trace(tf.matmul(matrix_a, matrix_b)).
+
+  Naive matrix multiplication takes O(n^3) operators, while elementwise
+  multiplication takes O(n^2).  To take advantage of this speedup,
+  consider the following:
+
+  \begin{align*}
+    \text{tr}[AB] &= \sum_x \langle x |AB| x \rangle
+    \\&= \sum_{x,i,j,k}\langle x| i\rangle A_{ik}B_{kj}\langle j |x\rangle
+    \\&= \sum_{x,k} A_{xk}B_{kx}
+    \\&= \sum_{x,k} A_{xk}B^T_{xk}
+  \end{align*}
+
+  Args:
+    matrix_a: 2D tensor which is the left matrix in the calculation.
+    matrix_b: 2D tensor which is the right matrix in the calculation.
+      Must have the same dtype as `matix_a`.
+  """
+  return tf.reduce_sum(tf.multiply(matrix_a, tf.transpose(matrix_b)))
+
+
 def density_matrix(model: hamiltonian_model.Hamiltonian):
   """Returns the normalized exponential of the hamililtonian.
 

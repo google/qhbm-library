@@ -24,6 +24,32 @@ from qhbmlib import hamiltonian_infer_utils
 from tests import test_util
 
 
+class TraceMatmulTest(tf.test.TestCase):
+  """Tests the trace_matmul function."""
+
+  def setUp(self):
+    """Initializes test objects."""
+    super().setUp()
+    self.close_rtol = 1e-5
+    self.not_zero_atol = 1e-4
+
+  @test_util.eager_mode_toggle
+  def test_trace_matmul(self):
+    """Confirms equality of naive and optimized methods on random matrices."""
+    num_rerolls = 10
+    side = 2 ** 5
+    for _ in range(num_rerolls):
+      matrix_a = tf.random.uniform([side, side], -2, 2)
+      matrix_b = tf.random.uniform([side, side], -2, 2)
+      # Confirm matrices are different
+      self.assertAllGreater(tf.math.abs(matrix_a - matrix_b), self.not_zero_atol)
+      expected_result = tf.linalg.trace(tf.matmul(matrix_a, matrix_b))
+
+      trace_matmul_wrapper = tf.function(hamiltonian_infer_utils.trace_matmul)
+      actual_result = trace_matmul_wrapper(matrix_a, matrix_b)
+      self.assertAllClose(actual_result, expected_result, rtol=self.close_rtol)
+    
+
 class DensityMatrixTest(tf.test.TestCase):
   """Tests the density_matrix function."""
 
