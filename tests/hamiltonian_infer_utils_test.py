@@ -89,23 +89,25 @@ class FidelityTest(tf.test.TestCase):
       intermediate = tf.linalg.sqrtm(sqrt_rho @ sigma @ sqrt_rho)
       return tf.linalg.trace(intermediate)**2
 
-    num_qubits = 4
-    sigma, _ = test_util.generate_mixed_random_density_operator(
-        num_qubits, 2**num_qubits)
-    sigma = tf.cast(sigma, tf.complex64)
+    num_rerolls = 5
+    for _ in range(num_rerolls):
+      num_qubits = 4
+      sigma, _ = test_util.generate_mixed_random_density_operator(
+          num_qubits, 2**num_qubits)
+      sigma = tf.cast(sigma, tf.complex64)
 
-    qubits = cirq.GridQubit.rect(num_qubits, 1)
-    num_layers = 3
-    identifier = "fidelity_test"
-    num_samples = 1  # required but unused
-    h, _ = test_util.get_random_hamiltonian_and_inference(
-        qubits, num_layers, identifier, num_samples)
-    h_dm = hamiltonian_infer_utils.density_matrix(h)
+      qubits = cirq.GridQubit.rect(num_qubits, 1)
+      num_layers = 3
+      identifier = "fidelity_test"
+      num_samples = 1  # required but unused
+      h, _ = test_util.get_random_hamiltonian_and_inference(
+          qubits, num_layers, identifier, num_samples)
+      h_dm = hamiltonian_infer_utils.density_matrix(h)
 
-    expected_fidelity = direct_fidelity(h_dm, sigma)
-    fidelity_wrapper = tf.function(hamiltonian_infer_utils.fidelity)
-    actual_fidelity = fidelity_wrapper(h, sigma)
-    self.assertAllClose(actual_fidelity, expected_fidelity)
+      expected_fidelity = direct_fidelity(h_dm, sigma)
+      fidelity_wrapper = tf.function(hamiltonian_infer_utils.fidelity)
+      actual_fidelity = fidelity_wrapper(h, sigma)
+      self.assertAllClose(actual_fidelity, expected_fidelity)
 
 
 if __name__ == "__main__":
