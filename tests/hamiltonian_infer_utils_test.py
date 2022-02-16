@@ -107,7 +107,8 @@ class FidelityTest(tf.test.TestCase):
       expected_fidelity = direct_fidelity(h_dm, sigma)
       fidelity_wrapper = tf.function(hamiltonian_infer_utils.fidelity)
       actual_fidelity = fidelity_wrapper(h, sigma)
-      self.assertAllClose(actual_fidelity, expected_fidelity)
+      self.assertAllClose(
+          actual_fidelity, expected_fidelity, rtol=self.close_rtol)
 
 
 if __name__ == "__main__":
