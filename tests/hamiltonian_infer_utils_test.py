@@ -42,7 +42,7 @@ class DensityMatrixTest(tf.test.TestCase):
     circuit = circuit_model.DirectQuantumCircuit(test_u)
     circuit.build([])
     model = hamiltonian_model.Hamiltonian(energy, circuit)
-    
+
     expected_dm = tf.constant(
         [[0.5, 0, 0, 0.5], [0, 0, 0, 0], [0, 0, 0, 0], [0.5, 0, 0, 0.5]],
         tf.complex64,
