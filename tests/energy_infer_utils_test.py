@@ -33,8 +33,8 @@ class ProbabilitiesTest(tf.test.TestCase):
     num_layers = 3
     units = random.sample(range(1, 100), num_layers)
     activations = random.sample([
-        "elu", "exponential", "gelu", "hard_sigmoid", "linear", "relu",
-        "selu", "sigmoid", "softmax", "softplus", "softsign", "swish", "tanh"
+        "elu", "exponential", "gelu", "hard_sigmoid", "linear", "relu", "selu",
+        "sigmoid", "softmax", "softplus", "softsign", "swish", "tanh"
     ], num_layers)
     expected_layer_list = []
     for i in range(num_layers):
@@ -42,10 +42,12 @@ class ProbabilitiesTest(tf.test.TestCase):
           tf.keras.layers.Dense(units[i], activation=activations[i]))
     expected_layer_list.append(tf.keras.layers.Dense(1))
     expected_layer_list.append(utils.Squeeze(-1))
-    energy = energy_model.BitstringEnergy(list(range(num_bits)), expected_layer_list)
+    energy = energy_model.BitstringEnergy(
+        list(range(num_bits)), expected_layer_list)
 
     num_expectation_samples = 1  # Required but unused
-    infer = energy_infer.AnalyticEnergyInference(energy, num_expectation_samples)
+    infer = energy_infer.AnalyticEnergyInference(energy,
+                                                 num_expectation_samples)
     expected_probabilities = infer.distribution.probs_parameter()
 
     probabilities_wrapped = tf.function(energy_infer_utils.probabilities)

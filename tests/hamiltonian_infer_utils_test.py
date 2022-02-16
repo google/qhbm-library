@@ -40,6 +40,17 @@ class DensityMatrixTest(tf.test.TestCase):
     qubits = cirq.GridQubit.rect(1, num_bits)
     test_u = cirq.Circuit([cirq.H(qubits[0]), cirq.CNOT(qubits[0], qubits[1])])
     circuit = circuit_model.DirectQuantumCircuit(test_u)
+    circuit.build([])
+    model = hamiltonian_model.Hamiltonian(energy, circuit)
+    
+    expected_dm = tf.constant(
+        [[0.5, 0, 0, 0.5], [0, 0, 0, 0], [0, 0, 0, 0], [0.5, 0, 0, 0.5]],
+        tf.complex64,
+    )
+
+    density_matrix_wrapper = tf.function(hamiltonian_infer_utils.density_matrix)
+    actual_dm = density_matrix_wrapper(model)
+    self.assertAllClose(actual_dm, expected_dm)
 
 
 class FidelityTest(tf.test.TestCase):

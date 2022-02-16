@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for the circuit_infer_utils module."""
 
+from absl import logging
 import random
 import string
 
@@ -24,6 +25,7 @@ from tensorflow_quantum.python import util as tfq_util
 
 from qhbmlib import circuit_infer_utils
 from qhbmlib import circuit_model
+
 
 class UnitaryTest(tf.test.TestCase):
   """Tests the unitary function."""
