@@ -25,8 +25,8 @@ def trace_matmul(matrix_a, matrix_b):
   r"""Returns value of tf.linalg.trace(tf.matmul(matrix_a, matrix_b)).
 
   Naive matrix multiplication takes O(n^3) operators, while elementwise
-  multiplication takes O(n^2).  To take advantage of this speedup,
-  consider the following:
+  multiplication takes O(n^2).  To take advantage of this speedup, we transform
+  the chained calculation as follows:
 
   \begin{align*}
     \text{tr}[AB] &= \sum_x \langle x |AB| x \rangle
@@ -44,7 +44,32 @@ def trace_matmul(matrix_a, matrix_b):
 
 
 def density_matrix(model: hamiltonian_model.Hamiltonian):
-  """Returns the normalized exponential of the hamililtonian.
+  r"""Returns the thermal state corresponding to a modular Hamiltonian.
+
+  Given a modular Hamiltonian $K_{\theta\phi} = U_\phi K_\theta U_\phi^\dagger$,
+  the corresponding thermal state is
+
+  \begin{align*}
+    \rho &= (\text{tr}[e^{-K_{\theta\phi}}])^{-1} e^{-K_{\theta\phi}}
+    \\&= Z_\theta^{-1} U_\phi e^{-K_\theta} U_\phi^\dagger
+    \\&= U_\phi P_\theta U_\phi^\dagger
+  \end{align*}
+  where we defined the diagonal matrix $P_\theta$ as
+  $$
+    \langle x|P_\theta|y\rangle = \begin{cases}
+                           p_\theta(x), & \text{if}\ x = y \\
+                           0, & \text{otherwise}
+                    \end{cases}
+  $$
+  Continuing, using the definition of matrix multiplication, we have
+  \begin{align*}
+    \rho &= U_\phi \sum_{i,k,j} |i\rangle\langle i|P_\theta|k\rangle
+            \langle k| U_\phi^\dagger|j\rangle\langle j|
+    \\&= U_\phi \sum_{k,j} p_\theta(k)|k\rangle
+            \langle k| U_\phi^\dagger|j\rangle\langle j|
+    \\&= \sum_{i,k,j} p_\theta(k)|i\rangle\langle i|U_\phi|k\rangle
+            \langle k| U_\phi^\dagger|j\rangle\langle j|
+  \end{align*}
 
   Args:
     model: Modular Hamiltonian whose corresponding thermal state is the density
@@ -53,11 +78,7 @@ def density_matrix(model: hamiltonian_model.Hamiltonian):
   probabilities = tf.cast(
       energy_infer_utils.probabilities(model.energy), tf.complex64)
   unitary_matrix = circuit_infer_utils.unitary(model.circuit)
-  unitary_probs = tf.multiply(
-      unitary_matrix,
-      tf.tile(
-          tf.expand_dims(probabilities, 0), [tf.shape(unitary_matrix)[0], 1]))
-  return tf.matmul(unitary_probs, tf.linalg.adjoint(unitary_matrix))
+  return tf.einsum("k,ik,kj->ij", probabilities, unitary_matrix, tf.linalg.adjoint(unitary_matrix))
 
 
 def fidelity(model: hamiltonian_model.Hamiltonian, sigma: tf.Tensor):
