@@ -21,28 +21,6 @@ from qhbmlib import energy_infer_utils
 from qhbmlib import hamiltonian_model
 
 
-def trace_matmul(matrix_a, matrix_b):
-  r"""Returns value of tf.linalg.trace(tf.matmul(matrix_a, matrix_b)).
-
-  Naive matrix multiplication takes O(n^3) operators, while elementwise
-  multiplication takes O(n^2).  To take advantage of this speedup, we transform
-  the chained calculation as follows:
-
-  \begin{align*}
-    \text{tr}[AB] &= \sum_x \langle x |AB| x \rangle
-    \\&= \sum_{x,i,j,k}\langle x| i\rangle A_{ik}B_{kj}\langle j |x\rangle
-    \\&= \sum_{x,k} A_{xk}B_{kx}
-    \\&= \sum_{x,k} A_{xk}B^T_{xk}
-  \end{align*}
-
-  Args:
-    matrix_a: 2D tensor which is the left matrix in the calculation.
-    matrix_b: 2D tensor which is the right matrix in the calculation.
-      Must have the same dtype as `matix_a`.
-  """
-  return tf.reduce_sum(tf.multiply(matrix_a, tf.transpose(matrix_b)))
-
-
 def density_matrix(model: hamiltonian_model.Hamiltonian):
   r"""Returns the thermal state corresponding to a modular Hamiltonian.
 
@@ -82,7 +60,30 @@ def density_matrix(model: hamiltonian_model.Hamiltonian):
 
 
 def fidelity(model: hamiltonian_model.Hamiltonian, sigma: tf.Tensor):
-  """Calculate the fidelity between a QHBM and a density matrix.
+  r"""Calculate the fidelity between a QHBM and a density matrix.
+
+  Definition of the fidelity between two quantum states $\rho$ and $\sigma$ is
+  $$
+  F(\rho, \sigma) = \left(\text{tr}\sqrt{\sqrt{\rho}\sigma\sqrt{\rho}}\right)^2.
+  $$
+  When the first argument is a QHBM, we can write
+  $$
+  F(\rho, \sigma) = \left(\text{tr}\sqrt{
+      U_\phi\sqrt{K_\theta}U_\phi^\dagger
+      \sigma U_\phi\sqrt{K_\theta}U_\phi^\dagger}\right)^2.
+  $$
+  By the definition of matrix functions, we can pull the unitaries outside
+  the square root, and use cyclicity of trace to remove them.  Then we have
+  $$
+  F(\rho, \sigma) = \left(\text{tr}\sqrt{
+      \sqrt{K_\theta}U_\phi^\dagger\sigma U_\phi\sqrt{K_\theta}}\right)^2.
+  $$
+  Let $\omega = \sqrt{K_\theta}U_\phi^\dagger\sigma U_\phi\sqrt{K_\theta}$,
+  and let $WD W^\dagger$ be a unitary diagonalization of $\omega$.  Then we have
+  $$
+    F(\rho, \sigma) = \left(\text{tr}\sqrt{D}\right)^2
+                    = \left(\sum_i\sqrt{D_{ii}}\right)^2.
+  $$
 
   Args:
     model: Modular Hamiltonian whose corresponding thermal state is to be
@@ -94,15 +95,12 @@ def fidelity(model: hamiltonian_model.Hamiltonian, sigma: tf.Tensor):
     A scalar `tf.Tensor` which is the fidelity between the density matrix
       represented by this QHBM and `sigma`.
   """
-  e_rho = tf.cast(energy_infer_utils.probabilities(model.energy), tf.complex64)
-  v_rho = circuit_infer_utils.unitary(model.circuit)
-  sqrt_e_rho = tf.sqrt(e_rho)
-  v_rho_sqrt_e_rho = tf.multiply(
-      v_rho, tf.tile(tf.expand_dims(sqrt_e_rho, 0), (tf.shape(v_rho)[0], 1)))
-  rho_sqrt = tf.matmul(v_rho_sqrt_e_rho, tf.linalg.adjoint(v_rho))
-  omega = tf.matmul(tf.matmul(rho_sqrt, tf.cast(sigma, tf.complex64)), rho_sqrt)
+  k_theta = tf.cast(energy_infer_utils.probabilities(model.energy), tf.complex64)
+  u_phi = circuit_infer_utils.unitary(model.circuit)
+  u_phi_dagger = tf.linalg.adjoint(u_phi)
+  sqrt_k_theta = tf.sqrt(k_theta)
+  omega = tf.einsum("b,ab,bc,cd,c->ad", sqrt_k_theta, u_phi_dagger, sigma, u_phi, sqrt_k_theta)
   # TODO(zaqqwerty): find convincing proof that omega is hermitian,
-  # in order to go back to eigvalsh.
-  e_omega = tf.linalg.eigvals(omega)
-  return tf.cast(
-      tf.math.abs(tf.math.reduce_sum(tf.math.sqrt(e_omega)))**2, tf.float32)
+  # in order to use the more efficient eigvalsh.
+  d_omega = tf.linalg.eigvals(omega)
+  return tf.cast(tf.math.reduce_sum(tf.math.sqrt(d_omega))**2, tf.float32)
