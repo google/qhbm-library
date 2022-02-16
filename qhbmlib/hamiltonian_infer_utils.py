@@ -68,23 +68,33 @@ def fidelity(model: hamiltonian_model.Hamiltonian, sigma: tf.Tensor):
   $$
   When the first argument is a QHBM, we can write
   $$
-  F(\rho, \sigma) = \left(\text{tr}\sqrt{
-      U_\phi\sqrt{K_\theta}U_\phi^\dagger
-      \sigma U_\phi\sqrt{K_\theta}U_\phi^\dagger}\right)^2.
+    F(\rho, \sigma) = \left(\text{tr}\sqrt{
+        U_\phi\sqrt{K_\theta}U_\phi^\dagger
+        \sigma U_\phi\sqrt{K_\theta}U_\phi^\dagger}\right)^2.
   $$
   By the definition of matrix functions, we can pull the unitaries outside
   the square root, and use cyclicity of trace to remove them.  Then we have
   $$
-  F(\rho, \sigma) = \left(\text{tr}\sqrt{
-      \sqrt{K_\theta}U_\phi^\dagger\sigma U_\phi\sqrt{K_\theta}}\right)^2.
+    F(\rho, \sigma) = \left(\text{tr}\sqrt{
+        \sqrt{K_\theta}U_\phi^\dagger\sigma U_\phi\sqrt{K_\theta}}\right)^2.
   $$
   Let $\omega = \sqrt{K_\theta}U_\phi^\dagger\sigma U_\phi\sqrt{K_\theta}$,
-  and let $WD W^\dagger$ be a unitary diagonalization of $\omega$.  Then we have
+  and let $WD W^\dagger$ be a unitary diagonalization of $\omega$.  Note that
+  $U_\phi^\dagger\sigma U_\phi$ is Hermitian since it is a unitary
+  conjugation of a Hermitian matrix.  Also, for Hermitian matrices A and B,
+  we have
+  $$
+    (ABA)^\dagger = (BA)^\dagger A^\dagger
+                  = A^\dagger B^\dagger A^\dagger
+                  = ABA.
+  $$
+  Therefore $ABA$ is also Hermitian.  Thus $\omega$ is Hermitian, which
+  allows the use of faster eigenvalue finding routines.  Then we have
   $$
     F(\rho, \sigma) = \left(\text{tr}\sqrt{D}\right)^2
                     = \left(\sum_i\sqrt{D_{ii}}\right)^2.
   $$
-
+  
   Args:
     model: Modular Hamiltonian whose corresponding thermal state is to be
       compared to `sigma`, as the left density matrix in fidelity.
@@ -99,8 +109,6 @@ def fidelity(model: hamiltonian_model.Hamiltonian, sigma: tf.Tensor):
   u_phi = circuit_infer_utils.unitary(model.circuit)
   u_phi_dagger = tf.linalg.adjoint(u_phi)
   sqrt_k_theta = tf.sqrt(k_theta)
-  omega = tf.einsum("b,ab,bc,cd,c->ad", sqrt_k_theta, u_phi_dagger, sigma, u_phi, sqrt_k_theta)
-  # TODO(zaqqwerty): find convincing proof that omega is hermitian,
-  # in order to use the more efficient eigvalsh.
-  d_omega = tf.linalg.eigvals(omega)
-  return tf.cast(tf.math.reduce_sum(tf.math.sqrt(d_omega))**2, tf.float32)
+  omega = tf.einsum("a,ab,bc,cd,d->ad", sqrt_k_theta, u_phi_dagger, sigma, u_phi, sqrt_k_theta)
+  d_omega = tf.linalg.eigvalsh(omega)
+  return tf.math.reduce_sum(tf.math.sqrt(d_omega))**2

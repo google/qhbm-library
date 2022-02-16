@@ -24,32 +24,6 @@ from qhbmlib import hamiltonian_infer_utils
 from tests import test_util
 
 
-class TraceMatmulTest(tf.test.TestCase):
-  """Tests the trace_matmul function."""
-
-  def setUp(self):
-    """Initializes test objects."""
-    super().setUp()
-    self.close_rtol = 1e-5
-    self.not_zero_atol = 1e-4
-
-  @test_util.eager_mode_toggle
-  def test_trace_matmul(self):
-    """Confirms equality of naive and optimized methods on random matrices."""
-    num_rerolls = 10
-    side = 2 ** 5
-    for _ in range(num_rerolls):
-      matrix_a = tf.random.uniform([side, side], -2, 2)
-      matrix_b = tf.random.uniform([side, side], -2, 2)
-      # Confirm matrices are different
-      self.assertAllGreater(tf.math.abs(matrix_a - matrix_b), self.not_zero_atol)
-      expected_result = tf.linalg.trace(tf.matmul(matrix_a, matrix_b))
-
-      trace_matmul_wrapper = tf.function(hamiltonian_infer_utils.trace_matmul)
-      actual_result = trace_matmul_wrapper(matrix_a, matrix_b)
-      self.assertAllClose(actual_result, expected_result, rtol=self.close_rtol)
-    
-
 class DensityMatrixTest(tf.test.TestCase):
   """Tests the density_matrix function."""
 
@@ -105,6 +79,35 @@ class FidelityTest(tf.test.TestCase):
     expected_fidelity = 1.0
     self.assertAllClose(
         actual_fidelity, expected_fidelity, rtol=self.close_rtol)
+
+  def test_fidelity_random(self):
+    """Confirms correct fidelity against slower direct formula."""
+
+    def direct_fidelity(rho, sigma):
+      """Direct matrix to matrix fidelity function."""
+      sqrt_rho = tf.linalg.sqrtm(rho)
+      intermediate = tf.linalg.sqrtm(sqrt_rho @ sigma @ sqrt_rho)
+      return tf.linalg.trace(intermediate) ** 2
+
+    num_qubits = 4
+    sigma, _ = test_util.generate_mixed_random_density_operator(num_qubits, 2**num_qubits)
+    sigma = tf.cast(sigma, tf.complex64)
+    
+    qubits = cirq.GridQubit.rect(num_qubits, 1)
+    num_layers = 3
+    identifier = "fidelity_test"
+    num_samples = 1  # required but unused
+    h, _ = test_util.get_random_hamiltonian_and_inference(
+        qubits,
+        num_layers,
+        identifier,
+        num_samples)
+    h_dm = hamiltonian_infer_utils.density_matrix(h)
+
+    expected_fidelity = direct_fidelity(h_dm, sigma)
+    fidelity_wrapper = tf.function(hamiltonian_infer_utils.fidelity)
+    actual_fidelity = fidelity_wrapper(h, sigma)
+    self.assertAllClose(actual_fidelity, expected_fidelity)
 
 
 if __name__ == "__main__":
