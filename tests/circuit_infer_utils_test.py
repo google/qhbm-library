@@ -14,4 +14,44 @@
 # ==============================================================================
 """Tests for the circuit_infer_utils module."""
 
+import tensorflow as tf
+
 from qhbmlib import circuit_infer_utils
+
+
+class UnitaryTest(tf.test.TestCase):
+  """Tests the unitary function."""
+
+  def test_unitary(self):
+    """Confirms unitary is correct for a random circuit."""
+    # TODO(#171) this random circuit construction happens in a few places.
+    batch_size = 1
+    n_moments = 10
+    act_fraction = 0.9
+    num_symbols = 2
+    symbols = set()
+    for _ in range(num_symbols):
+      symbols.add("".join(random.sample(string.ascii_letters, 10)))
+    symbols = sorted(list(symbols))
+    raw_circuits, _ = tfq_util.random_symbol_circuit_resolver_batch(
+        qubits, symbols, batch_size, n_moments=n_moments, p=act_fraction)
+    raw_circuit = raw_circuits[0]
+    random_values = tf.random.uniform([len(symbols)], -1, 1, tf.float32,
+                                      self.tf_random_seed).numpy().tolist()
+    resolver = dict(zip(symbols, random_values))
+
+    circuit = circuit_model.QuantumCircuit(
+        tfq.convert_to_tensor([raw_circuit]), qubits, tf.constant(symbols),
+        [tf.Variable([resolver[s] for s in symbols])], [[]])
+
+    resolved_circuit = cirq.protocols.resolve_parameters(raw_circuit, resolver)
+    expected_unitary = resolved_circuit.unitary()
+
+    unitary_wrapper = tf.function(circuit_infer_utils.unitary)
+    actual_unitary = unitary_wrapper(circuit)
+    self.assertAllClose(actual_unitary, expected_unitary)
+
+
+if __name__ == "__main__":
+  logging.info("Running circuit_infer_utils_test.py ...")
+  tf.test.main()
