@@ -78,7 +78,7 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
 
     self._tracked_variables = input_energy.variables
     if len(self._tracked_variables) == 0:
-      self._checkpoint = False
+      self._checkpoint = False  # Autograph forbids this from being a tensor
     else:
       self._tracked_variables_checkpoint = [
           tf.Variable(v.read_value(), trainable=False)
