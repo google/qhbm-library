@@ -95,7 +95,7 @@ def fidelity(model: hamiltonian_model.Hamiltonian, sigma: tf.Tensor):
     F(\rho, \sigma) = \left(\text{tr}\sqrt{D}\right)^2
                     = \left(\sum_i\sqrt{D_{ii}}\right)^2.
   $$
-  
+
   Args:
     model: Modular Hamiltonian whose corresponding thermal state is to be
       compared to `sigma`, as the left density matrix in fidelity.
