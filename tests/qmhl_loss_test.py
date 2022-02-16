@@ -70,7 +70,7 @@ class QMHLTest(tf.test.TestCase):
   #     expected_loss_derivative = [
   #         tf.zeros_like(v) for v in model_h.trainable_variables
   #     ]
-      
+
   #     with tf.GradientTape() as tape:
   #       actual_loss = qmhl_wrapper(data, model_infer)
   #     actual_loss_derivative = tape.gradient(actual_loss,
@@ -96,7 +96,7 @@ class QMHLTest(tf.test.TestCase):
   #     return delta_loss
 
   #   qmhl_wrapper = tf.function(qmhl_loss.qmhl)
-    
+
   #   def qmhl_derivative(variables_list, data, model_qhbm):
   #     """Approximately differentiates QMHL wih respect to the inputs."""
   #     derivatives = []
@@ -204,14 +204,18 @@ class QMHLTest(tf.test.TestCase):
         self.assertAllClose(actual_ktp, expected_ktp, rtol=self.close_rtol)
 
       # Build target data
-      alphas = tf.random.uniform([num_qubits], minval=-q_const, maxval=q_const, seed=self.tf_random_seed)
+      alphas = tf.random.uniform([num_qubits],
+                                 minval=-q_const,
+                                 maxval=q_const,
+                                 seed=self.tf_random_seed)
       y_rot = cirq.Circuit(
           cirq.ry(r.numpy())(q) for r, q in zip(alphas, qubits))
       data_circuit = circuit_model.DirectQuantumCircuit(y_rot)
       data_q_infer = circuit_infer.QuantumInference(data_circuit)
       data_probs = tf.random.uniform([num_qubits], seed=self.tf_random_seed)
       data_samples = tfp.distributions.Bernoulli(
-          probs=1 - data_probs, dtype=tf.int8).sample(self.num_samples, seed=self.tfp_seed)
+          probs=1 - data_probs, dtype=tf.int8).sample(
+              self.num_samples, seed=self.tfp_seed)
 
       # Load target data into a QuantumData class
       class FixedData(quantum_data.QuantumData):
@@ -232,22 +236,34 @@ class QMHLTest(tf.test.TestCase):
                                            tf.math.cos(test_phis))
       with tf.GradientTape() as expectation_tape:
         actual_expectation = data.expectation(qhbm_infer.hamiltonian)
-      self.assertAllClose(actual_expectation, expected_expectation, self.close_rtol)
+      self.assertAllClose(actual_expectation, expected_expectation,
+                          self.close_rtol)
 
       expected_loss = expected_expectation + expected_log_partition
       self.assertAllClose(actual_loss, expected_loss)
 
       expected_log_partition_grad = tf.math.tanh(test_thetas)
-      actual_log_partition_grad = log_partition_tape.gradient(actual_log_partition, test_thetas)
-      self.assertAllClose(actual_log_partition_grad, expected_log_partition_grad, rtol=self.close_rtol)
+      actual_log_partition_grad = log_partition_tape.gradient(
+          actual_log_partition, test_thetas)
+      self.assertAllClose(
+          actual_log_partition_grad,
+          expected_log_partition_grad,
+          rtol=self.close_rtol)
 
-      expected_expectation_thetas_grad = (2 * data_probs - 1) * tf.math.cos(
-          alphas) * tf.math.cos(test_phis)
+      expected_expectation_thetas_grad = (
+          2 * data_probs - 1) * tf.math.cos(alphas) * tf.math.cos(test_phis)
       expected_expectation_phis_grad = -test_thetas * (
           2 * data_probs - 1) * tf.math.cos(alphas) * tf.math.sin(test_phis)
-      actual_expectation_thetas_grad, actual_expectation_phis_grad = expectation_tape.gradient(actual_expectation, (test_thetas, test_phis))
-      self.assertAllClose(actual_expectation_thetas_grad, expected_expectation_thetas_grad, rtol=self.close_rtol)
-      self.assertAllClose(actual_expectation_phis_grad, expected_expectation_phis_grad, rtol=self.close_rtol)
+      actual_expectation_thetas_grad, actual_expectation_phis_grad = expectation_tape.gradient(
+          actual_expectation, (test_thetas, test_phis))
+      self.assertAllClose(
+          actual_expectation_thetas_grad,
+          expected_expectation_thetas_grad,
+          rtol=self.close_rtol)
+      self.assertAllClose(
+          actual_expectation_phis_grad,
+          expected_expectation_phis_grad,
+          rtol=self.close_rtol)
 
       actual_thetas_grads, actual_phis_grads = loss_tape.gradient(
           actual_loss, (test_thetas, test_phis))
