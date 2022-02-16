@@ -115,8 +115,7 @@ class QMHLTest(tf.test.TestCase):
         actual_dm = test_qhbm.density_matrix()
         actual_log_dm = tf.linalg.logm(actual_dm)
         actual_ktp = -actual_log_dm - tf.eye(
-            2, dtype=tf.complex64) * tf.cast(actual_log_partition,
-                                             tf.complex64)
+            2, dtype=tf.complex64) * tf.cast(actual_log_partition, tf.complex64)
         a = complex((test_thetas[0] * tf.math.cos(test_phis[0])).numpy(), 0)
         b = 1j * (test_thetas[0] * tf.math.sin(test_phis[0])).numpy()
         c = -1j * (test_thetas[0] * tf.math.sin(test_phis[0])).numpy()
@@ -125,9 +124,7 @@ class QMHLTest(tf.test.TestCase):
         self.assertAllClose(actual_ktp, expected_ktp, atol=ATOL, rtol=RTOL)
 
       # Build target data
-      alphas = tf.random.uniform([num_qubits],
-                                 minval=-q_const,
-                                 maxval=q_const)
+      alphas = tf.random.uniform([num_qubits], minval=-q_const, maxval=q_const)
       y_rot = cirq.Circuit(
           cirq.ry(r.numpy())(q) for r, q in zip(alphas, qubits))
       data_probs = tf.random.uniform([num_qubits])
@@ -148,9 +145,9 @@ class QMHLTest(tf.test.TestCase):
       with tf.GradientTape() as tape:
         actual_loss = qmhl_func(test_qhbm, target_states, target_counts)
       # TODO(zaqqwerty): add way to use a log QHBM as observable on states
-      expected_expectation = tf.reduce_sum(
-          test_thetas * (2 * data_probs - 1) * tf.math.cos(alphas) *
-          tf.math.cos(test_phis))
+      expected_expectation = tf.reduce_sum(test_thetas * (2 * data_probs - 1) *
+                                           tf.math.cos(alphas) *
+                                           tf.math.cos(test_phis))
       expected_loss = expected_expectation + expected_log_partition
       self.assertAllClose(actual_loss, expected_loss, atol=ATOL, rtol=RTOL)
 
