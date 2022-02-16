@@ -14,17 +14,32 @@
 # ==============================================================================
 """Tests for the circuit_infer_utils module."""
 
+import random
+import string
+
+import cirq
 import tensorflow as tf
+import tensorflow_quantum as tfq
+from tensorflow_quantum.python import util as tfq_util
 
 from qhbmlib import circuit_infer_utils
-
+from qhbmlib import circuit_model
 
 class UnitaryTest(tf.test.TestCase):
   """Tests the unitary function."""
 
+  def setUp(self):
+    """Initializes test objects."""
+    super().setUp()
+
+    self.num_bits = 4
+    self.tf_random_seed = 7
+    self.close_rtol = 1e-4
+
   def test_unitary(self):
     """Confirms unitary is correct for a random circuit."""
     # TODO(#171) this random circuit construction happens in a few places.
+    qubits = cirq.GridQubit.rect(1, self.num_bits)
     batch_size = 1
     n_moments = 10
     act_fraction = 0.9
@@ -49,7 +64,7 @@ class UnitaryTest(tf.test.TestCase):
 
     unitary_wrapper = tf.function(circuit_infer_utils.unitary)
     actual_unitary = unitary_wrapper(circuit)
-    self.assertAllClose(actual_unitary, expected_unitary)
+    self.assertAllClose(actual_unitary, expected_unitary, rtol=self.close_rtol)
 
 
 if __name__ == "__main__":
