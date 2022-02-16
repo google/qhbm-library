@@ -43,8 +43,8 @@ class QMHLTest(tf.test.TestCase):
     self.num_qubits_list = [1, 2]
     self.tf_random_seed = 5
     self.tfp_seed = tf.constant([3, 5], tf.int32)
-    self.num_samples = int(1e8)
-    self.close_rtol = 1e-3
+    self.num_samples = int(2e4)
+    self.close_rtol = 1e-2
     self.zero_atol = 1e-3
     self.not_zero_atol = 2e-3
 
@@ -240,7 +240,7 @@ class QMHLTest(tf.test.TestCase):
                           self.close_rtol)
 
       expected_loss = expected_expectation + expected_log_partition
-      self.assertAllClose(actual_loss, expected_loss)
+      self.assertAllClose(actual_loss, expected_loss, rtol=self.close_rtol)
 
       expected_log_partition_grad = tf.math.tanh(test_thetas)
       actual_log_partition_grad = log_partition_tape.gradient(

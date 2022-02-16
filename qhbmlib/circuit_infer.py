@@ -138,7 +138,7 @@ class QuantumInference(tf.keras.layers.Layer):
         tiled_ops,
         tf.tile(tf.expand_dims(counts, 1), [1, num_ops]),
     )
-    return utils.expand_unique_results(post_process(expectations), idx)
+    return post_process(utils.expand_unique_results(expectations, idx))
 
   def sample(self, initial_states: tf.Tensor, counts: tf.Tensor):
     """Returns bitstring samples from the QNN.
