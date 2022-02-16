@@ -56,9 +56,9 @@ def fidelity(model: hamiltonian_model.Hamiltonian, sigma: tf.Tensor):
   sqrt_e_rho = tf.sqrt(e_rho)
   v_rho_sqrt_e_rho = tf.multiply(
       v_rho, tf.tile(tf.expand_dims(sqrt_e_rho, 0), (tf.shape(v_rho)[0], 1)))
-  rho_sqrt = tf.linalg.matmul(v_rho_sqrt_e_rho, tf.linalg.adjoint(v_rho))
-  omega = tf.linalg.matmul(
-      tf.linalg.matmul(rho_sqrt, tf.cast(sigma, tf.complex64)), rho_sqrt)
+  rho_sqrt = tf.matmul(v_rho_sqrt_e_rho, tf.linalg.adjoint(v_rho))
+  omega = tf.matmul(
+      tf.matmul(rho_sqrt, tf.cast(sigma, tf.complex64)), rho_sqrt)
   # TODO(zaqqwerty): find convincing proof that omega is hermitian,
   # in order to go back to eigvalsh.
   e_omega = tf.linalg.eigvals(omega)
