@@ -56,7 +56,8 @@ def density_matrix(model: hamiltonian_model.Hamiltonian):
   probabilities = tf.cast(
       energy_infer_utils.probabilities(model.energy), tf.complex64)
   unitary_matrix = circuit_infer_utils.unitary(model.circuit)
-  return tf.einsum("k,ik,kj->ij", probabilities, unitary_matrix, tf.linalg.adjoint(unitary_matrix))
+  return tf.einsum("k,ik,kj->ij", probabilities, unitary_matrix,
+                   tf.linalg.adjoint(unitary_matrix))
 
 
 def fidelity(model: hamiltonian_model.Hamiltonian, sigma: tf.Tensor):
@@ -105,10 +106,12 @@ def fidelity(model: hamiltonian_model.Hamiltonian, sigma: tf.Tensor):
     A scalar `tf.Tensor` which is the fidelity between the density matrix
       represented by this QHBM and `sigma`.
   """
-  k_theta = tf.cast(energy_infer_utils.probabilities(model.energy), tf.complex64)
+  k_theta = tf.cast(
+      energy_infer_utils.probabilities(model.energy), tf.complex64)
   u_phi = circuit_infer_utils.unitary(model.circuit)
   u_phi_dagger = tf.linalg.adjoint(u_phi)
   sqrt_k_theta = tf.sqrt(k_theta)
-  omega = tf.einsum("a,ab,bc,cd,d->ad", sqrt_k_theta, u_phi_dagger, sigma, u_phi, sqrt_k_theta)
+  omega = tf.einsum("a,ab,bc,cd,d->ad", sqrt_k_theta, u_phi_dagger, sigma,
+                    u_phi, sqrt_k_theta)
   d_omega = tf.linalg.eigvalsh(omega)
   return tf.math.reduce_sum(tf.math.sqrt(d_omega))**2
