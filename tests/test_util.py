@@ -93,10 +93,8 @@ def get_random_hamiltonian_and_inference(qubits,
 
 def get_random_pauli_sum(qubits):
   """Test fixture.
-
     Args:
       qubits: A list of `cirq.GridQubit`s on which to build the pauli sum.
-
     Returns:
       pauli_sum: A `cirq.PauliSum` which is a linear combination of random pauli
       strings on `qubits`.
@@ -130,17 +128,13 @@ def generate_pure_random_density_operator(num_qubits):
 
 def generate_mixed_random_density_operator(num_qubits, num_mixtures=5):
   """Generates a random mixed density matrix.
-
     Generates `num_mixtures` random quantum states, takes their outer products,
     and generates a random convex combination of them.
-
     NOTE: the states in the mixture are all orthogonal.
-
     Args:
       num_qubits: 2**num_qubits is the size of the density matrix.
       num_mixtures: the number of pure states in the mixture.  Must be greater
         than 2**num_qubits.
-
     Returns:
       final_state: The mixed density matrix.
       prob: The probability of each random state in the mixture.
@@ -220,11 +214,9 @@ def eager_mode_toggle(func):
 
 def approximate_derivative(f, delta=1e-1):
   """Approximates the derivative of f using five point stencil.
-
   See wikipedia page on "five point stencil",
   https://en.wikipedia.org/wiki/Five-point_stencil
   Note: the error of this method scales with delta ** 4.
-
   Args:
     f: Function to approximately differentiate.  Should take one input, which
       is a parameter setting the perturbation to the parameter to differentiate.
@@ -240,3 +232,23 @@ def approximate_derivative(f, delta=1e-1):
   numerator = tf.reduce_sum(
       tf.stack(tf.nest.map_structure(tf.reduce_sum, numerator_flat)))
   return numerator / (12.0 * delta)
+
+
+def approximate_derivative_unsummed(f, delta=1e-1):
+  """Approximates the derivative of f using five point stencil.
+  See wikipedia page on "five point stencil",
+  https://en.wikipedia.org/wiki/Five-point_stencil
+  Note: the error of this method scales with delta ** 4.
+  Args:
+    f: Function to approximately differentiate.  Should take one input, which
+      is a parameter setting the perturbation to the parameter to differentiate.
+    delta: size of the fundamental perturbation in the stencil.
+  """
+  forward_twice = f(2.0 * delta)
+  forward_once = f(delta)
+  backward_once = f(-1.0 * delta)
+  backward_twice = f(-2.0 * delta)
+  numerator = tf.nest.map_structure(
+      lambda a, b, c, d: -1.0 * a + 8.0 * b - 8.0 * c + d, forward_twice,
+      forward_once, backward_once, backward_twice)
+  return tf.nest.map_structure(lambda x: x / (12.0 * delta), numerator)
