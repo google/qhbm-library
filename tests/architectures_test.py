@@ -75,8 +75,7 @@ class RPQCTest(tf.test.TestCase, parameterized.TestCase):
       if n % 2 == 1:
         s = sympy.Symbol("sc_{0}_{1}_{2}".format(name, layer_num, n))
         expected_circuit += cirq.Circuit(cirq.CZ(q0, q1)**s)
-    actual_circuit = architectures.get_cz_exp_layer(
-        qubits, layer_num, name)
+    actual_circuit = architectures.get_cz_exp_layer(qubits, layer_num, name)
     self.assertEqual(actual_circuit, expected_circuit)
 
   @parameterized.parameters([{"n_qubits": 11}, {"n_qubits": 12}])
@@ -85,13 +84,11 @@ class RPQCTest(tf.test.TestCase, parameterized.TestCase):
     qubits = cirq.GridQubit.rect(1, n_qubits)
     name = "test_hardware_efficient_model"
     expected_circuit = cirq.Circuit()
-    this_circuit = architectures.get_xz_rotation_layer(
-        qubits, 0, name)
+    this_circuit = architectures.get_xz_rotation_layer(qubits, 0, name)
     expected_circuit += this_circuit
     this_circuit = architectures.get_cz_exp_layer(qubits, 0, name)
     expected_circuit += this_circuit
-    this_circuit = architectures.get_xz_rotation_layer(
-        qubits, 1, name)
+    this_circuit = architectures.get_xz_rotation_layer(qubits, 1, name)
     expected_circuit += this_circuit
     this_circuit = architectures.get_cz_exp_layer(qubits, 1, name)
     expected_circuit += this_circuit
@@ -104,11 +101,9 @@ class RPQCTest(tf.test.TestCase, parameterized.TestCase):
     qubits = [cirq.GridQubit(2, 3)]
     name = "test_harware_efficient_model_1q"
     expected_circuit = cirq.Circuit()
-    this_circuit = architectures.get_xz_rotation_layer(
-        qubits, 0, name)
+    this_circuit = architectures.get_xz_rotation_layer(qubits, 0, name)
     expected_circuit += this_circuit
-    this_circuit = architectures.get_xz_rotation_layer(
-        qubits, 1, name)
+    this_circuit = architectures.get_xz_rotation_layer(qubits, 1, name)
     expected_circuit += this_circuit
     actual_circuit = architectures.get_hardware_efficient_model_unitary(
         qubits, 2, name)
@@ -183,8 +178,7 @@ class HEA2dTest(tf.test.TestCase):
     expected_circuit += cirq.Circuit(
         cirq.CZPowGate(exponent=s)(cirq.GridQubit(0, 2), cirq.GridQubit(1, 2)))
 
-    actual_circuit = architectures.get_2d_cz_exp_layer(
-        2, 3, layer_num, name)
+    actual_circuit = architectures.get_2d_cz_exp_layer(2, 3, layer_num, name)
     self.assertEqual(actual_circuit, expected_circuit)
 
   def test_get_2d_cz_exp_layer_empty(self):
@@ -199,8 +193,7 @@ class HEA2dTest(tf.test.TestCase):
     s = sympy.Symbol(f"scz_{name}_{layer_num}_row{0}_{0}_{1}")
     expected_circuit = cirq.Circuit(
         cirq.CZPowGate(exponent=s)(cirq.GridQubit(0, 0), cirq.GridQubit(0, 1)))
-    actual_circuit = architectures.get_2d_cz_exp_layer(
-        1, 2, layer_num, name)
+    actual_circuit = architectures.get_2d_cz_exp_layer(1, 2, layer_num, name)
     self.assertEqual(actual_circuit, expected_circuit)
 
   def test_get_2d_hea(self):
@@ -209,10 +202,8 @@ class HEA2dTest(tf.test.TestCase):
     name = "test_hea"
     expected_circuit = cirq.Circuit()
     for layer in range(num_layers):
-      xz_circuit = architectures.get_2d_xz_rotation_layer(
-          2, 3, layer, name)
-      cz_circuit = architectures.get_2d_cz_exp_layer(
-          2, 3, layer, name)
+      xz_circuit = architectures.get_2d_xz_rotation_layer(2, 3, layer, name)
+      cz_circuit = architectures.get_2d_cz_exp_layer(2, 3, layer, name)
       expected_circuit += xz_circuit
       expected_circuit += cz_circuit
     actual_circuit = architectures.get_2d_hea(2, 3, 2, name)
