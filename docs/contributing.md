@@ -36,7 +36,7 @@ We follow a standard open source pull request workflow.
 
 ### 1. Get the source code
 
-Before starting, be sure to follow the instructions to [install from source](https://github.com/google/qhbm-library/blob/main/docs/install.md#install-from-source).
+Before starting, be sure to follow the instructions to [install from source](https://github.com/google/qhbm-library/blob/main/docs/INSTALL.md#install-from-source).
 
 
 ### 2. Update your fork
