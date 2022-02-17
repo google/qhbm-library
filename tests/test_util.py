@@ -25,41 +25,12 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from qhbmlib import architectures
-from qhbmlib import ebm
-from qhbmlib import qhbm
-from qhbmlib import qnn
 from qhbmlib import circuit_infer
 from qhbmlib import circuit_model
 from qhbmlib import energy_infer
 from qhbmlib import energy_model
 from qhbmlib import hamiltonian_infer
 from qhbmlib import hamiltonian_model
-
-
-def get_random_qhbm(
-    qubits,
-    num_layers,
-    identifier,
-    minval_thetas=-1.0,
-    maxval_thetas=1.0,
-    minval_phis=-6.2,
-    maxval_phis=6.2,
-):
-  """Create a random QHBM for use in testing."""
-  num_qubits = len(qubits)
-  this_ebm = ebm.Bernoulli(
-      num_qubits,
-      tf.keras.initializers.RandomUniform(
-          minval=minval_thetas, maxval=maxval_thetas),
-      is_analytic=True)
-  unitary = architectures.get_hardware_efficient_model_unitary(
-      qubits, num_layers, identifier)
-  this_qnn = qnn.QNN(
-      unitary,
-      initializer=tf.keras.initializers.RandomUniform(
-          minval=minval_phis, maxval=maxval_phis),
-      is_analytic=True)
-  return qhbm.QHBM(this_ebm, this_qnn, identifier)
 
 
 def get_random_hamiltonian_and_inference(qubits,
