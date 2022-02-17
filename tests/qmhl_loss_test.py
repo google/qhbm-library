@@ -43,6 +43,7 @@ class QMHLTest(tf.test.TestCase):
     self.tf_random_seed = 4
     self.tf_random_seed_alt = 6
     self.tfp_seed = tf.constant([3, 6], tf.int32)
+    # TODO(#190)
     self.num_samples = int(1e6)
     self.close_rtol = 2e-2
     self.zero_atol = 2e-3
@@ -199,10 +200,10 @@ class QMHLTest(tf.test.TestCase):
         actual_ktp = -actual_log_dm - tf.eye(
             2, dtype=tf.complex64) * tf.cast(actual_log_partition, tf.complex64)
 
-        a = complex((test_thetas[0] * tf.math.cos(test_phis[0])).numpy(), 0)
+        a = (test_thetas[0] * tf.math.cos(test_phis[0])).numpy() + 0j
         b = 1j * (test_thetas[0] * tf.math.sin(test_phis[0])).numpy()
         c = -1j * (test_thetas[0] * tf.math.sin(test_phis[0])).numpy()
-        d = complex(-(test_thetas[0] * tf.math.cos(test_phis[0])).numpy(), 0)
+        d = -(test_thetas[0] * tf.math.cos(test_phis[0])).numpy() + 0j
         expected_ktp = tf.constant([[a, b], [c, d]], dtype=tf.complex64)
 
         self.assertAllClose(actual_ktp, expected_ktp, rtol=self.close_rtol)
@@ -223,7 +224,7 @@ class QMHLTest(tf.test.TestCase):
 
       # Load target data into a QuantumData class
       class FixedData(quantum_data.QuantumData):
-        """Contains a fixed quantumd data set."""
+        """Contains a fixed quantum data set."""
 
         def __init__(self, samples, q_infer):
           """Initializes a FixedData."""
