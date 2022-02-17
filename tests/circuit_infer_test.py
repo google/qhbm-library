@@ -409,7 +409,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     """Confirms correct sampling from identity, bit flip, and GHZ QNNs."""
     bitstrings = tf.constant(
         list(itertools.product([0, 1], repeat=self.num_bits)), dtype=tf.int8)
-    counts = tf.random.uniform([tf.shape(bitstrings)[0]], 10, 100, tf.int32)
+    counts = tf.random.uniform([tf.shape(bitstrings)[0]], 100, 1000, tf.int32)
 
     ident_qnn = circuit_model.DirectQuantumCircuit(
         cirq.Circuit(cirq.I(q) for q in self.raw_qubits), name="identity")

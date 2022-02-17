@@ -52,7 +52,7 @@ def get_random_qhbm(
       tf.keras.initializers.RandomUniform(
           minval=minval_thetas, maxval=maxval_thetas),
       is_analytic=True)
-  unitary, phis_symbols = architectures.get_hardware_efficient_model_unitary(
+  unitary = architectures.get_hardware_efficient_model_unitary(
       qubits, num_layers, identifier)
   this_qnn = qnn.QNN(
       unitary,
@@ -82,7 +82,7 @@ def get_random_hamiltonian_and_inference(qubits,
 
   qnn_init = tf.keras.initializers.RandomUniform(
       minval=minval_phis, maxval=maxval_phis)
-  unitary, _ = architectures.get_hardware_efficient_model_unitary(
+  unitary = architectures.get_hardware_efficient_model_unitary(
       qubits, num_layers, identifier)
   circuit = circuit_model.DirectQuantumCircuit(unitary, qnn_init)
   q_infer = circuit_infer.QuantumInference(circuit, name=identifier)
