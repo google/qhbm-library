@@ -14,8 +14,6 @@
 # ==============================================================================
 """Selection of quantum circuits architectures used in defining QHBMs."""
 
-import bisect
-
 import cirq
 import sympy
 import tensorflow_quantum as tfq
