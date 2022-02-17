@@ -14,9 +14,10 @@
 # ==============================================================================
 """Tests for the circuit_infer module."""
 
-import itertools
 from absl import logging
 from absl.testing import parameterized
+import functools
+import itertools
 import random
 import string
 
@@ -24,7 +25,6 @@ import cirq
 import math
 import sympy
 import tensorflow as tf
-import tensorflow_probability as tfp
 import tensorflow_quantum as tfq
 from tensorflow_quantum.python import util as tfq_util
 
@@ -33,12 +33,7 @@ from qhbmlib import circuit_model
 from qhbmlib import circuit_model_utils
 from qhbmlib import energy_model
 from qhbmlib import hamiltonian_model
-from qhbmlib import utils
 from tests import test_util
-
-# Global tolerance, set for float32.
-ATOL = 1e-5
-GRAD_ATOL = 2e-4
 
 
 class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
@@ -47,27 +42,23 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
   def setUp(self):
     """Initializes test objects."""
     super().setUp()
+    self.tf_random_seed = 10
+    self.tfp_seed = tf.constant([5, 6], dtype=tf.int32)
+
+    self.close_atol = 1e-3
+    self.close_rtol = 1e-3
+    self.not_zero_atol = 2e-3
 
     # Build QNN representing X^p|s>
-    self.num_qubits = 5
-    self.raw_qubits = cirq.GridQubit.rect(1, self.num_qubits)
+    self.num_bits = 3
+    self.raw_qubits = cirq.GridQubit.rect(1, self.num_bits)
     p_param = sympy.Symbol("p")
     p_circuit = cirq.Circuit(cirq.X(q)**p_param for q in self.raw_qubits)
     self.p_qnn = circuit_model.DirectQuantumCircuit(
         p_circuit,
         initializer=tf.keras.initializers.RandomUniform(
-            minval=-5.0, maxval=5.0),
+            minval=-1.0, maxval=1.0, seed=self.tf_random_seed),
         name="p_qnn")
-    self.tfp_seed = tf.constant([5, 6], dtype=tf.int32)
-
-    self.close_rtol = 1e-2
-    self.not_zero_atol = 1e-3
-
-    self.tf_random_seed = 10
-    self.tfp_seed = tf.constant([5, 6], dtype=tf.int32)
-
-    self.close_rtol = 1e-2
-    self.not_zero_atol = 1e-4
 
   def test_init(self):
     """Confirms QuantumInference is initialized correctly."""
@@ -87,7 +78,6 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
   @test_util.eager_mode_toggle
   def test_expectation(self):
     r"""Confirms basic correct expectation values and derivatives.
-
     Consider a circuit where each qubit has a gate X^p. Diagonalization of X is
         |0 1|   |-1 1||-1 0||-1/2 1/2|
     X = |1 0| = | 1 1|| 0 1|| 1/2 1/2|
@@ -110,13 +100,11 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     <s|(X^p)^dagger = 1/2 |((-1)^s)((-1)^p)^dagger -((-1)^s)((-1)^p)^dagger|
                                                                      + 1/2 |1 1|
     where ((-1)^p)^dagger = cos(pi * p) - isin(pi * p).
-
     We want to see what the expectation values <s|(X^p)^dagger W X^p|s> are,
     for W in {X, Y, Z}.  Applying the above results, we have
     <s|(X^p)^dagger X X^p|s> = 0
     <s|(X^p)^dagger Y X^p|s> = -(-1)^s sin(pi * p)
     <s|(X^p)^dagger Z X^p|s> = (-1)^s cos(pi * p)
-
     Since these expectation values are in terms of p, we can calculate their
     derivatives with respect to p:
     d/dp <s|(X^p)^dagger X X^p|s> = 0
@@ -127,11 +115,10 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     # Build inference object
     exp_infer = circuit_infer.QuantumInference(self.p_qnn)
 
-    # Choose some bitstrings.
-    num_bitstrings = int(1e6)
-    initial_states = tfp.distributions.Bernoulli(
-        probs=[0.5] * self.num_qubits, dtype=tf.int8).sample(num_bitstrings)
-    bitstrings, _, counts = utils.unique_bitstrings_with_counts(initial_states)
+    # Get all the bitstrings multiple times.
+    initial_states_list = 5 * list(
+        itertools.product([0, 1], repeat=self.num_bits))
+    initial_states = tf.constant(initial_states_list, dtype=tf.int8)
 
     # Get true expectation values based on the bitstrings.
     expected_x_exps = []
@@ -152,7 +139,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     ]
     sin_pi_p = math.sin(math.pi * self.p_qnn.symbol_values[0])
     cos_pi_p = math.cos(math.pi * self.p_qnn.symbol_values[0])
-    for bits in bitstrings.numpy().tolist():
+    for bits in initial_states_list:
       for exps in expected + expected_grad:
         exps.append([])
       for s in bits:
@@ -162,17 +149,6 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         expected_y_exps_grad[-1].append(-((-1.0)**s) * math.pi * cos_pi_p)
         expected_z_exps[-1].append(((-1.0)**s) * cos_pi_p)
         expected_z_exps_grad[-1].append(-((-1.0)**s) * math.pi * sin_pi_p)
-    e_counts = tf.cast(tf.expand_dims(counts, 1), tf.float32)
-    total_counts = tf.cast(tf.reduce_sum(counts), tf.float32)
-    expected_reduced = []
-    expected_grad_reduced = []
-    for exps in expected:
-      expected_reduced.append(tf.reduce_sum(exps * e_counts, 0) / total_counts)
-    for exps in expected_grad:
-      expected_grad_reduced.append(
-          tf.reduce_sum(exps * e_counts, 0) / total_counts)
-    expected_reduced = tf.stack(expected_reduced)
-    expected_grad_reduced = tf.stack(expected_grad_reduced)
 
     # Measure operators on every qubit.
     x_ops = tfq.convert_to_tensor([1 * cirq.X(q) for q in self.raw_qubits])
@@ -181,29 +157,24 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     all_ops = [x_ops, y_ops, z_ops]
 
     expectation_wrapper = tf.function(exp_infer.expectation)
-    actual_reduced = []
-    actual_grad_reduced = []
+    actual = []
+    actual_grad = []
     for op in all_ops:
       with tf.GradientTape() as tape:
         current_exp = expectation_wrapper(initial_states, op)
-        reduced_exp = tf.math.reduce_mean(current_exp, 0)
-      reduced_grad = tf.squeeze(
-          tape.jacobian(reduced_exp, self.p_qnn.trainable_variables))
-      actual_reduced.append(reduced_exp)
-      actual_grad_reduced.append(reduced_grad)
-    actual_reduced = tf.stack(actual_reduced)
-    actual_grad_reduced = tf.stack(actual_grad_reduced)
+      current_grad = tf.squeeze(
+          tape.jacobian(current_exp, self.p_qnn.trainable_variables))
+      actual.append(current_exp)
+      actual_grad.append(current_grad)
 
-    self.assertAllClose(actual_reduced, expected_reduced, atol=ATOL)
-    self.assertAllClose(
-        actual_grad_reduced, expected_grad_reduced, atol=GRAD_ATOL)
+    self.assertAllClose(actual, expected, rtol=self.close_rtol)
+    self.assertAllClose(actual_grad, expected_grad, rtol=self.close_rtol)
 
   @test_util.eager_mode_toggle
   def test_expectation_cirq(self):
     """Compares library expectation values to those from Cirq."""
     # observable
-    num_bits = 4
-    qubits = cirq.GridQubit.rect(1, num_bits)
+    qubits = cirq.GridQubit.rect(1, self.num_bits)
     raw_ops = [
         cirq.PauliSum.from_pauli_strings(
             [cirq.PauliString(cirq.Z(q)) for q in qubits])
@@ -212,9 +183,9 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
 
     # unitary
     batch_size = 1
-    n_moments = 10
-    act_fraction = 0.9
-    num_symbols = 2
+    n_moments = 3
+    act_fraction = 1.0
+    num_symbols = 4
     symbols = set()
     for _ in range(num_symbols):
       symbols.add("".join(random.sample(string.ascii_letters, 10)))
@@ -222,53 +193,86 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     raw_circuits, _ = tfq_util.random_symbol_circuit_resolver_batch(
         qubits, symbols, batch_size, n_moments=n_moments, p=act_fraction)
     raw_circuit = raw_circuits[0]
-    random_values = tf.random.uniform([len(symbols)], -1, 1, tf.float32,
-                                      self.tf_random_seed).numpy().tolist()
-    resolver = dict(zip(symbols, random_values))
+    initial_random_values = tf.random.uniform([len(symbols)], -1, 1, tf.float32,
+                                              self.tf_random_seed)
+    random_values = tf.Variable(initial_random_values)
+
+    all_bitstrings = list(itertools.product([0, 1], repeat=self.num_bits))
+    bitstring_circuit = circuit_model_utils.bit_circuit(qubits)
+    bitstring_symbols = sorted(tfq.util.get_circuit_symbols(bitstring_circuit))
+    total_circuit = bitstring_circuit + raw_circuit
+
+    def generate_resolvers():
+      """Return the current resolver."""
+      random_values_list = random_values.read_value().numpy().tolist()
+      base_resolver = dict(zip(symbols, random_values_list))
+      bitstring_resolvers = [
+          dict(zip(bitstring_symbols, b)) for b in all_bitstrings
+      ]
+      return [{**r, **base_resolver} for r in bitstring_resolvers]
+
+    def delta_expectations_func(k, var, delta):
+      """Calculate the expectation with kth entry of `var` perturbed."""
+      num_elts = tf.size(var)
+      old_value = var.read_value()
+      var.assign(old_value + delta * tf.one_hot(k, num_elts, 1.0, 0.0))
+      total_resolvers = generate_resolvers()
+      raw_delta_expectations = tf.constant([[
+          cirq.Simulator().simulate_expectation_values(total_circuit, o,
+                                                       r)[0].real
+          for o in raw_ops
+      ]
+                                            for r in total_resolvers])
+      delta_expectations = tf.constant(raw_delta_expectations)
+      var.assign(old_value)
+      return delta_expectations
 
     # hamiltonian model and inference
     circuit = circuit_model.QuantumCircuit(
         tfq.convert_to_tensor([raw_circuit]), qubits, tf.constant(symbols),
-        [tf.Variable([resolver[s] for s in symbols])], [[]])
+        [random_values], [[]])
     q_infer = circuit_infer.QuantumInference(circuit)
 
-    # bitstring injectors
-    all_bitstrings = list(itertools.product([0, 1], repeat=num_bits))
-    bitstring_circuit = circuit_model_utils.bit_circuit(qubits)
-    bitstring_symbols = sorted(tfq.util.get_circuit_symbols(bitstring_circuit))
-    bitstring_resolvers = [
-        dict(zip(bitstring_symbols, b)) for b in all_bitstrings
-    ]
-
     # calculate expected values
-    total_circuit = bitstring_circuit + raw_circuit
-    total_resolvers = [{**r, **resolver} for r in bitstring_resolvers]
-    raw_expectations = tf.constant([[
-        cirq.Simulator().simulate_expectation_values(total_circuit, o,
-                                                     r)[0].real for o in raw_ops
-    ] for r in total_resolvers])
-    expected_expectations = tf.constant(raw_expectations)
+    expected_expectations = delta_expectations_func(0, random_values, 0)
+    print(f"expected_expectations: {expected_expectations}")
+
     # Check that expectations are a reasonable size
     self.assertAllGreater(
         tf.math.abs(expected_expectations), self.not_zero_atol)
 
     expectation_wrapper = tf.function(q_infer.expectation)
-    actual_expectations = expectation_wrapper(all_bitstrings, ops)
+    with tf.GradientTape() as tape:
+      actual_expectations = expectation_wrapper(all_bitstrings, ops)
     self.assertAllClose(
         actual_expectations, expected_expectations, rtol=self.close_rtol)
 
-    # Ensure circuit parameter update changes the expectation value.
-    old_circuit_weights = circuit.get_weights()
-    circuit.set_weights([tf.ones_like(w) for w in old_circuit_weights])
-    altered_circuit_expectations = expectation_wrapper(all_bitstrings, ops)
-    self.assertNotAllClose(
-        altered_circuit_expectations, actual_expectations, rtol=self.close_rtol)
-    circuit.set_weights(old_circuit_weights)
+    def expectations_derivative(variables_list):
+      """Approximately differentiates expectations with respect to the inputs"""
+      derivatives = []
+      for var in variables_list:
+        var_derivative_list = []
+        num_elts = tf.size(var)  # Assumes variable is 1D
+        for n in range(num_elts):
+          this_derivative = test_util.approximate_derivative_unsummed(
+              functools.partial(delta_expectations_func, n, var))
+          var_derivative_list.append(this_derivative.numpy())
+        derivatives.append(tf.constant(var_derivative_list))
+      return derivatives
 
-    # Check that values return to start.
-    reset_expectations = expectation_wrapper(all_bitstrings, ops)
-    self.assertAllClose(reset_expectations, actual_expectations,
-                        self.close_rtol)
+    expected_expectations_derivative = tf.transpose(
+        tf.squeeze(expectations_derivative(circuit.trainable_variables)))
+    actual_expectations_derivative = tf.squeeze(
+        tape.jacobian(actual_expectations, circuit.trainable_variables))
+
+    self.assertNotAllClose(
+        expected_expectations_derivative,
+        tf.zeros_like(expected_expectations_derivative),
+        atol=self.not_zero_atol)
+    self.assertAllClose(
+        expected_expectations_derivative,
+        actual_expectations_derivative,
+        atol=self.close_atol)
 
   @parameterized.parameters({
       "energy_class": energy_class,
@@ -279,53 +283,132 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
   def test_expectation_modular_hamiltonian(self, energy_class, energy_args):
     """Confirm expectation of modular Hamiltonians works."""
     # set up the modular Hamiltonian to measure
-    num_bits = 3
-    n_moments = 5
+    # EBM
+    energy_h = energy_class(*([list(range(self.num_bits))] + energy_args))
+    energy_h.build([None, self.num_bits])
+
+    # QNN
+    qubits = cirq.GridQubit.rect(1, self.num_bits)
+    batch_size = 1
+    n_moments = 4
     act_fraction = 1.0
-    qubits = cirq.GridQubit.rect(1, num_bits)
-    energy_h = energy_class(*([list(range(num_bits))] + energy_args))
-    energy_h.build([None, num_bits])
-    raw_circuit_h = cirq.testing.random_circuit(qubits, n_moments, act_fraction)
+    num_symbols = 4
+    symbols = set()
+    for _ in range(num_symbols):
+      symbols.add("".join(random.sample(string.ascii_letters, 10)))
+    symbols = sorted(list(symbols))
+    raw_circuits, _ = tfq_util.random_symbol_circuit_resolver_batch(
+        qubits, symbols, batch_size, n_moments=n_moments, p=act_fraction)
+    raw_circuit_h = raw_circuits[0]
     circuit_h = circuit_model.DirectQuantumCircuit(raw_circuit_h)
     circuit_h.build([])
+    initial_random_values = tf.random.uniform([len(symbols)], -1, 1, tf.float32,
+                                              self.tf_random_seed)
+    circuit_h.set_weights([initial_random_values])
     hamiltonian_measure = hamiltonian_model.Hamiltonian(energy_h, circuit_h)
     raw_shards = tfq.from_tensor(hamiltonian_measure.operator_shards)
 
-    # set up the circuit and inference
+    # set up the circuit to measure against
     model_raw_circuit = cirq.testing.random_circuit(qubits, n_moments,
                                                     act_fraction)
     model_circuit = circuit_model.DirectQuantumCircuit(model_raw_circuit)
     model_infer = circuit_infer.QuantumInference(model_circuit)
 
     # bitstring injectors
-    all_bitstrings = list(itertools.product([0, 1], repeat=num_bits))
+    all_bitstrings = list(itertools.product([0, 1], repeat=self.num_bits))
     bitstring_circuit = circuit_model_utils.bit_circuit(qubits)
     bitstring_symbols = sorted(tfq.util.get_circuit_symbols(bitstring_circuit))
-    bitstring_resolvers = [
-        dict(zip(bitstring_symbols, b)) for b in all_bitstrings
-    ]
-
-    # calculate expected values
     total_circuit = bitstring_circuit + model_raw_circuit + raw_circuit_h**-1
-    expected_expectations = tf.stack([
-        tf.stack([
-            hamiltonian_measure.energy.operator_expectation([
-                cirq.Simulator().simulate_expectation_values(
-                    total_circuit, o, r)[0].real for o in raw_shards
-            ])
-        ]) for r in bitstring_resolvers
-    ])
+
+    def generate_resolvers():
+      """Return the current resolver."""
+      random_values_list = circuit_h.trainable_variables[0].read_value().numpy(
+      ).tolist()
+      base_resolver = dict(zip(symbols, random_values_list))
+      bitstring_resolvers = [
+          dict(zip(bitstring_symbols, b)) for b in all_bitstrings
+      ]
+      return [{**r, **base_resolver} for r in bitstring_resolvers]
+
+    def delta_expectations_func(k, var, delta):
+      """Calculate the expectation with kth entry of `var` perturbed."""
+      num_elts = tf.size(var)
+      old_value = var.read_value()
+      var.assign(old_value + delta * tf.one_hot(k, num_elts, 1.0, 0.0))
+      total_resolvers = generate_resolvers()
+      raw_delta_expectations = tf.stack([
+          tf.stack([
+              hamiltonian_measure.energy.operator_expectation([
+                  cirq.Simulator().simulate_expectation_values(
+                      total_circuit, o, r)[0].real for o in raw_shards
+              ])
+          ]) for r in total_resolvers
+      ])
+      delta_expectations = tf.constant(raw_delta_expectations)
+      var.assign(old_value)
+      return delta_expectations
+
+    expected_expectations = delta_expectations_func(
+        0, circuit_h.trainable_variables[0], 0)
+    self.assertNotAllClose(
+        expected_expectations,
+        tf.zeros_like(expected_expectations),
+        atol=self.not_zero_atol)
 
     expectation_wrapper = tf.function(model_infer.expectation)
-    actual_expectations = expectation_wrapper(all_bitstrings,
-                                              hamiltonian_measure)
+    with tf.GradientTape() as tape:
+      actual_expectations = expectation_wrapper(all_bitstrings,
+                                                hamiltonian_measure)
     self.assertAllClose(actual_expectations, expected_expectations)
+
+    def expectations_derivative(variables_list):
+      """Approximately differentiates expectations with respect to the inputs"""
+      derivatives = []
+      for var in variables_list:
+        var_derivative_list = []
+        num_elts = tf.size(var)  # Assumes variable is 1D
+        for n in range(num_elts):
+          this_derivative = test_util.approximate_derivative_unsummed(
+              functools.partial(delta_expectations_func, n, var))
+          var_derivative_list.append(this_derivative.numpy())
+        derivatives.append(tf.constant(var_derivative_list))
+      return derivatives
+
+    expected_derivatives_thetas = tf.transpose(
+        tf.squeeze(
+            expectations_derivative(
+                hamiltonian_measure.energy.trainable_variables)))
+    self.assertNotAllClose(
+        expected_derivatives_thetas,
+        tf.zeros_like(expected_derivatives_thetas),
+        atol=self.not_zero_atol)
+    expected_derivatives_phis = tf.transpose(
+        tf.squeeze(
+            expectations_derivative(
+                hamiltonian_measure.circuit.trainable_variables)))
+    self.assertNotAllClose(
+        expected_derivatives_phis,
+        tf.zeros_like(expected_derivatives_phis),
+        atol=self.not_zero_atol)
+    actual_derivatives_thetas, actual_derivatives_phis = tape.jacobian(
+        actual_expectations, (hamiltonian_measure.energy.trainable_variables,
+                              hamiltonian_measure.circuit.trainable_variables))
+    actual_derivatives_thetas = tf.squeeze(actual_derivatives_thetas)
+    actual_derivatives_phis = tf.squeeze(actual_derivatives_phis)
+    self.assertAllClose(
+        actual_derivatives_phis,
+        expected_derivatives_phis,
+        rtol=self.close_rtol)
+    self.assertAllClose(
+        actual_derivatives_thetas,
+        expected_derivatives_thetas,
+        rtol=self.close_rtol)
 
   @test_util.eager_mode_toggle
   def test_sample_basic(self):
     """Confirms correct sampling from identity, bit flip, and GHZ QNNs."""
     bitstrings = tf.constant(
-        list(itertools.product([0, 1], repeat=self.num_qubits)), dtype=tf.int8)
+        list(itertools.product([0, 1], repeat=self.num_bits)), dtype=tf.int8)
     counts = tf.random.uniform([tf.shape(bitstrings)[0]], 10, 100, tf.int32)
 
     ident_qnn = circuit_model.DirectQuantumCircuit(
@@ -362,15 +445,15 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     q_infer = circuit_infer.QuantumInference(ghz_qnn)
     sample_wrapper = tf.function(q_infer.sample)
     test_samples = sample_wrapper(
-        tf.expand_dims(tf.constant([0] * self.num_qubits, dtype=tf.int8), 0),
+        tf.expand_dims(tf.constant([0] * self.num_bits, dtype=tf.int8), 0),
         tf.expand_dims(counts[0], 0))[0].to_tensor()
     # Both |0...0> and |1...1> should be among the measured bitstrings
     self.assertTrue(
         test_util.check_bitstring_exists(
-            tf.constant([0] * self.num_qubits, dtype=tf.int8), test_samples))
+            tf.constant([0] * self.num_bits, dtype=tf.int8), test_samples))
     self.assertTrue(
         test_util.check_bitstring_exists(
-            tf.constant([1] * self.num_qubits, dtype=tf.int8), test_samples))
+            tf.constant([1] * self.num_bits, dtype=tf.int8), test_samples))
 
   @test_util.eager_mode_toggle
   def test_sample_uneven(self):
