@@ -1,13 +1,16 @@
 # Install the QHBM Library
 
-There are three ways to start developing with the QHBM Library:
-* Choose any example notebook at TODO, make a copy, and modify to suit your needs.
+There are two ways to start developing with the QHBM Library:
 * Install the package in a local environment.
 * Work from the source code.
 
+
 ## Pip package
 
-### Requirements
+To install, simply run:
+```
+pip install qhbmlib
+```
 
 ## Install from source
 
