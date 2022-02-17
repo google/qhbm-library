@@ -45,8 +45,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     self.tf_random_seed = 10
     self.tfp_seed = tf.constant([5, 6], dtype=tf.int32)
 
-    self.close_atol = 1e-3
-    self.close_rtol = 1e-3
+    self.close_atol = 2e-3
+    self.close_rtol = 2e-3
     self.not_zero_atol = 2e-3
 
     # Build QNN representing X^p|s>
