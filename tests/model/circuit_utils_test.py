@@ -48,3 +48,8 @@ class BitCircuitTest(tf.test.TestCase):
         [cirq.X(q)**s for q, s in zip(my_qubits, expected_symbols)])
     self.assertAllEqual(_pystr(test_symbols), _pystr(expected_symbols))
     self.assertEqual(test_circuit, expected_circuit)
+
+
+if __name__ == "__main__":
+  absl.logging.info("Running circuit_utils_test.py ...")
+  tf.test.main()

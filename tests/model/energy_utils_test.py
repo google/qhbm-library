@@ -111,5 +111,5 @@ class ParityTest(tf.test.TestCase):
 
 
 if __name__ == "__main__":
-  print("Running energy_model_utils_test.py ...")
+  print("Running energy_utils_test.py ...")
   tf.test.main()

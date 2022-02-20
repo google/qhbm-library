@@ -84,5 +84,5 @@ class HamiltonianTest(tf.test.TestCase):
 
 
 if __name__ == "__main__":
-  absl.logging.info("Running hamiltonian_model_test.py ...")
+  absl.logging.info("Running hamiltonian_test.py ...")
   tf.test.main()

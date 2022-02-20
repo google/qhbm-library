@@ -303,5 +303,5 @@ class KOBETest(tf.test.TestCase):
 
 
 if __name__ == "__main__":
-  print("Running energy_model_test.py ...")
+  print("Running energy_test.py ...")
   tf.test.main()
