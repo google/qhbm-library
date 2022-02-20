@@ -17,16 +17,16 @@
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-from qhbmlib import circuit_model
+from qhbmlib.model import circuit
 
 
-def unitary(circuit: circuit_model.QuantumCircuit):
+def unitary(input_circuit: circuit_model.QuantumCircuit):
   """Returns the unitary matrix corresponding to the given circuit.
 
   Args:
-    circuit: Quantum circuit whose unitary matrix is to be calculated.
+    input_circuit: Quantum circuit whose unitary matrix is to be calculated.
   """
   return tfq.layers.Unitary()(
-      circuit.pqc,
-      symbol_names=circuit.symbol_names,
-      symbol_values=tf.expand_dims(circuit.symbol_values, 0)).to_tensor()[0]
+      input_circuit.pqc,
+      symbol_names=input_circuit.symbol_names,
+      symbol_values=tf.expand_dims(input_circuit.symbol_values, 0)).to_tensor()[0]

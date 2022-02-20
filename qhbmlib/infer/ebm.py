@@ -23,7 +23,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow_probability import distributions as tfd
 
-from qhbmlib import energy_model
+from qhbmlib.model import energy
 from qhbmlib import utils
 
 
@@ -57,7 +57,7 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
   """
 
   def __init__(self,
-               input_energy: energy_model.BitstringEnergy,
+               input_energy: energy.BitstringEnergy,
                initial_seed: Union[None, tf.Tensor] = None,
                name: Union[None, str] = None):
     """Initializes an EnergyInferenceBase.
@@ -234,7 +234,7 @@ class EnergyInference(EnergyInferenceBase):
   """Provides some default method implementations."""
 
   def __init__(self,
-               input_energy: energy_model.BitstringEnergy,
+               input_energy: energy.BitstringEnergy,
                num_expectation_samples: int,
                initial_seed: Union[None, tf.Tensor] = None,
                name: Union[None, str] = None):
@@ -371,7 +371,7 @@ class AnalyticEnergyInference(EnergyInference):
   """Uses an explicit categorical distribution to implement parent functions."""
 
   def __init__(self,
-               input_energy: energy_model.BitstringEnergy,
+               input_energy: energy.BitstringEnergy,
                num_expectation_samples: int,
                initial_seed: Union[None, tf.Tensor] = None,
                name: Union[None, str] = None):
@@ -448,7 +448,7 @@ class BernoulliEnergyInference(EnergyInference):
   """Manages inference for a Bernoulli defined by spin energies."""
 
   def __init__(self,
-               input_energy: energy_model.BernoulliEnergy,
+               input_energy: energy.BernoulliEnergy,
                num_expectation_samples: int,
                initial_seed: Union[None, tf.Tensor] = None,
                name: Union[None, str] = None):

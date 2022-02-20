@@ -19,9 +19,9 @@ from typing import Union
 
 import tensorflow as tf
 
-from qhbmlib import circuit_infer
-from qhbmlib import energy_infer
-from qhbmlib import hamiltonian_model
+from qhbmlib.infer import ebm
+from qhbmlib.infer import qnn
+from qhbmlib.model import hamiltonian
 from qhbmlib import utils
 
 
@@ -63,31 +63,31 @@ class QHBM(tf.keras.layers.Layer):
   """
 
   def __init__(self,
-               e_inference: energy_infer.EnergyInference,
-               q_inference: circuit_infer.QuantumInference,
+               input_ebm: ebm.EnergyInference,
+               input_qnn: qnn.QuantumInference,
                name: Union[None, str] = None):
     """Initializes a QHBM.
 
     Args:
-      e_inference: Attends to density operator eigenvalues.
-      q_inference: Attends to density operator eigenvectors.
+      input_ebm: Attends to density operator eigenvalues.
+      input_qnn: Attends to density operator eigenvectors.
       name: Optional name for the model.
     """
     super().__init__(name=name)
-    self._e_inference = e_inference
-    self._q_inference = q_inference
-    self._hamiltonian = hamiltonian_model.Hamiltonian(e_inference.energy,
-                                                      q_inference.circuit)
+    self._ebm = input_ebm
+    self._qnn = input_qnn
+    self._hamiltonian = hamiltonian.Hamiltonian(self.ebm.energy,
+                                                      self.qnn.circuit)
 
   @property
-  def e_inference(self):
+  def ebm(self):
     """The object used for inference on density operator eigenvalues."""
-    return self._e_inference
+    return self._ebm
 
   @property
-  def q_inference(self):
+  def qnn(self):
     """The object used for inference on density operator eigenvectors."""
-    return self._q_inference
+    return self._qnn
 
   @property
   def hamiltonian(self):
@@ -116,13 +116,13 @@ class QHBM(tf.keras.layers.Layer):
       counts: 1D `tf.Tensor` of dtype `tf.int32`.  `counts[i]` is the number of
         times `states[i]` was drawn from the ensemble.
     """
-    samples = self.e_inference.sample(num_samples)
+    samples = self.ebm.sample(num_samples)
     bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
     states = self.hamiltonian.circuit(bitstrings)
     return states, counts
 
   def expectation(self, observables: Union[tf.Tensor,
-                                           hamiltonian_model.Hamiltonian]):
+                                           hamiltonian.Hamiltonian]):
     """Estimates observable expectation values against the density operator.
 
     TODO(#119): add expectation and derivative equations and discussions
@@ -143,6 +143,6 @@ class QHBM(tf.keras.layers.Layer):
       `tf.Tensor` with shape [n_ops] whose entries are are the sample averaged
       expectation values of each entry in `ops`.
     """
-    return self.e_inference.expectation(
+    return self.ebm.expectation(
         functools.partial(
-            self.q_inference.expectation, observables=observables))
+            self.qnn.expectation, observables=observables))

@@ -20,9 +20,9 @@ import cirq
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-from qhbmlib import circuit_model
-from qhbmlib import energy_model
-from qhbmlib import hamiltonian_model
+from qhbmlib.model import circuit
+from qhbmlib.model import energy
+from qhbmlib.model import hamiltonian
 from qhbmlib import utils
 
 
@@ -30,7 +30,7 @@ class QuantumInference(tf.keras.layers.Layer):
   """Methods for inference on QuantumCircuit objects."""
 
   def __init__(self,
-               circuit: circuit_model.QuantumCircuit,
+               input_circuit: circuit.QuantumCircuit,
                backend: Union[str, cirq.Sampler] = "noiseless",
                differentiator: Union[None,
                                      tfq.differentiators.Differentiator] = None,
@@ -38,15 +38,15 @@ class QuantumInference(tf.keras.layers.Layer):
     """Initialize a QuantumInference layer.
 
     Args:
-      circuit: The parameterized quantum circuit on which to do inference.
+      input_circuit: The parameterized quantum circuit on which to do inference.
       backend: Specifies what backend TFQ will use to compute expectation
         values. `str` options are {"noisy", "noiseless"}; users may also specify
         a preconfigured cirq execution object to use instead.
       differentiator: Specifies how to take the derivative of a quantum circuit.
       name: Identifier for this inference engine.
     """
-    circuit.build([])
-    self._circuit = circuit
+    input_circuit.build([])
+    self._circuit = input_circuit
     self._differentiator = differentiator
     self._backend = backend
     self._sample_layer = tfq.layers.Sample(backend=backend)
@@ -92,7 +92,7 @@ class QuantumInference(tf.keras.layers.Layer):
     return self._differentiator
 
   def expectation(self, initial_states: tf.Tensor,
-                  observables: Union[tf.Tensor, hamiltonian_model.Hamiltonian]):
+                  observables: Union[tf.Tensor, hamiltonian.Hamiltonian]):
     """Returns the expectation values of the observables against the QNN.
 
     Args:
@@ -113,7 +113,7 @@ class QuantumInference(tf.keras.layers.Layer):
       u = self.circuit
       ops = observables
       post_process = lambda x: x
-    elif isinstance(observables.energy, energy_model.PauliMixin):
+    elif isinstance(observables.energy, energy.PauliMixin):
       u = self.circuit + observables.circuit_dagger
       ops = observables.operator_shards
       post_process = lambda y: tf.map_fn(

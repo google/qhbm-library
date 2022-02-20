@@ -16,12 +16,12 @@
 
 import tensorflow as tf
 
-from qhbmlib import circuit_infer_utils
-from qhbmlib import energy_infer_utils
-from qhbmlib import hamiltonian_model
+from qhbmlib.infer import qnn_utils
+from qhbmlib.infer import ebm_utils
+from qhbmlib.model import hamiltonian
 
 
-def density_matrix(model: hamiltonian_model.Hamiltonian):
+def density_matrix(model: hamiltonian.Hamiltonian):
   r"""Returns the thermal state corresponding to a modular Hamiltonian.
 
   Given a modular Hamiltonian $K_{\theta\phi} = U_\phi K_\theta U_\phi^\dagger$,
@@ -54,13 +54,13 @@ def density_matrix(model: hamiltonian_model.Hamiltonian):
       matrix to be calculated.
   """
   probabilities = tf.cast(
-      energy_infer_utils.probabilities(model.energy), tf.complex64)
-  unitary_matrix = circuit_infer_utils.unitary(model.circuit)
+      ebm_utils.probabilities(model.energy), tf.complex64)
+  unitary_matrix = qnn_utils.unitary(model.circuit)
   return tf.einsum("k,ik,kj->ij", probabilities, unitary_matrix,
                    tf.linalg.adjoint(unitary_matrix))
 
 
-def fidelity(model: hamiltonian_model.Hamiltonian, sigma: tf.Tensor):
+def fidelity(model: hamiltonian.Hamiltonian, sigma: tf.Tensor):
   r"""Calculate the fidelity between a QHBM and a density matrix.
 
   Definition of the fidelity between two quantum states $\rho$ and $\sigma$ is
@@ -107,8 +107,8 @@ def fidelity(model: hamiltonian_model.Hamiltonian, sigma: tf.Tensor):
       represented by this QHBM and `sigma`.
   """
   k_theta = tf.cast(
-      energy_infer_utils.probabilities(model.energy), tf.complex64)
-  u_phi = circuit_infer_utils.unitary(model.circuit)
+      ebm_utils.probabilities(model.energy), tf.complex64)
+  u_phi = qnn_utils.unitary(model.circuit)
   u_phi_dagger = tf.linalg.adjoint(u_phi)
   sqrt_k_theta = tf.sqrt(k_theta)
   omega = tf.einsum("a,ab,bc,cd,d->ad", sqrt_k_theta, u_phi_dagger, sigma,

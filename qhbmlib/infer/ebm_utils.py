@@ -18,18 +18,18 @@ import itertools
 
 import tensorflow as tf
 
-from qhbmlib import energy_model
+from qhbmlib.model import energy
 
 
-def probabilities(energy: energy_model.BitstringEnergy):
+def probabilities(input_energy: energy.BitstringEnergy):
   """Returns the probabilities of the EBM.
 
   Args:
-    energy: The energy function defining the EBM.
+    input_energy: The energy function defining the EBM.
   """
   all_bitstrings = tf.constant(
-      list(itertools.product([0, 1], repeat=energy.num_bits)), dtype=tf.int8)
-  all_energies = energy(all_bitstrings)
+      list(itertools.product([0, 1], repeat=input_energy.num_bits)), dtype=tf.int8)
+  all_energies = input_energy(all_bitstrings)
   energy_exp = tf.math.exp(-all_energies)
   partition = tf.math.reduce_sum(energy_exp)
   return energy_exp / partition
