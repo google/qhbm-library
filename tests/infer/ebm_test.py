@@ -146,7 +146,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
          [1, 1, 0], [1, 1, 1]],
         dtype=tf.int8)
     expected_seed = tf.constant([44, 22], tf.int32)
-    expected_energies = energy(expected_bitstrings)
+    expected_energies = actual_energy(expected_bitstrings)
     actual_layer = ebm.AnalyticEnergyInference(actual_energy,
                                                         self.num_samples,
                                                         expected_seed,
