@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for the circuit_model module."""
+"""Tests for model.circuit_utils"""
 
 import cirq
 import sympy
