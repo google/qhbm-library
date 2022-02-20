@@ -19,33 +19,33 @@ from typing import Union
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-from qhbmlib import circuit_model
-from qhbmlib import energy_model
+from qhbmlib.model import circuit
+from qhbmlib.model import energy
 
 
 class Hamiltonian(tf.keras.layers.Layer):
   """Diagonalized (spectral) representation of a Hermitian operator."""
 
   def __init__(self,
-               energy: energy_model.BitstringEnergy,
-               circuit: circuit_model.QuantumCircuit,
+               input_energy: energy.BitstringEnergy,
+               input_circuit: circuit.QuantumCircuit,
                name: Union[None, str] = None):
     """Initializes a Hamiltonian.
 
     Args:
-      energy: Represents the eigenvalues of this operator.
-      circuit: Represents the eigenvectors of this operator.
+      input_energy: Represents the eigenvalues of this operator.
+      input_circuit: Represents the eigenvectors of this operator.
       name: Optional name for the model.
     """
     super().__init__(name=name)
     if energy.num_bits != len(circuit.qubits):
       raise ValueError(
           "`energy` and `circuit` must act on the same number of bits.")
-    self.energy = energy
-    self.circuit = circuit
-    self.circuit_dagger = circuit**-1
+    self.energy = input_energy
+    self.circuit = input_circuit
+    self.circuit_dagger = input_circuit**-1
 
     self.operator_shards = None
-    if isinstance(self.energy, energy_model.PauliMixin):
+    if isinstance(self.energy, energy.PauliMixin):
       self.operator_shards = tfq.convert_to_tensor(
           self.energy.operator_shards(self.circuit.qubits))

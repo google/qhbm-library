@@ -21,7 +21,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-from qhbmlib import circuit_model_utils
+from qhbmlib.model import circuit_utils
 
 
 class QuantumCircuit(tf.keras.layers.Layer):
@@ -56,7 +56,7 @@ class QuantumCircuit(tf.keras.layers.Layer):
     self._value_layers = value_layers
     self._value_layers_inputs = value_layers_inputs
 
-    raw_bit_circuit = circuit_model_utils.bit_circuit(self.qubits)
+    raw_bit_circuit = circuit_utils.bit_circuit(self.qubits)
     bit_symbol_names = list(
         sorted(tfq.util.get_circuit_symbols(raw_bit_circuit)))
     self._bit_symbol_names = tf.constant([str(x) for x in bit_symbol_names])

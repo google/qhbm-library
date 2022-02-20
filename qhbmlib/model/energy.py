@@ -20,7 +20,7 @@ from typing import List, Union
 import cirq
 import tensorflow as tf
 
-from qhbmlib import energy_model_utils
+from qhbmlib.model import energy_utils
 
 
 class BitstringEnergy(tf.keras.layers.Layer):
@@ -51,7 +51,7 @@ class BitstringEnergy(tf.keras.layers.Layer):
       name: Optional name for the model.
     """
     super().__init__(name=name)
-    self._bits = energy_model_utils.check_bits(bits)
+    self._bits = energy_utils.check_bits(bits)
     self._energy_layers = energy_layers
 
   @property
@@ -140,8 +140,8 @@ class BernoulliEnergy(BitstringEnergy, PauliMixin):
         initialize the values of the parameters.
       name: Optional name for the model.
     """
-    pre_process = [energy_model_utils.SpinsFromBitstrings()]
-    post_process = [energy_model_utils.VariableDot(initializer=initializer)]
+    pre_process = [energy_utils.SpinsFromBitstrings()]
+    post_process = [energy_utils.VariableDot(initializer=initializer)]
     super().__init__(bits, pre_process + post_process, name)
     self._post_process = post_process
 
@@ -184,11 +184,11 @@ class KOBE(BitstringEnergy, PauliMixin):
       initializer: Specifies how to initialize the values of the parameters.
       name: Optional name for the model.
     """
-    parity_layer = energy_model_utils.Parity(bits, order)
+    parity_layer = energy_utils.Parity(bits, order)
     self._num_terms = parity_layer.num_terms
     self._indices = parity_layer.indices
-    pre_process = [energy_model_utils.SpinsFromBitstrings(), parity_layer]
-    post_process = [energy_model_utils.VariableDot(initializer=initializer)]
+    pre_process = [energy_utils.SpinsFromBitstrings(), parity_layer]
+    post_process = [energy_utils.VariableDot(initializer=initializer)]
     super().__init__(bits, pre_process + post_process, name)
     self._post_process = post_process
 

@@ -15,7 +15,6 @@
 """Module for qhbmlib.model.*"""
 
 from qhbmlib.model.circuit import QuantumCircuit, DirectQuantumCircuit, QAIA
-from qhbmlib.model.circuit_utils import bit_circuit
 from qhbmlib.model.energy import BitstringEnergy, PauliMixin, BernoulliEnergy, KOBE
 from qhbmlib.model.energy_utils import SpinsFromBitstrings, VariableDot, Parity
 from qhbmlib.model.hamiltonian import Hamiltonian
