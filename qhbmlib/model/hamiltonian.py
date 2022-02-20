@@ -38,9 +38,9 @@ class Hamiltonian(tf.keras.layers.Layer):
       name: Optional name for the model.
     """
     super().__init__(name=name)
-    if energy.num_bits != len(circuit.qubits):
-      raise ValueError(
-          "`energy` and `circuit` must act on the same number of bits.")
+    if input_energy.num_bits != len(input_circuit.qubits):
+      raise ValueError("`input_energy` and `input_circuit` "
+                       "must act on the same number of bits.")
     self.energy = input_energy
     self.circuit = input_circuit
     self.circuit_dagger = input_circuit**-1
