@@ -25,12 +25,11 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from qhbmlib import architectures
-from qhbmlib import circuit_infer
-from qhbmlib import circuit_model
-from qhbmlib import energy_infer
-from qhbmlib import energy_model
-from qhbmlib import hamiltonian_infer
-from qhbmlib import hamiltonian_model
+from qhbmlib.infer import ebm
+from qhbmlib.infer import qhbm
+from qhbmlib.infer import qnn
+from qhbmlib.model import circuit
+from qhbmlib.model import energy
 
 
 def get_random_hamiltonian_and_inference(qubits,
@@ -47,17 +46,17 @@ def get_random_hamiltonian_and_inference(qubits,
   num_qubits = len(qubits)
   ebm_init = tf.keras.initializers.RandomUniform(
       minval=minval_thetas, maxval=maxval_thetas)
-  energy = energy_model.KOBE(list(range(num_qubits)), num_qubits, ebm_init)
-  e_infer = energy_infer.AnalyticEnergyInference(
-      energy, num_samples, name=identifier, initial_seed=ebm_seed)
+  actual_energy = energy.KOBE(list(range(num_qubits)), num_qubits, ebm_init)
+  e_infer = ebm.AnalyticEnergyInference(
+      actual_energy, num_samples, name=identifier, initial_seed=ebm_seed)
 
   qnn_init = tf.keras.initializers.RandomUniform(
       minval=minval_phis, maxval=maxval_phis)
   unitary = architectures.get_hardware_efficient_model_unitary(
       qubits, num_layers, identifier)
-  circuit = circuit_model.DirectQuantumCircuit(unitary, qnn_init)
-  q_infer = circuit_infer.QuantumInference(circuit, name=identifier)
-  qhbm = hamiltonian_infer.QHBM(e_infer, q_infer)
+  actual_circuit = circuit.DirectQuantumCircuit(unitary, qnn_init)
+  q_infer = qnn.QuantumInference(actual_circuit, name=identifier)
+  qhbm = qhbm.QHBM(e_infer, q_infer)
 
   return qhbm.hamiltonian, qhbm
 
