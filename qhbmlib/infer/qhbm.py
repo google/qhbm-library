@@ -76,7 +76,7 @@ class QHBM(tf.keras.layers.Layer):
     super().__init__(name=name)
     self._ebm = input_ebm
     self._qnn = input_qnn
-    self._hamiltonian = hamiltonian.Hamiltonian(self.ebm.energy,
+    self._modular_hamiltonian = hamiltonian.Hamiltonian(self.ebm.energy,
                                                       self.qnn.circuit)
 
   @property
@@ -90,9 +90,9 @@ class QHBM(tf.keras.layers.Layer):
     return self._qnn
 
   @property
-  def hamiltonian(self):
+  def modular_hamiltonian(self):
     """The modular Hamiltonian defining this QHBM."""
-    return self._hamiltonian
+    return self._modular_hamiltonian
 
   def circuits(self, num_samples: int):
     r"""Draws thermally distributed eigenstates from the model Hamiltonian.
