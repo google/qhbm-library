@@ -16,7 +16,7 @@
 
 import tensorflow as tf
 
-from qhbmlib import energy_model_utils
+from qhbmlib.model import energy_utils
 from tests import test_util
 
 
@@ -27,19 +27,19 @@ class CheckHelpersTest(tf.test.TestCase):
   def test_check_bits(self):
     """Confirms bad inputs are caught and good inputs pass through."""
     expected_bits = [1, 6, 222, 13223]
-    actual_bits = energy_model_utils.check_bits(expected_bits)
+    actual_bits = energy_utils.check_bits(expected_bits)
     self.assertAllEqual(actual_bits, expected_bits)
     with self.assertRaisesRegex(ValueError, expected_regex="must be unique"):
-      _ = energy_model_utils.check_bits([1, 1])
+      _ = energy_utils.check_bits([1, 1])
 
   @test_util.eager_mode_toggle
   def test_check_order(self):
     """Confirms bad inputs are caught and good inputs pass through."""
     expected_order = 5
-    actual_order = energy_model_utils.check_order(expected_order)
+    actual_order = energy_utils.check_order(expected_order)
     self.assertEqual(actual_order, expected_order)
     with self.assertRaisesRegex(ValueError, expected_regex="greater than zero"):
-      _ = energy_model_utils.check_order(0)
+      _ = energy_utils.check_order(0)
 
 
 class SpinsFromBitstringsTest(tf.test.TestCase):
@@ -48,7 +48,7 @@ class SpinsFromBitstringsTest(tf.test.TestCase):
   @test_util.eager_mode_toggle
   def test_layer(self):
     """Confirms the layer outputs correct spins."""
-    test_layer = energy_model_utils.SpinsFromBitstrings()
+    test_layer = energy_utils.SpinsFromBitstrings()
 
     @tf.function
     def wrapper(inputs):
@@ -68,7 +68,7 @@ class VariableDotTest(tf.test.TestCase):
     """Confirms the layer dots with inputs correctly."""
     inputs = tf.constant([[1.0, 5.0, 9.0]])
     constant = 2.5
-    actual_layer_constant = energy_model_utils.VariableDot(
+    actual_layer_constant = energy_utils.VariableDot(
         tf.keras.initializers.Constant(constant))
 
     @tf.function
@@ -89,7 +89,7 @@ class ParityTest(tf.test.TestCase):
     inputs = tf.constant([[-1, 1, -1, -1]])
     bits = [1, 2, 3, 4]
     order = 3
-    actual_layer = energy_model_utils.Parity(bits, order)
+    actual_layer = energy_utils.Parity(bits, order)
 
     expected_indices = [[0], [1], [2], [3], [0, 1], [0, 2], [0, 3], [1, 2],
                         [1, 3], [2, 3], [0, 1, 2], [0, 1, 3], [0, 2, 3],
