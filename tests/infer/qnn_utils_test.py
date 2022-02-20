@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for the circuit_infer_utils module."""
+"""Tests for the qnn_utils module."""
 
 from absl import logging
 import random
@@ -23,8 +23,8 @@ import tensorflow as tf
 import tensorflow_quantum as tfq
 from tensorflow_quantum.python import util as tfq_util
 
-from qhbmlib import circuit_infer_utils
-from qhbmlib import circuit_model
+from qhbmlib.infer import qnn_utils
+from qhbmlib.model import circuit
 
 
 class UnitaryTest(tf.test.TestCase):
@@ -57,18 +57,18 @@ class UnitaryTest(tf.test.TestCase):
                                       self.tf_random_seed).numpy().tolist()
     resolver = dict(zip(symbols, random_values))
 
-    circuit = circuit_model.QuantumCircuit(
+    actual_circuit = circuit.QuantumCircuit(
         tfq.convert_to_tensor([raw_circuit]), qubits, tf.constant(symbols),
         [tf.Variable([resolver[s] for s in symbols])], [[]])
 
     resolved_circuit = cirq.protocols.resolve_parameters(raw_circuit, resolver)
     expected_unitary = resolved_circuit.unitary()
 
-    unitary_wrapper = tf.function(circuit_infer_utils.unitary)
-    actual_unitary = unitary_wrapper(circuit)
+    unitary_wrapper = tf.function(qnn_utils.unitary)
+    actual_unitary = unitary_wrapper(actual_circuit)
     self.assertAllClose(actual_unitary, expected_unitary, rtol=self.close_rtol)
 
 
 if __name__ == "__main__":
-  logging.info("Running circuit_infer_utils_test.py ...")
+  logging.info("Running qnn_utils_test.py ...")
   tf.test.main()

@@ -24,12 +24,12 @@ import tensorflow as tf
 import tensorflow_quantum as tfq
 from tensorflow_quantum.python import util as tfq_util
 
-from qhbmlib import circuit_infer
-from qhbmlib import circuit_model
-from qhbmlib import energy_infer
-from qhbmlib import energy_model
-from qhbmlib import hamiltonian_model
-from qhbmlib import hamiltonian_infer
+from qhbmlib.infer import ebm
+from qhbmlib.infer import qhbm
+from qhbmlib.infer import qnn
+from qhbmlib.model import circuit
+from qhbmlib.model import energy
+from qhbmlib.model import hamiltonian
 from qhbmlib import utils
 from tests import test_util
 
@@ -44,24 +44,23 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
 
     # Model hamiltonian
     num_bits = 3
-    self.energy = energy_model.BernoulliEnergy(list(range(num_bits)))
-    self.expected_e_inference = energy_infer.AnalyticEnergyInference(
-        self.energy, self.num_samples)
+    self.actual_energy = energy.BernoulliEnergy(list(range(num_bits)))
+    self.expected_e_inference = ebm.AnalyticEnergyInference(
+        self.actual_energy, self.num_samples)
     # pin first and last bits, middle bit free.
-    self.energy.set_weights([tf.constant([-23, 0, 17])])
+    self.actual_energy.set_weights([tf.constant([-23, 0, 17])])
     qubits = cirq.GridQubit.rect(1, num_bits)
     symbols = set()
     num_symbols = 20
     for _ in range(num_symbols):
       symbols.add("".join(random.sample(string.ascii_letters, 10)))
     self.pqc = tfq_util.random_symbol_circuit(qubits, symbols)
-    circuit = circuit_model.DirectQuantumCircuit(self.pqc)
-    circuit.build([])
-    self.expected_q_inference = circuit_infer.QuantumInference(circuit)
+    actual_circuit = circuit.DirectQuantumCircuit(self.pqc)
+    self.expected_q_inference = qnn.QuantumInference(actual_circuit)
 
     # Inference
     self.expected_name = "nameforaQHBM"
-    self.actual_qhbm = hamiltonian_infer.QHBM(self.expected_e_inference,
+    self.actual_qhbm = qhbm.QHBM(self.expected_e_inference,
                                               self.expected_q_inference,
                                               self.expected_name)
 
@@ -117,19 +116,19 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
   def test_circuit_param_update(self):
     """Confirm circuits are different after updating energy model parameters."""
     num_bits = 2
-    energy = energy_model.BernoulliEnergy(list(range(num_bits)))
-    e_infer = energy_infer.BernoulliEnergyInference(energy, self.num_samples)
+    actual_energy = energy.BernoulliEnergy(list(range(num_bits)))
+    e_infer = ebm.BernoulliEnergyInference(actual_energy, self.num_samples)
 
     qubits = cirq.GridQubit.rect(1, num_bits)
     pqc = cirq.Circuit(cirq.Y(q) for q in qubits)
-    circuit = circuit_model.DirectQuantumCircuit(pqc)
-    q_infer = circuit_infer.QuantumInference(circuit)
+    actual_circuit = circuit.DirectQuantumCircuit(pqc)
+    q_infer = qnn.QuantumInference(actual_circuit)
 
-    h_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
+    h_infer = qhbm.QHBM(e_infer, q_infer)
     circuits_wrapper = tf.function(h_infer.circuits)
 
     # Pin Bernoulli to [0, 1]
-    energy.set_weights([tf.constant([-1000, 1000])])
+    actual_energy.set_weights([tf.constant([-1000, 1000])])
     expected_circuits_1 = tfq.from_tensor(
         tfq.convert_to_tensor(
             [cirq.Circuit(cirq.X(qubits[0])**0, cirq.X(qubits[1])) + pqc]))
@@ -138,7 +137,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     self.assertAllEqual(actual_circuits_1, expected_circuits_1)
 
     # Change pin to [1, 0]
-    energy.set_weights([tf.constant([1000, -1000])])
+    actual_energy.set_weights([tf.constant([1000, -1000])])
     expected_circuits_2 = tfq.from_tensor(
         tfq.convert_to_tensor(
             [cirq.Circuit(cirq.X(qubits[0]),
@@ -209,7 +208,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
       "energy_class": energy_class,
       "energy_args": energy_args,
   } for energy_class, energy_args in zip(
-      [energy_model.BernoulliEnergy, energy_model.KOBE], [[], [2]]))
+      [energy.BernoulliEnergy, energy.KOBE], [[], [2]]))
   @test_util.eager_mode_toggle
   def test_expectation_modular_hamiltonian(self, energy_class, energy_args):
     """Confirm expectation of modular Hamiltonians works."""
@@ -221,9 +220,8 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     energy_h = energy_class(*([list(range(num_bits))] + energy_args))
     energy_h.build([None, num_bits])
     raw_circuit_h = cirq.testing.random_circuit(qubits, n_moments, act_fraction)
-    circuit_h = circuit_model.DirectQuantumCircuit(raw_circuit_h)
-    circuit_h.build([])
-    hamiltonian_measure = hamiltonian_model.Hamiltonian(energy_h, circuit_h)
+    circuit_h = circuit.DirectQuantumCircuit(raw_circuit_h)
+    hamiltonian_measure = hamiltonian.Hamiltonian(energy_h, circuit_h)
 
     # unitary
     num_layers = 3
@@ -251,5 +249,5 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
 
 
 if __name__ == "__main__":
-  absl.logging.info("Running hamiltonian_infer_test.py ...")
+  absl.logging.info("Running qhbm_test.py ...")
   tf.test.main()

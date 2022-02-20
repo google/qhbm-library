@@ -18,9 +18,9 @@ import random
 
 import tensorflow as tf
 
-from qhbmlib import energy_infer
-from qhbmlib import energy_infer_utils
-from qhbmlib import energy_model
+from qhbmlib.infer import ebm
+from qhbmlib.infer import ebm_utils
+from qhbmlib.model import energy
 from qhbmlib import utils
 
 
@@ -42,19 +42,19 @@ class ProbabilitiesTest(tf.test.TestCase):
           tf.keras.layers.Dense(units[i], activation=activations[i]))
     expected_layer_list.append(tf.keras.layers.Dense(1))
     expected_layer_list.append(utils.Squeeze(-1))
-    energy = energy_model.BitstringEnergy(
+    actual_energy = energy.BitstringEnergy(
         list(range(num_bits)), expected_layer_list)
 
     num_expectation_samples = 1  # Required but unused
-    infer = energy_infer.AnalyticEnergyInference(energy,
+    infer = ebm.AnalyticEnergyInference(actual_energy,
                                                  num_expectation_samples)
     expected_probabilities = infer.distribution.probs_parameter()
 
-    probabilities_wrapped = tf.function(energy_infer_utils.probabilities)
-    actual_probabilities = probabilities_wrapped(energy)
+    probabilities_wrapped = tf.function(ebm_utils.probabilities)
+    actual_probabilities = probabilities_wrapped(actual_energy)
     self.assertAllClose(actual_probabilities, expected_probabilities)
 
 
 if __name__ == "__main__":
-  print("Running energy_infer_utils_test.py ...")
+  print("Running ebm_utils_test.py ...")
   tf.test.main()
