@@ -19,7 +19,7 @@ import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-from qhbmlib import circuit_model_utils
+from qhbmlib.model import circuit_utils
 from tests import test_util
 
 
@@ -39,7 +39,7 @@ class BitCircuitTest(tf.test.TestCase):
         cirq.GridQubit(2, 2)
     ]
     identifier = "build_bit_test"
-    test_circuit = circuit_model_utils.bit_circuit(my_qubits, identifier)
+    test_circuit = circuit_utils.bit_circuit(my_qubits, identifier)
     test_symbols = list(sorted(tfq.util.get_circuit_symbols(test_circuit)))
     expected_symbols = list(
         sympy.symbols(
