@@ -56,9 +56,9 @@ def get_random_hamiltonian_and_inference(qubits,
       qubits, num_layers, identifier)
   actual_circuit = circuit.DirectQuantumCircuit(unitary, qnn_init)
   q_infer = qnn.QuantumInference(actual_circuit, name=identifier)
-  qhbm = qhbm.QHBM(e_infer, q_infer)
+  random_qhbm = qhbm.QHBM(e_infer, q_infer)
 
-  return qhbm.hamiltonian, qhbm
+  return random_qhbm.modular_hamiltonian, random_qhbm
 
 
 def get_random_pauli_sum(qubits):

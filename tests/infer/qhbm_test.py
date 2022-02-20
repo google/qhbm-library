@@ -45,7 +45,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     # Model hamiltonian
     num_bits = 3
     self.actual_energy = energy.BernoulliEnergy(list(range(num_bits)))
-    self.expected_e_inference = ebm.AnalyticEnergyInference(
+    self.expected_ebm = ebm.AnalyticEnergyInference(
         self.actual_energy, self.num_samples)
     # pin first and last bits, middle bit free.
     self.actual_energy.set_weights([tf.constant([-23, 0, 17])])
@@ -56,20 +56,20 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
       symbols.add("".join(random.sample(string.ascii_letters, 10)))
     self.pqc = tfq_util.random_symbol_circuit(qubits, symbols)
     actual_circuit = circuit.DirectQuantumCircuit(self.pqc)
-    self.expected_q_inference = qnn.QuantumInference(actual_circuit)
+    self.expected_qnn = qnn.QuantumInference(actual_circuit)
 
     # Inference
     self.expected_name = "nameforaQHBM"
-    self.actual_qhbm = qhbm.QHBM(self.expected_e_inference,
-                                              self.expected_q_inference,
+    self.actual_qhbm = qhbm.QHBM(self.expected_ebm,
+                                              self.expected_qnn,
                                               self.expected_name)
 
     self.tfp_seed = tf.constant([5, 1], tf.int32)
 
   def test_init(self):
     """Tests QHBM initialization."""
-    self.assertEqual(self.actual_qhbm.e_inference, self.expected_e_inference)
-    self.assertEqual(self.actual_qhbm.q_inference, self.expected_q_inference)
+    self.assertEqual(self.actual_qhbm.ebm, self.expected_ebm)
+    self.assertEqual(self.actual_qhbm.qnn, self.expected_qnn)
     self.assertEqual(self.actual_qhbm.name, self.expected_name)
 
   @test_util.eager_mode_toggle
@@ -171,11 +171,11 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
         ebm_seed=self.tfp_seed)
 
     # sample bitstrings
-    samples = actual_h_infer.e_inference.sample(self.num_samples)
+    samples = actual_h_infer.ebm.sample(self.num_samples)
     bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
 
     # calculate expected values
-    raw_expectations = actual_h_infer.q_inference.expectation(bitstrings, ops)
+    raw_expectations = actual_h_infer.qnn.expectation(bitstrings, ops)
     expected_expectations = utils.weighted_average(counts, raw_expectations)
     # Check that expectations are a reasonable size
     self.assertAllGreater(tf.math.abs(expected_expectations), 1e-3)
@@ -233,11 +233,11 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
         ebm_seed=self.tfp_seed)
 
     # sample bitstrings
-    samples = actual_h_infer.e_inference.sample(self.num_samples)
+    samples = actual_h_infer.ebm.sample(self.num_samples)
     bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
 
     # calculate expected values
-    raw_expectations = actual_h_infer.q_inference.expectation(
+    raw_expectations = actual_h_infer.qnn.expectation(
         bitstrings, hamiltonian_measure)
     expected_expectations = utils.weighted_average(counts, raw_expectations)
     # Check that expectations are a reasonable size
