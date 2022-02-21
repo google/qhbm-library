@@ -19,8 +19,8 @@ from typing import Union
 
 import tensorflow as tf
 
-from qhbmlib.infer import ebm
-from qhbmlib.infer import qnn
+from qhbmlib.infer import ebm  # pylint: disable=unused-import
+from qhbmlib.infer import qnn  # pylint: disable=unused-import
 from qhbmlib.model import hamiltonian
 from qhbmlib import utils
 
@@ -127,10 +127,10 @@ class QHBM(tf.keras.layers.Layer):
     TODO(#119): add expectation and derivative equations and discussions
                 from updated paper.
 
-    Implicitly sample `num_samples` pure states from the canonical ensemble
-    corresponding to the thermal state defined by `self.modular_hamiltonian`.  For each
-    such state |psi>, estimate the expectation value <psi|op_j|psi> for each
-    `ops[j]`. Then, average these expectation values over the sampled states.
+    Implicitly sample pure states from the canonical ensemble corresponding to
+    the thermal state defined by `self.modular_hamiltonian`. For each such state
+    |psi>, estimate the expectation value <psi|op_j|psi> for each `ops[j]`.
+    Then, average these expectation values over the sampled states.
 
     Args:
       model: The modular Hamiltonian whose normalized exponential is the

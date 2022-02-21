@@ -20,7 +20,7 @@ import cirq
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-from qhbmlib.model import circuit
+from qhbmlib.model import circuit  # pylint: disable=unused-import
 from qhbmlib.model import energy
 from qhbmlib.model import hamiltonian
 from qhbmlib import utils
