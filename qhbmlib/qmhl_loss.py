@@ -30,4 +30,4 @@ def qmhl(data: quantum_data.QuantumData, input_qhbm: qhbm.QHBM):
   Returns:
     The quantum cross-entropy between the data and the model.
   """
-  return (data.expectation(input_qhbm.modular_hamiltonian) + input_qhbm.ebm.log_partition())
+  return (data.expectation(input_qhbm.modular_hamiltonian) + input_qhbm.e_inference.log_partition())

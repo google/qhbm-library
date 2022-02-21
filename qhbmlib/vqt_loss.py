@@ -45,11 +45,11 @@ def vqt(input_qhbm: qhbm.QHBM,
   # See equations B4 and B5 in appendix.  TODO(#119): confirm equation number.
   def f_vqt(bitstrings):
     h_expectations = tf.squeeze(
-        input_qhbm.qnn.expectation(bitstrings, hamiltonian), 1)
+        input_qhbm.q_inference.expectation(bitstrings, hamiltonian), 1)
     beta_h_expectations = beta * h_expectations
-    energies = tf.stop_gradient(input_qhbm.ebm.energy(bitstrings))
+    energies = tf.stop_gradient(input_qhbm.e_inference.energy(bitstrings))
     return beta_h_expectations - energies
 
-  average_expectation = input_qhbm.ebm.expectation(f_vqt)
-  current_partition = tf.stop_gradient(input_qhbm.ebm.log_partition())
+  average_expectation = input_qhbm.e_inference.expectation(f_vqt)
+  current_partition = tf.stop_gradient(input_qhbm.e_inference.log_partition())
   return average_expectation - current_partition

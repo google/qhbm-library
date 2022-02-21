@@ -67,8 +67,8 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
 
   def test_init(self):
     """Tests QHBM initialization."""
-    self.assertEqual(self.actual_qhbm.ebm, self.expected_ebm)
-    self.assertEqual(self.actual_qhbm.qnn, self.expected_qnn)
+    self.assertEqual(self.actual_qhbm.e_inference, self.expected_ebm)
+    self.assertEqual(self.actual_qhbm.q_inference, self.expected_qnn)
     self.assertEqual(self.actual_qhbm.name, self.expected_name)
 
   @test_util.eager_mode_toggle
@@ -78,8 +78,8 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     actual_circuits, actual_counts = circuits_wrapper(self.num_samples)
 
     # Circuits with the allowed-to-be-sampled bitstrings prepended.
-    u = tfq.from_tensor(self.actual_qhbm.qnn.circuit.pqc)[0]
-    qubits = self.actual_qhbm.qnn.circuit.qubits
+    u = tfq.from_tensor(self.actual_qhbm.q_inference.circuit.pqc)[0]
+    qubits = self.actual_qhbm.q_inference.circuit.qubits
     expected_circuits_deserialized = [
         cirq.Circuit(
             cirq.X(qubits[0])**0,
@@ -170,11 +170,11 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
         ebm_seed=self.tfp_seed)
 
     # sample bitstrings
-    samples = actual_h_infer.ebm.sample(self.num_samples)
+    samples = actual_h_infer.e_inference.sample(self.num_samples)
     bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
 
     # calculate expected values
-    raw_expectations = actual_h_infer.qnn.expectation(bitstrings, ops)
+    raw_expectations = actual_h_infer.q_inference.expectation(bitstrings, ops)
     expected_expectations = utils.weighted_average(counts, raw_expectations)
     # Check that expectations are a reasonable size
     self.assertAllGreater(tf.math.abs(expected_expectations), 1e-3)
@@ -232,12 +232,12 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
         ebm_seed=self.tfp_seed)
 
     # sample bitstrings
-    samples = actual_h_infer.ebm.sample(self.num_samples)
+    samples = actual_h_infer.e_inference.sample(self.num_samples)
     bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
 
     # calculate expected values
-    raw_expectations = actual_h_infer.qnn.expectation(bitstrings,
-                                                      hamiltonian_measure)
+    raw_expectations = actual_h_infer.q_inference.expectation(bitstrings,
+                                                              hamiltonian_measure)
     expected_expectations = utils.weighted_average(counts, raw_expectations)
     # Check that expectations are a reasonable size
     self.assertAllGreater(tf.math.abs(expected_expectations), 1e-3)

@@ -74,20 +74,20 @@ class QHBM(tf.keras.layers.Layer):
       name: Optional name for the model.
     """
     super().__init__(name=name)
-    self._ebm = input_ebm
-    self._qnn = input_qnn
-    self._modular_hamiltonian = hamiltonian.Hamiltonian(self.ebm.energy,
-                                                        self.qnn.circuit)
+    self._e_inference = input_ebm
+    self._q_inference = input_qnn
+    self._modular_hamiltonian = hamiltonian.Hamiltonian(self.e_inference.energy,
+                                                        self.q_inference.circuit)
 
   @property
-  def ebm(self):
+  def e_inference(self):
     """The object used for inference on density operator eigenvalues."""
-    return self._ebm
+    return self._e_inference
 
   @property
-  def qnn(self):
+  def q_inference(self):
     """The object used for inference on density operator eigenvectors."""
-    return self._qnn
+    return self._q_inference
 
   @property
   def modular_hamiltonian(self):
@@ -99,11 +99,11 @@ class QHBM(tf.keras.layers.Layer):
 
     Here we explain the algorithm.  First, construct $X$ to be a classical
     random variable with probability distribution $p_\theta(x)$ set by
-    `model.ebm.energy`.  Then, draw $n = $`num\_samples` bitstrings,
+    `model.e_inference.energy`.  Then, draw $n = $`num\_samples` bitstrings,
     $S=\{x_1, \ldots, x_n\}$, from $X$.  For each unique $x_i\in S$, set
     `states[i]` to the TFQ string representation of $U_\phi\ket{x_i}$, where
-    $U_\phi$ is set by `self.qnn.circuit`.  Finally, set `counts[i]` equal to
-    the number of times $x_i$ occurs in $S$.
+    $U_\phi$ is set by `self.q_inference.circuit`.  Finally, set `counts[i]`
+    equal to the number of times $x_i$ occurs in $S$.
 
     Args:
       model: The modular Hamiltonian whose normalized exponential is the
@@ -116,9 +116,9 @@ class QHBM(tf.keras.layers.Layer):
       counts: 1D `tf.Tensor` of dtype `tf.int32`.  `counts[i]` is the number of
         times `states[i]` was drawn from the ensemble.
     """
-    samples = self.ebm.sample(num_samples)
+    samples = self.e_inference.sample(num_samples)
     bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
-    states = self.qnn.circuit(bitstrings)
+    states = self.q_inference.circuit(bitstrings)
     return states, counts
 
   def expectation(self, observables: Union[tf.Tensor, hamiltonian.Hamiltonian]):
@@ -142,5 +142,5 @@ class QHBM(tf.keras.layers.Layer):
       `tf.Tensor` with shape [n_ops] whose entries are are the sample averaged
       expectation values of each entry in `ops`.
     """
-    return self.ebm.expectation(
-        functools.partial(self.qnn.expectation, observables=observables))
+    return self.e_inference.expectation(
+        functools.partial(self.q_inference.expectation, observables=observables))
