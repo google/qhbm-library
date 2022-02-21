@@ -21,11 +21,11 @@ import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-from qhbmlib import circuit_infer
-from qhbmlib import circuit_model
-from qhbmlib import energy_infer
-from qhbmlib import energy_model
-from qhbmlib import hamiltonian_infer
+from qhbmlib.infer import ebm
+from qhbmlib.infer import qhbm
+from qhbmlib.infer import qnn
+from qhbmlib.model import circuit
+from qhbmlib.model import energy
 from qhbmlib import vqt_loss
 from tests import test_util
 
@@ -184,9 +184,9 @@ class VQTTest(tf.test.TestCase):
       # model definition
       ebm_init = tf.keras.initializers.RandomUniform(
           minval=-2.0, maxval=2.0, seed=self.tf_random_seed)
-      energy = energy_model.BernoulliEnergy(list(range(num_qubits)), ebm_init)
-      e_infer = energy_infer.BernoulliEnergyInference(
-          energy, self.num_samples, initial_seed=self.tfp_seed)
+      actual_energy = energy.BernoulliEnergy(list(range(num_qubits)), ebm_init)
+      e_infer = ebm.BernoulliEnergyInference(
+          actual_energy, self.num_samples, initial_seed=self.tfp_seed)
 
       qubits = cirq.GridQubit.rect(1, num_qubits)
       r_symbols = [sympy.Symbol(f"phi_{n}") for n in range(num_qubits)]
@@ -194,9 +194,9 @@ class VQTTest(tf.test.TestCase):
           cirq.rx(r_s)(q) for r_s, q in zip(r_symbols, qubits))
       qnn_init = tf.keras.initializers.RandomUniform(
           minval=-1, maxval=1, seed=self.tf_random_seed)
-      circuit = circuit_model.DirectQuantumCircuit(r_circuit, qnn_init)
-      q_infer = circuit_infer.QuantumInference(circuit)
-      qhbm_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
+      actual_circuit = circuit.DirectQuantumCircuit(r_circuit, qnn_init)
+      q_infer = qnn.QuantumInference(actual_circuit)
+      qhbm_infer = qhbm.QHBM(e_infer, q_infer)
 
       # TODO(#171): code around here seems like boilerplate.
       model = qhbm_infer.hamiltonian

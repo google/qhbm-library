@@ -22,12 +22,13 @@ import sympy
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from qhbmlib import energy_infer
-from qhbmlib import energy_model
-from qhbmlib import circuit_infer
-from qhbmlib import circuit_model
-from qhbmlib import hamiltonian_infer
-from qhbmlib import hamiltonian_infer_utils
+
+from qhbmlib.infer import ebm
+from qhbmlib.infer import qhbm
+from qhbmlib.infer import qhbm_utils
+from qhbmlib.infer import qnn
+from qhbmlib.model import circuit
+from qhbmlib.model import energy
 from qhbmlib import qmhl_loss
 from qhbmlib import quantum_data
 from tests import test_util
@@ -168,9 +169,9 @@ class QMHLTest(tf.test.TestCase):
       # EBM
       ebm_init = tf.keras.initializers.RandomUniform(
           minval=ebm_const / 4, maxval=ebm_const, seed=self.tf_random_seed)
-      energy = energy_model.BernoulliEnergy(list(range(num_qubits)), ebm_init)
-      e_infer = energy_infer.BernoulliEnergyInference(
-          energy, self.num_samples, initial_seed=self.tfp_seed)
+      actual_energy = energy_model.BernoulliEnergy(list(range(num_qubits)), ebm_init)
+      e_infer = ebm.BernoulliEnergyInference(
+          actual_energy, self.num_samples, initial_seed=self.tfp_seed)
 
       # QNN
       qubits = cirq.GridQubit.rect(1, num_qubits)
@@ -179,9 +180,9 @@ class QMHLTest(tf.test.TestCase):
           cirq.rx(r_s)(q) for r_s, q in zip(r_symbols, qubits))
       qnn_init = tf.keras.initializers.RandomUniform(
           minval=q_const / 4, maxval=q_const, seed=self.tf_random_seed)
-      circuit = circuit_model.DirectQuantumCircuit(r_circuit, qnn_init)
-      q_infer = circuit_infer.QuantumInference(circuit)
-      qhbm_infer = hamiltonian_infer.QHBM(e_infer, q_infer)
+      actual_circuit = circuit_model.DirectQuantumCircuit(r_circuit, qnn_init)
+      q_infer = circuit_infer.QuantumInference(actual_circuit)
+      qhbm_infer = qhbm.QHBM(e_infer, q_infer)
       model = qhbm_infer.hamiltonian
 
       # Confirm qhbm_model QHBM
@@ -195,7 +196,7 @@ class QMHLTest(tf.test.TestCase):
           actual_log_partition, expected_log_partition, rtol=self.close_rtol)
       # Confirm qhbm_model modular Hamiltonian for 1 qubit case
       if num_qubits == 1:
-        actual_dm = hamiltonian_infer_utils.density_matrix(model)
+        actual_dm = qhbm_utils.density_matrix(model)
         actual_log_dm = tf.linalg.logm(actual_dm)
         actual_ktp = -actual_log_dm - tf.eye(
             2, dtype=tf.complex64) * tf.cast(actual_log_partition, tf.complex64)

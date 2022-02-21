@@ -19,8 +19,8 @@ from typing import Union
 
 import tensorflow as tf
 
-from qhbmlib import hamiltonian_infer
-from qhbmlib import hamiltonian_model
+from qhbmlib.infer import qhbm
+from qhbmlib.model import hamiltonian
 
 
 class QuantumData(abc.ABC):
@@ -28,7 +28,7 @@ class QuantumData(abc.ABC):
 
   @abc.abstractmethod
   def expectation(self, observable: Union[tf.Tensor,
-                                          hamiltonian_model.Hamiltonian]):
+                                          hamiltonian.Hamiltonian]):
     """Take the expectation value of an observable against this dataset.
 
     Args:
@@ -46,7 +46,7 @@ class QuantumData(abc.ABC):
 class QHBMData(QuantumData):
   """QuantumData defined by a QHBM."""
 
-  def __init__(self, qhbm: hamiltonian_infer.QHBM):
+  def __init__(self, qhbm: qhbm.QHBM):
     """Initializes a QHBMData.
 
     Args:
