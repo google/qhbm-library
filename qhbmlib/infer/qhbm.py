@@ -77,7 +77,7 @@ class QHBM(tf.keras.layers.Layer):
     self._ebm = input_ebm
     self._qnn = input_qnn
     self._modular_hamiltonian = hamiltonian.Hamiltonian(self.ebm.energy,
-                                                      self.qnn.circuit)
+                                                        self.qnn.circuit)
 
   @property
   def ebm(self):
@@ -121,8 +121,7 @@ class QHBM(tf.keras.layers.Layer):
     states = self.modular_hamiltonian.circuit(bitstrings)
     return states, counts
 
-  def expectation(self, observables: Union[tf.Tensor,
-                                           hamiltonian.Hamiltonian]):
+  def expectation(self, observables: Union[tf.Tensor, hamiltonian.Hamiltonian]):
     """Estimates observable expectation values against the density operator.
 
     TODO(#119): add expectation and derivative equations and discussions
@@ -144,5 +143,4 @@ class QHBM(tf.keras.layers.Layer):
       expectation values of each entry in `ops`.
     """
     return self.ebm.expectation(
-        functools.partial(
-            self.qnn.expectation, observables=observables))
+        functools.partial(self.qnn.expectation, observables=observables))

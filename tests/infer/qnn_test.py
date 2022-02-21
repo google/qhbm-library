@@ -277,8 +277,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
   @parameterized.parameters({
       "energy_class": energy_class,
       "energy_args": energy_args,
-  } for energy_class, energy_args in zip(
-      [energy.BernoulliEnergy, energy.KOBE], [[], [2]]))
+  } for energy_class, energy_args in zip([energy.BernoulliEnergy, energy.KOBE],
+                                         [[], [2]]))
   @test_util.eager_mode_toggle
   def test_expectation_modular_hamiltonian(self, energy_class, energy_args):
     """Confirm expectation of modular Hamiltonians works."""

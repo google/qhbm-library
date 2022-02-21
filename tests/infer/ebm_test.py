@@ -147,10 +147,8 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
         dtype=tf.int8)
     expected_seed = tf.constant([44, 22], tf.int32)
     expected_energies = actual_energy(expected_bitstrings)
-    actual_layer = ebm.AnalyticEnergyInference(actual_energy,
-                                                        self.num_samples,
-                                                        expected_seed,
-                                                        expected_name)
+    actual_layer = ebm.AnalyticEnergyInference(actual_energy, self.num_samples,
+                                               expected_seed, expected_name)
     self.assertEqual(actual_layer.name, expected_name)
     self.assertAllEqual(actual_layer.seed, expected_seed)
     self.assertAllEqual(actual_layer.all_bitstrings, expected_bitstrings)
@@ -196,7 +194,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     # Three bit tests.
     # First a uniform sampling test.
     three_bit_energy = energy.KOBE([0, 1, 2], 3,
-                                         tf.keras.initializers.Constant(0.0))
+                                   tf.keras.initializers.Constant(0.0))
     actual_layer = ebm.AnalyticEnergyInference(
         three_bit_energy, self.num_samples, initial_seed=self.tfp_seed)
 
@@ -488,8 +486,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     expected_log_partition = tf.math.log(tf.constant(3641.8353))
 
     actual_energy = energy.KOBE([0, 1], 2)
-    actual_layer = ebm.AnalyticEnergyInference(actual_energy,
-                                                        self.num_samples)
+    actual_layer = ebm.AnalyticEnergyInference(actual_energy, self.num_samples)
     actual_energy.set_weights([test_thetas])
 
     log_partition_wrapper = tf.function(actual_layer.log_partition)
@@ -506,7 +503,8 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
       """Perturbs the kth variable and calculates the log partition."""
       new_kernel = old_kernel + delta * tf.one_hot(k, kernel_len, 1.0, 0.0)
       actual_energy.set_weights([new_kernel])
-      delta_log_partition = tf.reduce_logsumexp(-1.0 * actual_energy(all_bitstrings))
+      delta_log_partition = tf.reduce_logsumexp(-1.0 *
+                                                actual_energy(all_bitstrings))
       actual_energy.set_weights([old_kernel])
       return delta_log_partition
 
@@ -529,8 +527,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     expected_entropy = tf.constant(0.00233551808)
 
     actual_energy = energy.KOBE([0, 1], 2)
-    actual_layer = ebm.AnalyticEnergyInference(actual_energy,
-                                                        self.num_samples)
+    actual_layer = ebm.AnalyticEnergyInference(actual_energy, self.num_samples)
     actual_energy.set_weights([test_thetas])
 
     entropy_wrapper = tf.function(actual_layer.entropy)
@@ -540,8 +537,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
   @test_util.eager_mode_toggle
   def test_call(self):
     """Confirms that call behaves correctly."""
-    one_bit_energy = energy.KOBE([0], 1,
-                                       tf.keras.initializers.Constant(0.0))
+    one_bit_energy = energy.KOBE([0], 1, tf.keras.initializers.Constant(0.0))
     actual_layer = ebm.AnalyticEnergyInference(
         one_bit_energy, self.num_samples, initial_seed=self.tfp_seed)
     actual_dist = actual_layer(None)
@@ -579,8 +575,8 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     expected_name = "test_bernoulli_dist_name"
     actual_energy = energy.BernoulliEnergy(bits)
     expected_seed = tf.constant([4, 12], dtype=tf.int32)
-    actual_layer = ebm.BernoulliEnergyInference(
-        actual_energy, self.num_samples, expected_seed, expected_name)
+    actual_layer = ebm.BernoulliEnergyInference(actual_energy, self.num_samples,
+                                                expected_seed, expected_name)
     self.assertEqual(actual_layer.name, expected_name)
     self.assertAllEqual(actual_layer.seed, expected_seed)
     self.assertIsInstance(actual_layer.distribution,
@@ -619,7 +615,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
 
     # Two bit tests.
     actual_energy = energy.BernoulliEnergy([0, 1],
-                                          tf.keras.initializers.Constant(0.0))
+                                           tf.keras.initializers.Constant(0.0))
     actual_layer = ebm.BernoulliEnergyInference(
         actual_energy, self.num_samples, initial_seed=self.tfp_seed)
 
@@ -679,9 +675,10 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     ebm_init = tf.keras.initializers.RandomUniform(
         -2, -1, seed=self.tf_random_seed)
     actual_energy = energy.BernoulliEnergy([5, 6, 7], ebm_init)
-    actual_layer = ebm.BernoulliEnergyInference(
-        actual_energy, self.num_samples, self.tfp_seed)
-    expected_log_partition = tf.reduce_logsumexp(-1.0 * actual_energy(all_bitstrings))
+    actual_layer = ebm.BernoulliEnergyInference(actual_energy, self.num_samples,
+                                                self.tfp_seed)
+    expected_log_partition = tf.reduce_logsumexp(-1.0 *
+                                                 actual_energy(all_bitstrings))
 
     log_partition_wrapper = tf.function(actual_layer.log_partition)
     with tf.GradientTape() as tape:
@@ -695,7 +692,8 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
       """Perturbs the kth variable and calculates the log partition."""
       new_kernel = old_kernel + delta * tf.one_hot(k, kernel_len, 1.0, 0.0)
       actual_energy.set_weights([new_kernel])
-      delta_log_partition = tf.reduce_logsumexp(-1.0 * actual_energy(all_bitstrings))
+      delta_log_partition = tf.reduce_logsumexp(-1.0 *
+                                                actual_energy(all_bitstrings))
       actual_energy.set_weights([old_kernel])
       return delta_log_partition
 
@@ -738,8 +736,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     expected_entropy = -1.0 * tf.reduce_sum(all_probs * tf.math.log(all_probs))
 
     actual_energy = energy.BernoulliEnergy([0, 1, 2])
-    actual_layer = ebm.BernoulliEnergyInference(
-        actual_energy, self.num_samples)
+    actual_layer = ebm.BernoulliEnergyInference(actual_energy, self.num_samples)
     actual_energy.set_weights([test_thetas])
 
     entropy_wrapper = tf.function(actual_layer.entropy)
@@ -750,7 +747,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
   def test_call(self):
     """Confirms that calling the layer works correctly."""
     actual_energy = energy.BernoulliEnergy([1],
-                                          tf.keras.initializers.Constant(0.0))
+                                           tf.keras.initializers.Constant(0.0))
     actual_layer = ebm.BernoulliEnergyInference(
         actual_energy, self.num_samples, initial_seed=self.tfp_seed)
     actual_dist = actual_layer(None)

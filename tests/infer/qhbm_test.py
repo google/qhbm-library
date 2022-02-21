@@ -45,8 +45,8 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     # Model hamiltonian
     num_bits = 3
     self.actual_energy = energy.BernoulliEnergy(list(range(num_bits)))
-    self.expected_ebm = ebm.AnalyticEnergyInference(
-        self.actual_energy, self.num_samples)
+    self.expected_ebm = ebm.AnalyticEnergyInference(self.actual_energy,
+                                                    self.num_samples)
     # pin first and last bits, middle bit free.
     self.actual_energy.set_weights([tf.constant([-23, 0, 17])])
     qubits = cirq.GridQubit.rect(1, num_bits)
@@ -60,9 +60,8 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
 
     # Inference
     self.expected_name = "nameforaQHBM"
-    self.actual_qhbm = qhbm.QHBM(self.expected_ebm,
-                                              self.expected_qnn,
-                                              self.expected_name)
+    self.actual_qhbm = qhbm.QHBM(self.expected_ebm, self.expected_qnn,
+                                 self.expected_name)
 
     self.tfp_seed = tf.constant([5, 1], tf.int32)
 
@@ -207,8 +206,8 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
   @parameterized.parameters({
       "energy_class": energy_class,
       "energy_args": energy_args,
-  } for energy_class, energy_args in zip(
-      [energy.BernoulliEnergy, energy.KOBE], [[], [2]]))
+  } for energy_class, energy_args in zip([energy.BernoulliEnergy, energy.KOBE],
+                                         [[], [2]]))
   @test_util.eager_mode_toggle
   def test_expectation_modular_hamiltonian(self, energy_class, energy_args):
     """Confirm expectation of modular Hamiltonians works."""
@@ -237,8 +236,8 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
 
     # calculate expected values
-    raw_expectations = actual_h_infer.qnn.expectation(
-        bitstrings, hamiltonian_measure)
+    raw_expectations = actual_h_infer.qnn.expectation(bitstrings,
+                                                      hamiltonian_measure)
     expected_expectations = utils.weighted_average(counts, raw_expectations)
     # Check that expectations are a reasonable size
     self.assertAllGreater(tf.math.abs(expected_expectations), 1e-3)

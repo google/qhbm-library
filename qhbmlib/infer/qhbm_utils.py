@@ -53,8 +53,7 @@ def density_matrix(model: hamiltonian.Hamiltonian):
     model: Modular Hamiltonian whose corresponding thermal state is the density
       matrix to be calculated.
   """
-  probabilities = tf.cast(
-      ebm_utils.probabilities(model.energy), tf.complex64)
+  probabilities = tf.cast(ebm_utils.probabilities(model.energy), tf.complex64)
   unitary_matrix = qnn_utils.unitary(model.circuit)
   return tf.einsum("k,ik,kj->ij", probabilities, unitary_matrix,
                    tf.linalg.adjoint(unitary_matrix))
@@ -106,8 +105,7 @@ def fidelity(model: hamiltonian.Hamiltonian, sigma: tf.Tensor):
     A scalar `tf.Tensor` which is the fidelity between the density matrix
       represented by this QHBM and `sigma`.
   """
-  k_theta = tf.cast(
-      ebm_utils.probabilities(model.energy), tf.complex64)
+  k_theta = tf.cast(ebm_utils.probabilities(model.energy), tf.complex64)
   u_phi = qnn_utils.unitary(model.circuit)
   u_phi_dagger = tf.linalg.adjoint(u_phi)
   sqrt_k_theta = tf.sqrt(k_theta)

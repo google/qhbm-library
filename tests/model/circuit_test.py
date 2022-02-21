@@ -308,8 +308,7 @@ class QAIATest(tf.test.TestCase):
       expected_symbol_values += (
           ([eta_const * theta_const] * len(classical_h_terms)) +
           ([gamma_const] * len(quantum_h_terms)))
-    actual_qnn = circuit.QAIA(quantum_h_terms, classical_h_terms,
-                                    num_layers)
+    actual_qnn = circuit.QAIA(quantum_h_terms, classical_h_terms, num_layers)
     self.assertAllEqual(actual_qnn.qubits, expected_qubits)
     self.assertAllEqual(actual_qnn.symbol_names, expected_symbol_names)
     self.assertAllEqual(

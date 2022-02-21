@@ -28,7 +28,8 @@ def probabilities(input_energy: energy.BitstringEnergy):
     input_energy: The energy function defining the EBM.
   """
   all_bitstrings = tf.constant(
-      list(itertools.product([0, 1], repeat=input_energy.num_bits)), dtype=tf.int8)
+      list(itertools.product([0, 1], repeat=input_energy.num_bits)),
+      dtype=tf.int8)
   all_energies = input_energy(all_bitstrings)
   energy_exp = tf.math.exp(-all_energies)
   partition = tf.math.reduce_sum(energy_exp)

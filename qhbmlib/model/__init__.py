@@ -18,4 +18,3 @@ from qhbmlib.model.circuit import QuantumCircuit, DirectQuantumCircuit, QAIA
 from qhbmlib.model.energy import BitstringEnergy, PauliMixin, BernoulliEnergy, KOBE
 from qhbmlib.model.energy_utils import SpinsFromBitstrings, VariableDot, Parity
 from qhbmlib.model.hamiltonian import Hamiltonian
-

@@ -34,8 +34,7 @@ class HamiltonianTest(tf.test.TestCase):
     super().setUp()
     self.expected_name = "this_IS_theTestHam42"
     self.num_bits = 3
-    self.expected_energy = energy.BernoulliEnergy(
-        list(range(self.num_bits)))
+    self.expected_energy = energy.BernoulliEnergy(list(range(self.num_bits)))
     self.expected_energy.build([None, self.num_bits])
     qubits = cirq.GridQubit.rect(1, self.num_bits)
     symbols = [sympy.Symbol(str(n)) for n in range(self.num_bits)]
@@ -44,8 +43,9 @@ class HamiltonianTest(tf.test.TestCase):
     self.expected_circuit.build([])
     self.expected_operator_shards = self.expected_energy.operator_shards(
         self.expected_circuit.qubits)
-    self.actual_hamiltonian = hamiltonian.Hamiltonian(
-        self.expected_energy, self.expected_circuit, self.expected_name)
+    self.actual_hamiltonian = hamiltonian.Hamiltonian(self.expected_energy,
+                                                      self.expected_circuit,
+                                                      self.expected_name)
 
   def test_init(self):
     """Tests Hamiltonian initialization.
