@@ -22,11 +22,9 @@ import sympy
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-
 from qhbmlib.infer import ebm
 from qhbmlib.infer import qhbm
 from qhbmlib.infer import qhbm_utils
-from qhbmlib.infer import qnn
 from qhbmlib.model import circuit
 from qhbmlib.model import energy
 from qhbmlib import qmhl_loss
@@ -169,7 +167,7 @@ class QMHLTest(tf.test.TestCase):
       # EBM
       ebm_init = tf.keras.initializers.RandomUniform(
           minval=ebm_const / 4, maxval=ebm_const, seed=self.tf_random_seed)
-      actual_energy = energy_model.BernoulliEnergy(list(range(num_qubits)), ebm_init)
+      actual_energy = energy.BernoulliEnergy(list(range(num_qubits)), ebm_init)
       e_infer = ebm.BernoulliEnergyInference(
           actual_energy, self.num_samples, initial_seed=self.tfp_seed)
 
@@ -180,8 +178,8 @@ class QMHLTest(tf.test.TestCase):
           cirq.rx(r_s)(q) for r_s, q in zip(r_symbols, qubits))
       qnn_init = tf.keras.initializers.RandomUniform(
           minval=q_const / 4, maxval=q_const, seed=self.tf_random_seed)
-      actual_circuit = circuit_model.DirectQuantumCircuit(r_circuit, qnn_init)
-      q_infer = circuit_infer.QuantumInference(actual_circuit)
+      actual_circuit = circuit.DirectQuantumCircuit(r_circuit, qnn_init)
+      q_infer = qhbm.QuantumInference(actual_circuit)
       qhbm_infer = qhbm.QHBM(e_infer, q_infer)
       model = qhbm_infer.hamiltonian
 
@@ -214,8 +212,8 @@ class QMHLTest(tf.test.TestCase):
                                  self.tf_random_seed)
       y_rot = cirq.Circuit(
           cirq.ry(r.numpy())(q) for r, q in zip(alphas, qubits))
-      data_circuit = circuit_model.DirectQuantumCircuit(y_rot)
-      data_q_infer = circuit_infer.QuantumInference(data_circuit)
+      data_circuit = circuit.DirectQuantumCircuit(y_rot)
+      data_q_infer = qhbm.QuantumInference(data_circuit)
       data_probs = tf.random.uniform([num_qubits],
                                      dtype=tf.float32,
                                      seed=self.tf_random_seed)

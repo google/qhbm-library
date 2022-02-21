@@ -27,8 +27,7 @@ class QuantumData(abc.ABC):
   """Interface for quantum datasets."""
 
   @abc.abstractmethod
-  def expectation(self, observable: Union[tf.Tensor,
-                                          hamiltonian.Hamiltonian]):
+  def expectation(self, observable: Union[tf.Tensor, hamiltonian.Hamiltonian]):
     """Take the expectation value of an observable against this dataset.
 
     Args:
@@ -46,13 +45,13 @@ class QuantumData(abc.ABC):
 class QHBMData(QuantumData):
   """QuantumData defined by a QHBM."""
 
-  def __init__(self, qhbm: qhbm.QHBM):
+  def __init__(self, input_qhbm: qhbm.QHBM):
     """Initializes a QHBMData.
 
     Args:
       qhbm: An inference engine for a QHBM.
     """
-    self.qhbm = qhbm
+    self.qhbm = input_qhbm
 
   def expectation(self, observable):
     """See base class docstring."""

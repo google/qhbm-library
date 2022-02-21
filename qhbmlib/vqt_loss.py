@@ -18,11 +18,11 @@ from typing import Union
 
 import tensorflow as tf
 
-from qhbmlib import hamiltonian_infer
+from qhbmlib import qhbm
 from qhbmlib import hamiltonian_model
 
 
-def vqt(qhbm: hamiltonian_infer.QHBM,
+def vqt(input_qhbm: qhbm.QHBM,
         hamiltonian: Union[tf.Tensor,
                            hamiltonian_model.Hamiltonian], beta: tf.Tensor):
   """Computes the VQT loss of a given QHBM and Hamiltonian.
@@ -30,7 +30,7 @@ def vqt(qhbm: hamiltonian_infer.QHBM,
   This function is differentiable within a `tf.GradientTape` scope.
 
   Args:
-    qhbm: Inference methods for the model.
+    input_qhbm: Inference methods for the model.
     hamiltonian: The Hamiltonian whose thermal state is to be learned.  If
       it is a `tf.Tensor`, it is of type `tf.string` with shape [1], result of
       calling `tfq.convert_to_tensor` on a list of `cirq.PauliSum`, `[op]`.
@@ -45,11 +45,11 @@ def vqt(qhbm: hamiltonian_infer.QHBM,
   # See equations B4 and B5 in appendix.  TODO(#119): confirm equation number.
   def f_vqt(bitstrings):
     h_expectations = tf.squeeze(
-        qhbm.q_inference.expectation(bitstrings, hamiltonian), 1)
+        input_qhbm.q_inference.expectation(bitstrings, hamiltonian), 1)
     beta_h_expectations = beta * h_expectations
-    energies = tf.stop_gradient(qhbm.hamiltonian.energy(bitstrings))
+    energies = tf.stop_gradient(input_qhbm.modular_hamiltonian.energy(bitstrings))
     return beta_h_expectations - energies
 
-  average_expectation = qhbm.e_inference.expectation(f_vqt)
-  current_partition = tf.stop_gradient(qhbm.e_inference.log_partition())
+  average_expectation = input_qhbm.e_inference.expectation(f_vqt)
+  current_partition = tf.stop_gradient(input_qhbm.e_inference.log_partition())
   return average_expectation - current_partition
