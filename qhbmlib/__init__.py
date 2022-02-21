@@ -14,15 +14,10 @@
 # ==============================================================================
 """Import QHBM library modules.*"""
 
-# from qhbmlib import architectures
-# from qhbmlib import circuit_infer
-# from qhbmlib import circuit_infer_utils
-# from qhbmlib import energy_infer
-# from qhbmlib import energy_infer_utils
-# from qhbmlib import hamiltonian_infer
-# from qhbmlib import hamiltonian_infer_utils
-# from qhbmlib import hamiltonian
-# from qhbmlib import qmhl_loss
-# from qhbmlib import quantum_data
-# from qhbmlib import utils
-# from qhbmlib import vqt_loss
+from qhbmlib import architectures
+from qhbmlib import infer
+from qhbmlib import model
+from qhbmlib import qmhl_loss
+from qhbmlib import quantum_data
+from qhbmlib import utils
+from qhbmlib import vqt_loss
