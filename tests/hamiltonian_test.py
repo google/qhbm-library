@@ -27,7 +27,7 @@ class QubitGridTest(tf.test.TestCase):
     """Confirm correct grid."""
     r = 2
     c = 3
-    test_qubits = hamiltonian._qubit_grid(r, c)
+    test_qubits = hamiltonian._qubit_grid(r, c)  # pylint: disable=protected-access
     for test_r, test_row in enumerate(test_qubits):
       for test_c, q in enumerate(test_row):
         self.assertEqual(cirq.GridQubit(test_r, test_c), q)
