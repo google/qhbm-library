@@ -35,7 +35,7 @@ tensorflow-quantum = "0.6.1"
 coverage = {extras = ["toml"], version = "5.5"}
 pytest-cov = "2.11.1"
 yapf = "0.31.0"
-pylint = "2.12.2"
+pylint = "2.9.3"
 pytest = "6.2.4"
 
 [tool.coverage.paths]
