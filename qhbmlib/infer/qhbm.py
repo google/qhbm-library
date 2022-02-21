@@ -99,11 +99,11 @@ class QHBM(tf.keras.layers.Layer):
 
     Here we explain the algorithm.  First, construct $X$ to be a classical
     random variable with probability distribution $p_\theta(x)$ set by
-    `model.modular_hamiltonian.energy`.  Then, draw $n = $`num\_samples`
-    bitstrings, $S=\{x_1, \ldots, x_n\}$, from $X$.  For each unique $x_i\in S$,
-    set `states[i]` to the TFQ string representation of $U_\phi\ket{x_i}$, where
-    $U_\phi$ is set by `self.modular_hamiltonian.circuit`.  Finally, set
-    `counts[i]` equal to the number of times $x_i$ occurs in $S$.
+    `model.ebm.energy`.  Then, draw $n = $`num\_samples` bitstrings,
+    $S=\{x_1, \ldots, x_n\}$, from $X$.  For each unique $x_i\in S$, set
+    `states[i]` to the TFQ string representation of $U_\phi\ket{x_i}$, where
+    $U_\phi$ is set by `self.qnn.circuit`.  Finally, set `counts[i]` equal to
+    the number of times $x_i$ occurs in $S$.
 
     Args:
       model: The modular Hamiltonian whose normalized exponential is the
@@ -118,7 +118,7 @@ class QHBM(tf.keras.layers.Layer):
     """
     samples = self.ebm.sample(num_samples)
     bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
-    states = self.modular_hamiltonian.circuit(bitstrings)
+    states = self.qnn.circuit(bitstrings)
     return states, counts
 
   def expectation(self, observables: Union[tf.Tensor, hamiltonian.Hamiltonian]):

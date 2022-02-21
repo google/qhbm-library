@@ -78,8 +78,8 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     actual_circuits, actual_counts = circuits_wrapper(self.num_samples)
 
     # Circuits with the allowed-to-be-sampled bitstrings prepended.
-    u = tfq.from_tensor(self.actual_qhbm.modular_hamiltonian.circuit.pqc)[0]
-    qubits = self.actual_qhbm.modular_hamiltonian.circuit.qubits
+    u = tfq.from_tensor(self.actual_qhbm.qnn.circuit.pqc)[0]
+    qubits = self.actual_qhbm.qnn.circuit.qubits
     expected_circuits_deserialized = [
         cirq.Circuit(
             cirq.X(qubits[0])**0,
