@@ -76,8 +76,8 @@ class QHBM(tf.keras.layers.Layer):
     super().__init__(name=name)
     self._e_inference = input_ebm
     self._q_inference = input_qnn
-    self._modular_hamiltonian = hamiltonian.Hamiltonian(self.e_inference.energy,
-                                                        self.q_inference.circuit)
+    self._modular_hamiltonian = hamiltonian.Hamiltonian(
+        self.e_inference.energy, self.q_inference.circuit)
 
   @property
   def e_inference(self):
@@ -143,4 +143,5 @@ class QHBM(tf.keras.layers.Layer):
       expectation values of each entry in `ops`.
     """
     return self.e_inference.expectation(
-        functools.partial(self.q_inference.expectation, observables=observables))
+        functools.partial(
+            self.q_inference.expectation, observables=observables))
