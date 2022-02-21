@@ -25,6 +25,7 @@ import tensorflow_probability as tfp
 from qhbmlib.infer import ebm
 from qhbmlib.infer import qhbm
 from qhbmlib.infer import qhbm_utils
+from qhbmlib.infer import qnn
 from qhbmlib.model import circuit
 from qhbmlib.model import energy
 from qhbmlib import qmhl_loss
@@ -179,9 +180,9 @@ class QMHLTest(tf.test.TestCase):
       qnn_init = tf.keras.initializers.RandomUniform(
           minval=q_const / 4, maxval=q_const, seed=self.tf_random_seed)
       actual_circuit = circuit.DirectQuantumCircuit(r_circuit, qnn_init)
-      q_infer = qhbm.QuantumInference(actual_circuit)
+      q_infer = qnn.QuantumInference(actual_circuit)
       qhbm_infer = qhbm.QHBM(e_infer, q_infer)
-      model = qhbm_infer.hamiltonian
+      model = qhbm_infer.modular_hamiltonian
 
       # Confirm qhbm_model QHBM
       test_thetas = model.energy.trainable_variables[0]
@@ -213,7 +214,7 @@ class QMHLTest(tf.test.TestCase):
       y_rot = cirq.Circuit(
           cirq.ry(r.numpy())(q) for r, q in zip(alphas, qubits))
       data_circuit = circuit.DirectQuantumCircuit(y_rot)
-      data_q_infer = qhbm.QuantumInference(data_circuit)
+      data_q_infer = qnn.QuantumInference(data_circuit)
       data_probs = tf.random.uniform([num_qubits],
                                      dtype=tf.float32,
                                      seed=self.tf_random_seed)
@@ -244,7 +245,7 @@ class QMHLTest(tf.test.TestCase):
                                            tf.math.cos(alphas) *
                                            tf.math.cos(test_phis))
       with tf.GradientTape() as expectation_tape:
-        actual_expectation = data.expectation(qhbm_infer.hamiltonian)
+        actual_expectation = data.expectation(qhbm_infer.modular_hamiltonian)
       self.assertAllClose(actual_expectation, expected_expectation,
                           self.close_rtol)
 

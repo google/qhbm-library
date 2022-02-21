@@ -199,7 +199,7 @@ class VQTTest(tf.test.TestCase):
       qhbm_infer = qhbm.QHBM(e_infer, q_infer)
 
       # TODO(#171): code around here seems like boilerplate.
-      model = qhbm_infer.hamiltonian
+      model = qhbm_infer.modular_hamiltonian
 
       # Generate remaining VQT arguments
       test_h = tfq.convert_to_tensor(
