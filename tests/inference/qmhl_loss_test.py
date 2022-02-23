@@ -25,10 +25,10 @@ import tensorflow_probability as tfp
 from qhbmlib.inference import ebm
 from qhbmlib.inference import qhbm
 from qhbmlib.inference import qhbm_utils
+from qhbmlib.inference import qmhl_loss
 from qhbmlib.inference import qnn
 from qhbmlib.models import circuit
 from qhbmlib.models import energy
-from qhbmlib import qmhl_loss
 from qhbmlib import quantum_data
 from tests import test_util
 

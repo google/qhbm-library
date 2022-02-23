@@ -18,7 +18,7 @@ from qhbmlib.inference.ebm import EnergyInferenceBase, EnergyInference, Analytic
 from qhbmlib.inference.ebm_utils import probabilities
 from qhbmlib.inference.qhbm import QHBM
 from qhbmlib.inference.qhbm_utils import density_matrix, fidelity
-from qhbmlib.inference.qmhl import qmhl
+from qhbmlib.inference.qmhl_loss import qmhl
 from qhbmlib.inference.qnn import QuantumInference
 from qhbmlib.inference.qnn_utils import unitary
-from qhbmlib.inference.vqt import vqt
+from qhbmlib.inference.vqt_loss import vqt
