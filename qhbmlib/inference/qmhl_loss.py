@@ -14,7 +14,7 @@
 # ==============================================================================
 """Implementation of the QMHL loss function."""
 
-from qhbmlib import quantum_data
+from qhbmlib.data import quantum_data
 from qhbmlib.inference import qhbm
 
 

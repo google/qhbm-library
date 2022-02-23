@@ -17,7 +17,7 @@
 import cirq
 import tensorflow as tf
 
-from qhbmlib.data import quantum_data
+from qhbmlib.data import qhbm_data
 from tests import test_util
 
 

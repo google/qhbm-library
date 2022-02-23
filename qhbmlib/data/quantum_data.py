@@ -19,7 +19,6 @@ from typing import Union
 
 import tensorflow as tf
 
-from qhbmlib.inference import qhbm
 from qhbmlib.models import hamiltonian
 
 
@@ -40,19 +39,3 @@ class QuantumData(abc.ABC):
         this quantum data source.
     """
     raise NotImplementedError()
-
-
-class QHBMData(QuantumData):
-  """QuantumData defined by a QHBM."""
-
-  def __init__(self, input_qhbm: qhbm.QHBM):
-    """Initializes a QHBMData.
-
-    Args:
-      qhbm: An inference engine for a QHBM.
-    """
-    self.qhbm = input_qhbm
-
-  def expectation(self, observable):
-    """See base class docstring."""
-    return tf.squeeze(self.qhbm.expectation(observable), 0)
