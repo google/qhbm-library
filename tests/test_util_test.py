@@ -14,9 +14,87 @@
 # ==============================================================================
 """Tests for the test_util module."""
 
+from absl.testing import parameterized
+import random
+
+import cirq
+import sympy
 import tensorflow as tf
+import tensorflow_quantum as tfq
 
 from tests import test_util
+
+
+class RPQCTest(tf.test.TestCase, parameterized.TestCase):
+  """Test RPQC functions in the test_util module."""
+
+  def test_get_xz_rotation(self):
+    """Confirm an XZ rotation is returned."""
+    q = cirq.GridQubit(7, 9)
+    a, b = sympy.symbols("a b")
+    expected_circuit = cirq.Circuit(cirq.X(q)**a, cirq.Z(q)**b)
+    actual_circuit = test_util.get_xz_rotation(q, a, b)
+    self.assertEqual(actual_circuit, expected_circuit)
+
+  def test_get_cz_exp(self):
+    """Confirm an exponentiated CNOT is returned."""
+    q0 = cirq.GridQubit(4, 1)
+    q1 = cirq.GridQubit(2, 5)
+    a = sympy.Symbol("a")
+    expected_circuit = cirq.Circuit(cirq.CZ(q0, q1)**a)
+    actual_circuit = test_util.get_cz_exp(q0, q1, a)
+    self.assertEqual(actual_circuit, expected_circuit)
+
+  def test_get_xz_rotation_layer(self):
+    """Confirm an XZ rotation on every qubit is returned."""
+    qubits = cirq.GridQubit.rect(1, 2)
+    layer_num = 3
+    name = "test_rot"
+    expected_circuit = cirq.Circuit()
+    for n, q in enumerate(qubits):
+      s = sympy.Symbol("sx_{0}_{1}_{2}".format(name, layer_num, n))
+      expected_circuit += cirq.Circuit(cirq.X(q)**s)
+      s = sympy.Symbol("sz_{0}_{1}_{2}".format(name, layer_num, n))
+      expected_circuit += cirq.Circuit(cirq.Z(q)**s)
+    actual_circuit = test_util.get_xz_rotation_layer(
+        qubits, layer_num, name)
+    self.assertEqual(actual_circuit, expected_circuit)
+
+  @parameterized.parameters([{"n_qubits": 11}, {"n_qubits": 12}])
+  def test_get_cz_exp_layer(self, n_qubits):
+    """Confirm an exponentiated CZ on every qubit is returned."""
+    qubits = cirq.GridQubit.rect(1, n_qubits)
+    layer_num = 0
+    name = "test_cz"
+    expected_circuit = cirq.Circuit()
+    for n, (q0, q1) in enumerate(zip(qubits, qubits[1:])):
+      if n % 2 == 0:
+        s = sympy.Symbol("sc_{0}_{1}_{2}".format(name, layer_num, n))
+        expected_circuit += cirq.Circuit(cirq.CZ(q0, q1)**s)
+    for n, (q0, q1) in enumerate(zip(qubits, qubits[1:])):
+      if n % 2 == 1:
+        s = sympy.Symbol("sc_{0}_{1}_{2}".format(name, layer_num, n))
+        expected_circuit += cirq.Circuit(cirq.CZ(q0, q1)**s)
+    actual_circuit = test_util.get_cz_exp_layer(qubits, layer_num, name)
+    self.assertEqual(actual_circuit, expected_circuit)
+
+  @parameterized.parameters([{"n_qubits": 11}, {"n_qubits": 12}])
+  def test_get_hardware_efficient_model_unitary(self, n_qubits):
+    """Confirm a multi-layered circuit is returned."""
+    qubits = cirq.GridQubit.rect(1, n_qubits)
+    name = "test_hardware_efficient_model"
+    expected_circuit = cirq.Circuit()
+    this_circuit = test_util.get_xz_rotation_layer(qubits, 0, name)
+    expected_circuit += this_circuit
+    this_circuit = test_util.get_cz_exp_layer(qubits, 0, name)
+    expected_circuit += this_circuit
+    this_circuit = test_util.get_xz_rotation_layer(qubits, 1, name)
+    expected_circuit += this_circuit
+    this_circuit = test_util.get_cz_exp_layer(qubits, 1, name)
+    expected_circuit += this_circuit
+    actual_circuit = test_util.get_hardware_efficient_model_unitary(
+        qubits, 2, name)
+    self.assertEqual(actual_circuit, expected_circuit)
 
 
 class EagerModeToggle(tf.test.TestCase):

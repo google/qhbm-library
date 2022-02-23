@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Import QHBM library modules.*"""
+"""Module for qhbmlib.*"""
 
-from qhbmlib import architectures
+from qhbmlib import data
 from qhbmlib import inference
 from qhbmlib import models
-from qhbmlib import quantum_data
 from qhbmlib import utils
