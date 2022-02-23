@@ -20,8 +20,8 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from qhbmlib.infer import ebm
-from qhbmlib.model import energy
-from qhbmlib.model import energy_utils
+from qhbmlib.models import energy
+from qhbmlib.models import energy_utils
 from qhbmlib import utils
 
 from tests import test_util
