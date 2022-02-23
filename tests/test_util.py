@@ -20,7 +20,7 @@ import random
 import cirq
 import numpy as np
 import scipy
-
+import sympy
 import tensorflow as tf
 import tensorflow_probability as tfp
 
@@ -96,8 +96,7 @@ def get_random_hamiltonian_and_inference(qubits,
 
   qnn_init = tf.keras.initializers.RandomUniform(
       minval=minval_phis, maxval=maxval_phis)
-  unitary = test_util.get_hardware_efficient_model_unitary(
-      qubits, num_layers, identifier)
+  unitary = get_hardware_efficient_model_unitary(qubits, num_layers, identifier)
   actual_circuit = circuit.DirectQuantumCircuit(unitary, qnn_init)
   q_infer = qnn.QuantumInference(actual_circuit, name=identifier)
   random_qhbm = qhbm.QHBM(e_infer, q_infer)

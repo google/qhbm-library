@@ -46,7 +46,7 @@ class QHBMDataTest(tf.test.TestCase):
           qubits, num_layers, f"observable_{num_qubits}", self.num_samples)
       expected_expectation = tf.squeeze(qhbm.expectation(hamiltonian))
 
-      data = quantum_data.QHBMData(qhbm)
+      data = qhbm_data.QHBMData(qhbm)
       actual_expectation = data.expectation(hamiltonian)
 
       self.assertAllClose(actual_expectation, expected_expectation)

@@ -22,6 +22,7 @@ import sympy
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from qhbmlib.data import qhbm_data
 from qhbmlib.data import quantum_data
 from qhbmlib.inference import ebm
 from qhbmlib.inference import qhbm
@@ -66,7 +67,7 @@ class QMHLTest(tf.test.TestCase):
           initializer_seed=self.tf_random_seed)
       # Set data equal to the model
       data_h.set_weights(model_h.get_weights())
-      data = quantum_data.QHBMData(data_infer)
+      data = qhbm_data.QHBMData(data_infer)
 
       # Trained loss is the entropy.
       expected_loss = model_infer.e_inference.entropy()
@@ -123,7 +124,7 @@ class QMHLTest(tf.test.TestCase):
           self.num_samples,
           initializer_seed=self.tf_random_seed,
           ebm_seed=self.tfp_seed)
-      data = quantum_data.QHBMData(data_qhbm)
+      data = qhbm_data.QHBMData(data_qhbm)
 
       model_h, model_qhbm = test_util.get_random_hamiltonian_and_inference(
           qubits,
