@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Module for qhbmlib.models.*"""
+"""Defines the qhbmlib.models package."""
 
 from qhbmlib.models.circuit import QuantumCircuit, DirectQuantumCircuit, QAIA
 from qhbmlib.models.energy import BitstringEnergy, PauliMixin, BernoulliEnergy, KOBE

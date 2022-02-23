@@ -12,6 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Module for qhbmlib.data.*"""
+"""Defines the qbmlib.data package."""
 
 from qhbmlib.data.quantum_data import QuantumData, QHBMData

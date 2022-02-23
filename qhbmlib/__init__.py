@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Module for qhbmlib.*"""
+"""Defines the qhbmlib package."""
 
 from qhbmlib import data
 from qhbmlib import inference

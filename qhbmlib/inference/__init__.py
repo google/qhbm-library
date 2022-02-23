@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Module for qhbmlib.inference.*"""
+"""Defines the qhbmlib.inference package."""
 
 from qhbmlib.inference.ebm import EnergyInferenceBase, EnergyInference, AnalyticEnergyInference, BernoulliEnergyInference
 from qhbmlib.inference.ebm_utils import probabilities

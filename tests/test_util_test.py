@@ -15,12 +15,10 @@
 """Tests for the test_util module."""
 
 from absl.testing import parameterized
-import random
 
 import cirq
 import sympy
 import tensorflow as tf
-import tensorflow_quantum as tfq
 
 from tests import test_util
 
@@ -56,8 +54,7 @@ class RPQCTest(tf.test.TestCase, parameterized.TestCase):
       expected_circuit += cirq.Circuit(cirq.X(q)**s)
       s = sympy.Symbol("sz_{0}_{1}_{2}".format(name, layer_num, n))
       expected_circuit += cirq.Circuit(cirq.Z(q)**s)
-    actual_circuit = test_util.get_xz_rotation_layer(
-        qubits, layer_num, name)
+    actual_circuit = test_util.get_xz_rotation_layer(qubits, layer_num, name)
     self.assertEqual(actual_circuit, expected_circuit)
 
   @parameterized.parameters([{"n_qubits": 11}, {"n_qubits": 12}])
