@@ -26,8 +26,8 @@ from qhbmlib.infer import ebm
 from qhbmlib.infer import qhbm
 from qhbmlib.infer import qhbm_utils
 from qhbmlib.infer import qnn
-from qhbmlib.model import circuit
-from qhbmlib.model import energy
+from qhbmlib.models import circuit
+from qhbmlib.models import energy
 from qhbmlib import qmhl_loss
 from qhbmlib import quantum_data
 from tests import test_util

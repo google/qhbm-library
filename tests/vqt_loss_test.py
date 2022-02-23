@@ -24,8 +24,8 @@ import tensorflow_quantum as tfq
 from qhbmlib.infer import ebm
 from qhbmlib.infer import qhbm
 from qhbmlib.infer import qnn
-from qhbmlib.model import circuit
-from qhbmlib.model import energy
+from qhbmlib.models import circuit
+from qhbmlib.models import energy
 from qhbmlib import vqt_loss
 from tests import test_util
 

@@ -18,7 +18,7 @@ import itertools
 
 import tensorflow as tf
 
-from qhbmlib.model import energy
+from qhbmlib.models import energy
 
 
 def probabilities(input_energy: energy.BitstringEnergy):

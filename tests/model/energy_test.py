@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for model.energy"""
+"""Tests for models.energy"""
 
 import itertools
 import random
@@ -20,7 +20,7 @@ import random
 import cirq
 import tensorflow as tf
 
-from qhbmlib.model import energy
+from qhbmlib.models import energy
 from qhbmlib import utils
 from tests import test_util
 

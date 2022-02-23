@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Module for qhbmlib.model.*"""
+"""Module for qhbmlib.models.*"""
 
-from qhbmlib.model.circuit import QuantumCircuit, DirectQuantumCircuit, QAIA
-from qhbmlib.model.energy import BitstringEnergy, PauliMixin, BernoulliEnergy, KOBE
-from qhbmlib.model.energy_utils import SpinsFromBitstrings, VariableDot, Parity
-from qhbmlib.model.hamiltonian import Hamiltonian
+from qhbmlib.models.circuit import QuantumCircuit, DirectQuantumCircuit, QAIA
+from qhbmlib.models.energy import BitstringEnergy, PauliMixin, BernoulliEnergy, KOBE
+from qhbmlib.models.energy_utils import SpinsFromBitstrings, VariableDot, Parity
+from qhbmlib.models.hamiltonian import Hamiltonian

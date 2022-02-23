@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for model.circuit"""
+"""Tests for models.circuit"""
 
 import absl
 import itertools
@@ -24,7 +24,7 @@ import tensorflow as tf
 from tensorflow.python.framework import errors
 import tensorflow_quantum as tfq
 
-from qhbmlib.model import circuit
+from qhbmlib.models import circuit
 from qhbmlib import utils
 from tests import test_util
 

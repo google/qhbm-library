@@ -18,7 +18,7 @@ import tensorflow as tf
 
 from qhbmlib.infer import qnn_utils
 from qhbmlib.infer import ebm_utils
-from qhbmlib.model import hamiltonian
+from qhbmlib.models import hamiltonian
 
 
 def density_matrix(model: hamiltonian.Hamiltonian):

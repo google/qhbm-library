@@ -29,10 +29,10 @@ import tensorflow_quantum as tfq
 from tensorflow_quantum.python import util as tfq_util
 
 from qhbmlib.infer import qnn
-from qhbmlib.model import circuit
-from qhbmlib.model import circuit_utils
-from qhbmlib.model import energy
-from qhbmlib.model import hamiltonian
+from qhbmlib.models import circuit
+from qhbmlib.models import circuit_utils
+from qhbmlib.models import energy
+from qhbmlib.models import hamiltonian
 from tests import test_util
 
 

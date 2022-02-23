@@ -21,7 +21,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-from qhbmlib.model import circuit_utils
+from qhbmlib.models import circuit_utils
 
 
 class QuantumCircuit(tf.keras.layers.Layer):

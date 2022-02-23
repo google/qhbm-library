@@ -20,7 +20,7 @@ from typing import List, Union
 import cirq
 import tensorflow as tf
 
-from qhbmlib.model import energy_utils
+from qhbmlib.models import energy_utils
 
 
 class BitstringEnergy(tf.keras.layers.Layer):

@@ -27,9 +27,9 @@ from tensorflow_quantum.python import util as tfq_util
 from qhbmlib.infer import ebm
 from qhbmlib.infer import qhbm
 from qhbmlib.infer import qnn
-from qhbmlib.model import circuit
-from qhbmlib.model import energy
-from qhbmlib.model import hamiltonian
+from qhbmlib.models import circuit
+from qhbmlib.models import energy
+from qhbmlib.models import hamiltonian
 from qhbmlib import utils
 from tests import test_util
 

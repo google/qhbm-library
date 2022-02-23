@@ -20,7 +20,7 @@ import tensorflow as tf
 
 from qhbmlib.infer import ebm
 from qhbmlib.infer import ebm_utils
-from qhbmlib.model import energy
+from qhbmlib.models import energy
 from qhbmlib import utils
 
 

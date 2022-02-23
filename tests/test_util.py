@@ -28,8 +28,8 @@ from qhbmlib import architectures
 from qhbmlib.infer import ebm
 from qhbmlib.infer import qhbm
 from qhbmlib.infer import qnn
-from qhbmlib.model import circuit
-from qhbmlib.model import energy
+from qhbmlib.models import circuit
+from qhbmlib.models import energy
 
 
 def get_random_hamiltonian_and_inference(qubits,

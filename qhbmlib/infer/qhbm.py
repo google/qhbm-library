@@ -21,7 +21,7 @@ import tensorflow as tf
 
 from qhbmlib.infer import ebm  # pylint: disable=unused-import
 from qhbmlib.infer import qnn  # pylint: disable=unused-import
-from qhbmlib.model import hamiltonian
+from qhbmlib.models import hamiltonian
 from qhbmlib import utils
 
 

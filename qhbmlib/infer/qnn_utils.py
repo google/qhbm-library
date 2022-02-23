@@ -17,7 +17,7 @@
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-from qhbmlib.model import circuit
+from qhbmlib.models import circuit
 
 
 def unitary(input_circuit: circuit.QuantumCircuit):

@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for model.circuit_utils"""
+"""Tests for models.circuit_utils"""
 
 import cirq
 import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-from qhbmlib.model import circuit_utils
+from qhbmlib.models import circuit_utils
 from tests import test_util
 
 

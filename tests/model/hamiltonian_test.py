@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for model.hamiltonian"""
+"""Tests for models.hamiltonian"""
 
 import absl
 
@@ -22,9 +22,9 @@ import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-from qhbmlib.model import circuit
-from qhbmlib.model import energy
-from qhbmlib.model import hamiltonian
+from qhbmlib.models import circuit
+from qhbmlib.models import energy
+from qhbmlib.models import hamiltonian
 
 
 class HamiltonianTest(tf.test.TestCase):

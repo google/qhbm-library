@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for model.energy_utils"""
+"""Tests for models.energy_utils"""
 
 import tensorflow as tf
 
-from qhbmlib.model import energy_utils
+from qhbmlib.models import energy_utils
 from tests import test_util
 
 
