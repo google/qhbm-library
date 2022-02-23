@@ -14,13 +14,16 @@
 # ==============================================================================
 """Interface to quantum data sources defined by QHBMs."""
 
+from typing import Union
+
 import tensorflow as tf
 
+from qhbmlib.data import quantum_data
 from qhbmlib.inference import qhbm
 from qhbmlib.models import hamiltonian
 
 
-class QHBMData(QuantumData):
+class QHBMData(quantum_data.QuantumData):
   """QuantumData defined by a QHBM."""
 
   def __init__(self, input_qhbm: qhbm.QHBM):
