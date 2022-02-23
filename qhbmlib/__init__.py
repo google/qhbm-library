@@ -17,7 +17,5 @@
 from qhbmlib import architectures
 from qhbmlib import inference
 from qhbmlib import models
-from qhbmlib import qmhl_loss
 from qhbmlib import quantum_data
 from qhbmlib import utils
-from qhbmlib import vqt_loss
