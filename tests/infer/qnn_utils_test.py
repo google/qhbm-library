@@ -23,7 +23,7 @@ import tensorflow as tf
 import tensorflow_quantum as tfq
 from tensorflow_quantum.python import util as tfq_util
 
-from qhbmlib.infer import qnn_utils
+from qhbmlib.inference import qnn_utils
 from qhbmlib.models import circuit
 
 

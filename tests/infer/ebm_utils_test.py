@@ -18,8 +18,8 @@ import random
 
 import tensorflow as tf
 
-from qhbmlib.infer import ebm
-from qhbmlib.infer import ebm_utils
+from qhbmlib.inference import ebm
+from qhbmlib.inference import ebm_utils
 from qhbmlib.models import energy
 from qhbmlib import utils
 

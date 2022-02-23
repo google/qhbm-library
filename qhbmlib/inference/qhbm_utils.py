@@ -16,8 +16,8 @@
 
 import tensorflow as tf
 
-from qhbmlib.infer import qnn_utils
-from qhbmlib.infer import ebm_utils
+from qhbmlib.inference import qnn_utils
+from qhbmlib.inference import ebm_utils
 from qhbmlib.models import hamiltonian
 
 

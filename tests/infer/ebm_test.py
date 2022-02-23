@@ -19,7 +19,7 @@ import functools
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from qhbmlib.infer import ebm
+from qhbmlib.inference import ebm
 from qhbmlib.models import energy
 from qhbmlib.models import energy_utils
 from qhbmlib import utils

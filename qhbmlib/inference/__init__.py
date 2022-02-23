@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Module for qhbmlib.infer.*"""
+"""Module for qhbmlib.inference.*"""
 
-from qhbmlib.infer.ebm import EnergyInferenceBase, EnergyInference, AnalyticEnergyInference, BernoulliEnergyInference
-from qhbmlib.infer.ebm_utils import probabilities
-from qhbmlib.infer.qhbm import QHBM
-from qhbmlib.infer.qhbm_utils import density_matrix, fidelity
+from qhbmlib.inference.ebm import EnergyInferenceBase, EnergyInference, AnalyticEnergyInference, BernoulliEnergyInference
+from qhbmlib.inference.ebm_utils import probabilities
+from qhbmlib.inference.qhbm import QHBM
+from qhbmlib.inference.qhbm_utils import density_matrix, fidelity

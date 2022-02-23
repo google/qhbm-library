@@ -19,7 +19,7 @@ from typing import Union
 
 import tensorflow as tf
 
-from qhbmlib.infer import qhbm
+from qhbmlib.inference import qhbm
 from qhbmlib.models import hamiltonian
 
 

@@ -17,7 +17,7 @@
 import cirq
 import tensorflow as tf
 
-from qhbmlib.infer import qhbm_utils
+from qhbmlib.inference import qhbm_utils
 from qhbmlib.models import circuit
 from qhbmlib.models import energy
 from qhbmlib.models import hamiltonian

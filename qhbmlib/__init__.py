@@ -15,7 +15,7 @@
 """Import QHBM library modules.*"""
 
 from qhbmlib import architectures
-from qhbmlib import infer
+from qhbmlib import inference
 from qhbmlib import models
 from qhbmlib import qmhl_loss
 from qhbmlib import quantum_data

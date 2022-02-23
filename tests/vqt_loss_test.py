@@ -21,9 +21,9 @@ import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-from qhbmlib.infer import ebm
-from qhbmlib.infer import qhbm
-from qhbmlib.infer import qnn
+from qhbmlib.inference import ebm
+from qhbmlib.inference import qhbm
+from qhbmlib.inference import qnn
 from qhbmlib.models import circuit
 from qhbmlib.models import energy
 from qhbmlib import vqt_loss

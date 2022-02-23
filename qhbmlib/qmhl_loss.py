@@ -15,7 +15,7 @@
 """Implementation of the QMHL loss function."""
 
 from qhbmlib import quantum_data
-from qhbmlib.infer import qhbm
+from qhbmlib.inference import qhbm
 
 
 def qmhl(data: quantum_data.QuantumData, input_qhbm: qhbm.QHBM):
