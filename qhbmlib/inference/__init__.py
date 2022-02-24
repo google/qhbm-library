@@ -14,11 +14,30 @@
 # ==============================================================================
 """Defines the qhbmlib.inference package."""
 
-from qhbmlib.inference.ebm import EnergyInferenceBase, EnergyInference, AnalyticEnergyInference, BernoulliEnergyInference
+from qhbmlib.inference.ebm import AnalyticEnergyInference
+from qhbmlib.inference.ebm import BernoulliEnergyInference
+from qhbmlib.inference.ebm import EnergyInference
+from qhbmlib.inference.ebm import EnergyInferenceBase
 from qhbmlib.inference.ebm_utils import probabilities
 from qhbmlib.inference.qhbm import QHBM
-from qhbmlib.inference.qhbm_utils import density_matrix, fidelity
+from qhbmlib.inference.qhbm_utils import density_matrix
+from qhbmlib.inference.qhbm_utils import fidelity
 from qhbmlib.inference.qmhl_loss import qmhl
 from qhbmlib.inference.qnn import QuantumInference
 from qhbmlib.inference.qnn_utils import unitary
 from qhbmlib.inference.vqt_loss import vqt
+
+__all__ = [
+    "AnalyticEnergyInference",
+    "BernoulliEnergyInference",
+    "density_matrix",
+    "EnergyInference",
+    "EnergyInferenceBase",
+    "fidelity",
+    "probabilities",
+    "QHBM",
+    "qmhl",
+    "QuantumInference",
+    "unitary",
+    "vqt",
+]
