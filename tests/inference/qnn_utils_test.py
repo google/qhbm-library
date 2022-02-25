@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for infer.qnn_utils"""
+"""Tests for inference.qnn_utils"""
 
 from absl import logging
 import random

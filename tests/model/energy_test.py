@@ -20,7 +20,7 @@ import random
 import cirq
 import tensorflow as tf
 
-from qhbmlib.models import energy
+from qhbmlib import models
 from qhbmlib import utils
 from tests import test_util
 
@@ -34,7 +34,7 @@ class BitstringEnergyTest(tf.test.TestCase):
     expected_bits = [5, 17, 22, 30, 42]
     expected_name = "init_test"
     expected_energy_layers = [tf.keras.layers.Dense(1), utils.Squeeze(-1)]
-    actual_b = energy.BitstringEnergy(
+    actual_b = models.BitstringEnergy(
         expected_bits, expected_energy_layers, name=expected_name)
     self.assertEqual(actual_b.num_bits, expected_num_bits)
     self.assertAllEqual(actual_b.bits, expected_bits)
@@ -50,7 +50,7 @@ class BitstringEnergyTest(tf.test.TestCase):
             1, kernel_initializer=tf.keras.initializers.Constant(1)),
         utils.Squeeze(-1)
     ]
-    test_b = energy.BitstringEnergy(list(range(num_bits)), energy_layers)
+    test_b = models.BitstringEnergy(list(range(num_bits)), energy_layers)
 
     @tf.function
     def test_b_wrapper(bitstrings):
@@ -88,7 +88,7 @@ class BitstringEnergyTest(tf.test.TestCase):
             tf.keras.layers.Dense(units[i], activation=activations[i]))
       expected_layer_list.append(tf.keras.layers.Dense(1))
       expected_layer_list.append(utils.Squeeze(-1))
-      actual_mlp = energy.BitstringEnergy(bits, expected_layer_list)
+      actual_mlp = models.BitstringEnergy(bits, expected_layer_list)
 
       expected_mlp = tf.keras.Sequential(expected_layer_list)
       expected_mlp.build([None, num_bits])
@@ -118,7 +118,7 @@ class BernoulliEnergyTest(tf.test.TestCase):
     Then the derivative of the energy with respect to the thetas vector is
       $$\partial / \partial \theta E_\theta(b) = [(1-2b_i) for b_i in b]$$
     """
-    test_b = energy.BernoulliEnergy([1, 2, 3])
+    test_b = models.BernoulliEnergy([1, 2, 3])
     test_vars = tf.constant([1.0, 1.7, -2.8], dtype=tf.float32)
     test_b.build([None, 3])
     test_b.set_weights([test_vars])
@@ -166,7 +166,7 @@ class BernoulliEnergyTest(tf.test.TestCase):
     for _ in range(num_tests):
       bits = random.sample(range(1000), num_bits)
       thetas = tf.random.uniform([num_bits], -100, 100, tf.float32)
-      test_b = energy.BernoulliEnergy(bits)
+      test_b = models.BernoulliEnergy(bits)
       test_b.build([None, num_bits])
       test_b.set_weights([thetas])
 
@@ -184,7 +184,7 @@ class BernoulliEnergyTest(tf.test.TestCase):
   def test_operator_shards(self):
     """Confirms operators are single qubit Z only."""
     num_bits = 10
-    test_b = energy.BernoulliEnergy(list(range(num_bits)))
+    test_b = models.BernoulliEnergy(list(range(num_bits)))
     qubits = cirq.GridQubit.rect(1, num_bits)
     actual_ops = test_b.operator_shards(qubits)
     expected_ops = [cirq.PauliSum.from_pauli_strings(cirq.Z(q)) for q in qubits]
@@ -195,7 +195,7 @@ class BernoulliEnergyTest(tf.test.TestCase):
     """Tests combining expectations of operators in energy."""
     # Build Bernoulli
     num_bits = 3
-    test_b = energy.BernoulliEnergy(list(range(num_bits)))
+    test_b = models.BernoulliEnergy(list(range(num_bits)))
 
     @tf.function
     def operator_expectation_wrapper(sub_expectations):
@@ -236,7 +236,7 @@ class KOBETest(tf.test.TestCase):
     order = 2
     test_thetas = tf.constant([1.5, 2.7, -4.0])
     expected_energies = tf.constant([0.2, 2.8, 5.2, -8.2])
-    test_k = energy.KOBE(bits, order)
+    test_k = models.KOBE(bits, order)
 
     @tf.function
     def test_k_wrapper(bitstrings):
@@ -251,7 +251,7 @@ class KOBETest(tf.test.TestCase):
   def test_operator_shards(self):
     """Confirms correct operators for a simple Boltzmann."""
     num_bits = 3
-    test_k = energy.KOBE(list(range(num_bits)), 2)
+    test_k = models.KOBE(list(range(num_bits)), 2)
     qubits = cirq.GridQubit.rect(1, num_bits)
     test_ops = test_k.operator_shards(qubits)
     ref_ops = [
@@ -270,7 +270,7 @@ class KOBETest(tf.test.TestCase):
     """Confirms the expectations combine to the correct total energy."""
     # Build simple Boltzmann
     num_bits = 3
-    test_b = energy.KOBE(list(range(num_bits)), 2)
+    test_b = models.KOBE(list(range(num_bits)), 2)
 
     @tf.function
     def operator_expectation_wrapper(sub_expectations):

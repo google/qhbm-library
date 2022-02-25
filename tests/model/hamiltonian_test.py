@@ -22,9 +22,7 @@ import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-from qhbmlib.models import circuit
-from qhbmlib.models import energy
-from qhbmlib.models import hamiltonian
+from qhbmlib import models
 
 
 class HamiltonianTest(tf.test.TestCase):
@@ -35,16 +33,16 @@ class HamiltonianTest(tf.test.TestCase):
     super().setUp()
     self.expected_name = "this_IS_theTestHam42"
     self.num_bits = 3
-    self.expected_energy = energy.BernoulliEnergy(list(range(self.num_bits)))
+    self.expected_energy = models.BernoulliEnergy(list(range(self.num_bits)))
     self.expected_energy.build([None, self.num_bits])
     qubits = cirq.GridQubit.rect(1, self.num_bits)
     symbols = [sympy.Symbol(str(n)) for n in range(self.num_bits)]
     pqc = cirq.Circuit(cirq.X(q)**s for q, s in zip(qubits, symbols))
-    self.expected_circuit = circuit.DirectQuantumCircuit(pqc)
+    self.expected_circuit = models.DirectQuantumCircuit(pqc)
     self.expected_circuit.build([])
     self.expected_operator_shards = self.expected_energy.operator_shards(
         self.expected_circuit.qubits)
-    self.actual_hamiltonian = hamiltonian.Hamiltonian(self.expected_energy,
+    self.actual_hamiltonian = models.Hamiltonian(self.expected_energy,
                                                       self.expected_circuit,
                                                       self.expected_name)
 
@@ -71,17 +69,17 @@ class HamiltonianTest(tf.test.TestCase):
 
     # check None operator shards.
     pqc = cirq.Circuit(cirq.X(cirq.GridQubit(0, 0))**sympy.Symbol("a"))
-    qnn = circuit.DirectQuantumCircuit(pqc)
-    actual_energy = energy.BitstringEnergy([1], [])
-    actual_ham = hamiltonian.Hamiltonian(actual_energy, qnn)
+    qnn = models.DirectQuantumCircuit(pqc)
+    actual_energy = models.BitstringEnergy([1], [])
+    actual_ham = models.Hamiltonian(actual_energy, qnn)
     self.assertIsNone(actual_ham.operator_shards)
 
   def test_init_error(self):
     """Confirms initialization fails for mismatched energy and circuit."""
-    small_energy = energy.BernoulliEnergy(list(range(self.num_bits - 1)))
+    small_energy = models.BernoulliEnergy(list(range(self.num_bits - 1)))
     with self.assertRaisesRegex(
         ValueError, expected_regex="same number of bits"):
-      _ = hamiltonian.Hamiltonian(small_energy, self.expected_circuit)
+      _ = models.Hamiltonian(small_energy, self.expected_circuit)
 
 
 if __name__ == "__main__":

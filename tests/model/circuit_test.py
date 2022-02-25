@@ -24,7 +24,7 @@ import tensorflow as tf
 from tensorflow.python.framework import errors
 import tensorflow_quantum as tfq
 
-from qhbmlib.models import circuit
+from qhbmlib import models
 from qhbmlib import utils
 from tests import test_util
 
@@ -54,7 +54,7 @@ class QuantumCircuitTest(tf.test.TestCase):
     self.expected_symbol_values = value_layer_2(
         value_layer_1(value_layer_0(self.expected_value_layers_inputs[0])))
     self.expected_name = "TestOE"
-    self.actual_layer = circuit.QuantumCircuit(
+    self.actual_layer = models.QuantumCircuit(
         self.expected_pqc, self.expected_qubits, self.expected_symbol_names,
         self.expected_value_layers_inputs, self.expected_value_layers,
         self.expected_name)
@@ -121,7 +121,7 @@ class QuantumCircuitTest(tf.test.TestCase):
         [self.expected_symbol_values, other_value_layers_inputs[0][0]], 0)
     other_name = "the_other_layer"
     expected_name = self.expected_name + "_" + other_name
-    other_layer = circuit.QuantumCircuit(
+    other_layer = models.QuantumCircuit(
         tfq.convert_to_tensor([other_pqc]), other_pqc.all_qubits(),
         tf.constant([str(s) for s in other_symbols]), other_value_layers_inputs,
         other_value_layers, other_name)
@@ -139,12 +139,12 @@ class QuantumCircuitTest(tf.test.TestCase):
     # Confirm that tf.Variables in the sum are the same as in the addends.
     var_1 = tf.Variable([5.0])
     pqc_1 = cirq.Circuit(cirq.X(cirq.GridQubit(0, 0))**sympy.Symbol("a"))
-    qnn_1 = circuit.QuantumCircuit(
+    qnn_1 = models.QuantumCircuit(
         tfq.convert_to_tensor([pqc_1]), pqc_1.all_qubits(), tf.constant(["a"]),
         [var_1], [[]])
     var_2 = tf.Variable([-7.0])
     pqc_2 = cirq.Circuit(cirq.X(cirq.GridQubit(0, 0))**sympy.Symbol("b"))
-    qnn_2 = circuit.QuantumCircuit(
+    qnn_2 = models.QuantumCircuit(
         tfq.convert_to_tensor([pqc_2]), pqc_2.all_qubits(), tf.constant(["b"]),
         [var_2], [[]])
     actual_sum = qnn_1 + qnn_2
@@ -159,12 +159,12 @@ class QuantumCircuitTest(tf.test.TestCase):
     """Confirm addition works under tf.function tracing."""
     var_1 = tf.Variable([5.0])
     pqc_1 = cirq.Circuit(cirq.X(cirq.GridQubit(0, 0))**sympy.Symbol("a"))
-    qnn_1 = circuit.QuantumCircuit(
+    qnn_1 = models.QuantumCircuit(
         tfq.convert_to_tensor([pqc_1]), pqc_1.all_qubits(), tf.constant(["a"]),
         [var_1], [[]])
     var_2 = tf.Variable([-7.0])
     pqc_2 = cirq.Circuit(cirq.X(cirq.GridQubit(0, 0))**sympy.Symbol("b"))
-    qnn_2 = circuit.QuantumCircuit(
+    qnn_2 = models.QuantumCircuit(
         tfq.convert_to_tensor([pqc_2]), pqc_2.all_qubits(), tf.constant(["b"]),
         [var_2], [[]])
 
@@ -188,11 +188,11 @@ class QuantumCircuitTest(tf.test.TestCase):
     symbols_2 = [sympy.Symbol(s) for s in symbol_names_2]
     pqc_1 = cirq.Circuit([cirq.X(qubit_1)**s for s in symbols_1])
     pqc_2 = cirq.Circuit([cirq.Y(qubit_2)**s for s in symbols_2])
-    qnn_1 = circuit.QuantumCircuit(
+    qnn_1 = models.QuantumCircuit(
         tfq.convert_to_tensor([pqc_1]), pqc_1.all_qubits(),
         tf.constant([str(s) for s in symbol_names_1]),
         [tf.random.uniform([len(symbol_names_1)], dtype=tf.float32)], [[]])
-    qnn_2 = circuit.QuantumCircuit(
+    qnn_2 = models.QuantumCircuit(
         tfq.convert_to_tensor([pqc_2]), pqc_2.all_qubits(),
         tf.constant([str(s) for s in symbol_names_2]),
         [tf.random.uniform([len(symbol_names_2)], dtype=tf.float32)], [[]])
@@ -219,7 +219,7 @@ class QuantumCircuitTest(tf.test.TestCase):
     # Confirm that tf.Variables in the inverse are the same as self.
     var_1 = tf.Variable([2.5])
     pqc_1 = cirq.Circuit(cirq.X(cirq.GridQubit(0, 0))**sympy.Symbol("a"))
-    qnn_1 = circuit.QuantumCircuit(
+    qnn_1 = models.QuantumCircuit(
         tfq.convert_to_tensor([pqc_1]), pqc_1.all_qubits(), tf.constant(["a"]),
         [var_1], [[]])
     actual_inverse = qnn_1**-1
@@ -250,7 +250,7 @@ class DirectQuantumCircuitTest(tf.test.TestCase):
     init_const = tf.random.uniform([len(raw_symbol_names)], dtype=tf.float32)
     expected_value_layers_inputs = [tf.Variable(init_const)]
     expected_value_layers = [[]]
-    actual_qnn = circuit.DirectQuantumCircuit(
+    actual_qnn = models.DirectQuantumCircuit(
         expected_pqc, initializer=tf.keras.initializers.Constant(init_const))
     self.assertAllEqual(actual_qnn.qubits, expected_qubits)
     self.assertAllEqual(actual_qnn.symbol_names, expected_symbol_names)
@@ -308,7 +308,7 @@ class QAIATest(tf.test.TestCase):
       expected_symbol_values += (
           ([eta_const * theta_const] * len(classical_h_terms)) +
           ([gamma_const] * len(quantum_h_terms)))
-    actual_qnn = circuit.QAIA(quantum_h_terms, classical_h_terms, num_layers)
+    actual_qnn = models.QAIA(quantum_h_terms, classical_h_terms, num_layers)
     self.assertAllEqual(actual_qnn.qubits, expected_qubits)
     self.assertAllEqual(actual_qnn.symbol_names, expected_symbol_names)
     self.assertAllEqual(
