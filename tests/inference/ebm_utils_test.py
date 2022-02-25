@@ -45,7 +45,8 @@ class ProbabilitiesTest(tf.test.TestCase):
         list(range(num_bits)), expected_layer_list)
 
     num_expectation_samples = 1  # Required but unused
-    infer = inference.AnalyticEnergyInference(actual_energy, num_expectation_samples)
+    infer = inference.AnalyticEnergyInference(actual_energy,
+                                              num_expectation_samples)
     expected_probabilities = infer.distribution.probs_parameter()
 
     probabilities_wrapped = tf.function(inference.probabilities)

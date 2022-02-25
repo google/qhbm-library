@@ -24,11 +24,8 @@ import sympy
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from qhbmlib.inference import ebm
-from qhbmlib.inference import qhbm
-from qhbmlib.inference import qnn
-from qhbmlib.models import circuit
-from qhbmlib.models import energy
+from qhbmlib import inference
+from qhbmlib import models
 
 
 def get_xz_rotation(q, a, b):
@@ -90,16 +87,16 @@ def get_random_hamiltonian_and_inference(qubits,
   num_qubits = len(qubits)
   ebm_init = tf.keras.initializers.RandomUniform(
       minval=minval_thetas, maxval=maxval_thetas)
-  actual_energy = energy.KOBE(list(range(num_qubits)), num_qubits, ebm_init)
-  e_infer = ebm.AnalyticEnergyInference(
+  actual_energy = models.KOBE(list(range(num_qubits)), num_qubits, ebm_init)
+  e_infer = inference.AnalyticEnergyInference(
       actual_energy, num_samples, name=identifier, initial_seed=ebm_seed)
 
   qnn_init = tf.keras.initializers.RandomUniform(
       minval=minval_phis, maxval=maxval_phis)
   unitary = get_hardware_efficient_model_unitary(qubits, num_layers, identifier)
-  actual_circuit = circuit.DirectQuantumCircuit(unitary, qnn_init)
-  q_infer = qnn.QuantumInference(actual_circuit, name=identifier)
-  random_qhbm = qhbm.QHBM(e_infer, q_infer)
+  actual_circuit = models.DirectQuantumCircuit(unitary, qnn_init)
+  q_infer = inference.QuantumInference(actual_circuit, name=identifier)
+  random_qhbm = inference.QHBM(e_infer, q_infer)
 
   return random_qhbm.modular_hamiltonian, random_qhbm
 

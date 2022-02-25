@@ -43,8 +43,8 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     # Model hamiltonian
     num_bits = 3
     self.actual_energy = models.BernoulliEnergy(list(range(num_bits)))
-    self.expected_ebm = inference.AnalyticEnergyInference(self.actual_energy,
-                                                    self.num_samples)
+    self.expected_ebm = inference.AnalyticEnergyInference(
+        self.actual_energy, self.num_samples)
     # pin first and last bits, middle bit free.
     self.actual_energy.set_weights([tf.constant([-23, 0, 17])])
     qubits = cirq.GridQubit.rect(1, num_bits)
@@ -59,7 +59,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     # Inference
     self.expected_name = "nameforaQHBM"
     self.actual_qhbm = inference.QHBM(self.expected_ebm, self.expected_qnn,
-                                 self.expected_name)
+                                      self.expected_name)
 
     self.tfp_seed = tf.constant([5, 1], tf.int32)
 
@@ -114,7 +114,8 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     """Confirm circuits are different after updating energy model parameters."""
     num_bits = 2
     actual_energy = models.BernoulliEnergy(list(range(num_bits)))
-    e_infer = inference.BernoulliEnergyInference(actual_energy, self.num_samples)
+    e_infer = inference.BernoulliEnergyInference(actual_energy,
+                                                 self.num_samples)
 
     qubits = cirq.GridQubit.rect(1, num_bits)
     pqc = cirq.Circuit(cirq.Y(q) for q in qubits)

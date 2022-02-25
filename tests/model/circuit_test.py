@@ -54,10 +54,12 @@ class QuantumCircuitTest(tf.test.TestCase):
     self.expected_symbol_values = value_layer_2(
         value_layer_1(value_layer_0(self.expected_value_layers_inputs[0])))
     self.expected_name = "TestOE"
-    self.actual_layer = models.QuantumCircuit(
-        self.expected_pqc, self.expected_qubits, self.expected_symbol_names,
-        self.expected_value_layers_inputs, self.expected_value_layers,
-        self.expected_name)
+    self.actual_layer = models.QuantumCircuit(self.expected_pqc,
+                                              self.expected_qubits,
+                                              self.expected_symbol_names,
+                                              self.expected_value_layers_inputs,
+                                              self.expected_value_layers,
+                                              self.expected_name)
 
   def test_init(self):
     """Tests initialization."""

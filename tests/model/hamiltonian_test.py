@@ -43,8 +43,8 @@ class HamiltonianTest(tf.test.TestCase):
     self.expected_operator_shards = self.expected_energy.operator_shards(
         self.expected_circuit.qubits)
     self.actual_hamiltonian = models.Hamiltonian(self.expected_energy,
-                                                      self.expected_circuit,
-                                                      self.expected_name)
+                                                 self.expected_circuit,
+                                                 self.expected_name)
 
   def test_init(self):
     """Tests Hamiltonian initialization.

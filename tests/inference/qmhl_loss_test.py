@@ -134,8 +134,8 @@ class QMHLTest(tf.test.TestCase):
       actual_derivative = tape.gradient(actual_loss,
                                         model_h.trainable_variables)
 
-      expected_derivative = qmhl_derivative(model_h.trainable_variables, actual_data,
-                                            model_qhbm)
+      expected_derivative = qmhl_derivative(model_h.trainable_variables,
+                                            actual_data, model_qhbm)
       # Changing model parameters is working if finite difference derivatives
       # are non-zero.  Also confirms that model_h and data_h are different.
       tf.nest.map_structure(
@@ -240,7 +240,8 @@ class QMHLTest(tf.test.TestCase):
                                            tf.math.cos(alphas) *
                                            tf.math.cos(test_phis))
       with tf.GradientTape() as expectation_tape:
-        actual_expectation = actual_data.expectation(qhbm_infer.modular_hamiltonian)
+        actual_expectation = actual_data.expectation(
+            qhbm_infer.modular_hamiltonian)
       self.assertAllClose(actual_expectation, expected_expectation,
                           self.close_rtol)
 

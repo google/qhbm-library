@@ -146,8 +146,10 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
         dtype=tf.int8)
     expected_seed = tf.constant([44, 22], tf.int32)
     expected_energies = actual_energy(expected_bitstrings)
-    actual_layer = inference.AnalyticEnergyInference(actual_energy, self.num_samples,
-                                               expected_seed, expected_name)
+    actual_layer = inference.AnalyticEnergyInference(actual_energy,
+                                                     self.num_samples,
+                                                     expected_seed,
+                                                     expected_name)
     self.assertEqual(actual_layer.name, expected_name)
     self.assertAllEqual(actual_layer.seed, expected_seed)
     self.assertAllEqual(actual_layer.all_bitstrings, expected_bitstrings)
@@ -485,7 +487,8 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     expected_log_partition = tf.math.log(tf.constant(3641.8353))
 
     actual_energy = models.KOBE([0, 1], 2)
-    actual_layer = inference.AnalyticEnergyInference(actual_energy, self.num_samples)
+    actual_layer = inference.AnalyticEnergyInference(actual_energy,
+                                                     self.num_samples)
     actual_energy.set_weights([test_thetas])
 
     log_partition_wrapper = tf.function(actual_layer.log_partition)
@@ -526,7 +529,8 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     expected_entropy = tf.constant(0.00233551808)
 
     actual_energy = models.KOBE([0, 1], 2)
-    actual_layer = inference.AnalyticEnergyInference(actual_energy, self.num_samples)
+    actual_layer = inference.AnalyticEnergyInference(actual_energy,
+                                                     self.num_samples)
     actual_energy.set_weights([test_thetas])
 
     entropy_wrapper = tf.function(actual_layer.entropy)
@@ -574,8 +578,10 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     expected_name = "test_bernoulli_dist_name"
     actual_energy = models.BernoulliEnergy(bits)
     expected_seed = tf.constant([4, 12], dtype=tf.int32)
-    actual_layer = inference.BernoulliEnergyInference(actual_energy, self.num_samples,
-                                                expected_seed, expected_name)
+    actual_layer = inference.BernoulliEnergyInference(actual_energy,
+                                                      self.num_samples,
+                                                      expected_seed,
+                                                      expected_name)
     self.assertEqual(actual_layer.name, expected_name)
     self.assertAllEqual(actual_layer.seed, expected_seed)
     self.assertIsInstance(actual_layer.distribution,
@@ -674,8 +680,9 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     ebm_init = tf.keras.initializers.RandomUniform(
         -2, -1, seed=self.tf_random_seed)
     actual_energy = models.BernoulliEnergy([5, 6, 7], ebm_init)
-    actual_layer = inference.BernoulliEnergyInference(actual_energy, self.num_samples,
-                                                self.tfp_seed)
+    actual_layer = inference.BernoulliEnergyInference(actual_energy,
+                                                      self.num_samples,
+                                                      self.tfp_seed)
     expected_log_partition = tf.reduce_logsumexp(-1.0 *
                                                  actual_energy(all_bitstrings))
 
@@ -735,7 +742,8 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     expected_entropy = -1.0 * tf.reduce_sum(all_probs * tf.math.log(all_probs))
 
     actual_energy = models.BernoulliEnergy([0, 1, 2])
-    actual_layer = inference.BernoulliEnergyInference(actual_energy, self.num_samples)
+    actual_layer = inference.BernoulliEnergyInference(actual_energy,
+                                                      self.num_samples)
     actual_energy.set_weights([test_thetas])
 
     entropy_wrapper = tf.function(actual_layer.entropy)
