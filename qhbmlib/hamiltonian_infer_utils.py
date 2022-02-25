@@ -106,6 +106,7 @@ def fidelity(model: hamiltonian_model.Hamiltonian, sigma: tf.Tensor):
     A scalar `tf.Tensor` which is the fidelity between the density matrix
       represented by this QHBM and `sigma`.
   """
+  sigma = tf.cast(sigma, tf.complex64)
   k_theta = tf.cast(
       energy_infer_utils.probabilities(model.energy), tf.complex64)
   u_phi = circuit_infer_utils.unitary(model.circuit)
