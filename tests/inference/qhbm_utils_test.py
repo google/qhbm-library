@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for inference.qhbm_utils"""
+"""Tests for qhbmlib.inference.qhbm_utils"""
 
 import cirq
 import tensorflow as tf

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for the test_util module."""
+"""Tests for tests.test_util"""
 
 from absl.testing import parameterized
 

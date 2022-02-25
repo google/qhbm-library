@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for inference.ebm_utils"""
+"""Tests for qhbmlib.inference.ebm_utils"""
 
 import random
 

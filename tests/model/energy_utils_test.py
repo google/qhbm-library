@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for models.energy_utils"""
+"""Tests for qhbmlib.models.energy_utils"""
 
 import tensorflow as tf
 
