@@ -12,9 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Defines the qhbmlib package."""
+"""Utilities for metrics on BitstringEnergy."""
 
-from qhbmlib import data
-from qhbmlib import inference
-from qhbmlib import models
-from qhbmlib import utils
+import itertools
+
+import tensorflow as tf
+
+from qhbmlib.models import energy
+
+
+def probabilities(input_energy: energy.BitstringEnergy):
+  """Returns the probabilities of the EBM.
+
+  Args:
+    input_energy: The energy function defining the EBM.
+  """
+  all_bitstrings = tf.constant(
+      list(itertools.product([0, 1], repeat=input_energy.num_bits)),
+      dtype=tf.int8)
+  all_energies = input_energy(all_bitstrings)
+  energy_exp = tf.math.exp(-all_energies)
+  partition = tf.math.reduce_sum(energy_exp)
+  return energy_exp / partition

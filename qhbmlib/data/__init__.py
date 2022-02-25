@@ -12,9 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Defines the qhbmlib package."""
+"""Defines the qbmlib.data package."""
 
-from qhbmlib import data
-from qhbmlib import inference
-from qhbmlib import models
-from qhbmlib import utils
+from qhbmlib.data.qhbm_data import QHBMData
+from qhbmlib.data.quantum_data import QuantumData
+
+__all__ = [
+    "QHBMData",
+    "QuantumData",
+]
