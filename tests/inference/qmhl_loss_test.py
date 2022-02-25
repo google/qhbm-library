@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for the QMHL loss and gradients."""
+"""Tests for inference.qmhl_loss"""
 
 import functools
 import math

@@ -12,15 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for infer.qhbm_utils"""
+"""Tests for inference.qhbm_utils"""
 
 import cirq
 import tensorflow as tf
 
-from qhbmlib.inference import qhbm_utils
-from qhbmlib.models import circuit
-from qhbmlib.models import energy
-from qhbmlib.models import hamiltonian
+from qhbmlib import inference
+from qhbmlib import models
 from tests import test_util
 
 
@@ -33,22 +31,22 @@ class DensityMatrixTest(tf.test.TestCase):
 
     # Check density matrix of Bell state.
     num_bits = 2
-    actual_energy = energy.BernoulliEnergy(list(range(num_bits)))
+    actual_energy = models.BernoulliEnergy(list(range(num_bits)))
     actual_energy.build([None, num_bits])
     actual_energy.set_weights([tf.constant([-10.0, -10.0])])  # pin at |00>
 
     qubits = cirq.GridQubit.rect(1, num_bits)
     test_u = cirq.Circuit([cirq.H(qubits[0]), cirq.CNOT(qubits[0], qubits[1])])
-    actual_circuit = circuit.DirectQuantumCircuit(test_u)
+    actual_circuit = models.DirectQuantumCircuit(test_u)
     actual_circuit.build([])
-    model = hamiltonian.Hamiltonian(actual_energy, actual_circuit)
+    model = models.Hamiltonian(actual_energy, actual_circuit)
 
     expected_dm = tf.constant(
         [[0.5, 0, 0, 0.5], [0, 0, 0, 0], [0, 0, 0, 0], [0.5, 0, 0, 0.5]],
         tf.complex64,
     )
 
-    density_matrix_wrapper = tf.function(qhbm_utils.density_matrix)
+    density_matrix_wrapper = tf.function(inference.density_matrix)
     actual_dm = density_matrix_wrapper(model)
     self.assertAllClose(actual_dm, expected_dm)
 
@@ -71,9 +69,9 @@ class FidelityTest(tf.test.TestCase):
     model, _ = test_util.get_random_hamiltonian_and_inference(
         qubits, num_layers, "test_fidelity", num_samples)
 
-    density_matrix_wrapper = tf.function(qhbm_utils.density_matrix)
+    density_matrix_wrapper = tf.function(inference.density_matrix)
     model_dm = density_matrix_wrapper(model)
-    fidelity_wrapper = tf.function(qhbm_utils.fidelity)
+    fidelity_wrapper = tf.function(inference.fidelity)
     actual_fidelity = fidelity_wrapper(model, model_dm)
 
     expected_fidelity = 1.0
@@ -102,10 +100,10 @@ class FidelityTest(tf.test.TestCase):
       num_samples = 1  # required but unused
       h, _ = test_util.get_random_hamiltonian_and_inference(
           qubits, num_layers, identifier, num_samples)
-      h_dm = qhbm_utils.density_matrix(h)
+      h_dm = inference.density_matrix(h)
 
       expected_fidelity = direct_fidelity(h_dm, sigma)
-      fidelity_wrapper = tf.function(qhbm_utils.fidelity)
+      fidelity_wrapper = tf.function(inference.fidelity)
       actual_fidelity = fidelity_wrapper(h, sigma)
       self.assertAllClose(
           actual_fidelity, expected_fidelity, rtol=self.close_rtol)

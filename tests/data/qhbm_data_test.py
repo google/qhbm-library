@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests quantum data sources."""
+"""Tests for data.qhbm_data"""
 
 import cirq
 import tensorflow as tf
 
-from qhbmlib.data import qhbm_data
+from qhbmlib import data
 from tests import test_util
 
 
@@ -46,7 +46,7 @@ class QHBMDataTest(tf.test.TestCase):
           qubits, num_layers, f"observable_{num_qubits}", self.num_samples)
       expected_expectation = tf.squeeze(qhbm.expectation(hamiltonian))
 
-      data = qhbm_data.QHBMData(qhbm)
-      actual_expectation = data.expectation(hamiltonian)
+      actual_data = data.QHBMData(qhbm)
+      actual_expectation = actual_data.expectation(hamiltonian)
 
       self.assertAllClose(actual_expectation, expected_expectation)

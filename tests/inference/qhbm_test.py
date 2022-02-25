@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for infer.qhbm"""
+"""Tests for inference.qhbm"""
 
 import absl
 from absl.testing import parameterized
@@ -24,10 +24,8 @@ import tensorflow as tf
 import tensorflow_quantum as tfq
 from tensorflow_quantum.python import util as tfq_util
 
-from qhbmlib.inference import ebm
-from qhbmlib.inference import qhbm
-from qhbmlib.inference import qnn
-from qhbmlib.models import circuit
+from qhbmlib import inference
+from qhbmlib import models
 from qhbmlib.models import energy
 from qhbmlib.models import hamiltonian
 from qhbmlib import utils
@@ -44,8 +42,8 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
 
     # Model hamiltonian
     num_bits = 3
-    self.actual_energy = energy.BernoulliEnergy(list(range(num_bits)))
-    self.expected_ebm = ebm.AnalyticEnergyInference(self.actual_energy,
+    self.actual_energy = models.BernoulliEnergy(list(range(num_bits)))
+    self.expected_ebm = inference.AnalyticEnergyInference(self.actual_energy,
                                                     self.num_samples)
     # pin first and last bits, middle bit free.
     self.actual_energy.set_weights([tf.constant([-23, 0, 17])])
@@ -55,12 +53,12 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     for _ in range(num_symbols):
       symbols.add("".join(random.sample(string.ascii_letters, 10)))
     self.pqc = tfq_util.random_symbol_circuit(qubits, symbols)
-    actual_circuit = circuit.DirectQuantumCircuit(self.pqc)
-    self.expected_qnn = qnn.QuantumInference(actual_circuit)
+    actual_circuit = models.DirectQuantumCircuit(self.pqc)
+    self.expected_qnn = inference.QuantumInference(actual_circuit)
 
     # Inference
     self.expected_name = "nameforaQHBM"
-    self.actual_qhbm = qhbm.QHBM(self.expected_ebm, self.expected_qnn,
+    self.actual_qhbm = inference.QHBM(self.expected_ebm, self.expected_qnn,
                                  self.expected_name)
 
     self.tfp_seed = tf.constant([5, 1], tf.int32)
@@ -115,15 +113,15 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
   def test_circuit_param_update(self):
     """Confirm circuits are different after updating energy model parameters."""
     num_bits = 2
-    actual_energy = energy.BernoulliEnergy(list(range(num_bits)))
-    e_infer = ebm.BernoulliEnergyInference(actual_energy, self.num_samples)
+    actual_energy = models.BernoulliEnergy(list(range(num_bits)))
+    e_infer = inference.BernoulliEnergyInference(actual_energy, self.num_samples)
 
     qubits = cirq.GridQubit.rect(1, num_bits)
     pqc = cirq.Circuit(cirq.Y(q) for q in qubits)
-    actual_circuit = circuit.DirectQuantumCircuit(pqc)
-    q_infer = qnn.QuantumInference(actual_circuit)
+    actual_circuit = models.DirectQuantumCircuit(pqc)
+    q_infer = inference.QuantumInference(actual_circuit)
 
-    h_infer = qhbm.QHBM(e_infer, q_infer)
+    h_infer = inference.QHBM(e_infer, q_infer)
     circuits_wrapper = tf.function(h_infer.circuits)
 
     # Pin Bernoulli to [0, 1]
@@ -206,7 +204,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
   @parameterized.parameters({
       "energy_class": energy_class,
       "energy_args": energy_args,
-  } for energy_class, energy_args in zip([energy.BernoulliEnergy, energy.KOBE],
+  } for energy_class, energy_args in zip([models.BernoulliEnergy, models.KOBE],
                                          [[], [2]]))
   @test_util.eager_mode_toggle
   def test_expectation_modular_hamiltonian(self, energy_class, energy_args):
@@ -219,8 +217,8 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     energy_h = energy_class(*([list(range(num_bits))] + energy_args))
     energy_h.build([None, num_bits])
     raw_circuit_h = cirq.testing.random_circuit(qubits, n_moments, act_fraction)
-    circuit_h = circuit.DirectQuantumCircuit(raw_circuit_h)
-    hamiltonian_measure = hamiltonian.Hamiltonian(energy_h, circuit_h)
+    circuit_h = models.DirectQuantumCircuit(raw_circuit_h)
+    hamiltonian_measure = models.Hamiltonian(energy_h, circuit_h)
 
     # unitary
     num_layers = 3
