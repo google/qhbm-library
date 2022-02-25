@@ -12,9 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Defines the qhbmlib package."""
+"""Interface to quantum data sources defined by QHBMs."""
 
-from qhbmlib import data
-from qhbmlib import inference
-from qhbmlib import models
-from qhbmlib import utils
+from typing import Union
+
+import tensorflow as tf
+
+from qhbmlib.data import quantum_data
+from qhbmlib.inference import qhbm
+from qhbmlib.models import hamiltonian
+
+
+class QHBMData(quantum_data.QuantumData):
+  """QuantumData defined by a QHBM."""
+
+  def __init__(self, input_qhbm: qhbm.QHBM):
+    """Initializes a QHBMData.
+
+    Args:
+      qhbm: An inference engine for a QHBM.
+    """
+    self.qhbm = input_qhbm
+
+  def expectation(self, observable: Union[tf.Tensor, hamiltonian.Hamiltonian]):
+    """See base class docstring."""
+    return tf.squeeze(self.qhbm.expectation(observable), 0)

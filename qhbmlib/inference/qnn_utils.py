@@ -12,9 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Defines the qhbmlib package."""
+"""Utilities for metrics on QuantumCircuit."""
 
-from qhbmlib import data
-from qhbmlib import inference
-from qhbmlib import models
-from qhbmlib import utils
+import tensorflow as tf
+import tensorflow_quantum as tfq
+
+from qhbmlib.models import circuit
+
+
+def unitary(input_circuit: circuit.QuantumCircuit):
+  """Returns the unitary matrix corresponding to the given circuit.
+
+  Args:
+    input_circuit: Quantum circuit whose unitary matrix is to be calculated.
+  """
+  return tfq.layers.Unitary()(
+      input_circuit.pqc,
+      symbol_names=input_circuit.symbol_names,
+      symbol_values=tf.expand_dims(input_circuit.symbol_values,
+                                   0)).to_tensor()[0]

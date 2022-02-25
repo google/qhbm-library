@@ -20,17 +20,57 @@ import random
 import cirq
 import numpy as np
 import scipy
-
+import sympy
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from qhbmlib import architectures
-from qhbmlib import circuit_infer
-from qhbmlib import circuit_model
-from qhbmlib import energy_infer
-from qhbmlib import energy_model
-from qhbmlib import hamiltonian_infer
-from qhbmlib import hamiltonian_model
+from qhbmlib import inference
+from qhbmlib import models
+
+
+def get_xz_rotation(q, a, b):
+  """Two-axis single qubit rotation."""
+  return cirq.Circuit(cirq.X(q)**a, cirq.Z(q)**b)
+
+
+def get_cz_exp(q0, q1, a):
+  """Exponent of entangling CZ gate."""
+  return cirq.Circuit(cirq.CZPowGate(exponent=a)(q0, q1))
+
+
+def get_xz_rotation_layer(qubits, layer_num, name):
+  """Apply two-axis single qubit rotations to all the given qubits."""
+  circuit = cirq.Circuit()
+  for n, q in enumerate(qubits):
+    sx, sz = sympy.symbols("sx_{0}_{1}_{2} sz_{0}_{1}_{2}".format(
+        name, layer_num, n))
+    circuit += get_xz_rotation(q, sx, sz)
+  return circuit
+
+
+def get_cz_exp_layer(qubits, layer_num, name):
+  """Apply parameterized CZ gates to all pairs of nearest-neighbor qubits."""
+  circuit = cirq.Circuit()
+  for n, (q0, q1) in enumerate(zip(qubits[::2], qubits[1::2])):
+    a = sympy.symbols("sc_{0}_{1}_{2}".format(name, layer_num, 2 * n))
+    circuit += get_cz_exp(q0, q1, a)
+  shifted_qubits = qubits[1::]
+  for n, (q0, q1) in enumerate(zip(shifted_qubits[::2], shifted_qubits[1::2])):
+    a = sympy.symbols("sc_{0}_{1}_{2}".format(name, layer_num, 2 * n + 1))
+    circuit += get_cz_exp(q0, q1, a)
+  return circuit
+
+
+def get_hardware_efficient_model_unitary(qubits, num_layers, name):
+  """Build our full parameterized model unitary."""
+  circuit = cirq.Circuit()
+  for layer_num in range(num_layers):
+    new_circ = get_xz_rotation_layer(qubits, layer_num, name)
+    circuit += new_circ
+    if len(qubits) > 1:
+      new_circ = get_cz_exp_layer(qubits, layer_num, name)
+      circuit += new_circ
+  return circuit
 
 
 def get_random_hamiltonian_and_inference(qubits,
@@ -47,19 +87,18 @@ def get_random_hamiltonian_and_inference(qubits,
   num_qubits = len(qubits)
   ebm_init = tf.keras.initializers.RandomUniform(
       minval=minval_thetas, maxval=maxval_thetas)
-  energy = energy_model.KOBE(list(range(num_qubits)), num_qubits, ebm_init)
-  e_infer = energy_infer.AnalyticEnergyInference(
-      energy, num_samples, name=identifier, initial_seed=ebm_seed)
+  actual_energy = models.KOBE(list(range(num_qubits)), num_qubits, ebm_init)
+  e_infer = inference.AnalyticEnergyInference(
+      actual_energy, num_samples, name=identifier, initial_seed=ebm_seed)
 
   qnn_init = tf.keras.initializers.RandomUniform(
       minval=minval_phis, maxval=maxval_phis)
-  unitary = architectures.get_hardware_efficient_model_unitary(
-      qubits, num_layers, identifier)
-  circuit = circuit_model.DirectQuantumCircuit(unitary, qnn_init)
-  q_infer = circuit_infer.QuantumInference(circuit, name=identifier)
-  qhbm = hamiltonian_infer.QHBM(e_infer, q_infer)
+  unitary = get_hardware_efficient_model_unitary(qubits, num_layers, identifier)
+  actual_circuit = models.DirectQuantumCircuit(unitary, qnn_init)
+  q_infer = inference.QuantumInference(actual_circuit, name=identifier)
+  random_qhbm = inference.QHBM(e_infer, q_infer)
 
-  return qhbm.hamiltonian, qhbm
+  return random_qhbm.modular_hamiltonian, random_qhbm
 
 
 def get_random_pauli_sum(qubits):

@@ -12,9 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Defines the qhbmlib package."""
+"""Implementation of the QMHL loss function."""
 
-from qhbmlib import data
-from qhbmlib import inference
-from qhbmlib import models
-from qhbmlib import utils
+from qhbmlib.data import quantum_data
+from qhbmlib.inference import qhbm
+
+
+def qmhl(data: quantum_data.QuantumData, input_qhbm: qhbm.QHBM):
+  """Calculate the QMHL loss of the QHBM against the quantum data.
+
+  See equation 21 in the appendix.
+
+  Args:
+    data: The data mixed state to learn.
+    input_qhbm: QHBM being trained to approximate `data`.
+
+  Returns:
+    The quantum cross-entropy between the data and the model.
+  """
+  return (data.expectation(input_qhbm.modular_hamiltonian) +
+          input_qhbm.e_inference.log_partition())
