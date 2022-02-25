@@ -22,15 +22,9 @@ import sympy
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from qhbmlib.data import qhbm_data
-from qhbmlib.data import quantum_data
-from qhbmlib.inference import ebm
-from qhbmlib.inference import qhbm
-from qhbmlib.inference import qhbm_utils
-from qhbmlib.inference import qmhl_loss
-from qhbmlib.inference import qnn
-from qhbmlib.models import circuit
-from qhbmlib.models import energy
+from qhbmlib import data
+from qhbmlib import inference
+from qhbmlib import models
 from tests import test_util
 
 
@@ -54,7 +48,7 @@ class QMHLTest(tf.test.TestCase):
   def test_self_qmhl(self):
     """Confirms known value of the QMHL loss of a model against itself."""
     num_layers = 1
-    qmhl_wrapper = tf.function(qmhl_loss.qmhl)
+    qmhl_wrapper = tf.function(inference.qmhl)
     for num_qubits in self.num_qubits_list:
       qubits = cirq.GridQubit.rect(1, num_qubits)
       data_h, data_infer = test_util.get_random_hamiltonian_and_inference(
@@ -67,7 +61,7 @@ class QMHLTest(tf.test.TestCase):
           initializer_seed=self.tf_random_seed)
       # Set data equal to the model
       data_h.set_weights(model_h.get_weights())
-      data = qhbm_data.QHBMData(data_infer)
+      actual_data = data.QHBMData(data_infer)
 
       # Trained loss is the entropy.
       expected_loss = model_infer.e_inference.entropy()
@@ -77,7 +71,7 @@ class QMHLTest(tf.test.TestCase):
       ]
 
       with tf.GradientTape() as tape:
-        actual_loss = qmhl_wrapper(data, model_infer)
+        actual_loss = qmhl_wrapper(actual_data, model_infer)
       actual_loss_derivative = tape.gradient(actual_loss,
                                              model_h.trainable_variables)
 
@@ -90,18 +84,18 @@ class QMHLTest(tf.test.TestCase):
     """Tests derivatives of QMHL with respect to the model."""
 
     # TODO(#171): Delta function seems generalizable.
-    def delta_qmhl(k, var, data, model_qhbm, delta):
+    def delta_qmhl(k, var, actual_data, model_qhbm, delta):
       """Calculates the qmhl loss with the kth entry of `var` perturbed."""
       num_elts = tf.size(var)
       old_value = var.read_value()
       var.assign(old_value + delta * tf.one_hot(k, num_elts, 1.0, 0.0))
-      delta_loss = qmhl_loss.qmhl(data, model_qhbm)
+      delta_loss = inference.qmhl(actual_data, model_qhbm)
       var.assign(old_value)
       return delta_loss
 
-    qmhl_wrapper = tf.function(qmhl_loss.qmhl)
+    qmhl_wrapper = tf.function(inference.qmhl)
 
-    def qmhl_derivative(variables_list, data, model_qhbm):
+    def qmhl_derivative(variables_list, actual_data, model_qhbm):
       """Approximately differentiates QMHL wih respect to the inputs."""
       derivatives = []
       for var in variables_list:
@@ -109,7 +103,7 @@ class QMHLTest(tf.test.TestCase):
         num_elts = tf.size(var)  # Assumes variable is 1D
         for n in range(num_elts):
           this_derivative = test_util.approximate_derivative(
-              functools.partial(delta_qmhl, n, var, data, model_qhbm))
+              functools.partial(delta_qmhl, n, var, actual_data, model_qhbm))
           var_derivative_list.append(this_derivative.numpy())
         derivatives.append(tf.constant(var_derivative_list))
       return derivatives
@@ -124,7 +118,7 @@ class QMHLTest(tf.test.TestCase):
           self.num_samples,
           initializer_seed=self.tf_random_seed,
           ebm_seed=self.tfp_seed)
-      data = qhbm_data.QHBMData(data_qhbm)
+      actual_data = data.QHBMData(data_qhbm)
 
       model_h, model_qhbm = test_util.get_random_hamiltonian_and_inference(
           qubits,
@@ -136,11 +130,11 @@ class QMHLTest(tf.test.TestCase):
       # Make sure variables are trainable
       self.assertGreater(len(model_h.trainable_variables), 1)
       with tf.GradientTape() as tape:
-        actual_loss = qmhl_wrapper(data, model_qhbm)
+        actual_loss = qmhl_wrapper(actual_data, model_qhbm)
       actual_derivative = tape.gradient(actual_loss,
                                         model_h.trainable_variables)
 
-      expected_derivative = qmhl_derivative(model_h.trainable_variables, data,
+      expected_derivative = qmhl_derivative(model_h.trainable_variables, actual_data,
                                             model_qhbm)
       # Changing model parameters is working if finite difference derivatives
       # are non-zero.  Also confirms that model_h and data_h are different.
@@ -169,8 +163,8 @@ class QMHLTest(tf.test.TestCase):
       # EBM
       ebm_init = tf.keras.initializers.RandomUniform(
           minval=ebm_const / 4, maxval=ebm_const, seed=self.tf_random_seed)
-      actual_energy = energy.BernoulliEnergy(list(range(num_qubits)), ebm_init)
-      e_infer = ebm.BernoulliEnergyInference(
+      actual_energy = models.BernoulliEnergy(list(range(num_qubits)), ebm_init)
+      e_infer = inference.BernoulliEnergyInference(
           actual_energy, self.num_samples, initial_seed=self.tfp_seed)
 
       # QNN
@@ -180,9 +174,9 @@ class QMHLTest(tf.test.TestCase):
           cirq.rx(r_s)(q) for r_s, q in zip(r_symbols, qubits))
       qnn_init = tf.keras.initializers.RandomUniform(
           minval=q_const / 4, maxval=q_const, seed=self.tf_random_seed)
-      actual_circuit = circuit.DirectQuantumCircuit(r_circuit, qnn_init)
-      q_infer = qnn.QuantumInference(actual_circuit)
-      qhbm_infer = qhbm.QHBM(e_infer, q_infer)
+      actual_circuit = models.DirectQuantumCircuit(r_circuit, qnn_init)
+      q_infer = inference.QuantumInference(actual_circuit)
+      qhbm_infer = inference.QHBM(e_infer, q_infer)
       model = qhbm_infer.modular_hamiltonian
 
       # Confirm qhbm_model QHBM
@@ -196,7 +190,7 @@ class QMHLTest(tf.test.TestCase):
           actual_log_partition, expected_log_partition, rtol=self.close_rtol)
       # Confirm qhbm_model modular Hamiltonian for 1 qubit case
       if num_qubits == 1:
-        actual_dm = qhbm_utils.density_matrix(model)
+        actual_dm = inference.density_matrix(model)
         actual_log_dm = tf.linalg.logm(actual_dm)
         actual_ktp = -actual_log_dm - tf.eye(
             2, dtype=tf.complex64) * tf.cast(actual_log_partition, tf.complex64)
@@ -214,8 +208,8 @@ class QMHLTest(tf.test.TestCase):
                                  self.tf_random_seed)
       y_rot = cirq.Circuit(
           cirq.ry(r.numpy())(q) for r, q in zip(alphas, qubits))
-      data_circuit = circuit.DirectQuantumCircuit(y_rot)
-      data_q_infer = qnn.QuantumInference(data_circuit)
+      data_circuit = models.DirectQuantumCircuit(y_rot)
+      data_q_infer = inference.QuantumInference(data_circuit)
       data_probs = tf.random.uniform([num_qubits],
                                      dtype=tf.float32,
                                      seed=self.tf_random_seed)
@@ -224,7 +218,7 @@ class QMHLTest(tf.test.TestCase):
               self.num_samples, seed=self.tfp_seed)
 
       # Load target data into a QuantumData class
-      class FixedData(quantum_data.QuantumData):
+      class FixedData(data.QuantumData):
         """Contains a fixed quantum data set."""
 
         def __init__(self, samples, q_infer):
@@ -237,16 +231,16 @@ class QMHLTest(tf.test.TestCase):
           raw_expectations = self.q_infer.expectation(self.samples, observable)
           return tf.math.reduce_mean(raw_expectations)
 
-      data = FixedData(data_samples, data_q_infer)
-      qmhl_wrapper = tf.function(qmhl_loss.qmhl)
+      actual_data = FixedData(data_samples, data_q_infer)
+      qmhl_wrapper = tf.function(inference.qmhl)
       with tf.GradientTape() as loss_tape:
-        actual_loss = qmhl_wrapper(data, qhbm_infer)
+        actual_loss = qmhl_wrapper(actual_data, qhbm_infer)
       # TODO(zaqqwerty): add way to use a log QHBM as observable on states
       expected_expectation = tf.reduce_sum(test_thetas * (2 * data_probs - 1) *
                                            tf.math.cos(alphas) *
                                            tf.math.cos(test_phis))
       with tf.GradientTape() as expectation_tape:
-        actual_expectation = data.expectation(qhbm_infer.modular_hamiltonian)
+        actual_expectation = actual_data.expectation(qhbm_infer.modular_hamiltonian)
       self.assertAllClose(actual_expectation, expected_expectation,
                           self.close_rtol)
 

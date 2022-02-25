@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for infer.qnn"""
+"""Tests for inference.qnn"""
 
 from absl import logging
 from absl.testing import parameterized
@@ -28,11 +28,8 @@ import tensorflow as tf
 import tensorflow_quantum as tfq
 from tensorflow_quantum.python import util as tfq_util
 
-from qhbmlib.inference import qnn
-from qhbmlib.models import circuit
-from qhbmlib.models import circuit_utils
-from qhbmlib.models import energy
-from qhbmlib.models import hamiltonian
+from qhbmlib import inference
+from qhbmlib import models
 from tests import test_util
 
 
@@ -54,7 +51,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     self.raw_qubits = cirq.GridQubit.rect(1, self.num_bits)
     p_param = sympy.Symbol("p")
     p_circuit = cirq.Circuit(cirq.X(q)**p_param for q in self.raw_qubits)
-    self.p_qnn = circuit.DirectQuantumCircuit(
+    self.p_qnn = models.DirectQuantumCircuit(
         p_circuit,
         initializer=tf.keras.initializers.RandomUniform(
             minval=-1.0, maxval=1.0, seed=self.tf_random_seed),
@@ -65,7 +62,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     expected_backend = "noiseless"
     expected_differentiator = None
     expected_name = "TestOE"
-    actual_exp = qnn.QuantumInference(
+    actual_exp = inference.QuantumInference(
         self.p_qnn,
         backend=expected_backend,
         differentiator=expected_differentiator,
@@ -113,7 +110,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     """
 
     # Build inference object
-    exp_infer = qnn.QuantumInference(self.p_qnn)
+    exp_infer = inference.QuantumInference(self.p_qnn)
 
     # Get all the bitstrings multiple times.
     initial_states_list = 5 * list(
@@ -198,7 +195,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     random_values = tf.Variable(initial_random_values)
 
     all_bitstrings = list(itertools.product([0, 1], repeat=self.num_bits))
-    bitstring_circuit = circuit_utils.bit_circuit(qubits)
+    bitstring_circuit = models.circuit_utils.bit_circuit(qubits)
     bitstring_symbols = sorted(tfq.util.get_circuit_symbols(bitstring_circuit))
     total_circuit = bitstring_circuit + raw_circuit
 
@@ -228,10 +225,10 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
       return delta_expectations
 
     # hamiltonian model and inference
-    actual_circuit = circuit.QuantumCircuit(
+    actual_circuit = models.QuantumCircuit(
         tfq.convert_to_tensor([raw_circuit]), qubits, tf.constant(symbols),
         [random_values], [[]])
-    q_infer = qnn.QuantumInference(actual_circuit)
+    q_infer = inference.QuantumInference(actual_circuit)
 
     # calculate expected values
     expected_expectations = delta_expectations_func(0, random_values, 0)
@@ -277,7 +274,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
   @parameterized.parameters({
       "energy_class": energy_class,
       "energy_args": energy_args,
-  } for energy_class, energy_args in zip([energy.BernoulliEnergy, energy.KOBE],
+  } for energy_class, energy_args in zip([models.BernoulliEnergy, models.KOBE],
                                          [[], [2]]))
   @test_util.eager_mode_toggle
   def test_expectation_modular_hamiltonian(self, energy_class, energy_args):
@@ -300,23 +297,23 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     raw_circuits, _ = tfq_util.random_symbol_circuit_resolver_batch(
         qubits, symbols, batch_size, n_moments=n_moments, p=act_fraction)
     raw_circuit_h = raw_circuits[0]
-    circuit_h = circuit.DirectQuantumCircuit(raw_circuit_h)
+    circuit_h = models.DirectQuantumCircuit(raw_circuit_h)
     circuit_h.build([])
     initial_random_values = tf.random.uniform([len(symbols)], -1, 1, tf.float32,
                                               self.tf_random_seed)
     circuit_h.set_weights([initial_random_values])
-    hamiltonian_measure = hamiltonian.Hamiltonian(energy_h, circuit_h)
+    hamiltonian_measure = models.Hamiltonian(energy_h, circuit_h)
     raw_shards = tfq.from_tensor(hamiltonian_measure.operator_shards)
 
     # set up the circuit to measure against
     model_raw_circuit = cirq.testing.random_circuit(qubits, n_moments,
                                                     act_fraction)
-    model_circuit = circuit.DirectQuantumCircuit(model_raw_circuit)
-    model_infer = qnn.QuantumInference(model_circuit)
+    model_circuit = models.DirectQuantumCircuit(model_raw_circuit)
+    model_infer = inference.QuantumInference(model_circuit)
 
     # bitstring injectors
     all_bitstrings = list(itertools.product([0, 1], repeat=self.num_bits))
-    bitstring_circuit = circuit_utils.bit_circuit(qubits)
+    bitstring_circuit = models.circuit_utils.bit_circuit(qubits)
     bitstring_symbols = sorted(tfq.util.get_circuit_symbols(bitstring_circuit))
     total_circuit = bitstring_circuit + model_raw_circuit + raw_circuit_h**-1
 
@@ -411,9 +408,9 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         list(itertools.product([0, 1], repeat=self.num_bits)), dtype=tf.int8)
     counts = tf.random.uniform([tf.shape(bitstrings)[0]], 100, 1000, tf.int32)
 
-    ident_qnn = circuit.DirectQuantumCircuit(
+    ident_qnn = models.DirectQuantumCircuit(
         cirq.Circuit(cirq.I(q) for q in self.raw_qubits), name="identity")
-    q_infer = qnn.QuantumInference(ident_qnn)
+    q_infer = inference.QuantumInference(ident_qnn)
     sample_wrapper = tf.function(q_infer.sample)
     test_samples = sample_wrapper(bitstrings, counts)
     for i, (b, c) in enumerate(zip(bitstrings, counts)):
@@ -421,9 +418,9 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
       for j in range(c):
         self.assertAllEqual(test_samples[i][j], b)
 
-    flip_qnn = circuit.DirectQuantumCircuit(
+    flip_qnn = models.DirectQuantumCircuit(
         cirq.Circuit(cirq.X(q) for q in self.raw_qubits), name="flip")
-    q_infer = qnn.QuantumInference(flip_qnn)
+    q_infer = inference.QuantumInference(flip_qnn)
     sample_wrapper = tf.function(q_infer.sample)
     test_samples = sample_wrapper(bitstrings, counts)
     for i, (b, c) in enumerate(zip(bitstrings, counts)):
@@ -438,11 +435,11 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         self.raw_qubits[0])**ghz_param) + cirq.Circuit(
             cirq.CNOT(q0, q1)
             for q0, q1 in zip(self.raw_qubits, self.raw_qubits[1:]))
-    ghz_qnn = circuit.DirectQuantumCircuit(
+    ghz_qnn = models.DirectQuantumCircuit(
         ghz_circuit,
         initializer=tf.keras.initializers.Constant(value=0.5),
         name="ghz")
-    q_infer = qnn.QuantumInference(ghz_qnn)
+    q_infer = inference.QuantumInference(ghz_qnn)
     sample_wrapper = tf.function(q_infer.sample)
     test_samples = sample_wrapper(
         tf.expand_dims(tf.constant([0] * self.num_bits, dtype=tf.int8), 0),
@@ -460,9 +457,9 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     """Check for discrepancy in samples when count entries differ."""
     max_counts = int(1e7)
     counts = tf.constant([max_counts // 2, max_counts])
-    test_qnn = circuit.DirectQuantumCircuit(
+    test_qnn = models.DirectQuantumCircuit(
         cirq.Circuit(cirq.H(cirq.GridQubit(0, 0))))
-    test_infer = qnn.QuantumInference(test_qnn)
+    test_infer = inference.QuantumInference(test_qnn)
     sample_wrapper = tf.function(test_infer.sample)
     bitstrings = tf.constant([[0], [0]], dtype=tf.int8)
     _, samples_counts = sample_wrapper(bitstrings, counts)

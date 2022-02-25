@@ -21,12 +21,8 @@ import sympy
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-from qhbmlib.inference import ebm
-from qhbmlib.inference import qhbm
-from qhbmlib.inference import qnn
-from qhbmlib.inference import vqt_loss
-from qhbmlib.models import circuit
-from qhbmlib.models import energy
+from qhbmlib import inference
+from qhbmlib import models
 from tests import test_util
 
 
@@ -69,7 +65,7 @@ class VQTTest(tf.test.TestCase):
       data_h.set_weights(model_h.get_weights())
 
       beta = 1.0  # Data and model are only the same if beta == 1
-      vqt = tf.function(vqt_loss.vqt)
+      vqt = tf.function(inference.vqt)
 
       # Trained loss is minus log partition of the data.
       expected_loss = -1.0 * data_infer.e_inference.log_partition()
@@ -103,7 +99,7 @@ class VQTTest(tf.test.TestCase):
       return delta_loss
 
     delta = 1e-1
-    vqt = tf.function(vqt_loss.vqt)
+    vqt = tf.function(inference.vqt)
 
     def vqt_derivative(variables_list, model_infer, data_h, beta):
       """Approximately differentiates VQT with respect to the inputs"""
@@ -178,14 +174,14 @@ class VQTTest(tf.test.TestCase):
     qubit losses, and the gradients are the the per-qubit gradients.
     """
 
-    vqt = tf.function(vqt_loss.vqt)
+    vqt = tf.function(inference.vqt)
 
     for num_qubits in self.num_qubits_list:
       # model definition
       ebm_init = tf.keras.initializers.RandomUniform(
           minval=-2.0, maxval=2.0, seed=self.tf_random_seed)
-      actual_energy = energy.BernoulliEnergy(list(range(num_qubits)), ebm_init)
-      e_infer = ebm.BernoulliEnergyInference(
+      actual_energy = models.BernoulliEnergy(list(range(num_qubits)), ebm_init)
+      e_infer = inference.BernoulliEnergyInference(
           actual_energy, self.num_samples, initial_seed=self.tfp_seed)
 
       qubits = cirq.GridQubit.rect(1, num_qubits)
@@ -194,12 +190,12 @@ class VQTTest(tf.test.TestCase):
           cirq.rx(r_s)(q) for r_s, q in zip(r_symbols, qubits))
       qnn_init = tf.keras.initializers.RandomUniform(
           minval=-1, maxval=1, seed=self.tf_random_seed)
-      actual_circuit = circuit.DirectQuantumCircuit(r_circuit, qnn_init)
-      q_infer = qnn.QuantumInference(actual_circuit)
-      qhbm_infer = qhbm.QHBM(e_infer, q_infer)
+      actual_circuit = models.DirectQuantumCircuit(r_circuit, qnn_init)
+      q_infer = inference.QuantumInference(actual_circuit)
+      qhbm_infer = inference.QHBM(e_infer, q_infer)
 
       # TODO(#171): code around here seems like boilerplate.
-      model = qhbm_infer.modular_hamiltonian
+      model_h = qhbm_infer.modular_hamiltonian
 
       # Generate remaining VQT arguments
       test_h = tfq.convert_to_tensor(
@@ -209,9 +205,9 @@ class VQTTest(tf.test.TestCase):
 
       # Compute losses
       # Bernoulli has only one tf.Variable
-      test_thetas = model.energy.trainable_variables[0]
+      test_thetas = model_h.energy.trainable_variables[0]
       # QNN has only one tf.Variable
-      test_phis = model.circuit.trainable_variables[0]
+      test_phis = model_h.circuit.trainable_variables[0]
       actual_expectation = qhbm_infer.expectation(test_h)[0]
       expected_expectation = tf.reduce_sum(
           tf.math.tanh(test_thetas) * tf.math.sin(test_phis))

@@ -23,8 +23,8 @@ import tensorflow as tf
 import tensorflow_quantum as tfq
 from tensorflow_quantum.python import util as tfq_util
 
-from qhbmlib.inference import qnn_utils
-from qhbmlib.models import circuit
+from qhbmlib import inference
+from qhbmlib import models
 
 
 class UnitaryTest(tf.test.TestCase):
@@ -57,14 +57,14 @@ class UnitaryTest(tf.test.TestCase):
                                       self.tf_random_seed).numpy().tolist()
     resolver = dict(zip(symbols, random_values))
 
-    actual_circuit = circuit.QuantumCircuit(
+    actual_circuit = models.QuantumCircuit(
         tfq.convert_to_tensor([raw_circuit]), qubits, tf.constant(symbols),
         [tf.Variable([resolver[s] for s in symbols])], [[]])
 
     resolved_circuit = cirq.protocols.resolve_parameters(raw_circuit, resolver)
     expected_unitary = resolved_circuit.unitary()
 
-    unitary_wrapper = tf.function(qnn_utils.unitary)
+    unitary_wrapper = tf.function(inference.unitary)
     actual_unitary = unitary_wrapper(actual_circuit)
     self.assertAllClose(actual_unitary, expected_unitary, rtol=self.close_rtol)
 
