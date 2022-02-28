@@ -401,6 +401,70 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         expected_derivatives_thetas,
         rtol=self.close_rtol)
 
+  def test_expectation_bitstring_energy(self):
+    """Tests Hamiltonian containing a general BitstringEnergy diagonal."""
+    
+    # Circuit preparation
+    qubits = cirq.GridQubit.rect(1, self.num_bits)
+    batch_size = 1
+    n_moments = 4
+    act_fraction = 1.0
+    num_symbols = 8
+    symbols = set()
+    for _ in range(num_symbols):
+      symbols.add("".join(random.sample(string.ascii_letters, 10)))
+    symbols = sorted(list(symbols))
+
+    # state circuit
+    state_qnn_symbols = symbols[num_symbols//2:]
+    state_raw_circuits, _ = tfq_util.random_symbol_circuit_resolver_batch(
+        qubits, state_qnn_symbols, batch_size, n_moments=n_moments, p=act_fraction)
+    state_raw_circuit = state_raw_circuits[0]
+    state_circuit = models.DirectQuantumCircuit(state_raw_circuit)
+
+    # state qnn
+    expectation_samples = int(1e6)
+    actual_qnn = inference.QuantumInference(state_circuit, expectation_samples=expectation_samples)
+
+    # hamiltonian circuit
+    hamiltonian_qnn_symbols = symbols[:num_symbols//2]
+    hamiltonian_raw_circuits, _ = tfq_util.random_symbol_circuit_resolver_batch(
+        qubits, state_qnn_symbols, batch_size, n_moments=n_moments, p=act_fraction)
+    hamiltonian_raw_circuit = hamiltonian_raw_circuits[0]
+    hamiltonian_circuit = models.DirectQuantumCircuit(hamiltonian_raw_circuit)
+
+    # hamiltonian energy
+    num_layer = 5
+    bits = random.sample(range(1000), self.num_bits)
+    units = random.sample(range(1, 100), num_layers)
+    activations = random.sample([
+        "elu", "exponential", "gelu", "hard_sigmoid", "linear", "relu",
+        "selu", "sigmoid", "softmax", "softplus", "softsign", "swish", "tanh"
+    ], num_layers)
+    expected_layer_list = []
+    for i in range(num_layers):
+      expected_layer_list.append(
+        tf.keras.layers.Dense(units[i], activation=activations[i]))
+    expected_layer_list.append(tf.keras.layers.Dense(1))
+    expected_layer_list.append(utils.Squeeze(-1))
+    hamiltonian_energy = models.BitstringEnergy(bits, expected_layer_list)
+    hamiltonian = models.Hamiltonian(hamiltonian_energy, hamiltonian_circuit)
+
+    # Get all the bitstrings multiple times.
+    initial_states_list = 5 * list(
+        itertools.product([0, 1], repeat=self.num_bits))
+    initial_states = tf.constant(initial_states_list, dtype=tf.int8)
+
+    # Get expectations
+    self.assertNotAllClose(
+        expected_expectations,
+        tf.zeros_like(expected_derivatives_thetas),
+        atol=self.not_zero_atol)
+
+    actual_expectations = actual_qnn.expectation(initial_states, hamiltonian)
+    self.assertAllClose(actual_expectations, expected_expectations, rtol=self.close_rtol)
+    
+
   @test_util.eager_mode_toggle
   def test_sample_basic(self):
     """Confirms correct sampling from identity, bit flip, and GHZ QNNs."""
