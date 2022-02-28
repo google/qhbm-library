@@ -98,7 +98,7 @@ def fidelity(model: hamiltonian.Hamiltonian, sigma: tf.Tensor):
   Args:
     model: Modular Hamiltonian whose corresponding thermal state is to be
       compared to `sigma`, as the left density matrix in fidelity.
-    sigma: 2-D `tf.Tensor` of dtype `complex64` representing the right
+    sigma: 2-D `tf.Tensor` of a numeric dtype representing the right
       density matrix in the fidelity calculation.
 
   Returns:
