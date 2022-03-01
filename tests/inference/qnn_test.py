@@ -456,11 +456,13 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     initial_states = tf.constant(initial_states_list, dtype=tf.int8)
 
     # Get expectations
+    
     self.assertNotAllClose(
         expected_expectations,
         tf.zeros_like(expected_derivatives_thetas),
         atol=self.not_zero_atol)
 
+    # Compare
     actual_expectations = actual_qnn.expectation(initial_states, hamiltonian)
     self.assertAllClose(actual_expectations, expected_expectations, rtol=self.close_rtol)
     
