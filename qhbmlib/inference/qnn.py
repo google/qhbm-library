@@ -31,6 +31,7 @@ class QuantumInference(tf.keras.layers.Layer):
 
   def __init__(self,
                input_circuit: circuit.QuantumCircuit,
+               expectation_samples: Union[None, int] = None,
                backend: Union[str, cirq.Sampler] = "noiseless",
                differentiator: Union[None,
                                      tfq.differentiators.Differentiator] = None,
@@ -39,14 +40,20 @@ class QuantumInference(tf.keras.layers.Layer):
 
     Args:
       input_circuit: The parameterized quantum circuit on which to do inference.
+      expectation_samples: Number of samples to use when estimating the
+        expectation value of a Hamiltonian with a general BitstringEnergy.
+        If None, can only use Hamiltonians whose energy inherits PauliMixin.
       backend: Specifies what backend TFQ will use to compute expectation
         values. `str` options are {"noisy", "noiseless"}; users may also specify
         a preconfigured cirq execution object to use instead.
       differentiator: Specifies how to take the derivative of a quantum circuit.
+        Note that derivatives of expectation values of general Hamiltonian
+        observables are only supported if this value is not None.
       name: Identifier for this inference engine.
     """
     input_circuit.build([])
     self._circuit = input_circuit
+    self._expectation_samples = expectation_samples
     self._differentiator = differentiator
     self._backend = backend
     self._sample_layer = tfq.layers.Sample(backend=backend)
@@ -91,6 +98,24 @@ class QuantumInference(tf.keras.layers.Layer):
   def differentiator(self):
     return self._differentiator
 
+  def _sampled_expectation(self, initial_states: tf.Tensor,
+                           observable: hamiltonian.Hamiltonian):
+    """Returns the expectation values of the observables against the QNN.
+
+    Args:
+      initial_states: Shape [batch_size, num_qubits] of dtype `tf.int8`.
+        Each entry is an initial state for the set of qubits.  For each state,
+        `qnn` is applied and the pure state expectation value is calculated.
+      observables: Hermitian operator to measure.  Will be tiled to measure
+        `<op>_((qnn)|initial_states[i]>)` for each i.
+
+    Returns:
+      `tf.Tensor` with shape [batch_size, 1] whose entries are the
+      unaveraged expectation values of `observable` against each transformed
+      initial state.
+    """
+    u = self.circuit + observable.circuit_dagger
+
   def expectation(self, initial_states: tf.Tensor,
                   observables: Union[tf.Tensor, hamiltonian.Hamiltonian]):
     """Returns the expectation values of the observables against the QNN.
@@ -120,8 +145,7 @@ class QuantumInference(tf.keras.layers.Layer):
           lambda x: tf.expand_dims(
               observables.energy.operator_expectation(x), 0), y)
     else:
-      raise NotImplementedError(
-          "General `BitstringEnergy` models not yet supported.")
+      return self._sampled_expectation(initial_states, observables)
 
     unique_states, idx, counts = utils.unique_bitstrings_with_counts(
         initial_states)
