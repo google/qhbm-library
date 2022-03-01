@@ -403,7 +403,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
 
   def test_expectation_bitstring_energy(self):
     """Tests Hamiltonian containing a general BitstringEnergy diagonal."""
-    
+
     # Circuit preparation
     qubits = cirq.GridQubit.rect(1, self.num_bits)
     batch_size = 1
@@ -433,6 +433,27 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     hamiltonian_raw_circuit = hamiltonian_raw_circuits[0]
     hamiltonian_circuit = models.DirectQuantumCircuit(hamiltonian_raw_circuit)
 
+    # Total circuit
+    bitstring_circuit = models.circuit_utils.bit_circuit(qubits)
+    measurement_circuit = cirq.Circuit(cirq.measure(q, key=f"measure_qubit_{n}") for n, q in enumerate(qubits))
+    total_circuit = (bitstring_circuit + state_raw_circuit + hamiltonian_raw_circuit ** -1 + measurement_circuit)
+
+    # Resolvers for total circuit
+    bitstring_symbols = sorted(tfq.util.get_circuit_symbols(bitstring_circuit))
+    initial_states_list = 5 * list(
+        itertools.product([0, 1], repeat=self.num_bits))
+    initial_states = tf.constant(initial_states_list, dtype=tf.int8)
+    def generate_resolvers():
+      """Return the current resolver."""
+      state_values_list = state_circuit.trainable_variables[0].numpy().tolist()
+      state_resolver = dict(zip(symbols, state_values_list))
+      hamiltonian_values_list = hamiltonian_circuit.trainable_variables[0].numpy().tolist()
+      hamiltonian_resolver = dict(zip(symbols, hamiltonian_values_list))
+      bitstring_resolvers = [
+          dict(zip(bitstring_symbols, b)) for b in initial_states_list
+      ]
+      return [{**r, **state_resolver, **hamiltonian_resolver} for r in bitstring_resolvers]
+
     # hamiltonian energy
     num_layer = 5
     bits = random.sample(range(1000), self.num_bits)
@@ -450,21 +471,22 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     hamiltonian_energy = models.BitstringEnergy(bits, expected_layer_list)
     hamiltonian = models.Hamiltonian(hamiltonian_energy, hamiltonian_circuit)
 
-    # Get all the bitstrings multiple times.
-    initial_states_list = 5 * list(
-        itertools.product([0, 1], repeat=self.num_bits))
-    initial_states = tf.constant(initial_states_list, dtype=tf.int8)
-
     # Get expectations
+    num_samples = int(1e6)
+    total_resolvers = generate_resolvers()
+    expected_expectations = []
+    for r in total_resolvers:
+      samples = cirq.Simulator().sample(total_circuit, repetitions=num_samples, params=r)
+      print(samples)
     
-    self.assertNotAllClose(
-        expected_expectations,
-        tf.zeros_like(expected_derivatives_thetas),
-        atol=self.not_zero_atol)
+    # self.assertNotAllClose(
+    #     expected_expectations,
+    #     tf.zeros_like(expected_derivatives_thetas),
+    #     atol=self.not_zero_atol)
 
-    # Compare
-    actual_expectations = actual_qnn.expectation(initial_states, hamiltonian)
-    self.assertAllClose(actual_expectations, expected_expectations, rtol=self.close_rtol)
+    # # Compare
+    # actual_expectations = actual_qnn.expectation(initial_states, hamiltonian)
+    # self.assertAllClose(actual_expectations, expected_expectations, rtol=self.close_rtol)
     
 
   @test_util.eager_mode_toggle
