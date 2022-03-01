@@ -92,7 +92,8 @@ class FidelityTest(tf.test.TestCase):
       num_qubits = 4
       sigma, _ = test_util.generate_mixed_random_density_operator(
           num_qubits, 2**num_qubits)
-      sigma = tf.cast(sigma, tf.complex64)
+      sigma_complex64 = tf.cast(sigma, tf.complex64)
+      sigma_complex128 = tf.cast(sigma, tf.complex128)
 
       qubits = cirq.GridQubit.rect(num_qubits, 1)
       num_layers = 3
@@ -102,9 +103,10 @@ class FidelityTest(tf.test.TestCase):
           qubits, num_layers, identifier, num_samples)
       h_dm = inference.density_matrix(h)
 
-      expected_fidelity = direct_fidelity(h_dm, sigma)
+      expected_fidelity = direct_fidelity(h_dm, sigma_complex64)
       fidelity_wrapper = tf.function(inference.fidelity)
-      actual_fidelity = fidelity_wrapper(h, sigma)
+      # Uses sigma of dtype complex128 to test typecasting of fidelity function
+      actual_fidelity = fidelity_wrapper(h, sigma_complex128)
       self.assertAllClose(
           actual_fidelity, expected_fidelity, rtol=self.close_rtol)
 
