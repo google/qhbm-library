@@ -511,3 +511,70 @@ class BernoulliEnergyInference(EnergyInference):
   def _sample(self, num_samples: int):
     """See base class docstring"""
     return self.distribution.sample(num_samples, seed=self.seed)
+
+
+class GibbsWithGradients(EnergyInference):
+  """Manages inference for a Bernoulli defined by spin energies."""
+
+  def __init__(self,
+               input_energy: energy.BernoulliEnergy,
+               num_expectation_samples: int,
+               initial_seed: Union[None, tf.Tensor] = None,
+               name: Union[None, str] = None):
+    """Initializes a GibbsWithGradients.
+
+    Args:
+      input_energy: The parameterized energy function which defines this
+        distribution via the equations of an energy based model.  This class
+        assumes that all parameters of `energy` are `tf.Variable`s and that
+        they are all returned by `energy.variables`.
+      num_expectation_samples: Number of samples to draw and use for estimating
+        the expectation value.
+      initial_seed: PRNG seed; see tfp.random.sanitize_seed for details. This
+        seed will be used in the `sample` method.  If None, the seed is updated
+        after every inference call.  Otherwise, the seed is fixed.
+      name: Optional name for the model.
+    """
+    super().__init__(input_energy, num_expectation_samples, initial_seed, name)
+    self._logits_variable = tf.Variable(input_energy.logits, trainable=False)
+    self._distribution = tfd.Bernoulli(
+        logits=self._logits_variable, dtype=tf.int8)
+
+  def _ready_inference(self):
+    """See base class docstring."""
+    self._logits_variable.assign(self.energy.logits)
+
+  def _call(self, inputs, *args, **kwargs):
+    """See base class docstring."""
+    if inputs is None:
+      return self.distribution
+    else:
+      return self.sample(inputs)
+
+  def _entropy(self):
+    """Returns the exact entropy.
+
+    The total entropy of a set of spins is the sum of each individual spin's
+    entropies.
+    """
+    return tf.reduce_sum(self.distribution.entropy())
+
+  def _log_partition_forward_pass(self):
+    r"""Returns the exact log partition function.
+
+    For a single spin of energy $\theta$, the partition function is
+    $$Z_\theta = \exp(\theta) + \exp(-\theta).$$
+    Since each spin is independent, the total log partition function is
+    the sum of the individual spin log partition functions.
+    """
+    thetas = 0.5 * self.energy.logits
+    single_log_partitions = tf.math.log(
+        tf.math.exp(thetas) + tf.math.exp(-thetas))
+    return tf.math.reduce_sum(single_log_partitions)
+
+  def _sample(self, num_samples: int):
+    """See base class docstring"""
+    last_bitstring = ?
+    d_tilde = -(2 * tf.cast(last_bitstring, tf.float32) - 1)
+    flip_dim= tf.nn.softmax(d_tilde)
+    return self.distribution.sample(num_samples, seed=self.seed)

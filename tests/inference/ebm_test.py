@@ -775,6 +775,11 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     self.assertAllClose(1.0, counts[0] / counts[1], rtol=self.close_rtol)
 
 
+class GibbsWithGradientsTest(tf.test.TestCase):
+  """Tests the GibbsWithGradients class."""
+
+
+
 if __name__ == "__main__":
   print("Running ebm_test.py ...")
   tf.test.main()
