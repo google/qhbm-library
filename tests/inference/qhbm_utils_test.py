@@ -110,6 +110,11 @@ class FidelityTest(tf.test.TestCase):
       self.assertAllClose(
           actual_fidelity, expected_fidelity, rtol=self.close_rtol)
 
+      # Uses sigma of dtype complex64 to test default type of fidelity function
+      actual_fidelity = fidelity_wrapper(h, sigma_complex64)
+      self.assertAllClose(
+          actual_fidelity, expected_fidelity, rtol=self.close_rtol)
+
 
 if __name__ == "__main__":
   print("Running qhbm_utils_test.py ...")
