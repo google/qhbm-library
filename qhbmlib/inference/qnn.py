@@ -53,7 +53,11 @@ class QuantumInference(tf.keras.layers.Layer):
     """
     input_circuit.build([])
     self._circuit = input_circuit
-    self._expectation_samples = expectation_samples
+    if expectation_samples is None:
+      self._expectation_samples = None
+    else:
+      # Expand for compatibility with sample layer
+      self._expectation_samples = tf.constant([expectation_samples], dtype=tf.int32)
     self._differentiator = differentiator
     self._backend = backend
     self._sample_layer = tfq.layers.Sample(backend=backend)
@@ -115,6 +119,19 @@ class QuantumInference(tf.keras.layers.Layer):
       initial state.
     """
     u = self.circuit + observable.circuit_dagger
+    unique_states, idx, counts = utils.unique_bitstrings_with_counts(
+        initial_states)
+    circuits = u(unique_states)
+    num_circuits = tf.shape(circuits)[0]
+    tiled_values = tf.tile(
+        tf.expand_dims(u.symbol_values, 0), [num_circuits, 1])
+    samples = self._sample_layer(
+        circuits,
+        symbol_names=u.symbol_names,
+        symbol_values=tiled_values,
+        repetitions=self._expectation_samples).to_tensor()
+    unique_expectations = tf.map_fn(lambda x: tf.math.reduce_mean(observable.energy(x)), samples, fn_output_signature=tf.float32)
+    return utils.expand_unique_results(unique_expectations, idx)
 
   def expectation(self, initial_states: tf.Tensor,
                   observables: Union[tf.Tensor, hamiltonian.Hamiltonian]):
