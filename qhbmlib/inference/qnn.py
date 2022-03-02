@@ -57,7 +57,8 @@ class QuantumInference(tf.keras.layers.Layer):
       self._expectation_samples = None
     else:
       # Expand for compatibility with sample layer
-      self._expectation_samples = tf.constant([expectation_samples], dtype=tf.int32)
+      self._expectation_samples = tf.constant([expectation_samples],
+                                              dtype=tf.int32)
     self._differentiator = differentiator
     self._backend = backend
     self._sample_layer = tfq.layers.Sample(backend=backend)
@@ -130,7 +131,10 @@ class QuantumInference(tf.keras.layers.Layer):
         symbol_names=u.symbol_names,
         symbol_values=tiled_values,
         repetitions=self._expectation_samples).to_tensor()
-    unique_expectations = tf.map_fn(lambda x: tf.math.reduce_mean(observable.energy(x)), samples, fn_output_signature=tf.float32)
+    unique_expectations = tf.map_fn(
+        lambda x: tf.math.reduce_mean(observable.energy(x)),
+        samples,
+        fn_output_signature=tf.float32)
     return utils.expand_unique_results(unique_expectations, idx)
 
   def expectation(self, initial_states: tf.Tensor,
