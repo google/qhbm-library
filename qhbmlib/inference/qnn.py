@@ -120,8 +120,7 @@ class QuantumInference(tf.keras.layers.Layer):
       initial state.
     """
     u = self.circuit + observable.circuit_dagger
-    unique_states, idx, counts = utils.unique_bitstrings_with_counts(
-        initial_states)
+    unique_states, idx, _ = utils.unique_bitstrings_with_counts(initial_states)
     circuits = u(unique_states)
     num_circuits = tf.shape(circuits)[0]
     tiled_values = tf.tile(
