@@ -31,6 +31,7 @@ class QuantumInference(tf.keras.layers.Layer):
 
   def __init__(self,
                input_circuit: circuit.QuantumCircuit,
+               expectation_samples: Union[None, int] = None,
                backend: Union[str, cirq.Sampler] = "noiseless",
                differentiator: Union[None,
                                      tfq.differentiators.Differentiator] = None,
@@ -39,14 +40,25 @@ class QuantumInference(tf.keras.layers.Layer):
 
     Args:
       input_circuit: The parameterized quantum circuit on which to do inference.
+      expectation_samples: Number of samples to use when estimating the
+        expectation value of a Hamiltonian with a general BitstringEnergy.
+        If None, can only use Hamiltonians whose energy inherits PauliMixin.
       backend: Specifies what backend TFQ will use to compute expectation
         values. `str` options are {"noisy", "noiseless"}; users may also specify
         a preconfigured cirq execution object to use instead.
       differentiator: Specifies how to take the derivative of a quantum circuit.
+        Note that derivatives of expectation values of general Hamiltonian
+        observables are only supported if this value is not None.
       name: Identifier for this inference engine.
     """
     input_circuit.build([])
     self._circuit = input_circuit
+    if expectation_samples is None:
+      self._expectation_samples = None
+    else:
+      # Expand for compatibility with sample layer
+      self._expectation_samples = tf.constant([expectation_samples],
+                                              dtype=tf.int32)
     self._differentiator = differentiator
     self._backend = backend
     self._sample_layer = tfq.layers.Sample(backend=backend)
@@ -91,6 +103,41 @@ class QuantumInference(tf.keras.layers.Layer):
   def differentiator(self):
     return self._differentiator
 
+  # TODO(#201): consider Hamiltonian type renaming
+  def _sampled_expectation(self, initial_states: tf.Tensor,
+                           observable: hamiltonian.Hamiltonian):
+    """Returns the expectation values of the observables against the QNN.
+
+    Args:
+      initial_states: Shape [batch_size, num_qubits] of dtype `tf.int8`.
+        Each entry is an initial state for the set of qubits.  For each state,
+        `qnn` is applied and the pure state expectation value is calculated.
+      observable: Hermitian operator to measure.  Will be tiled to measure
+        the expectation value of the observable in the state
+        `qnn|initial_states[i]>` batched over `i`.
+
+    Returns:
+      `tf.Tensor` with shape [batch_size, 1] whose entries are the
+      unaveraged expectation values of `observable` against each transformed
+      initial state.
+    """
+    u = self.circuit + observable.circuit_dagger
+    unique_states, idx, _ = utils.unique_bitstrings_with_counts(initial_states)
+    circuits = u(unique_states)
+    num_circuits = tf.shape(circuits)[0]
+    tiled_values = tf.tile(
+        tf.expand_dims(u.symbol_values, 0), [num_circuits, 1])
+    samples = self._sample_layer(
+        circuits,
+        symbol_names=u.symbol_names,
+        symbol_values=tiled_values,
+        repetitions=self._expectation_samples).to_tensor()
+    unique_expectations = tf.map_fn(
+        lambda x: tf.math.reduce_mean(observable.energy(x)),
+        samples,
+        fn_output_signature=tf.float32)
+    return utils.expand_unique_results(unique_expectations, idx)
+
   def expectation(self, initial_states: tf.Tensor,
                   observables: Union[tf.Tensor, hamiltonian.Hamiltonian]):
     """Returns the expectation values of the observables against the QNN.
@@ -120,8 +167,7 @@ class QuantumInference(tf.keras.layers.Layer):
           lambda x: tf.expand_dims(
               observables.energy.operator_expectation(x), 0), y)
     else:
-      raise NotImplementedError(
-          "General `BitstringEnergy` models not yet supported.")
+      return self._sampled_expectation(initial_states, observables)
 
     unique_states, idx, counts = utils.unique_bitstrings_with_counts(
         initial_states)
