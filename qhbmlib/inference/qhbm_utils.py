@@ -98,13 +98,14 @@ def fidelity(model: hamiltonian.Hamiltonian, sigma: tf.Tensor):
   Args:
     model: Modular Hamiltonian whose corresponding thermal state is to be
       compared to `sigma`, as the left density matrix in fidelity.
-    sigma: 2-D `tf.Tensor` of dtype `complex64` representing the right
+    sigma: 2-D `tf.Tensor` of a numeric dtype representing the right
       density matrix in the fidelity calculation.
 
   Returns:
     A scalar `tf.Tensor` which is the fidelity between the density matrix
       represented by this QHBM and `sigma`.
   """
+  sigma = tf.cast(sigma, tf.complex64)
   k_theta = tf.cast(ebm_utils.probabilities(model.energy), tf.complex64)
   u_phi = qnn_utils.unitary(model.circuit)
   u_phi_dagger = tf.linalg.adjoint(u_phi)
