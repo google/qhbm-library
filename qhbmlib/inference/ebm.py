@@ -562,10 +562,13 @@ class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
     else:
       x_prime = current_state - tf.one_hot(proposed_i, self._num_bits)
     q_i_of_x_prime = self._q_i_of_x(x_prime)
-    q_ratio = q_i_of_x_prime.probs_parameter()[proposed_i] / q_i_of_x.probs_parameter()[proposed_i]
-    exp_f = tf.math.exp(-self._energy(tf.expand_dims(x_prime, 0)) + self._energy(tf.expand_dims(current_state, 0)))
+    q_ratio = q_i_of_x_prime.probs_parameter(
+    )[proposed_i] / q_i_of_x.probs_parameter()[proposed_i]
+    exp_f = tf.math.exp(-self._energy(tf.expand_dims(x_prime, 0)) +
+                        self._energy(tf.expand_dims(current_state, 0)))
     accept_prob = tf.math.minimum(exp_f * q_ratio, 1.0)
-    accept = tfp.distributions.Bernoulli(probs=accept_prob, dtype=tf.bool).sample()
+    accept = tfp.distributions.Bernoulli(
+        probs=accept_prob, dtype=tf.bool).sample()
     if accept:
       next_state = x_prime
     else:

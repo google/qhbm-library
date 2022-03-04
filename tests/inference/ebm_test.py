@@ -796,15 +796,15 @@ class GibbsWithGradientsTest(tf.test.TestCase):
     expected_num_burnin_samples = 32641
     expected_seed = tf.constant([441, 1191], tf.int32)
     expected_name = "test_analytic_dist_name"
-    actual_layer = inference.GibbsWithGradientsInference(expected_energy,
-                                                         expected_num_expectation_samples,
-                                                         expected_num_burnin_samples,
-                                                         expected_seed,
-                                                         expected_name)
-    
+    actual_layer = inference.GibbsWithGradientsInference(
+        expected_energy, expected_num_expectation_samples,
+        expected_num_burnin_samples, expected_seed, expected_name)
+
     self.assertEqual(actual_layer.energy, expected_energy)
-    self.assertAllEqual(actual_layer.num_expectation_samples, expected_num_expectation_samples)
-    self.assertAllEqual(actual_lauer.num_burnin_samples, expected_num_burnin_samples)
+    self.assertAllEqual(actual_layer.num_expectation_samples,
+                        expected_num_expectation_samples)
+    self.assertAllEqual(actual_lauer.num_burnin_samples,
+                        expected_num_burnin_samples)
     self.assertAllEqual(actual_layer.seed, expected_seed)
     self.assertEqual(actual_layer.name, expected_name)
 
