@@ -103,6 +103,7 @@ class QuantumInference(tf.keras.layers.Layer):
   def differentiator(self):
     return self._differentiator
 
+  # TODO(#201): consider Hamiltonian type renaming
   def _sampled_expectation(self, initial_states: tf.Tensor,
                            observable: hamiltonian.Hamiltonian):
     """Returns the expectation values of the observables against the QNN.
@@ -111,8 +112,9 @@ class QuantumInference(tf.keras.layers.Layer):
       initial_states: Shape [batch_size, num_qubits] of dtype `tf.int8`.
         Each entry is an initial state for the set of qubits.  For each state,
         `qnn` is applied and the pure state expectation value is calculated.
-      observables: Hermitian operator to measure.  Will be tiled to measure
-        `<op>_((qnn)|initial_states[i]>)` for each i.
+      observable: Hermitian operator to measure.  Will be tiled to measure
+        the expectation value of the observable in the state
+        `qnn|initial_states[i]>` batched over `i`.
 
     Returns:
       `tf.Tensor` with shape [batch_size, 1] whose entries are the
