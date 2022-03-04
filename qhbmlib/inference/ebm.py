@@ -617,7 +617,7 @@ class GibbsWithGradientsInference(EnergyInference):
       name: Optional name for the model.
     """
     super().__init__(input_energy, num_expectation_samples, initial_seed, name)
-    self._num_burnin_samples = num_burnin_samples
+    self.num_burnin_samples = num_burnin_samples
     self._kernel = GibbsWithGradientsKernel(input_energy)
     self._current_state = tf.uniform([self.energy], 0, 1, tf.int8)
     self._current_results = self._kernel.bootstrap_results(self._current_state)
@@ -653,6 +653,7 @@ class GibbsWithGradientsInference(EnergyInference):
     """
     ta = tf.TensorArray(tf.int8, size=num_samples)
     for i in tf.range(num_samples):
-      self.current
-      ta = ta.write(i, v)
+      self._current_state, self._current_results = self._kernel.one_step(
+          self._current_state, self._current_results)
+      ta = ta.write(i, self._current_state)
     return ta.stack()
