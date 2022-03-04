@@ -528,17 +528,18 @@ class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
       input_energy: The parameterized energy function which helps define the
         acceptance probabilities of the Markov chain.
     """
-    self._energy = energy
-    self._num_bits = energy.num_bits
+    self._energy = input_energy
+    self._num_bits = input_energy.num_bits
     self._parameters = dict(input_energy=input_energy)
 
   def _q_i_of_x(self, x):
     """Sets the distribution written in equation 6 of the paper."""
+    x_float = tf.cast(x, tf.float32)
     with tf.GradientTape() as tape:
-      tape.watch(x)
-      current_energy = tf.squeeze(self._energy(tf.expand_dims(x, 0)))
-    f_grad = tape.gradient(current_energy, x)
-    d_tilde = -(2 * tf.cast(x, tf.float32) - 1) * f_gra
+      tape.watch(x_float)
+      current_energy = tf.squeeze(self._energy(tf.expand_dims(x_float, 0)))
+    f_grad = tape.gradient(current_energy, x_float)
+    d_tilde = -(2 * tf.cast(x, tf.float32) - 1) * f_grad
     i_probs = tf.nn.softmax(d_tilde / 2.0)
     return tfp.distributions.Categorical(probs=i_probs)
 
@@ -558,9 +559,9 @@ class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
     q_i_of_x = self._q_i_of_x(current_state)
     proposed_i = q_i_of_x.sample()
     if current_state[proposed_i] == 0:
-      x_prime = current_state + tf.one_hot(proposed_i, self._num_bits)
+      x_prime = current_state + tf.one_hot(proposed_i, self._num_bits, dtype=tf.int8)
     else:
-      x_prime = current_state - tf.one_hot(proposed_i, self._num_bits)
+      x_prime = current_state - tf.one_hot(proposed_i, self._num_bits, dtype=tf.int8)
     q_i_of_x_prime = self._q_i_of_x(x_prime)
     q_ratio = q_i_of_x_prime.probs_parameter(
     )[proposed_i] / q_i_of_x.probs_parameter()[proposed_i]
@@ -620,10 +621,20 @@ class GibbsWithGradientsInference(EnergyInference):
       name: Optional name for the model.
     """
     super().__init__(input_energy, num_expectation_samples, initial_seed, name)
-    self.num_burnin_samples = num_burnin_samples
+    self._num_burnin_samples = num_burnin_samples
     self._kernel = GibbsWithGradientsKernel(input_energy)
-    self._current_state = tf.uniform([self.energy], 0, 1, tf.int8)
+    self._current_state = tfp.distributions.Bernoulli(
+        probs=[0.5] * self.energy.num_bits).sample()
     self._current_results = self._kernel.bootstrap_results(self._current_state)
+
+  @property
+  def num_burnin_samples(self):
+    """Returns the number of burnin samples discarded by this class.
+
+    Number of samples to discard when letting the chain equilibrate after
+    updating the parameters of `self.energy`.
+    """
+    return self._num_burnin_samples
 
   def _ready_inference(self):
     """See base class docstring.
@@ -631,7 +642,7 @@ class GibbsWithGradientsInference(EnergyInference):
     Runs the chain for a number of steps without saving the results, in order
     to better reach equilibrium before recording samples.
     """
-    for _ in range(self._num_burnin_samples):
+    for _ in range(self.num_burnin_samples):
       self._current_state, self._current_results = self._kernel.one_step(
           self._current_state, self._current_results)
 
