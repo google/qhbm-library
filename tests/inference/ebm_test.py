@@ -863,35 +863,34 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
     self.assertAllEqual(actual_layer.seed, expected_seed)
     self.assertEqual(actual_layer.name, expected_name)
 
-  # @test_util.eager_mode_toggle
-  # def test_sample(self):
-  #   """Confirms that bitstrings are sampled as expected."""
-  #   # Set up energy function
-  #   num_bits = 5
-  #   num_layers = 3
-  #   bits = random.sample(range(1000), num_bits)
-  #   units = random.sample(range(1, 100), num_layers)
-  #   activations = random.sample([
-  #     "elu", "exponential", "gelu", "hard_sigmoid", "linear", "relu",
-  #     "selu", "sigmoid", "softmax", "softplus", "softsign", "swish", "tanh"
-  #   ], num_layers)
-  #   expected_layer_list = []
-  #   for i in range(num_layers):
-  #     expected_layer_list.append(
-  #       tf.keras.layers.Dense(units[i], activation=activations[i]))
-  #   expected_layer_list.append(tf.keras.layers.Dense(1))
-  #   expected_layer_list.append(utils.Squeeze(-1))
-  #   actual_energy = models.BitstringEnergy(bits, expected_layer_list)
+  @test_util.eager_mode_toggle
+  def test_sample(self):
+    """Confirms that bitstrings are sampled as expected."""
+    # Set up energy function
+    num_bits = 5
+    num_layers = 3
+    bits = random.sample(range(1000), num_bits)
+    units = random.sample(range(1, 100), num_layers)
+    activations = random.sample([
+      "elu", "exponential", "gelu", "hard_sigmoid", "linear", "relu",
+      "selu", "sigmoid", "softmax", "softplus", "softsign", "swish", "tanh"
+    ], num_layers)
+    expected_layer_list = []
+    for i in range(num_layers):
+      expected_layer_list.append(
+        tf.keras.layers.Dense(units[i], activation=activations[i]))
+    expected_layer_list.append(tf.keras.layers.Dense(1))
+    expected_layer_list.append(utils.Squeeze(-1))
+    actual_energy = models.BitstringEnergy(bits, expected_layer_list)
 
-  #   # Sampler
-  #   num_expectation_samples = int(1e4)
-  #   num_burnin_samples = int(1e3)
-  #   actual_layer = inference.GibbsWithGradientsInference(
-  #       actual_energy, num_expectation_samples, num_burnin_samples)
+    # Sampler
+    num_expectation_samples = int(1e2)
+    num_burnin_samples = int(1e1)
+    actual_layer = inference.GibbsWithGradientsInference(
+        actual_energy, num_expectation_samples, num_burnin_samples)
 
-  #   sample_wrapper = tf.function(actual_layer.sample)
-  #   samples = sample_wrapper(num_expectation_samples)
-
+    sample_wrapper = tf.function(actual_layer.sample)
+    samples = sample_wrapper(num_expectation_samples)
 
 
 if __name__ == "__main__":

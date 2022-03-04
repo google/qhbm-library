@@ -623,9 +623,8 @@ class GibbsWithGradientsInference(EnergyInference):
     super().__init__(input_energy, num_expectation_samples, initial_seed, name)
     self._num_burnin_samples = num_burnin_samples
     self._kernel = GibbsWithGradientsKernel(input_energy)
-    self._current_state = tfp.distributions.Bernoulli(
-        probs=[0.5] * self.energy.num_bits).sample()
-    self._current_results = self._kernel.bootstrap_results(self._current_state)
+    self._current_state = tf.Variable(tfp.distributions.Bernoulli(
+        probs=[0.5] * self.energy.num_bits, dtype=tf.int8).sample(), trainable=False)
 
   @property
   def num_burnin_samples(self):
@@ -643,8 +642,9 @@ class GibbsWithGradientsInference(EnergyInference):
     to better reach equilibrium before recording samples.
     """
     for _ in range(self.num_burnin_samples):
-      self._current_state, self._current_results = self._kernel.one_step(
-          self._current_state, self._current_results)
+      next_state, _ = self._kernel.one_step(
+          self._current_state, [])
+      self._current_state.assign(next_state)
 
   def _call(self, inputs, *args, **kwargs):
     """See base class docstring."""
@@ -667,7 +667,8 @@ class GibbsWithGradientsInference(EnergyInference):
     """
     ta = tf.TensorArray(tf.int8, size=num_samples)
     for i in tf.range(num_samples):
-      self._current_state, self._current_results = self._kernel.one_step(
-          self._current_state, self._current_results)
+      next_state, _ = self._kernel.one_step(
+          self._current_state, [])
+      self._current_state.assign(next_state)
       ta = ta.write(i, self._current_state)
     return ta.stack()
