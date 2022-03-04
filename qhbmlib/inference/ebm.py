@@ -513,12 +513,91 @@ class BernoulliEnergyInference(EnergyInference):
     return self.distribution.sample(num_samples, seed=self.seed)
 
 
-class GibbsWithGradients(EnergyInference):
-  """Manages inference for a Bernoulli defined by spin energies."""
+class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
+  """Implements the Gibbs With Gradients update rule.
+
+  See Algorithm 1 of
+  https://arxiv.org/abs/2102.04509v2
+  for details.
+  """
+
+  def __init__(self, input_energy):
+    """Initializes a GibbsWithGradientsKernel.
+
+    Args:
+      input_energy: The parameterized energy function which helps define the
+        acceptance probabilities of the Markov chain.
+    """
+    self._energy = energy
+    self._num_bits = energy.num_bits
+    self._parameters = dict(input_energy=input_energy)
+
+  def _q_i_of_x(self, x):
+    """Sets the distribution written in equation 6 of the paper."""
+    with tf.GradientTape() as tape:
+      tape.watch(x)
+      current_energy = tf.squeeze(self._energy(tf.expand_dims(x, 0)))
+    f_grad = tape.gradient(current_energy, x)
+    d_tilde = -(2 * tf.cast(x, tf.float32) - 1) * f_gra
+    i_probs = tf.nn.softmax(d_tilde / 2.0)
+    return tfp.distributions.Categorical(probs=i_probs)
+
+  def one_step(self, current_state, previous_kernel_results, seed=None):
+    """Takes one step of the TransitionKernel.
+
+    Args:
+      current_state: 1D `tf.Tensor` which is the current chain state.
+      previous_kernel_results: Required but unused argument.
+      seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
+
+    Returns:
+      next_state: 1D `Tensor` which is the next state in the chain.
+      kernel_results: Empty list.
+    """
+    del previous_kernel_results
+    q_i_of_x = self._q_i_of_x(current_state)
+    proposed_i = q_i_of_x.sample()
+    if current_state[proposed_i] == 0:
+      x_prime = current_state + tf.one_hot(proposed_i, self._num_bits)
+    else:
+      x_prime = current_state - tf.one_hot(proposed_i, self._num_bits)
+    q_i_of_x_prime = self._q_i_of_x(x_prime)
+    q_ratio = q_i_of_x_prime.probs_parameter()[proposed_i] / q_i_of_x.probs_parameter()[proposed_i]
+    exp_f = tf.math.exp(-self._energy(tf.expand_dims(x_prime, 0)) + self._energy(tf.expand_dims(current_state, 0)))
+    accept_prob = tf.math.minimum(exp_f * q_ratio, 1.0)
+    accept = tfp.distributions.Bernoulli(probs=accept_prob, dtype=tf.bool).sample()
+    if accept:
+      next_state = x_prime
+    else:
+      next_state = current_state
+    kernel_results = []
+    return next_state, kernel_results
+
+  @property
+  def is_calibrated(self):
+    """Returns `True` if Markov chain converges to specified distribution."""
+    return True
+
+  def bootstrap_results(self, init_state):
+    """Returns an object with the same type as returned by `one_step(...)[1]`.
+
+    Args:
+      init_state: 1D `tf.Tensor` which is the initial chain state.
+
+    Returns:
+      kernel_results: Empty list.
+    """
+    del init_state
+    return []
+
+
+class GibbsWithGradientsInference(EnergyInference):
+  """Manages inference using a Gibbs With Gradients kernel."""
 
   def __init__(self,
-               input_energy: energy.BernoulliEnergy,
+               input_energy: energy.BitstringEnergy,
                num_expectation_samples: int,
+               num_burnin_samples: int,
                initial_seed: Union[None, tf.Tensor] = None,
                name: Union[None, str] = None):
     """Initializes a GibbsWithGradients.
@@ -530,51 +609,50 @@ class GibbsWithGradients(EnergyInference):
         they are all returned by `energy.variables`.
       num_expectation_samples: Number of samples to draw and use for estimating
         the expectation value.
+      num_burnin_samples: Number of samples to discard when letting the chain
+        equilibrate after updating the parameters of `input_energy`.
       initial_seed: PRNG seed; see tfp.random.sanitize_seed for details. This
         seed will be used in the `sample` method.  If None, the seed is updated
         after every inference call.  Otherwise, the seed is fixed.
       name: Optional name for the model.
     """
     super().__init__(input_energy, num_expectation_samples, initial_seed, name)
-    self._logits_variable = tf.Variable(input_energy.logits, trainable=False)
-    self._distribution = tfd.Bernoulli(
-        logits=self._logits_variable, dtype=tf.int8)
+    self._num_burnin_samples = num_burnin_samples
+    self._kernel = GibbsWithGradientsKernel(input_energy)
+    self._current_state = tf.uniform([self.energy], 0, 1, tf.int8)
+    self._current_results = self._kernel.bootstrap_results(self._current_state)
 
   def _ready_inference(self):
-    """See base class docstring."""
-    self._logits_variable.assign(self.energy.logits)
+    """See base class docstring.
+
+    Runs the chain for a number of steps without saving the results, in order
+    to better reach equilibrium before recording samples.
+    """
+    for _ in range(self._num_burnin_samples):
+      self._current_state, self._current_results = self._kernel.one_step(
+          self._current_state, self._current_results)
 
   def _call(self, inputs, *args, **kwargs):
     """See base class docstring."""
-    if inputs is None:
-      return self.distribution
-    else:
-      return self.sample(inputs)
+    return self.sample(inputs)
 
   def _entropy(self):
-    """Returns the exact entropy.
-
-    The total entropy of a set of spins is the sum of each individual spin's
-    entropies.
+    """Returns an estimate of the entropy.
     """
-    return tf.reduce_sum(self.distribution.entropy())
+    raise NotImplementedError()
 
   def _log_partition_forward_pass(self):
-    r"""Returns the exact log partition function.
-
-    For a single spin of energy $\theta$, the partition function is
-    $$Z_\theta = \exp(\theta) + \exp(-\theta).$$
-    Since each spin is independent, the total log partition function is
-    the sum of the individual spin log partition functions.
+    """Returns an estimate of the log partition function.
     """
-    thetas = 0.5 * self.energy.logits
-    single_log_partitions = tf.math.log(
-        tf.math.exp(thetas) + tf.math.exp(-thetas))
-    return tf.math.reduce_sum(single_log_partitions)
+    raise NotImplementedError()
 
   def _sample(self, num_samples: int):
-    """See base class docstring"""
-    last_bitstring = ?
-    d_tilde = -(2 * tf.cast(last_bitstring, tf.float32) - 1)
-    flip_dim= tf.nn.softmax(d_tilde)
-    return self.distribution.sample(num_samples, seed=self.seed)
+    """See base class docstring.
+
+    The kernel is repeatedly called to traverse a chain of samples.
+    """
+    ta = tf.TensorArray(tf.int8, size=num_samples)
+    for i in tf.range(num_samples):
+      self.current
+      ta = ta.write(i, v)
+    return ta.stack()
