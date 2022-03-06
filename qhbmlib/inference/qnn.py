@@ -136,7 +136,7 @@ class QuantumInference(tf.keras.layers.Layer):
         lambda x: tf.math.reduce_mean(observable.energy(x)),
         samples,
         fn_output_signature=tf.float32)
-    return utils.expand_unique_results(unique_expectations, idx)
+    return tf.expand_dims(utils.expand_unique_results(unique_expectations, idx), 1)
 
   def expectation(self, initial_states: tf.Tensor,
                   observables: Union[tf.Tensor, hamiltonian.Hamiltonian]):

@@ -447,6 +447,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     bitstring_circuit = models.circuit_utils.bit_circuit(qubits)
     measurement_circuit = cirq.Circuit(
         cirq.measure(q, key=f"measure_qubit_{n}") for n, q in enumerate(qubits))
+    # needed later for retrieving sample results from Cirq output
+    qb_keys = [(q, f"measure_qubit_{i}") for i, q in enumerate(qubits)]
     total_circuit = (
         bitstring_circuit + state_raw_circuit + hamiltonian_raw_circuit**-1 +
         measurement_circuit)
@@ -492,15 +494,28 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     hamiltonian = models.Hamiltonian(hamiltonian_energy, hamiltonian_circuit)
 
     # Get expectations
-    total_resolvers = generate_resolvers()
-    qb_keys = [(q, f"measure_qubit_{i}") for i, q in enumerate(qubits)]
-    expected_expectations = []
-    for r in total_resolvers:
-      samples_pd = cirq.Simulator().sample(
-          total_circuit, repetitions=expectation_samples, params=r)
-      samples = samples_pd[[x[1] for x in qb_keys]].to_numpy()
-      current_energies = hamiltonian_energy(samples)
-      expected_expectations.append(tf.math.reduce_mean(current_energies))
+    # TODO(#171) function seems to be ripe for refactoring
+    def delta_expectations_func(k, var, delta):
+      """Calculate the expectation with kth entry of `var` perturbed."""
+      num_elts = tf.size(var)
+      old_value = var.read_value()
+      old_value_flat = tf.reshape(old_value, [num_elts])
+      new_value_flat = old_value_flat + delta * tf.one_hot(k, num_elts, 1.0, 0.0)
+      new_value = tf.reshape(new_value_flat, tf.shape(var))
+      var.assign(new_value)
+      total_resolvers = generate_resolvers()
+      raw_delta_expectations = []
+      for r in total_resolvers:
+        samples_pd = cirq.Simulator().sample(
+            total_circuit, repetitions=expectation_samples, params=r)
+        samples = samples_pd[[x[1] for x in qb_keys]].to_numpy()
+        current_energies = hamiltonian_energy(samples)
+        raw_delta_expectations.append(tf.math.reduce_mean(current_energies))
+      delta_expectations = tf.expand_dims(tf.stack(raw_delta_expectations), 1)
+      var.assign(old_value)
+      return delta_expectations
+
+    expected_expectations = delta_expectations_func(0, hamiltonian_circuit.trainable_variables[0], 0)
     self.assertNotAllClose(
         expected_expectations,
         tf.zeros_like(expected_expectations),
@@ -510,6 +525,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     actual_expectations = actual_qnn.expectation(initial_states, hamiltonian)
     self.assertAllClose(
         actual_expectations, expected_expectations, rtol=self.close_rtol)
+    self.assertAllEqual(tf.shape(actual_expectations), [len(initial_states_list), 1])
 
   @test_util.eager_mode_toggle
   def test_sample_basic(self):
