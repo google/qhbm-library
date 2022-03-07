@@ -435,7 +435,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     # state qnn
     expectation_samples = int(1e6)
     actual_qnn = inference.QuantumInference(
-        state_circuit, expectation_samples=expectation_samples)
+        state_circuit, expectation_samples=expectation_samples, differentiator=tfq.differentiators.ParameterShift())
 
     # hamiltonian circuit
     hamiltonian_qnn_symbols = symbols[:num_symbols // 2]
@@ -592,7 +592,6 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     self.assertEqual(len(actual_derivatives_phis), len(expected_derivatives_phis))
     for actual, expected in zip(actual_derivatives_phis, expected_derivatives_phis):
       self.assertAllClose(actual, expected, rtol=0.05)
-
 
   @test_util.eager_mode_toggle
   def test_sample_basic(self):
