@@ -132,6 +132,8 @@ class QuantumInference(tf.keras.layers.Layer):
       num_unique_circuits = tf.shape(unique_circuits)[0]
       unique_tiled_values = tf.tile(
           tf.expand_dims(u.symbol_values, 0), [num_unique_circuits, 1])
+      # TODO(#207): second tile dimension should be updated if more observable
+      # shapes are allowed.
       samples = self._sample_layer(
           unique_circuits,
           symbol_names=u.symbol_names,
@@ -142,38 +144,29 @@ class QuantumInference(tf.keras.layers.Layer):
             lambda x: tf.math.reduce_mean(observable.energy(x)),
             samples,
             fn_output_signature=tf.float32)
-      forward_pass = tf.expand_dims(
-          utils.expand_unique_results(unique_expectations, idx), 1)
+        forward_pass = tf.expand_dims(
+            utils.expand_unique_results(unique_expectations, idx), 1)
 
       def grad_fn(*upstream, variables):
-        """See equation A5 in the QHBM paper appendix for details.
-
-        # TODO(#119): confirm equation number.
-        """
-        unique_thetas_grads = thetas_tape.jacobian(
-            unique_expectations,
+        """Use `get_gradient_circuits` method to get QNN variable derivatives"""
+        thetas_grads = thetas_tape.gradient(
+            forward_pass,
             variables,
+            output_gradients=upstream[0],
             unconnected_gradients=tf.UnconnectedGradients.ZERO)
-        expanded_thetas_gradients = [
-            utils.expand_unique_results(g, idx) for g in unique_thetas_grads
-        ]
-        # Only one upstream component exists since return was a tensor.
-        # Note the -1 axis squeeze is because there is only 1 observable,
-        # for more general Hamiltonians will need to generalize this.
-        compressed_upstream = tf.squeeze(upstream[0], -1)
-        thetas_gradients = [
-          tf.einsum("i,i...->...", compressed_upstream, etg) for etg in expanded_thetas_gradients
-        ]
+        print(f"upstream: {upstream}")
+        print(f"thetas_grads: {thetas_grads}")
 
-        # Adapted from my `differentiate_sampled` in TFQ.
+        # This block adapted from my `differentiate_sampled` in TFQ.
         (batch_programs, new_symbol_names, batch_symbol_values, batch_weights,
          batch_mapper) = self.differentiator.get_gradient_circuits(unique_circuits, u.symbol_names, unique_tiled_values)
         m_i = tf.shape(batch_programs)[1]
-        batch_num_samples = tf.tile(tf.expand_dims(self._expectation_samples, 1), [1, m_i, 1])
-        n_batch_programs = tf.reduce_prod(tf.shape(batch_programs))
-        n_symbols = tf.shape(new_symbol_names)[0]
         n_ops = 1
-
+        # shape is [num_unique_circuits, m_i, n_ops]
+        expanded_expectaion_samples = tf.expand_dims(tf.expand_dims(self._expectation_samples, 0), 0)
+        batch_num_samples = tf.tile(expanded_expectation_samples, [num_unique_circuits, m_i, n_ops])
+        n_batch_programs = tf.size(batch_programs)
+        n_symbols = tf.shape(new_symbol_names)[0]
         gradient_samples = self._sample_layer(
             tf.reshape(batch_programs, [n_batch_programs]),
             symbol_names=new_symbol_names,
@@ -183,25 +176,26 @@ class QuantumInference(tf.keras.layers.Layer):
             lambda x: tf.math.reduce_mean(observable.energy(x)),
             gradient_samples,
             fn_output_signature=tf.float32)
-        batch_expectations = tf.reshape(gradient_expectations, [num_unique_programs, m_i, 1])
+        batch_expectations = tf.reshape(gradient_expectations, [num_unique_circuits, m_i, n_ops])
 
         # In the einsum equation, s is the symbols index, m is the
         # differentiator tiling index, o is the observables index.
-        # `batch_jacobian` has shape [num_unique_programs, n_symbols, 1]
+        # `batch_jacobian` has shape [num_unique_programs, n_symbols, n_ops]
         batch_jacobian = tf.map_fn(
             lambda x: tf.einsum('sm,smo->so', x[0], tf.gather(x[1], x[2])),
             (batch_weights, batch_expectations, batch_mapper),
             fn_output_signature=tf.float32)
-        # Squeeze last dimension because it is size 1
-        batch_jacobian = tf.squeeze(batch_jacobian, [2])
         expanded_jacobian = utils.expand_unique_results(unique_batch_jacobian, idx)
 
-        # Connect symbol_value gradients to QNN variable gradients
+        # Connect upstream to symbol_values gradient
+        symbol_values_gradients = tf.einsum('pso,po->ps', batch_jacobian, upstream[0])
+
+        # Connect symbol values gradients to QNN variables
         with tf.GradientTape() as phis_tape:
           symbol_values = u.symbol_values
           tiled_symbol_values = tf.tile(tf.expand_dims(symbol_values, 0), [tf.shape(samples)[0], 1])
         phis_gradients = phis_tape.gradient(
-            tiled_symbol_values, variables, output_gradients=expanded_jacobian
+            tiled_symbol_values, variables, output_gradients=symbol_values_gradients, unconnected_gradients=tf.UnconnectedGradients.ZERO)
 
         variables_gradients = [tg + pg for tg, pg in zip(thetas_gradients, phis_gradients)]
         return tuple(), variables_gradients

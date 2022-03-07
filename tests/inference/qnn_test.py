@@ -42,7 +42,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     super().setUp()
     self.python_random_seed = 11
     self.tf_random_seed = 10
-    self.tf_random_seed_alt = 215
+    self.tf_random_seed_alt = 212
     self.tfp_seed = tf.constant([5, 6], dtype=tf.int32)
 
     self.close_atol = 2e-3
@@ -408,6 +408,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
 #  @test_util.eager_mode_toggle
   def test_expectation_bitstring_energy(self):
     """Tests Hamiltonian containing a general BitstringEnergy diagonal."""
+    tf.config.run_functions_eagerly(True)
 
     # Circuit preparation
     qubits = cirq.GridQubit.rect(1, self.num_bits)
@@ -469,9 +470,10 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
 
     # Resolvers for total circuit
     bitstring_symbols = sorted(tfq.util.get_circuit_symbols(bitstring_circuit))
-    num_bitstrings = 3
-    initial_states_list = random.choices(
-        list(itertools.product([0, 1], repeat=self.num_bits)), k=num_bitstrings)
+    num_unique_bitstrings = 3
+    num_repetitions = 2  # to ensure sending multiple identical inputs works
+    initial_states_list = num_repetitions * random.sample(
+        list(itertools.product([0, 1], repeat=self.num_bits)), num_unique_bitstrings)
     initial_states = tf.constant(initial_states_list, dtype=tf.int8)
 
     # TODO(#171): consider refactoring to accept symbol and variable tensors
@@ -596,21 +598,16 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
                        tf.shape(var).numpy().tolist()))
       return derivatives
 
-    raw_expected_derivatives = expectations_derivative(hamiltonian.trainable_variables)
-    # do a weighted sum so we can use tape.gradient for the test below.
-    weights = tf.random.uniform(shape=[num_bitstrings], minval=-2, maxval=2, dtype=tf.float32, seed=self.tf_random_seed)
-    expected_derivatives = [tf.einsum("i,i...->...", weights, g) for g in raw_expected_derivatives]
+    expected_derivatives = expectations_derivative(hamiltonian.trainable_variables)
     for derivative in expected_derivatives:
-      print(f"derivative: {derivative}")
       self.assertNotAllClose(
           derivative, tf.zeros_like(derivative), atol=self.not_zero_atol)
 
     with tf.GradientTape() as tape:
-      raw_expectations = actual_qnn.expectation(initial_states, hamiltonian)
-      actual_value = tf.einsum("i,i->", weights, tf.squeeze(raw_expectations))
-    actual_derivatives = tape.gradient(actual_value, hamiltonian.trainable_variables)
-    for actual in actual_derivatives:
-      print(tf.shape(actual))
+      actual_expectations = actual_qnn.expectation(initial_states, hamiltonian)
+    actual_derivatives = tape.jacobian(actual_expectations, hamiltonian.trainable_variables)
+    print(f"expected_derivatives: {expected_derivatives}")
+    print(f"actual_derivatives: {actual_derivatives}")
     self.assertEqual(len(actual_derivatives), len(expected_derivatives))
     for actual, expected in zip(actual_derivatives, expected_derivatives):
       self.assertAllClose(actual, expected, rtol=0.05)
