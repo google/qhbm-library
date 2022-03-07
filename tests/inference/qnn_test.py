@@ -404,7 +404,9 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         expected_derivatives_thetas,
         rtol=self.close_rtol)
 
+
 #  @test_util.eager_mode_toggle
+
   def test_expectation_bitstring_energy(self):
     """Tests Hamiltonian containing a general BitstringEnergy diagonal."""
 
@@ -430,12 +432,15 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     state_raw_circuit = state_raw_circuits[0]
     state_circuit_initializer = tf.keras.initializers.RandomUniform(
         minval=-1.0, maxval=1.0, seed=self.tf_random_seed)
-    state_circuit = models.DirectQuantumCircuit(state_raw_circuit, state_circuit_initializer)
+    state_circuit = models.DirectQuantumCircuit(state_raw_circuit,
+                                                state_circuit_initializer)
 
     # state qnn
     expectation_samples = int(1e6)
     actual_qnn = inference.QuantumInference(
-        state_circuit, expectation_samples=expectation_samples, differentiator=tfq.differentiators.ParameterShift())
+        state_circuit,
+        expectation_samples=expectation_samples,
+        differentiator=tfq.differentiators.ParameterShift())
 
     # hamiltonian circuit
     hamiltonian_qnn_symbols = symbols[:num_symbols // 2]
@@ -448,7 +453,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     hamiltonian_raw_circuit = hamiltonian_raw_circuits[0]
     hamiltonian_circuit_initializer = tf.keras.initializers.RandomUniform(
         minval=-1.0, maxval=1.0, seed=self.tf_random_seed_alt)
-    hamiltonian_circuit = models.DirectQuantumCircuit(hamiltonian_raw_circuit, hamiltonian_circuit_initializer)
+    hamiltonian_circuit = models.DirectQuantumCircuit(
+        hamiltonian_raw_circuit, hamiltonian_circuit_initializer)
 
     # Total circuit
     bitstring_circuit = models.circuit_utils.bit_circuit(qubits)
@@ -463,7 +469,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     # Resolvers for total circuit
     bitstring_symbols = sorted(tfq.util.get_circuit_symbols(bitstring_circuit))
     num_bitstrings = 3
-    initial_states_list = random.choices(list(itertools.product([0, 1], repeat=self.num_bits)), k=num_bitstrings)
+    initial_states_list = random.choices(
+        list(itertools.product([0, 1], repeat=self.num_bits)), k=num_bitstrings)
     initial_states = tf.constant(initial_states_list, dtype=tf.int8)
 
     # TODO(#171): consider refactoring to accept symbol and variable tensors
@@ -495,16 +502,28 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     max_val = 0.5
     for i in range(num_layers):
       kernel_initializer = tf.keras.initializers.RandomUniform(
-        minval=min_val, maxval=max_val, seed=(self.tf_random_seed_alt + i))
+          minval=min_val, maxval=max_val, seed=(self.tf_random_seed_alt + i))
       bias_initializer = tf.keras.initializers.RandomUniform(
-        minval=min_val, maxval=max_val, seed=(self.tf_random_seed_alt + 2*i + 1))
+          minval=min_val,
+          maxval=max_val,
+          seed=(self.tf_random_seed_alt + 2 * i + 1))
       expected_layer_list.append(
-          tf.keras.layers.Dense(units[i], activation=activations[i], kernel_initializer=kernel_initializer, bias_initializer=bias_initializer))
+          tf.keras.layers.Dense(
+              units[i],
+              activation=activations[i],
+              kernel_initializer=kernel_initializer,
+              bias_initializer=bias_initializer))
     kernel_initializer = tf.keras.initializers.RandomUniform(
-        minval=min_val, maxval=max_val, seed=(self.tf_random_seed_alt + 2*i))
+        minval=min_val, maxval=max_val, seed=(self.tf_random_seed_alt + 2 * i))
     bias_initializer = tf.keras.initializers.RandomUniform(
-        minval=min_val, maxval=max_val, seed=(self.tf_random_seed_alt + 2*i + 1))
-    expected_layer_list.append(tf.keras.layers.Dense(1, kernel_initializer=kernel_initializer, bias_initializer=bias_initializer))
+        minval=min_val,
+        maxval=max_val,
+        seed=(self.tf_random_seed_alt + 2 * i + 1))
+    expected_layer_list.append(
+        tf.keras.layers.Dense(
+            1,
+            kernel_initializer=kernel_initializer,
+            bias_initializer=bias_initializer))
     expected_layer_list.append(utils.Squeeze(-1))
     hamiltonian_energy = models.BitstringEnergy(bits, expected_layer_list)
     hamiltonian = models.Hamiltonian(hamiltonian_energy, hamiltonian_circuit)
@@ -518,7 +537,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
           total_circuit, repetitions=expectation_samples, params=r)
       samples = samples_pd[[x[1] for x in qb_keys]].to_numpy()
       current_energies = hamiltonian_energy(samples)
-      raw_expectations.append(tf.math.reduce_mean(current_energies, keepdims=True))
+      raw_expectations.append(
+          tf.math.reduce_mean(current_energies, keepdims=True))
     expected_expectations = tf.stack(raw_expectations)
     self.assertNotAllClose(
         expected_expectations,
@@ -530,7 +550,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     actual_expectations = expectation_wrapper(initial_states, hamiltonian)
     self.assertAllClose(
         actual_expectations, expected_expectations, rtol=self.close_rtol)
-    self.assertAllEqual(tf.shape(actual_expectations), [len(initial_states_list), 1])
+    self.assertAllEqual(
+        tf.shape(actual_expectations), [len(initial_states_list), 1])
 
     # TODO(#205) function seems to be ripe for refactoring
     def delta_expectations_func(k, var, delta):
@@ -539,15 +560,18 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
       old_value = var.read_value()
       # Can no longer assume var is 1D, since energy uses matrix variables now
       old_value_flat = tf.reshape(old_value, [num_elts])
-      new_value_flat = old_value_flat + delta * tf.one_hot(k, num_elts, 1.0, 0.0)
+      new_value_flat = old_value_flat + delta * tf.one_hot(
+          k, num_elts, 1.0, 0.0)
       new_value = tf.reshape(new_value_flat, tf.shape(var))
       var.assign(new_value)
-      delta_expectations = tf.squeeze(actual_qnn.expectation(initial_states, hamiltonian), -1)
+      delta_expectations = tf.squeeze(
+          actual_qnn.expectation(initial_states, hamiltonian), -1)
       var.assign(old_value)
       return delta_expectations
 
     # TODO(#206)
     delta = 1e-1
+
     def expectations_derivative(variables_list):
       """Approximately differentiates expectations with respect to the inputs"""
       derivatives = []
@@ -563,21 +587,21 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         # transpose to shape [len(initial_states_list), num_elts]
         var_derivatives_transpose = tf.transpose(var_derivatives)
         # reshape the trailing dimensions to match the original variable
-        derivatives.append(tf.reshape(var_derivatives_transpose, [len(initial_states_list)] + tf.shape(var).numpy().tolist()))
+        derivatives.append(
+            tf.reshape(var_derivatives_transpose, [len(initial_states_list)] +
+                       tf.shape(var).numpy().tolist()))
       return derivatives
 
     expected_derivatives_thetas = expectations_derivative(
         hamiltonian.energy.trainable_variables)
     for derivative in expected_derivatives_thetas:
-      self.assertNotAllClose(derivative,
-                             tf.zeros_like(derivative),
-                             atol=self.not_zero_atol)
+      self.assertNotAllClose(
+          derivative, tf.zeros_like(derivative), atol=self.not_zero_atol)
     expected_derivatives_phis = expectations_derivative(
         hamiltonian.circuit.trainable_variables)
     for derivative in expected_derivatives_phis:
-      self.assertNotAllClose(derivative,
-                             tf.zeros_like(derivative),
-                             atol=self.not_zero_atol)
+      self.assertNotAllClose(
+          derivative, tf.zeros_like(derivative), atol=self.not_zero_atol)
 
     with tf.GradientTape() as tape:
       raw_expectations = expectation_wrapper(initial_states, hamiltonian)
@@ -586,11 +610,15 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     actual_derivatives_thetas, actual_derivatives_phis = tape.jacobian(
         actual_expectations, (hamiltonian.energy.trainable_variables,
                               hamiltonian.circuit.trainable_variables))
-    self.assertEqual(len(actual_derivatives_thetas), len(expected_derivatives_thetas))
-    for actual, expected in zip(actual_derivatives_thetas, expected_derivatives_thetas):
+    self.assertEqual(
+        len(actual_derivatives_thetas), len(expected_derivatives_thetas))
+    for actual, expected in zip(actual_derivatives_thetas,
+                                expected_derivatives_thetas):
       self.assertAllClose(actual, expected, rtol=0.05)
-    self.assertEqual(len(actual_derivatives_phis), len(expected_derivatives_phis))
-    for actual, expected in zip(actual_derivatives_phis, expected_derivatives_phis):
+    self.assertEqual(
+        len(actual_derivatives_phis), len(expected_derivatives_phis))
+    for actual, expected in zip(actual_derivatives_phis,
+                                expected_derivatives_phis):
       self.assertAllClose(actual, expected, rtol=0.05)
 
   @test_util.eager_mode_toggle
@@ -658,7 +686,6 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     # QNN samples should be half 0 and half 1.
     self.assertAllClose(
         samples_counts[0], samples_counts[1], atol=max_counts // 1000)
-
 
 if __name__ == "__main__":
   logging.info("Running qnn_test.py ...")

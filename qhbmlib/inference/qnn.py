@@ -131,11 +131,13 @@ class QuantumInference(tf.keras.layers.Layer):
       _ = [tf.identity(v) for v in observable.energy.trainable_variables]
       _ = [tf.identity(v) for v in observable.circuit.trainable_variables]
 
-      unique_states, idx, _ = utils.unique_bitstrings_with_counts(initial_states)
+      unique_states, idx, _ = utils.unique_bitstrings_with_counts(
+          initial_states)
       u = self.circuit + observable.circuit_dagger
       circuits = u(unique_states)
       num_circuits = tf.shape(circuits)[0]
-      tiled_values = tf.tile(tf.expand_dims(u.symbol_values, 0), [num_circuits, 1])
+      tiled_values = tf.tile(
+          tf.expand_dims(u.symbol_values, 0), [num_circuits, 1])
       samples = self._sample_layer(
           circuits,
           symbol_names=u.symbol_names,
@@ -147,7 +149,7 @@ class QuantumInference(tf.keras.layers.Layer):
             samples,
             fn_output_signature=tf.float32)
       forward_pass = tf.expand_dims(
-        utils.expand_unique_results(unique_expectations, idx), 1)
+          utils.expand_unique_results(unique_expectations, idx), 1)
 
       def grad_fn(*upstream, variables):
         """See equation A5 in the QHBM paper appendix for details.
@@ -159,21 +161,20 @@ class QuantumInference(tf.keras.layers.Layer):
             observable.energy.trainable_variables,
             unconnected_gradients=tf.UnconnectedGradients.ZERO)
         thetas_grads = [
-            utils.expand_unique_results(g, idx) for g in unique_thetas_grads]
+            utils.expand_unique_results(g, idx) for g in unique_thetas_grads
+        ]
 
-        (
-          batch_programs, new_symbol_names, batch_symbol_values,
-          batch_weights, batch_mapper
-        ) = self.differentiator.get_gradient_circuits(
-            circuits, u.symbol_names, tiled_values)
+        (batch_programs, new_symbol_names, batch_symbol_values, batch_weights,
+         batch_mapper) = self.differentiator.get_gradient_circuits(
+             circuits, u.symbol_names, tiled_values)
         n_batch_programs = tf.reduce_prod(tf.shape(batch_programs))
         n_symbols = tf.shape(new_symbol_names)[0]
 
         gradient_samples = self._sample_layer(
             circuits,
             symbol_names=u.symbol_names,
-            symbol_values=tf.reshape(
-              batch_symbol_values, [n_batch_programs, n_symbols]),
+            symbol_values=tf.reshape(batch_symbol_values,
+                                     [n_batch_programs, n_symbols]),
             repetitions=self._expectation_samples).to_tensor()
         gradient_expectations = tf.map_fn(
             lambda x: tf.math.reduce_mean(observable.energy(x)),
@@ -186,10 +187,15 @@ class QuantumInference(tf.keras.layers.Layer):
             fn_output_signature=tf.float32)
         unique_phis_gradients = tf.reduce_sum(batch_jacobian, -1)
         phis_gradients = [
-            utils.expand_unique_results(g, idx) for g in unique_phis_gradients]
+            utils.expand_unique_results(g, idx) for g in unique_phis_gradients
+        ]
 
-        return tuple(), [upstream * g for g in thetas_gradients + phis_gradients]
+        return tuple(), [
+            upstream * g for g in thetas_gradients + phis_gradients
+        ]
+
       return forward_pass, grad_fn
+
     return _inner_expectation()
 
   def expectation(self, initial_states: tf.Tensor,
