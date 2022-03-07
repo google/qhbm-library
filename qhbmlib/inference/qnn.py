@@ -149,13 +149,11 @@ class QuantumInference(tf.keras.layers.Layer):
 
       def grad_fn(*upstream, variables):
         """Use `get_gradient_circuits` method to get QNN variable derivatives"""
-        thetas_grads = thetas_tape.gradient(
+        thetas_gradients = thetas_tape.gradient(
             forward_pass,
             variables,
             output_gradients=upstream[0],
             unconnected_gradients=tf.UnconnectedGradients.ZERO)
-        print(f"upstream: {upstream}")
-        print(f"thetas_grads: {thetas_grads}")
 
         # This block adapted from my `differentiate_sampled` in TFQ.
         (batch_programs, new_symbol_names, batch_symbol_values, batch_weights,
@@ -164,7 +162,7 @@ class QuantumInference(tf.keras.layers.Layer):
         m_i = tf.shape(batch_programs)[1]
         n_ops = 1
         # shape is [num_unique_circuits, m_i, n_ops]
-        expanded_expectaion_samples = tf.expand_dims(
+        expanded_expectation_samples = tf.expand_dims(
             tf.expand_dims(self._expectation_samples, 0), 0)
         batch_num_samples = tf.tile(expanded_expectation_samples,
                                     [num_unique_circuits, m_i, n_ops])
@@ -187,15 +185,15 @@ class QuantumInference(tf.keras.layers.Layer):
         # In the einsum equation, s is the symbols index, m is the
         # differentiator tiling index, o is the observables index.
         # `batch_jacobian` has shape [num_unique_programs, n_symbols, n_ops]
-        batch_jacobian = tf.map_fn(
-            lambda x: tf.einsum('sm,smo->so', x[0], tf.gather(x[1], x[2])),
+        unique_batch_jacobian = tf.map_fn(
+            lambda x: tf.einsum("sm,smo->so", x[0], tf.gather(x[1], x[2], axis=0)),
             (batch_weights, batch_expectations, batch_mapper),
             fn_output_signature=tf.float32)
         expanded_jacobian = utils.expand_unique_results(unique_batch_jacobian,
                                                         idx)
 
         # Connect upstream to symbol_values gradient
-        symbol_values_gradients = tf.einsum('pso,po->ps', batch_jacobian,
+        symbol_values_gradients = tf.einsum("pso,po->ps", expanded_jacobian,
                                             upstream[0])
         print(f"symbol_values_gradients: {symbol_values_gradients}")
 
