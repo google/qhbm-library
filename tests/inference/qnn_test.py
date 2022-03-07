@@ -406,6 +406,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
 
 
 #  @test_util.eager_mode_toggle
+
   def test_expectation_bitstring_energy(self):
     """Tests Hamiltonian containing a general BitstringEnergy diagonal."""
     tf.config.run_functions_eagerly(True)
@@ -473,7 +474,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     num_unique_bitstrings = 3
     num_repetitions = 2  # to ensure sending multiple identical inputs works
     initial_states_list = num_repetitions * random.sample(
-        list(itertools.product([0, 1], repeat=self.num_bits)), num_unique_bitstrings)
+        list(itertools.product([0, 1], repeat=self.num_bits)),
+        num_unique_bitstrings)
     initial_states = tf.constant(initial_states_list, dtype=tf.int8)
 
     # TODO(#171): consider refactoring to accept symbol and variable tensors
@@ -530,9 +532,13 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     expected_layer_list.append(utils.Squeeze(-1))
     hamiltonian_energy = models.BitstringEnergy(bits, expected_layer_list)
     hamiltonian_energy.build([None, self.num_bits])
-    print(f"hamiltonian_energy.trainable_variables: {hamiltonian_energy.trainable_variables}")
+    print(
+        f"hamiltonian_energy.trainable_variables: {hamiltonian_energy.trainable_variables}"
+    )
     _ = hamiltonian_energy(tf.constant([[0] * self.num_bits], tf.int8))
-    print(f"hamiltonian_energy.trainable_variables: {hamiltonian_energy.trainable_variables}")
+    print(
+        f"hamiltonian_energy.trainable_variables: {hamiltonian_energy.trainable_variables}"
+    )
     hamiltonian = models.Hamiltonian(hamiltonian_energy, hamiltonian_circuit)
 
     # # Get expectations
@@ -577,6 +583,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
       return delta_expectations
 
     delta = 1e-1
+
     # TODO(#206)
     def expectations_derivative(variables_list):
       """Approximately differentiates expectations with respect to the inputs"""
@@ -598,14 +605,16 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
                        tf.shape(var).numpy().tolist()))
       return derivatives
 
-    expected_derivatives = expectations_derivative(hamiltonian.trainable_variables)
+    expected_derivatives = expectations_derivative(
+        hamiltonian.trainable_variables)
     for derivative in expected_derivatives:
       self.assertNotAllClose(
           derivative, tf.zeros_like(derivative), atol=self.not_zero_atol)
 
     with tf.GradientTape() as tape:
       actual_expectations = actual_qnn.expectation(initial_states, hamiltonian)
-    actual_derivatives = tape.jacobian(actual_expectations, hamiltonian.trainable_variables)
+    actual_derivatives = tape.jacobian(actual_expectations,
+                                       hamiltonian.trainable_variables)
     print(f"expected_derivatives: {expected_derivatives}")
     print(f"actual_derivatives: {actual_derivatives}")
     self.assertEqual(len(actual_derivatives), len(expected_derivatives))

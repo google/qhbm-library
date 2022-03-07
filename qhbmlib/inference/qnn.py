@@ -159,24 +159,30 @@ class QuantumInference(tf.keras.layers.Layer):
 
         # This block adapted from my `differentiate_sampled` in TFQ.
         (batch_programs, new_symbol_names, batch_symbol_values, batch_weights,
-         batch_mapper) = self.differentiator.get_gradient_circuits(unique_circuits, u.symbol_names, unique_tiled_values)
+         batch_mapper) = self.differentiator.get_gradient_circuits(
+             unique_circuits, u.symbol_names, unique_tiled_values)
         m_i = tf.shape(batch_programs)[1]
         n_ops = 1
         # shape is [num_unique_circuits, m_i, n_ops]
-        expanded_expectaion_samples = tf.expand_dims(tf.expand_dims(self._expectation_samples, 0), 0)
-        batch_num_samples = tf.tile(expanded_expectation_samples, [num_unique_circuits, m_i, n_ops])
+        expanded_expectaion_samples = tf.expand_dims(
+            tf.expand_dims(self._expectation_samples, 0), 0)
+        batch_num_samples = tf.tile(expanded_expectation_samples,
+                                    [num_unique_circuits, m_i, n_ops])
         n_batch_programs = tf.size(batch_programs)
         n_symbols = tf.shape(new_symbol_names)[0]
         gradient_samples = self._sample_layer(
             tf.reshape(batch_programs, [n_batch_programs]),
             symbol_names=new_symbol_names,
-            symbol_values=tf.reshape(batch_symbol_values, [n_batch_programs, n_symbols]),
-            repetitions=tf.reshape(batch_num_samples, [n_batch_programs, n_ops])).to_tensor()
+            symbol_values=tf.reshape(batch_symbol_values,
+                                     [n_batch_programs, n_symbols]),
+            repetitions=tf.reshape(batch_num_samples,
+                                   [n_batch_programs, n_ops])).to_tensor()
         gradient_expectations = tf.map_fn(
             lambda x: tf.math.reduce_mean(observable.energy(x)),
             gradient_samples,
             fn_output_signature=tf.float32)
-        batch_expectations = tf.reshape(gradient_expectations, [num_unique_circuits, m_i, n_ops])
+        batch_expectations = tf.reshape(gradient_expectations,
+                                        [num_unique_circuits, m_i, n_ops])
 
         # In the einsum equation, s is the symbols index, m is the
         # differentiator tiling index, o is the observables index.
@@ -185,19 +191,29 @@ class QuantumInference(tf.keras.layers.Layer):
             lambda x: tf.einsum('sm,smo->so', x[0], tf.gather(x[1], x[2])),
             (batch_weights, batch_expectations, batch_mapper),
             fn_output_signature=tf.float32)
-        expanded_jacobian = utils.expand_unique_results(unique_batch_jacobian, idx)
+        expanded_jacobian = utils.expand_unique_results(unique_batch_jacobian,
+                                                        idx)
 
         # Connect upstream to symbol_values gradient
-        symbol_values_gradients = tf.einsum('pso,po->ps', batch_jacobian, upstream[0])
+        symbol_values_gradients = tf.einsum('pso,po->ps', batch_jacobian,
+                                            upstream[0])
+        print(f"symbol_values_gradients: {symbol_values_gradients}")
 
         # Connect symbol values gradients to QNN variables
         with tf.GradientTape() as phis_tape:
           symbol_values = u.symbol_values
-          tiled_symbol_values = tf.tile(tf.expand_dims(symbol_values, 0), [tf.shape(samples)[0], 1])
+          tiled_symbol_values = tf.tile(
+              tf.expand_dims(symbol_values, 0), [tf.shape(samples)[0], 1])
         phis_gradients = phis_tape.gradient(
-            tiled_symbol_values, variables, output_gradients=symbol_values_gradients, unconnected_gradients=tf.UnconnectedGradients.ZERO)
+            tiled_symbol_values,
+            variables,
+            output_gradients=symbol_values_gradients,
+            unconnected_gradients=tf.UnconnectedGradients.ZERO)
+        print(f"phis_gradients: {phis_gradients}")
 
-        variables_gradients = [tg + pg for tg, pg in zip(thetas_gradients, phis_gradients)]
+        variables_gradients = [
+            tg + pg for tg, pg in zip(thetas_gradients, phis_gradients)
+        ]
         return tuple(), variables_gradients
 
       return forward_pass, grad_fn
