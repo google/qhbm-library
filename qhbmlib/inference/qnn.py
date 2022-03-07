@@ -134,7 +134,7 @@ class QuantumInference(tf.keras.layers.Layer):
           tf.expand_dims(u.symbol_values, 0), [num_unique_circuits, 1])
       # TODO(#207): second tile dimension should be updated if more observable
       # shapes are allowed.
-      samples = self._sample_layer(
+      unique_samples = self._sample_layer(
           unique_circuits,
           symbol_names=u.symbol_names,
           symbol_values=unique_tiled_values,
@@ -142,7 +142,7 @@ class QuantumInference(tf.keras.layers.Layer):
       with tf.GradientTape() as thetas_tape:
         unique_expectations = tf.map_fn(
             lambda x: tf.math.reduce_mean(observable.energy(x)),
-            samples,
+            unique_samples,
             fn_output_signature=tf.float32)
         forward_pass = tf.expand_dims(
             utils.expand_unique_results(unique_expectations, idx), 1)
@@ -162,10 +162,6 @@ class QuantumInference(tf.keras.layers.Layer):
         m_i = tf.shape(batch_programs)[1]
         n_ops = 1
         # shape is [num_unique_circuits, m_i, n_ops]
-        expanded_expectation_samples = tf.expand_dims(
-            tf.expand_dims(self._expectation_samples, 0), 0)
-        batch_num_samples = tf.tile(expanded_expectation_samples,
-                                    [num_unique_circuits, m_i, n_ops])
         n_batch_programs = tf.size(batch_programs)
         n_symbols = tf.shape(new_symbol_names)[0]
         gradient_samples = self._sample_layer(
@@ -173,8 +169,7 @@ class QuantumInference(tf.keras.layers.Layer):
             symbol_names=new_symbol_names,
             symbol_values=tf.reshape(batch_symbol_values,
                                      [n_batch_programs, n_symbols]),
-            repetitions=tf.reshape(batch_num_samples,
-                                   [n_batch_programs, n_ops])).to_tensor()
+            repetitions=self._expectation_samples).to_tensor()
         gradient_expectations = tf.map_fn(
             lambda x: tf.math.reduce_mean(observable.energy(x)),
             gradient_samples,
@@ -201,7 +196,8 @@ class QuantumInference(tf.keras.layers.Layer):
         with tf.GradientTape() as phis_tape:
           symbol_values = u.symbol_values
           tiled_symbol_values = tf.tile(
-              tf.expand_dims(symbol_values, 0), [tf.shape(samples)[0], 1])
+              tf.expand_dims(symbol_values, 0), [tf.shape(idx)[0], 1])
+        print(f"tiled_symbol_values: {tiled_symbol_values}")
         phis_gradients = phis_tape.gradient(
             tiled_symbol_values,
             variables,

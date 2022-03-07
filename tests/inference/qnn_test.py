@@ -438,7 +438,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     state_circuit.build([])
 
     # state qnn
-    expectation_samples = int(1e6)
+    expectation_samples = int(2e6)
     actual_qnn = inference.QuantumInference(
         state_circuit,
         expectation_samples=expectation_samples,
@@ -583,7 +583,6 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
       return delta_expectations
 
     delta = 1e-1
-
     # TODO(#206)
     def expectations_derivative(variables_list):
       """Approximately differentiates expectations with respect to the inputs"""
@@ -601,7 +600,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         var_derivatives_transpose = tf.transpose(var_derivatives)
         # reshape the trailing dimensions to match the original variable
         derivatives.append(
-            tf.reshape(var_derivatives_transpose, [len(initial_states_list)] +
+            tf.reshape(var_derivatives_transpose, [len(initial_states_list), 1] +
                        tf.shape(var).numpy().tolist()))
       return derivatives
 
