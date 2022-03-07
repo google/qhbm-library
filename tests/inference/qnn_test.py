@@ -42,7 +42,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     super().setUp()
     self.python_random_seed = 11
     self.tf_random_seed = 10
-    self.tf_random_seed_alt = 222
+    self.tf_random_seed_alt = 212
     self.tfp_seed = tf.constant([5, 6], dtype=tf.int32)
 
     self.close_atol = 2e-3
@@ -411,9 +411,9 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     # Circuit preparation
     qubits = cirq.GridQubit.rect(1, self.num_bits)
     batch_size = 1
-    n_moments = 4
+    n_moments = 3
     act_fraction = 1.0
-    num_symbols = 8
+    num_symbols = 4
     symbols = set()
     for _ in range(num_symbols):
       symbols.add("".join(random.sample(string.ascii_letters, 10)))
@@ -433,7 +433,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     state_circuit = models.DirectQuantumCircuit(state_raw_circuit, state_circuit_initializer)
 
     # state qnn
-    expectation_samples = int(1e4)
+    expectation_samples = int(1e6)
     actual_qnn = inference.QuantumInference(
         state_circuit, expectation_samples=expectation_samples)
 
@@ -462,8 +462,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
 
     # Resolvers for total circuit
     bitstring_symbols = sorted(tfq.util.get_circuit_symbols(bitstring_circuit))
-    initial_states_list = 2 * list(
-        itertools.product([0, 1], repeat=self.num_bits))
+    num_bitstrings = 3
+    initial_states_list = random.choices(list(itertools.product([0, 1], repeat=self.num_bits)), k=num_bitstrings)
     initial_states = tf.constant(initial_states_list, dtype=tf.int8)
 
     # TODO(#171): consider refactoring to accept symbol and variable tensors
@@ -485,23 +485,26 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
       } for r in bitstring_resolvers]
 
     # hamiltonian energy
-    num_layers = 2
+    num_layers = 1
     random.seed(self.python_random_seed)
     bits = random.sample(range(1000), self.num_bits)
-    units = random.sample(range(2, 5), num_layers)
-    activations = random.sample([
-        "elu", "exponential", "gelu", "hard_sigmoid", "linear", "relu", "selu",
-        "sigmoid", "softmax", "softplus", "softsign", "swish", "tanh"
-    ], num_layers)
+    units = [2] * num_layers
+    activations = ["linear"] * num_layers
     expected_layer_list = []
+    min_val = -0.5
+    max_val = 0.5
     for i in range(num_layers):
       kernel_initializer = tf.keras.initializers.RandomUniform(
-        minval=-1.0, maxval=1.0, seed=(self.tf_random_seed + i))
+        minval=min_val, maxval=max_val, seed=(self.tf_random_seed_alt + i))
+      bias_initializer = tf.keras.initializers.RandomUniform(
+        minval=min_val, maxval=max_val, seed=(self.tf_random_seed_alt + 2*i + 1))
       expected_layer_list.append(
-          tf.keras.layers.Dense(units[i], activation=activations[i], kernel_initializer=kernel_initializer))
+          tf.keras.layers.Dense(units[i], activation=activations[i], kernel_initializer=kernel_initializer, bias_initializer=bias_initializer))
     kernel_initializer = tf.keras.initializers.RandomUniform(
-        minval=-1.0, maxval=1.0, seed=(self.tf_random_seed + i))
-    expected_layer_list.append(tf.keras.layers.Dense(1, kernel_initializer=kernel_initializer))
+        minval=min_val, maxval=max_val, seed=(self.tf_random_seed_alt + 2*i))
+    bias_initializer = tf.keras.initializers.RandomUniform(
+        minval=min_val, maxval=max_val, seed=(self.tf_random_seed_alt + 2*i + 1))
+    expected_layer_list.append(tf.keras.layers.Dense(1, kernel_initializer=kernel_initializer, bias_initializer=bias_initializer))
     expected_layer_list.append(utils.Squeeze(-1))
     hamiltonian_energy = models.BitstringEnergy(bits, expected_layer_list)
     hamiltonian = models.Hamiltonian(hamiltonian_energy, hamiltonian_circuit)
@@ -509,13 +512,14 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     # Get expectations
     total_resolvers = generate_resolvers()
     qb_keys = [(q, f"measure_qubit_{i}") for i, q in enumerate(qubits)]
-    expected_expectations = []
+    raw_expectations = []
     for r in total_resolvers:
       samples_pd = cirq.Simulator().sample(
           total_circuit, repetitions=expectation_samples, params=r)
       samples = samples_pd[[x[1] for x in qb_keys]].to_numpy()
       current_energies = hamiltonian_energy(samples)
-      expected_expectations.append(tf.math.reduce_mean(current_energies))
+      raw_expectations.append(tf.math.reduce_mean(current_energies, keepdims=True))
+    expected_expectations = tf.stack(raw_expectations)
     self.assertNotAllClose(
         expected_expectations,
         tf.zeros_like(expected_expectations),
@@ -538,45 +542,56 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
       new_value_flat = old_value_flat + delta * tf.one_hot(k, num_elts, 1.0, 0.0)
       new_value = tf.reshape(new_value_flat, tf.shape(var))
       var.assign(new_value)
-      delta_expectations = actual_qnn.expectation(initial_states, hamiltonian)
+      delta_expectations = tf.squeeze(actual_qnn.expectation(initial_states, hamiltonian), -1)
       var.assign(old_value)
       return delta_expectations
 
     # TODO(#206)
+    delta = 1e-1
     def expectations_derivative(variables_list):
       """Approximately differentiates expectations with respect to the inputs"""
       derivatives = []
       for var in variables_list:
-        flat_var_derivative_list = []
+        per_bitstring_derivative_list = []
         num_elts = tf.size(var)
         for n in range(num_elts):
           this_derivative = test_util.approximate_derivative_unsummed(
-              functools.partial(delta_expectations_func, n, var))
-          flat_var_derivative_list.append(this_derivative.numpy())
-        var_derivatives = tf.reshape(tf.stack(flat_var_derivative_list), tf.shape(var))
-        derivatives.append(var_derivatives)
+              functools.partial(delta_expectations_func, n, var), delta=delta)
+          per_bitstring_derivative_list.append(this_derivative)
+        # shape is now [num_elts, len(initial_states_list)]
+        var_derivatives = tf.stack(per_bitstring_derivative_list)
+        # transpose to shape [len(initial_states_list), num_elts]
+        var_derivatives_transpose = tf.transpose(var_derivatives)
+        # reshape the trailing dimensions to match the original variable
+        derivatives.append(tf.reshape(var_derivatives_transpose, [len(initial_states_list)] + tf.shape(var).numpy().tolist()))
       return derivatives
 
-    expected_derivatives_thetas = tf.transpose(
-        tf.squeeze(
-            expectations_derivative(
-                hamiltonian.energy.trainable_variables)))
-    self.assertNotAllClose(
-        expected_derivatives_thetas,
-        tf.zeros_like(expected_derivatives_thetas),
-        atol=self.not_zero_atol)
-    expected_derivatives_phis = tf.transpose(
-        tf.squeeze(
-            expectations_derivative(
-                hamiltonian.circuit.trainable_variables)))
-    self.assertNotAllClose(
-        expected_derivatives_phis,
-        tf.zeros_like(expected_derivatives_phis),
-        atol=self.not_zero_atol)
+    expected_derivatives_thetas = expectations_derivative(
+        hamiltonian.energy.trainable_variables)
+    for derivative in expected_derivatives_thetas:
+      self.assertNotAllClose(derivative,
+                             tf.zeros_like(derivative),
+                             atol=self.not_zero_atol)
+    expected_derivatives_phis = expectations_derivative(
+        hamiltonian.circuit.trainable_variables)
+    for derivative in expected_derivatives_phis:
+      self.assertNotAllClose(derivative,
+                             tf.zeros_like(derivative),
+                             atol=self.not_zero_atol)
 
+    with tf.GradientTape() as tape:
+      raw_expectations = expectation_wrapper(initial_states, hamiltonian)
+      # make 1D to simplify jacobian
+      actual_expectations = tf.squeeze(raw_expectations)
     actual_derivatives_thetas, actual_derivatives_phis = tape.jacobian(
         actual_expectations, (hamiltonian.energy.trainable_variables,
                               hamiltonian.circuit.trainable_variables))
+    self.assertEqual(len(actual_derivatives_thetas), len(expected_derivatives_thetas))
+    for actual, expected in zip(actual_derivatives_thetas, expected_derivatives_thetas):
+      self.assertAllClose(actual, expected, rtol=0.05)
+    self.assertEqual(len(actual_derivatives_phis), len(expected_derivatives_phis))
+    for actual, expected in zip(actual_derivatives_phis, expected_derivatives_phis):
+      self.assertAllClose(actual, expected, rtol=0.05)
 
 
   @test_util.eager_mode_toggle
