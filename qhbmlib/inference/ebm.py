@@ -604,7 +604,7 @@ class GibbsWithGradientsInference(EnergyInference):
                num_burnin_samples: int,
                initial_seed: Union[None, tf.Tensor] = None,
                name: Union[None, str] = None):
-    """Initializes a GibbsWithGradients.
+    """Initializes a GibbsWithGradientsInference.
 
     Args:
       input_energy: The parameterized energy function which defines this
@@ -657,7 +657,15 @@ class GibbsWithGradientsInference(EnergyInference):
 
   def _log_partition_forward_pass(self):
     """Returns an estimate of the log partition function.
+
+    See the importance sampling estimator above equation 1 of
+    https://auai.org/uai2015/proceedings/papers/120.pdf
+    where we replace p_0(x) with the observed relative frequency of x.
     """
+    samples = self.sample(self.num_expectation_samples)
+    unique, _, counts = utils.unique_bitstrings_with_counts(samples)
+    n = tf.math.reduce_sum(counts)
+    
     raise NotImplementedError()
 
   def _sample(self, num_samples: int):
