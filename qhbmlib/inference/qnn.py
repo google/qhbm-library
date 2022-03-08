@@ -181,7 +181,8 @@ class QuantumInference(tf.keras.layers.Layer):
         # differentiator tiling index, o is the observables index.
         # `batch_jacobian` has shape [num_unique_programs, n_symbols, n_ops]
         unique_batch_jacobian = tf.map_fn(
-            lambda x: tf.einsum("sm,smo->so", x[0], tf.gather(x[1], x[2], axis=0)),
+            lambda x: tf.einsum("sm,smo->so", x[0], tf.gather(
+                x[1], x[2], axis=0)),
             (batch_weights, batch_expectations, batch_mapper),
             fn_output_signature=tf.float32)
         expanded_jacobian = utils.expand_unique_results(unique_batch_jacobian,
