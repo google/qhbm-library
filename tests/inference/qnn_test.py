@@ -45,9 +45,9 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     self.tf_random_seed_alt = 201
     self.tfp_seed = tf.constant([5, 6], dtype=tf.int32)
 
-    self.close_atol = 1e-3
-    self.close_rtol = 1e-3
-    self.not_zero_atol = 2e-3
+    self.close_atol = 2e-3
+    self.close_rtol = 2e-3
+    self.not_zero_atol = 3e-3
 
     # Build QNN representing X^p|s>
     self.num_bits = 3
@@ -405,10 +405,9 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         rtol=self.close_rtol)
 
 
-#  @test_util.eager_mode_toggle
+  @test_util.eager_mode_toggle
   def test_expectation_bitstring_energy(self):
     """Tests Hamiltonian containing a general BitstringEnergy diagonal."""
-    tf.config.run_functions_eagerly(True)
 
     # Circuit preparation
     qubits = cirq.GridQubit.rect(1, self.num_bits)
@@ -537,30 +536,30 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     _ = hamiltonian_energy(tf.constant([[0] * self.num_bits], tf.int8))
     hamiltonian = models.Hamiltonian(hamiltonian_energy, hamiltonian_circuit)
 
-    # # Get expectations
-    # total_resolvers = generate_resolvers()
-    # qb_keys = [(q, f"measure_qubit_{i}") for i, q in enumerate(qubits)]
-    # raw_expectations = []
-    # for r in total_resolvers:
-    #   samples_pd = cirq.Simulator().sample(
-    #       total_circuit, repetitions=expectation_samples, params=r)
-    #   samples = samples_pd[[x[1] for x in qb_keys]].to_numpy()
-    #   current_energies = hamiltonian_energy(samples)
-    #   raw_expectations.append(
-    #       tf.math.reduce_mean(current_energies, keepdims=True))
-    # expected_expectations = tf.stack(raw_expectations)
-    # self.assertNotAllClose(
-    #     expected_expectations,
-    #     tf.zeros_like(expected_expectations),
-    #     atol=self.not_zero_atol)
+    # Get expectations
+    total_resolvers = generate_resolvers()
+    qb_keys = [(q, f"measure_qubit_{i}") for i, q in enumerate(qubits)]
+    raw_expectations = []
+    for r in total_resolvers:
+      samples_pd = cirq.Simulator().sample(
+          total_circuit, repetitions=expectation_samples, params=r)
+      samples = samples_pd[[x[1] for x in qb_keys]].to_numpy()
+      current_energies = hamiltonian_energy(samples)
+      raw_expectations.append(
+          tf.math.reduce_mean(current_energies, keepdims=True))
+    expected_expectations = tf.stack(raw_expectations)
+    self.assertNotAllClose(
+        expected_expectations,
+        tf.zeros_like(expected_expectations),
+        atol=self.not_zero_atol)
 
-    # # Compare
-    # expectation_wrapper = tf.function(actual_qnn.expectation)
-    # actual_expectations = expectation_wrapper(initial_states, hamiltonian)
-    # self.assertAllClose(
-    #     actual_expectations, expected_expectations, rtol=self.close_rtol)
-    # self.assertAllEqual(
-    #     tf.shape(actual_expectations), [len(initial_states_list), 1])
+    # Compare
+    expectation_wrapper = tf.function(actual_qnn.expectation)
+    actual_expectations = expectation_wrapper(initial_states, hamiltonian)
+    self.assertAllClose(
+        actual_expectations, expected_expectations, rtol=self.close_rtol)
+    self.assertAllEqual(
+        tf.shape(actual_expectations), [len(initial_states_list), 1])
 
     # TODO(#205) function seems to be ripe for refactoring
     def delta_expectations_func(k, var, delta):
