@@ -404,7 +404,6 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         expected_derivatives_thetas,
         rtol=self.close_rtol)
 
-
   @test_util.eager_mode_toggle
   def test_expectation_bitstring_energy(self):
     """Tests Hamiltonian containing a general BitstringEnergy diagonal."""
