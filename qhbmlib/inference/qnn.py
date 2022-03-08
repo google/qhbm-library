@@ -132,8 +132,6 @@ class QuantumInference(tf.keras.layers.Layer):
       num_unique_circuits = tf.shape(unique_circuits)[0]
       unique_tiled_values = tf.tile(
           tf.expand_dims(u.symbol_values, 0), [num_unique_circuits, 1])
-      # TODO(#207): second tile dimension should be updated if more observable
-      # shapes are allowed.
       unique_samples = self._sample_layer(
           unique_circuits,
           symbol_names=u.symbol_names,
@@ -203,6 +201,7 @@ class QuantumInference(tf.keras.layers.Layer):
             output_gradients=symbol_values_gradients,
             unconnected_gradients=tf.UnconnectedGradients.ZERO)
 
+        # Note: upstream gradient is already a coefficient in tg and pg.
         variables_gradients = [
             tg + pg for tg, pg in zip(thetas_gradients, phis_gradients)
         ]
