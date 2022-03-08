@@ -42,11 +42,11 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     super().setUp()
     self.python_random_seed = 11
     self.tf_random_seed = 10
-    self.tf_random_seed_alt = 212
+    self.tf_random_seed_alt = 201
     self.tfp_seed = tf.constant([5, 6], dtype=tf.int32)
 
-    self.close_atol = 2e-3
-    self.close_rtol = 2e-3
+    self.close_atol = 1e-3
+    self.close_rtol = 1e-3
     self.not_zero_atol = 2e-3
 
     # Build QNN representing X^p|s>
@@ -406,7 +406,6 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
 
 
 #  @test_util.eager_mode_toggle
-
   def test_expectation_bitstring_energy(self):
     """Tests Hamiltonian containing a general BitstringEnergy diagonal."""
     tf.config.run_functions_eagerly(True)
@@ -431,14 +430,16 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         n_moments=n_moments,
         p=act_fraction)
     state_raw_circuit = state_raw_circuits[0]
+    qnn_minval = 0.25
+    qnn_maxval = 0.75
     state_circuit_initializer = tf.keras.initializers.RandomUniform(
-        minval=-1.0, maxval=1.0, seed=self.tf_random_seed)
+        minval=qnn_minval, maxval=qnn_maxval, seed=self.tf_random_seed)
     state_circuit = models.DirectQuantumCircuit(state_raw_circuit,
                                                 state_circuit_initializer)
     state_circuit.build([])
 
     # state qnn
-    expectation_samples = int(2e6)
+    expectation_samples = int(1e6)
     actual_qnn = inference.QuantumInference(
         state_circuit,
         expectation_samples=expectation_samples,
@@ -454,7 +455,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         p=act_fraction)
     hamiltonian_raw_circuit = hamiltonian_raw_circuits[0]
     hamiltonian_circuit_initializer = tf.keras.initializers.RandomUniform(
-        minval=-1.0, maxval=1.0, seed=self.tf_random_seed_alt)
+        minval=qnn_minval, maxval=qnn_maxval, seed=self.tf_random_seed_alt)
     hamiltonian_circuit = models.DirectQuantumCircuit(
         hamiltonian_raw_circuit, hamiltonian_circuit_initializer)
     hamiltonian_circuit.build([])
@@ -503,8 +504,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     units = [2] * num_layers
     activations = ["linear"] * num_layers
     expected_layer_list = []
-    min_val = -0.5
-    max_val = 0.5
+    min_val = -0.75
+    max_val = 0.75
     for i in range(num_layers):
       kernel_initializer = tf.keras.initializers.RandomUniform(
           minval=min_val, maxval=max_val, seed=(self.tf_random_seed_alt + i))
@@ -532,13 +533,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     expected_layer_list.append(utils.Squeeze(-1))
     hamiltonian_energy = models.BitstringEnergy(bits, expected_layer_list)
     hamiltonian_energy.build([None, self.num_bits])
-    print(
-        f"hamiltonian_energy.trainable_variables: {hamiltonian_energy.trainable_variables}"
-    )
+    # TODO(#209)
     _ = hamiltonian_energy(tf.constant([[0] * self.num_bits], tf.int8))
-    print(
-        f"hamiltonian_energy.trainable_variables: {hamiltonian_energy.trainable_variables}"
-    )
     hamiltonian = models.Hamiltonian(hamiltonian_energy, hamiltonian_circuit)
 
     # # Get expectations
@@ -607,18 +603,18 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     expected_derivatives = expectations_derivative(
         hamiltonian.trainable_variables)
     for derivative in expected_derivatives:
-      self.assertNotAllClose(
-          derivative, tf.zeros_like(derivative), atol=self.not_zero_atol)
+      # Checks that at last one entry in each variable's derivative is
+      # not too close to zero.
+      self.assertNotAllClose(derivative, tf.zeros_like(derivative), 0.011)
 
     with tf.GradientTape() as tape:
       actual_expectations = actual_qnn.expectation(initial_states, hamiltonian)
     actual_derivatives = tape.jacobian(actual_expectations,
                                        hamiltonian.trainable_variables)
-    print(f"expected_derivatives: {expected_derivatives}")
-    print(f"actual_derivatives: {actual_derivatives}")
     self.assertEqual(len(actual_derivatives), len(expected_derivatives))
     for actual, expected in zip(actual_derivatives, expected_derivatives):
-      self.assertAllClose(actual, expected, rtol=0.05)
+      # atol is ok here because we checked above derivatives are not all zero
+      self.assertAllClose(actual, expected, atol=0.01)
 
   @test_util.eager_mode_toggle
   def test_sample_basic(self):

@@ -190,20 +190,17 @@ class QuantumInference(tf.keras.layers.Layer):
         # Connect upstream to symbol_values gradient
         symbol_values_gradients = tf.einsum("pso,po->ps", expanded_jacobian,
                                             upstream[0])
-        print(f"symbol_values_gradients: {symbol_values_gradients}")
 
         # Connect symbol values gradients to QNN variables
         with tf.GradientTape() as phis_tape:
           symbol_values = u.symbol_values
           tiled_symbol_values = tf.tile(
               tf.expand_dims(symbol_values, 0), [tf.shape(idx)[0], 1])
-        print(f"tiled_symbol_values: {tiled_symbol_values}")
         phis_gradients = phis_tape.gradient(
             tiled_symbol_values,
             variables,
             output_gradients=symbol_values_gradients,
             unconnected_gradients=tf.UnconnectedGradients.ZERO)
-        print(f"phis_gradients: {phis_gradients}")
 
         variables_gradients = [
             tg + pg for tg, pg in zip(thetas_gradients, phis_gradients)
