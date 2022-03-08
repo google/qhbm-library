@@ -608,7 +608,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
       self.assertNotAllClose(derivative, tf.zeros_like(derivative), 0.011)
 
     with tf.GradientTape() as tape:
-      actual_expectations = actual_qnn.expectation(initial_states, hamiltonian)
+      actual_expectations = expectation_wrapper(initial_states, hamiltonian)
     actual_derivatives = tape.jacobian(actual_expectations,
                                        hamiltonian.trainable_variables)
     self.assertEqual(len(actual_derivatives), len(expected_derivatives))
