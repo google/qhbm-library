@@ -461,9 +461,6 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     bitstring_circuit = models.circuit_utils.bit_circuit(qubits)
     measurement_circuit = cirq.Circuit(
         cirq.measure(q, key=f"measure_qubit_{n}") for n, q in enumerate(qubits))
-    # needed later for retrieving sample results from Cirq output.
-    # Note the keys must match those used in `measurement_circuit`.
-    qb_keys = [(q, f"measure_qubit_{i}") for i, q in enumerate(qubits)]
     total_circuit = (
         bitstring_circuit + state_raw_circuit + hamiltonian_raw_circuit**-1 +
         measurement_circuit)
@@ -541,6 +538,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     # Get expectations
     total_resolvers = generate_resolvers()
     raw_expectations = []
+    # Note the keys must match those used in `measurement_circuit`.
+    qb_keys = [(q, f"measure_qubit_{i}") for i, q in enumerate(qubits)]
     for r in total_resolvers:
       samples_pd = cirq.Simulator().sample(
           total_circuit, repetitions=expectation_samples, params=r)
