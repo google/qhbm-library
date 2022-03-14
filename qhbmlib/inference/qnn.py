@@ -133,7 +133,8 @@ class QuantumInference(tf.keras.layers.Layer):
       unique_circuits = total_circuit(unique_states)
       num_unique_circuits = tf.shape(unique_circuits)[0]
       unique_tiled_values = tf.tile(
-          tf.expand_dims(total_circuit.symbol_values, 0), [num_unique_circuits, 1])
+          tf.expand_dims(total_circuit.symbol_values, 0),
+          [num_unique_circuits, 1])
       unique_samples = self._sample_layer(
           unique_circuits,
           symbol_names=total_circuit.symbol_names,

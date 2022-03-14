@@ -501,9 +501,9 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     bits = random.sample(range(1000), self.num_bits)
     units = [2] * num_layers
     activations = random.sample([
-          "elu", "exponential", "gelu", "hard_sigmoid", "linear", "relu",
-          "selu", "sigmoid", "softmax", "softplus", "softsign", "swish", "tanh"
-      ], num_layers)
+        "elu", "exponential", "gelu", "hard_sigmoid", "linear", "relu", "selu",
+        "sigmoid", "softmax", "softplus", "softsign", "swish", "tanh"
+    ], num_layers)
     expected_layer_list = []
     min_val = -0.75
     max_val = 0.75
