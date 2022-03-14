@@ -115,6 +115,8 @@ class QuantumInference(tf.keras.layers.Layer):
       observable: Hermitian operator to measure.  Will be tiled to measure
         the expectation value of the observable in the state
         `qnn|initial_states[i]>` batched over `i`.
+        Note that since the accepted type is `hamiltonian.Hamiltonian`, the
+        representation is restricted to diagonalized operators.
 
     Returns:
       `tf.Tensor` with shape [batch_size, 1] whose entries are the
