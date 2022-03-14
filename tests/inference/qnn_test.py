@@ -451,6 +451,11 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         n_moments=n_moments,
         p=act_fraction)
     hamiltonian_raw_circuit = hamiltonian_raw_circuits[0]
+    # Note that this initializer uses a different seed than the `state_circuit`
+    # initializer does.  This is to make sure `state_circuit` and
+    # `hamiltonian_circuit` have different parameter values, to assuage a worry
+    # about pathological behavior if
+    # `state_circuit.circuit + hamiltonian.circuit_dagger` was possibly identity
     hamiltonian_circuit_initializer = tf.keras.initializers.RandomUniform(
         minval=qnn_minval, maxval=qnn_maxval, seed=self.tf_random_seed_alt)
     hamiltonian_circuit = models.DirectQuantumCircuit(
