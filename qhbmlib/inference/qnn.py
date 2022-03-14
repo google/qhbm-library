@@ -115,28 +115,105 @@ class QuantumInference(tf.keras.layers.Layer):
       observable: Hermitian operator to measure.  Will be tiled to measure
         the expectation value of the observable in the state
         `qnn|initial_states[i]>` batched over `i`.
+        Note that since the accepted type is `hamiltonian.Hamiltonian`, the
+        representation is restricted to diagonalized operators.
 
     Returns:
       `tf.Tensor` with shape [batch_size, 1] whose entries are the
       unaveraged expectation values of `observable` against each transformed
       initial state.
     """
-    u = self.circuit + observable.circuit_dagger
-    unique_states, idx, _ = utils.unique_bitstrings_with_counts(initial_states)
-    circuits = u(unique_states)
-    num_circuits = tf.shape(circuits)[0]
-    tiled_values = tf.tile(
-        tf.expand_dims(u.symbol_values, 0), [num_circuits, 1])
-    samples = self._sample_layer(
-        circuits,
-        symbol_names=u.symbol_names,
-        symbol_values=tiled_values,
-        repetitions=self._expectation_samples).to_tensor()
-    unique_expectations = tf.map_fn(
-        lambda x: tf.math.reduce_mean(observable.energy(x)),
-        samples,
-        fn_output_signature=tf.float32)
-    return utils.expand_unique_results(unique_expectations, idx)
+
+    @tf.custom_gradient
+    def _inner_expectation():
+      """Enables derivatives."""
+      unique_states, idx, _ = utils.unique_bitstrings_with_counts(
+          initial_states)
+      total_circuit = self.circuit + observable.circuit_dagger
+      unique_circuits = total_circuit(unique_states)
+      num_unique_circuits = tf.shape(unique_circuits)[0]
+      unique_tiled_values = tf.tile(
+          tf.expand_dims(total_circuit.symbol_values, 0),
+          [num_unique_circuits, 1])
+      unique_samples = self._sample_layer(
+          unique_circuits,
+          symbol_names=total_circuit.symbol_names,
+          symbol_values=unique_tiled_values,
+          repetitions=self._expectation_samples).to_tensor()
+      with tf.GradientTape() as thetas_tape:
+        unique_expectations = tf.map_fn(
+            lambda x: tf.math.reduce_mean(observable.energy(x)),
+            unique_samples,
+            fn_output_signature=tf.float32)
+        forward_pass = tf.expand_dims(
+            utils.expand_unique_results(unique_expectations, idx), 1)
+
+      def grad_fn(*upstream, variables):
+        """Use `get_gradient_circuits` method to get QNN variable derivatives"""
+        # This block adapted from my `differentiate_sampled` in TFQ.
+        (batch_programs, new_symbol_names, batch_symbol_values, batch_weights,
+         batch_mapper) = self.differentiator.get_gradient_circuits(
+             unique_circuits, total_circuit.symbol_names, unique_tiled_values)
+        m_i = tf.shape(batch_programs)[1]
+        # shape is [num_unique_circuits, m_i, n_ops]
+        n_batch_programs = tf.size(batch_programs)
+        n_symbols = tf.shape(new_symbol_names)[0]
+        gradient_samples = self._sample_layer(
+            tf.reshape(batch_programs, [n_batch_programs]),
+            symbol_names=new_symbol_names,
+            symbol_values=tf.reshape(batch_symbol_values,
+                                     [n_batch_programs, n_symbols]),
+            repetitions=self._expectation_samples).to_tensor()
+        gradient_expectations = tf.map_fn(
+            lambda x: tf.math.reduce_mean(observable.energy(x)),
+            gradient_samples,
+            fn_output_signature=tf.float32)
+        # last dimension is number of observables.
+        # TODO(#207): parameterize it if more than one observable is accepted.
+        batch_expectations = tf.reshape(gradient_expectations,
+                                        [num_unique_circuits, m_i, 1])
+
+        # In the einsum equation, s is the symbols index, m is the
+        # differentiator tiling index, o is the observables index.
+        # `batch_jacobian` has shape [num_unique_programs, n_symbols, n_ops]
+        unique_batch_jacobian = tf.map_fn(
+            lambda x: tf.einsum("sm,smo->so", x[0], tf.gather(
+                x[1], x[2], axis=0)),
+            (batch_weights, batch_expectations, batch_mapper),
+            fn_output_signature=tf.float32)
+        expanded_jacobian = utils.expand_unique_results(unique_batch_jacobian,
+                                                        idx)
+
+        # Connect upstream to symbol_values gradient
+        symbol_values_gradients = tf.einsum("pso,po->ps", expanded_jacobian,
+                                            upstream[0])
+
+        # Connect symbol values gradients to QNN variables
+        with tf.GradientTape() as phis_tape:
+          symbol_values = total_circuit.symbol_values
+          tiled_symbol_values = tf.tile(
+              tf.expand_dims(symbol_values, 0), [tf.shape(idx)[0], 1])
+        phis_gradients = phis_tape.gradient(
+            tiled_symbol_values,
+            variables,
+            output_gradients=symbol_values_gradients,
+            unconnected_gradients=tf.UnconnectedGradients.ZERO)
+
+        thetas_gradients = thetas_tape.gradient(
+            forward_pass,
+            variables,
+            output_gradients=upstream[0],
+            unconnected_gradients=tf.UnconnectedGradients.ZERO)
+
+        # Note: upstream gradient is already a coefficient in tg and pg.
+        variables_gradients = [
+            tg + pg for tg, pg in zip(thetas_gradients, phis_gradients)
+        ]
+        return tuple(), variables_gradients
+
+      return forward_pass, grad_fn
+
+    return _inner_expectation()
 
   def expectation(self, initial_states: tf.Tensor,
                   observables: Union[tf.Tensor, hamiltonian.Hamiltonian]):
@@ -157,11 +234,11 @@ class QuantumInference(tf.keras.layers.Layer):
       transformed initial state.
     """
     if isinstance(observables, tf.Tensor):
-      u = self.circuit
+      total_circuit = self.circuit
       ops = observables
       post_process = lambda x: x
     elif isinstance(observables.energy, energy.PauliMixin):
-      u = self.circuit + observables.circuit_dagger
+      total_circuit = self.circuit + observables.circuit_dagger
       ops = observables.operator_shards
       post_process = lambda y: tf.map_fn(
           lambda x: tf.expand_dims(
@@ -171,15 +248,15 @@ class QuantumInference(tf.keras.layers.Layer):
 
     unique_states, idx, counts = utils.unique_bitstrings_with_counts(
         initial_states)
-    circuits = u(unique_states)
+    circuits = total_circuit(unique_states)
     num_circuits = tf.shape(circuits)[0]
     num_ops = tf.shape(ops)[0]
     tiled_values = tf.tile(
-        tf.expand_dims(u.symbol_values, 0), [num_circuits, 1])
+        tf.expand_dims(total_circuit.symbol_values, 0), [num_circuits, 1])
     tiled_ops = tf.tile(tf.expand_dims(ops, 0), [num_circuits, 1])
     expectations = self._expectation_function(
         circuits,
-        u.symbol_names,
+        total_circuit.symbol_names,
         tiled_values,
         tiled_ops,
         tf.tile(tf.expand_dims(counts, 1), [1, num_ops]),
