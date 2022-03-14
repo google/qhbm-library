@@ -496,7 +496,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
       } for r in bitstring_resolvers]
 
     # hamiltonian energy
-    num_layers = 1
+    num_layers = 2
     random.seed(self.python_random_seed)
     bits = random.sample(range(1000), self.num_bits)
     units = [2] * num_layers
