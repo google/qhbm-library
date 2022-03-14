@@ -434,7 +434,6 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         minval=qnn_minval, maxval=qnn_maxval, seed=self.tf_random_seed)
     state_circuit = models.DirectQuantumCircuit(state_raw_circuit,
                                                 state_circuit_initializer)
-    state_circuit.build([])
 
     # state qnn
     expectation_samples = int(1e6)
@@ -462,7 +461,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     bitstring_circuit = models.circuit_utils.bit_circuit(qubits)
     measurement_circuit = cirq.Circuit(
         cirq.measure(q, key=f"measure_qubit_{n}") for n, q in enumerate(qubits))
-    # needed later for retrieving sample results from Cirq output
+    # needed later for retrieving sample results from Cirq output.
+    # Note the keys must match those used in `measurement_circuit`.
     qb_keys = [(q, f"measure_qubit_{i}") for i, q in enumerate(qubits)]
     total_circuit = (
         bitstring_circuit + state_raw_circuit + hamiltonian_raw_circuit**-1 +
@@ -500,7 +500,10 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     random.seed(self.python_random_seed)
     bits = random.sample(range(1000), self.num_bits)
     units = [2] * num_layers
-    activations = ["linear"] * num_layers
+    activations = random.sample([
+          "elu", "exponential", "gelu", "hard_sigmoid", "linear", "relu",
+          "selu", "sigmoid", "softmax", "softplus", "softsign", "swish", "tanh"
+      ], num_layers)
     expected_layer_list = []
     min_val = -0.75
     max_val = 0.75
@@ -537,7 +540,6 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
 
     # Get expectations
     total_resolvers = generate_resolvers()
-    qb_keys = [(q, f"measure_qubit_{i}") for i, q in enumerate(qubits)]
     raw_expectations = []
     for r in total_resolvers:
       samples_pd = cirq.Simulator().sample(
