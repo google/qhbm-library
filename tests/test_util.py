@@ -262,3 +262,25 @@ def approximate_derivative_unsummed(f, delta=1e-1):
       lambda a, b, c, d: -1.0 * a + 8.0 * b - 8.0 * c + d, forward_twice,
       forward_once, backward_once, backward_twice)
   return tf.nest.map_structure(lambda x: x / (12.0 * delta), numerator)
+
+
+def perturb_function(f, var, k, delta):
+  """Evaluates the function with a specified variable perturbed.
+
+  Args:
+    f: Callable taking no arguments and returning a `tf.Tensor`.
+    var: `tf.Variable` to perturb.
+    k: Entry of `var` to perturb.
+    delta: Amount to perturb `var`.
+
+  Return:
+    f_value: Return of `f()` evaluated while `var` is perturbed.
+  """
+  num_elts = tf.size(var)
+  old_value = var.read_value()
+  perturbation_direction = tf.one_hot(k, num_elts, 1.0, 0.0, None, var.dtype)
+  perturbation = tf.reshape(tf.cast(delta, var.dtype) * perturbation_direction, tf.shape(var))
+  var.assign(old_value + perturbation)
+  f_value = f()
+  var.assign(old_value)
+  return f_value
