@@ -280,7 +280,8 @@ def perturb_function(f, var, k, delta):
   num_elts = tf.size(var)
   old_value = var.read_value()
   perturbation_direction = tf.one_hot(k, num_elts, 1.0, 0.0, None, var.dtype)
-  perturbation = tf.reshape(tf.cast(delta, var.dtype) * perturbation_direction, tf.shape(var))
+  perturbation = tf.reshape(
+      tf.cast(delta, var.dtype) * perturbation_direction, tf.shape(var))
   var.assign(old_value + perturbation)
   f_value = f()
   var.assign(old_value)

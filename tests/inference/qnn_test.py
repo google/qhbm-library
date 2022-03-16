@@ -219,7 +219,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
                                                        r)[0].real
           for o in raw_ops
       ]
-                                            for r in total_resolvers])
+                          for r in total_resolvers])
 
     # hamiltonian model and inference
     actual_circuit = models.QuantumCircuit(
@@ -248,7 +248,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         num_elts = tf.size(var)  # Assumes variable is 1D
         for n in range(num_elts):
           this_derivative = test_util.approximate_derivative_unsummed(
-              functools.partial(test_util.perturb_function, expectation_func, var, n))
+              functools.partial(test_util.perturb_function, expectation_func,
+                                var, n))
           var_derivative_list.append(this_derivative.numpy())
         derivatives.append(tf.constant(var_derivative_list))
       return derivatives
@@ -355,7 +356,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         num_elts = tf.size(var)  # Assumes variable is 1D
         for n in range(num_elts):
           this_derivative = test_util.approximate_derivative_unsummed(
-              functools.partial(test_util.perturb_function, expectation_func, var, n))
+              functools.partial(test_util.perturb_function, expectation_func,
+                                var, n))
           var_derivative_list.append(this_derivative.numpy())
         derivatives.append(tf.constant(var_derivative_list))
       return derivatives
@@ -554,10 +556,10 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
 
     def expectation_func():
       """Returns the current expectation values."""
-      return tf.squeeze(
-          actual_qnn.expectation(initial_states, hamiltonian), -1)
+      return tf.squeeze(actual_qnn.expectation(initial_states, hamiltonian), -1)
 
     delta = 1e-1
+
     # TODO(#206)
     def expectations_derivative(variables_list):
       """Approximately differentiates expectations with respect to the inputs"""
@@ -567,7 +569,9 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         num_elts = tf.size(var)
         for n in range(num_elts):
           this_derivative = test_util.approximate_derivative_unsummed(
-              functools.partial(test_util.perturb_function, expectation_func, n, var), delta=delta)
+              functools.partial(test_util.perturb_function, expectation_func, n,
+                                var),
+              delta=delta)
           per_bitstring_derivative_list.append(this_derivative)
         # shape is now [num_elts, len(initial_states_list)]
         var_derivatives = tf.stack(per_bitstring_derivative_list)

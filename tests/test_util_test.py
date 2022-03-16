@@ -141,17 +141,22 @@ class PerturbFunctionTest(tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose(actual_return, expected_return)
     self.assertAllClose(basic_variable, initial_value)
 
-  @parameterized.parameters([{"this_type": t} for t in [tf.float16, tf.float32, tf.float64, tf.complex64, tf.complex128]])
+  @parameterized.parameters([{
+      "this_type": t
+  } for t in [tf.float16, tf.float32, tf.float64, tf.complex64, tf.complex128]])
   def test_multi_variable(self, this_type):
     """Tests perturbation when there are multiple differently shaped vars."""
     dimension = 7
     minval = -5
     maxval = 5
-    scalar_initial_value = tf.cast(tf.random.uniform([], minval, maxval), this_type)
+    scalar_initial_value = tf.cast(
+        tf.random.uniform([], minval, maxval), this_type)
     scalar_var = tf.Variable(scalar_initial_value)
-    vector_initial_value = tf.cast(tf.random.uniform([dimension], minval, maxval), this_type)
+    vector_initial_value = tf.cast(
+        tf.random.uniform([dimension], minval, maxval), this_type)
     vector_var = tf.Variable(vector_initial_value)
-    matrix_initial_value = tf.cast(tf.random.uniform([dimension, dimension], minval, maxval), this_type)
+    matrix_initial_value = tf.cast(
+        tf.random.uniform([dimension, dimension], minval, maxval), this_type)
     matrix_var = tf.Variable(matrix_initial_value)
 
     def f():
@@ -168,32 +173,46 @@ class PerturbFunctionTest(tf.test.TestCase, parameterized.TestCase):
     expected_val = tf.linalg.matvec(matrix_var, vector_var) * perturbed_scalar
     expected_return = [expected_val, [expected_val, expected_val]]
     actual_return = wrapped_perturb_function(f, scalar_var, 0, test_delta)
-    tf.nest.map_structure(lambda x: self.assertIsInstance(x, tf.Tensor), actual_return)
+    tf.nest.map_structure(lambda x: self.assertIsInstance(x, tf.Tensor),
+                          actual_return)
     tf.nest.map_structure(self.assertAllClose, actual_return, expected_return)
     self.assertAllClose(scalar_var, scalar_initial_value)
 
     # check vector perturbations
     for i in range(dimension):
       vector_list = vector_initial_value.numpy().tolist()
-      perturbation_vector = [test_delta_python if j == i else 0 for j in range(dimension)]
-      perturbed_vector_list = [v + v_p for v, v_p in zip(vector_list, perturbation_vector)]
+      perturbation_vector = [
+          test_delta_python if j == i else 0 for j in range(dimension)
+      ]
+      perturbed_vector_list = [
+          v + v_p for v, v_p in zip(vector_list, perturbation_vector)
+      ]
       perturbed_vector = tf.constant(perturbed_vector_list, this_type)
       expected_val = tf.linalg.matvec(matrix_var, perturbed_vector) * scalar_var
       expected_return = [expected_val, [expected_val, expected_val]]
       actual_return = wrapped_perturb_function(f, vector_var, i, test_delta)
-      tf.nest.map_structure(lambda x: self.assertIsInstance(x, tf.Tensor), actual_return)
+      tf.nest.map_structure(lambda x: self.assertIsInstance(x, tf.Tensor),
+                            actual_return)
       tf.nest.map_structure(self.assertAllClose, actual_return, expected_return)
       self.assertAllClose(vector_var, vector_initial_value)
 
     # check matrix perturbations
     for i in range(dimension * dimension):
-      matrix_list = tf.reshape(matrix_initial_value, [dimension * dimension]).numpy().tolist()
-      perturbation_matrix = [test_delta_python if j == i else 0 for j in range(dimension * dimension)]
-      perturbed_matrix_list = [m + m_p for m, m_p in zip(matrix_list, perturbation_matrix)]
-      perturbed_matrix = tf.reshape(tf.constant(perturbed_matrix_list, this_type), [dimension, dimension])
+      matrix_list = tf.reshape(matrix_initial_value,
+                               [dimension * dimension]).numpy().tolist()
+      perturbation_matrix = [
+          test_delta_python if j == i else 0
+          for j in range(dimension * dimension)
+      ]
+      perturbed_matrix_list = [
+          m + m_p for m, m_p in zip(matrix_list, perturbation_matrix)
+      ]
+      perturbed_matrix = tf.reshape(
+          tf.constant(perturbed_matrix_list, this_type), [dimension, dimension])
       expected_val = tf.linalg.matvec(perturbed_matrix, vector_var) * scalar_var
       expected_return = [expected_val, [expected_val, expected_val]]
       actual_return = wrapped_perturb_function(f, matrix_var, i, test_delta)
-      tf.nest.map_structure(lambda x: self.assertIsInstance(x, tf.Tensor), actual_return)
+      tf.nest.map_structure(lambda x: self.assertIsInstance(x, tf.Tensor),
+                            actual_return)
       tf.nest.map_structure(self.assertAllClose, actual_return, expected_return)
       self.assertAllClose(matrix_var, matrix_initial_value)

@@ -452,8 +452,8 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
       samples = e_infer.sample(self.num_samples)
       bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
       values = f(bitstrings)
-      return tf.nest.map_structure(
-          lambda x: utils.weighted_average(counts, x), values)
+      return tf.nest.map_structure(lambda x: utils.weighted_average(counts, x),
+                                   values)
 
     expected_expectation = expectation_func()
     tf.nest.map_structure(
@@ -465,7 +465,8 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     derivative_list = []
     for n in range(tf.size(energy_var)):
       this_derivative = test_util.approximate_derivative(
-          functools.partial(test_util.perturb_function, expectation_func, energy_var, n))
+          functools.partial(test_util.perturb_function, expectation_func,
+                            energy_var, n))
       derivative_list.append(this_derivative.numpy())
     expected_derivative = tf.constant(derivative_list)
     tf.nest.map_structure(
