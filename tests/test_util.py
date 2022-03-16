@@ -272,7 +272,7 @@ def perturb_function(f, var, k, delta):
       whose atomic elements are `tf.Tensor`.
     var: `tf.Variable` to perturb.
     k: Entry of `var` to perturb.
-    delta: Amount to perturb `var`.
+    delta: Amount to perturb entry `k` of `var`.
 
   Return:
     f_value: Return of `f()` evaluated while `var` is perturbed.
