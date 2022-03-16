@@ -211,21 +211,15 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
       ]
       return [{**r, **base_resolver} for r in bitstring_resolvers]
 
-    def delta_expectations_func(k, var, delta):
-      """Calculate the expectation with kth entry of `var` perturbed."""
-      num_elts = tf.size(var)
-      old_value = var.read_value()
-      var.assign(old_value + delta * tf.one_hot(k, num_elts, 1.0, 0.0))
+    def expectation_func():
+      """Computes the current expectation values."""
       total_resolvers = generate_resolvers()
-      raw_delta_expectations = tf.constant([[
+      return tf.constant([[
           cirq.Simulator().simulate_expectation_values(total_circuit, o,
                                                        r)[0].real
           for o in raw_ops
       ]
-                                            for r in total_resolvers])
-      delta_expectations = tf.constant(raw_delta_expectations)
-      var.assign(old_value)
-      return delta_expectations
+                          for r in total_resolvers])
 
     # hamiltonian model and inference
     actual_circuit = models.QuantumCircuit(
@@ -234,8 +228,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     q_infer = inference.QuantumInference(actual_circuit)
 
     # calculate expected values
-    expected_expectations = delta_expectations_func(0, random_values, 0)
-    print(f"expected_expectations: {expected_expectations}")
+    expected_expectations = expectation_func()
 
     # Check that expectations are a reasonable size
     self.assertAllGreater(
@@ -255,7 +248,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         num_elts = tf.size(var)  # Assumes variable is 1D
         for n in range(num_elts):
           this_derivative = test_util.approximate_derivative_unsummed(
-              functools.partial(delta_expectations_func, n, var))
+              functools.partial(test_util.perturb_function, expectation_func,
+                                var, n))
           var_derivative_list.append(this_derivative.numpy())
         derivatives.append(tf.constant(var_derivative_list))
       return derivatives
@@ -330,13 +324,10 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
       ]
       return [{**r, **base_resolver} for r in bitstring_resolvers]
 
-    def delta_expectations_func(k, var, delta):
-      """Calculate the expectation with kth entry of `var` perturbed."""
-      num_elts = tf.size(var)
-      old_value = var.read_value()
-      var.assign(old_value + delta * tf.one_hot(k, num_elts, 1.0, 0.0))
+    def expectation_func():
+      """Returns the current expectation values."""
       total_resolvers = generate_resolvers()
-      raw_delta_expectations = tf.stack([
+      return tf.stack([
           tf.stack([
               hamiltonian_measure.energy.operator_expectation([
                   cirq.Simulator().simulate_expectation_values(
@@ -344,12 +335,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
               ])
           ]) for r in total_resolvers
       ])
-      delta_expectations = tf.constant(raw_delta_expectations)
-      var.assign(old_value)
-      return delta_expectations
 
-    expected_expectations = delta_expectations_func(
-        0, circuit_h.trainable_variables[0], 0)
+    expected_expectations = expectation_func()
     self.assertNotAllClose(
         expected_expectations,
         tf.zeros_like(expected_expectations),
@@ -369,7 +356,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         num_elts = tf.size(var)  # Assumes variable is 1D
         for n in range(num_elts):
           this_derivative = test_util.approximate_derivative_unsummed(
-              functools.partial(delta_expectations_func, n, var))
+              functools.partial(test_util.perturb_function, expectation_func,
+                                var, n))
           var_derivative_list.append(this_derivative.numpy())
         derivatives.append(tf.constant(var_derivative_list))
       return derivatives
@@ -566,21 +554,9 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     self.assertAllEqual(
         tf.shape(actual_expectations), [len(initial_states_list), 1])
 
-    # TODO(#205) function seems to be ripe for refactoring
-    def delta_expectations_func(k, var, delta):
-      """Calculate the expectation with kth entry of `var` perturbed."""
-      num_elts = tf.size(var)
-      old_value = var.read_value()
-      # Can no longer assume var is 1D, since energy uses matrix variables now
-      old_value_flat = tf.reshape(old_value, [num_elts])
-      new_value_flat = old_value_flat + delta * tf.one_hot(
-          k, num_elts, 1.0, 0.0)
-      new_value = tf.reshape(new_value_flat, tf.shape(var))
-      var.assign(new_value)
-      delta_expectations = tf.squeeze(
-          actual_qnn.expectation(initial_states, hamiltonian), -1)
-      var.assign(old_value)
-      return delta_expectations
+    def expectation_func():
+      """Returns the current expectation values."""
+      return tf.squeeze(actual_qnn.expectation(initial_states, hamiltonian), -1)
 
     delta = 1e-1
 
@@ -593,7 +569,9 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         num_elts = tf.size(var)
         for n in range(num_elts):
           this_derivative = test_util.approximate_derivative_unsummed(
-              functools.partial(delta_expectations_func, n, var), delta=delta)
+              functools.partial(test_util.perturb_function, expectation_func,
+                                var, n),
+              delta=delta)
           per_bitstring_derivative_list.append(this_derivative)
         # shape is now [num_elts, len(initial_states_list)]
         var_derivatives = tf.stack(per_bitstring_derivative_list)

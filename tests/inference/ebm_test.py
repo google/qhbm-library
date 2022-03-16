@@ -447,31 +447,26 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
       actual_expectation = e_infer.expectation(f)
     actual_derivative = tape.gradient(actual_expectation, energy_var)
 
-    # Trainable variable of KOBE is 1D.
-    num_elts = tf.size(energy_var)
-
-    def delta_expectation(k, delta):
-      """Calculate the expectation with kth variable perturbed."""
-      old_value = energy_var.read_value()
-      energy_var.assign(old_value + delta * tf.one_hot(k, num_elts, 1.0, 0.0))
+    def expectation_func():
+      """Evaluate the current expectation value."""
       samples = e_infer.sample(self.num_samples)
       bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
       values = f(bitstrings)
-      delta_expectation = tf.nest.map_structure(
-          lambda x: utils.weighted_average(counts, x), values)
-      energy_var.assign(old_value)
-      return delta_expectation
+      return tf.nest.map_structure(lambda x: utils.weighted_average(counts, x),
+                                   values)
 
-    expected_expectation = delta_expectation(0, 0)
+    expected_expectation = expectation_func()
     tf.nest.map_structure(
         lambda x: self.assertAllGreater(tf.abs(x), self.not_zero_atol),
         expected_expectation)
     self.assertAllClose(actual_expectation, expected_expectation)
 
+    # TODO(#206)
     derivative_list = []
-    for n in range(num_elts):
+    for n in range(tf.size(energy_var)):
       this_derivative = test_util.approximate_derivative(
-          functools.partial(delta_expectation, n))
+          functools.partial(test_util.perturb_function, expectation_func,
+                            energy_var, n))
       derivative_list.append(this_derivative.numpy())
     expected_derivative = tf.constant(derivative_list)
     tf.nest.map_structure(
