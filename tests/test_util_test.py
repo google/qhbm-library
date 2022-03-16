@@ -159,6 +159,7 @@ class PerturbFunctionTest(tf.test.TestCase, parameterized.TestCase):
       return tf.linalg.matvec(matrix_var, vector_var) * scalar_var
 
     test_delta = tf.cast(tf.random.uniform([]), this_type)
+    test_delta_python = test_delta.numpy().tolist()
     wrapped_perturb_function = tf.function(test_util.perturb_function)
 
     # check scalar perturbation
@@ -168,4 +169,27 @@ class PerturbFunctionTest(tf.test.TestCase, parameterized.TestCase):
     self.assertIsInstance(actual_return, tf.Tensor)
     self.assertAllClose(actual_return, expected_return)
     self.assertAllClose(scalar_var, scalar_initial_value)
-    
+
+    # check vector perturbations
+    for i in range(dimension):
+      vector_list = vector_initial_value.numpy().tolist()
+      perturbation_vector = [test_delta_python if j == i else 0 for j in range(dimension)]
+      perturbed_vector_list = [v + v_p for v, v_p in zip(vector_list, perturbation_vector)]
+      perturbed_vector = tf.constant(perturbed_vector_list, this_type)
+      expected_return = tf.linalg.matvec(matrix_var, perturbed_vector) * scalar_var
+      actual_return = wrapped_perturb_function(f, vector_var, i, test_delta)
+      self.assertIsInstance(actual_return, tf.Tensor)
+      self.assertAllClose(actual_return, expected_return)
+      self.assertAllClose(vector_var, vector_initial_value)
+
+    # check matrix perturbations
+    for i in range(dimension * dimension):
+      matrix_list = tf.reshape(matrix_initial_value, [dimension * dimension]).numpy().tolist()
+      perturbation_matrix = [test_delta_python if j == i else 0 for j in range(dimension * dimension)]
+      perturbed_matrix_list = [m + m_p for m, m_p in zip(matrix_list, perturbation_matrix)]
+      perturbed_matrix = tf.reshape(tf.constant(perturbed_matrix_list, this_type), [dimension, dimension])
+      expected_return = tf.linalg.matvec(perturbed_matrix, vector_var) * scalar_var
+      actual_return = wrapped_perturb_function(f, matrix_var, i, test_delta)
+      self.assertIsInstance(actual_return, tf.Tensor)
+      self.assertAllClose(actual_return, expected_return)
+      self.assertAllClose(matrix_var, matrix_initial_value)
