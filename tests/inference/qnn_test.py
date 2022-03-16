@@ -211,7 +211,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
       ]
       return [{**r, **base_resolver} for r in bitstring_resolvers]
 
-    def expectations_func():
+    def expectation_func():
       """Computes the current expectation values."""
       total_resolvers = generate_resolvers()
       return tf.constant([[
@@ -569,8 +569,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         num_elts = tf.size(var)
         for n in range(num_elts):
           this_derivative = test_util.approximate_derivative_unsummed(
-              functools.partial(test_util.perturb_function, expectation_func, n,
-                                var),
+              functools.partial(test_util.perturb_function, expectation_func, var, n),
               delta=delta)
           per_bitstring_derivative_list.append(this_derivative)
         # shape is now [num_elts, len(initial_states_list)]
