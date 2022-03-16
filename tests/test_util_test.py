@@ -164,8 +164,9 @@ class PerturbFunctionTest(tf.test.TestCase, parameterized.TestCase):
       val = tf.linalg.matvec(matrix_var, vector_var) * scalar_var
       return [val, [val, val]]
 
-    test_delta = tf.cast(tf.random.uniform([]), this_type)
-    test_delta_python = test_delta.numpy().tolist()
+    test_delta_raw = tf.random.uniform([], dtype=tf.float32)
+    test_delta_python = test_delta_raw.numpy().tolist()
+    test_delta = tf.cast(test_delta_raw, this_type)
     wrapped_perturb_function = tf.function(test_util.perturb_function)
 
     # check scalar perturbation
