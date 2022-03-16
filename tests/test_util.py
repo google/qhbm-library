@@ -268,7 +268,8 @@ def perturb_function(f, var, k, delta):
   """Evaluates the function with a specified variable perturbed.
 
   Args:
-    f: Callable taking no arguments and returning a `tf.Tensor`.
+    f: Callable taking no arguments and returning a possibly nested structure
+      whose atomic elements are `tf.Tensor`.
     var: `tf.Variable` to perturb.
     k: Entry of `var` to perturb.
     delta: Amount to perturb `var`.
