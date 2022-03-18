@@ -15,6 +15,7 @@
 """Tests for tests.test_util"""
 
 from absl.testing import parameterized
+import random
 
 import cirq
 import sympy
@@ -221,3 +222,28 @@ class PerturbFunctionTest(tf.test.TestCase, parameterized.TestCase):
 
 class ApproximateJacobianTest(tf.test.TestCase):
   """Tests the approximate_jacobian function."""
+
+  def test_jacobian(self):
+    """Compares approximation against exact jacobian."""
+    dimension = 7
+    minval = -5
+    maxval = 5
+    scalar_initial_value = tf.random.uniform([], minval, maxval)
+    scalar_var = tf.Variable(scalar_initial_value)
+    vector_initial_value = tf.random.uniform([dimension], minval, maxval)
+    vector_var = tf.Variable(vector_initial_value)
+    matrix_initial_value = tf.random.uniform(
+        [dimension, dimension], minval, maxval)
+    matrix_var = tf.Variable(matrix_initial_value)
+    variable_list = random.shuffle([scalar_var, vector_var, matrix_var])
+
+    def f():
+      """Vector result of combining the variables."""
+      return tf.linalg.matvec(matrix_var, vector_var) * scalar_var
+
+    with tf.GradientTape() as tape:
+      value = f()
+    expected_derivative = tape.jacobian(value, variable_list)
+
+    actual_derivative = test_util.approximate_jacobian(f, variable_list)
+    self.assertAllClose(actual_derivative, expected_derivative)
