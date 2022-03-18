@@ -217,3 +217,7 @@ class PerturbFunctionTest(tf.test.TestCase, parameterized.TestCase):
                             actual_return)
       tf.nest.map_structure(self.assertAllClose, actual_return, expected_return)
       self.assertAllClose(matrix_var, matrix_initial_value)
+
+
+class ApproximateJacobianTest(tf.test.TestCase):
+  """Tests the approximate_jacobian function."""

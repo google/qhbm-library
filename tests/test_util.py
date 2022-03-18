@@ -286,3 +286,47 @@ def perturb_function(f, var, k, delta):
   f_value = f()
   var.assign(old_value)
   return f_value
+
+
+def approximate_jacobian(f, variables, delta=1e-1):
+  """Approximates the derivative of f using five point stencil.
+
+  Suppose the input function returns a tensor `r` under gradient tape `t`.  Then
+  this function returns an approximation to `t.jacobian(r, variables)`.
+
+  See wikipedia page on "five point stencil",
+  https://en.wikipedia.org/wiki/Five-point_stencil
+  Note: the error of this method scales with delta ** 4.
+
+  Args:
+    f: Callable taking no arguments and returning a possibly nested structure
+      whose atomic elements are `tf.Tensor`.
+    variables: List of `tf.Variable` in which to differentiate `f`.
+    delta: Size of the fundamental perturbation in the stencil.
+  """
+  all_derivatives = []
+  for var in variables:
+    derivatives_list = []
+    num_elts = tf.size(var)
+    for i in range(num_elts):
+      forward_twice = perturb_func(f, var, i, 2.0 * delta)
+      flat_forward_twice = tf.nest.flatten(forward_twice)
+      forward_once = perturb_func(f, var, i, delta)
+      flat_forward_once = tf.nest.flatten(forward_once)
+      backward_once = perturb_func(f, var, i, -1.0 * delta)
+      flat_backward_once = tf.nest.flatten(backward_once)
+      backward_twice = perturb_func(f, var, i, -2.0 * delta)
+      flat_backward_twice = tf.nest.flattend(backward_twice)
+      numerator = tf.nest.map_structure(
+        lambda a, b, c, d: -1.0 * a + 8.0 * b - 8.0 * c + d, flat_forward_twice,
+        flat_forward_once, flat_backward_once, flat_backward_twice)
+      entry_derivative = tf.nest.map_structure(lambda x: x / (12.0 * delta), numerator)
+      derivatives_list.append(entry_derivative)  # shape [num_elts, f()]
+    for i, _ in enumerate(flat_forward_twice):
+      var_derivatives_list  = []
+      for d in derivatives_list:
+        var_derivatives_list.append(d[i])
+      var_derivatives
+      
+    
+    
