@@ -308,16 +308,18 @@ def approximate_jacobian(f, variables, delta=5e-2):
     derivatives_list = []
     num_elts = tf.size(var)
     for i in range(num_elts):
-      forward_twice = perturb_func(f, var, i, 2.0 * delta)
-      forward_once = perturb_func(f, var, i, delta)
-      backward_once = perturb_func(f, var, i, -1.0 * delta)
-      backward_twice = perturb_func(f, var, i, -2.0 * delta)
+      forward_twice = perturb_function(f, var, i, 2.0 * delta)
+      forward_once = perturb_function(f, var, i, delta)
+      backward_once = perturb_function(f, var, i, -1.0 * delta)
+      backward_twice = perturb_function(f, var, i, -2.0 * delta)
       numerator = (-1.0 * forward_twice + 8.0 * forward_once - 8.0 * backward_once + backward_twice)
       entry_derivative = numerator / (12.0 * delta)
       derivatives_list.append(entry_derivative)  # shape is: [num_elts] + tf.shape(f())
     derivatives = tf.stack(derivatives_list)
+    # swap function and variable dims
+    derivatives = tf.transpose()
     # reshape to correct Jacobian shape.
-    all_derivatives.append(tf.reshape(derivatives, tf.shape(forward_twice) + tf.shape(var)))
+    all_derivatives.append(tf.reshape(derivatives, tf.concat([tf.shape(forward_twice), tf.shape(var)], 0)))
   return all_derivatives
     
     

@@ -15,7 +15,6 @@
 """Tests for tests.test_util"""
 
 from absl.testing import parameterized
-import random
 
 import cirq
 import sympy
@@ -235,7 +234,7 @@ class ApproximateJacobianTest(tf.test.TestCase):
     matrix_initial_value = tf.random.uniform(
         [dimension, dimension], minval, maxval)
     matrix_var = tf.Variable(matrix_initial_value)
-    variable_list = random.shuffle([scalar_var, vector_var, matrix_var])
+    variable_list = [scalar_var, vector_var, matrix_var]
 
     def f():
       """Vector result of combining the variables."""
