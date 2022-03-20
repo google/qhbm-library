@@ -302,6 +302,11 @@ def approximate_jacobian(f, variables, delta=5e-2):
     f: Callable taking no arguments and returning a `tf.Tensor`.
     variables: List of `tf.Variable` in which to differentiate `f`.
     delta: Size of the fundamental perturbation in the stencil.
+
+  Returns:
+    all_derivatives: list containing derivatives.  `all_derivatives[i]`
+      contains the jacobian of `f()` with respect to `variables[i]`, and hence
+      has shape `tf.shape(f()) + tf.shape(variables[i])`.
   """
   all_derivatives = []
   for var in variables:
@@ -314,12 +319,16 @@ def approximate_jacobian(f, variables, delta=5e-2):
       backward_twice = perturb_function(f, var, i, -2.0 * delta)
       numerator = (-1.0 * forward_twice + 8.0 * forward_once - 8.0 * backward_once + backward_twice)
       entry_derivative = numerator / (12.0 * delta)
-      derivatives_list.append(entry_derivative)  # shape is: [num_elts] + tf.shape(f())
-    derivatives = tf.stack(derivatives_list)
+      derivatives_list.append(entry_derivative)
+    derivatives = tf.stack(derivatives_list)  # shape is: [num_elts] + tf.shape(f())
     # swap function and variable dims
-    derivatives = tf.transpose()
+    transpose_perm = list(range(1, len(tf.shape(forward_twice)) + 1)) + [0]
+    print(transpose_perm)
+    derivatives = tf.transpose(derivatives, transpose_perm)
     # reshape to correct Jacobian shape.
-    all_derivatives.append(tf.reshape(derivatives, tf.concat([tf.shape(forward_twice), tf.shape(var)], 0)))
+    reshape_shape = tf.concat([tf.shape(forward_twice), tf.shape(var)], 0)
+    print(reshape_shape)
+    all_derivatives.append(tf.reshape(derivatives, reshape_shape))
   return all_derivatives
     
     

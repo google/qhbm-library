@@ -222,27 +222,62 @@ class PerturbFunctionTest(tf.test.TestCase, parameterized.TestCase):
 class ApproximateJacobianTest(tf.test.TestCase):
   """Tests the approximate_jacobian function."""
 
+  def setUp(self):
+    super().setUp()
+    self.close_rtol = 1e-4
+    self.zero_atol = 1e-4
+
   def test_jacobian(self):
     """Compares approximation against exact jacobian."""
-    dimension = 7
+    dimension_0 = 7
+    dimension_1 = 4
     minval = -5
     maxval = 5
     scalar_initial_value = tf.random.uniform([], minval, maxval)
     scalar_var = tf.Variable(scalar_initial_value)
-    vector_initial_value = tf.random.uniform([dimension], minval, maxval)
+    vector_initial_value = tf.random.uniform([dimension_0], minval, maxval)
     vector_var = tf.Variable(vector_initial_value)
     matrix_initial_value = tf.random.uniform(
-        [dimension, dimension], minval, maxval)
+        [dimension_1, dimension_0], minval, maxval)
     matrix_var = tf.Variable(matrix_initial_value)
     variable_list = [scalar_var, vector_var, matrix_var]
 
-    def f():
+    # First, test with a linear function of the matrix variable.
+    def f_linear():
+      """Just the variable itself."""
+      return matrix_var.read_value()
+    actual_derivative = test_util.approximate_jacobian(f_linear, [matrix_var, vector_var])
+    expected_derivative_shapes = [[dimension_1, dimension_0, dimension_1, dimension_0], [dimension_1, dimension_0, dimension_0]]
+    self.assertEqual(len(actual_derivative), len(expected_derivative_shapes))
+    for a, e_shape in zip(actual_derivative, expected_derivative_shapes):
+      self.assertAllEqual(tf.shape(a), e_shape)
+    # The derivative of `f_linear()` should be 1 at [i, j, i, j].
+    expected_matrix_derivative = tf.one_(matrix_var)
+    expected_vector_derivative = tf.zeros_like(vector_var)
+    self.assertAllClose(actual_derivative[0], expected_matrix_derivative, rtol=self.close_rtol)
+    self.assertAllClose(actual_derivative[1], expected_vector_derivative, atol=self.zero_atol)
+    
+    def f_scalar():
+      """Scalar result of combining the variables."""
+      return tf.reduce_sum(tf.linalg.matvec(matrix_var, vector_var) * scalar_var)
+
+    def f_vector():
       """Vector result of combining the variables."""
       return tf.linalg.matvec(matrix_var, vector_var) * scalar_var
 
-    with tf.GradientTape() as tape:
-      value = f()
-    expected_derivative = tape.jacobian(value, variable_list)
+    def f_matrix():
+      """Matrix result of combining the variables."""
+      new_vec = vector_var * scalar_var
+      tiled_vec = tf.tile(tf.expand_dims(new_vec, 1), [1, dimension_1])
+      return tf.linalg.matmul(matrix_var, tiled_vec)
 
-    actual_derivative = test_util.approximate_jacobian(f, variable_list)
-    self.assertAllClose(actual_derivative, expected_derivative)
+    for f in [f_scalar, f_vector, f_matrix]:
+      with tf.GradientTape() as tape:
+        value = f()
+      expected_derivative = tape.jacobian(value, variable_list)
+      actual_derivative = test_util.approximate_jacobian(f, variable_list)
+      self.assertEqual(len(actual_derivative), len(variable_list))
+      for a, e in zip(actual_derivative, expected_derivative):
+        print(f"tf.shape(a): {tf.shape(a)}")
+        print(f"tf.shape(e): {tf.shape(e)}")
+        self.assertAllClose(a, e, rtol=self.close_rtol)
