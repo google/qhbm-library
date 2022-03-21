@@ -330,5 +330,3 @@ def approximate_jacobian(f, variables, delta=5e-2):
     print(reshape_shape)
     all_derivatives.append(tf.reshape(derivatives, reshape_shape))
   return all_derivatives
-    
-    
