@@ -288,8 +288,48 @@ def perturb_function(f, var, k, delta):
   return f_value
 
 
+def approximate_gradient(f, variables, delta=5e-2):
+  """Approximates the gradient of f using five point stencil.
+
+  Suppose the input function returns a possibly nested structure `r` under
+  gradient tape `t`.  Then this function returns an approximation to
+  `t.gradient(r, variables)`.
+
+  See wikipedia page on "five point stencil",
+  https://en.wikipedia.org/wiki/Five-point_stencil
+  Note: the error of this method scales with delta ** 4.
+
+  Args:
+    f: Callable taking no arguments and returning a possibly nested structure
+      whose atomic elements are `tf.Tensor`.
+    variables: List of `tf.Variable` in which to differentiate `f`.
+    delta: Size of the fundamental perturbation in the stencil.
+
+  Returns:
+    all_derivatives: List containing derivatives.  `all_derivatives[i]`
+      contains the gradient of `f()`with respect to `variables[i]`, which is the
+      sum over any non-variable dimensions of the jacobian of `f()` with respect
+      to `variables[i]`, hence has shape `tf.shape(variables[i])`.
+  """
+  all_derivatives = []
+  for var in variables:
+    derivatives_list = []
+    num_elts = tf.size(var)
+    for i in range(num_elts):
+      forward_twice = perturb_function(f, var, i, 2.0 * delta)
+      forward_once = perturb_function(f, var, i, delta)
+      backward_once = perturb_function(f, var, i, -1.0 * delta)
+      backward_twice = perturb_function(f, var, i, -2.0 * delta)
+      numerator = (-1.0 * forward_twice + 8.0 * forward_once - 8.0 * backward_once + backward_twice)
+      entry_derivative = tf.reduce_sum(numerator / (12.0 * delta))
+      derivatives_list.append(entry_derivative)
+    derivatives = tf.stack(derivatives_list)  # shape is: tf.shape(f())
+    all_derivatives.append(tf.reshape(derivatives, tf.shape(var)))
+  return all_derivatives
+
+
 def approximate_jacobian(f, variables, delta=5e-2):
-  """Approximates the derivative of f using five point stencil.
+  """Approximates the jacobian of f using five point stencil.
 
   Suppose the input function returns a tensor `r` under gradient tape `t`.  Then
   this function returns an approximation to `t.jacobian(r, variables)`.
@@ -323,10 +363,8 @@ def approximate_jacobian(f, variables, delta=5e-2):
     derivatives = tf.stack(derivatives_list)  # shape is: [num_elts] + tf.shape(f())
     # swap function and variable dims
     transpose_perm = list(range(1, len(tf.shape(forward_twice)) + 1)) + [0]
-    print(transpose_perm)
     derivatives = tf.transpose(derivatives, transpose_perm)
     # reshape to correct Jacobian shape.
     reshape_shape = tf.concat([tf.shape(forward_twice), tf.shape(var)], 0)
-    print(reshape_shape)
     all_derivatives.append(tf.reshape(derivatives, reshape_shape))
   return all_derivatives

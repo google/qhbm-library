@@ -258,6 +258,27 @@ class ApproximateDerivativesTest(tf.test.TestCase):
       return self.matrix_var.read_value()
     self.linear_matrix = linear_matrix
 
+  def test_linear_gradient(self):
+    """Confirms correct Gradient values for linear functions."""
+
+    # scalar
+    expected_gradient = [tf.ones_like(self.scalar_var), tf.zeros_like(self.vector_var), tf.zeros_like(self.matrix_var)]
+    actual_gradient = test_util.approximate_gradient(self.linear_scalar, self.variables_list)
+    for a, e in zip(actual_gradient, expected_gradient):
+      self.assertAllClose(a, e, atol=self.close_atol)
+
+    # vector
+    expected_gradient = [tf.zeros_like(self.scalar_var), tf.ones_like(self.vector_var), tf.zeros_like(self.matrix_var)]
+    actual_gradient = test_util.approximate_gradient(self.linear_vector, self.variables_list)
+    for a, e in zip(actual_gradient, expected_gradient):
+      self.assertAllClose(a, e, atol=self.close_atol)
+
+    # matrix
+    expected_gradient = [tf.zeros_like(self.scalar_var), tf.zeros_like(self.vector_var), tf.ones_like(self.matrix_var)]
+    actual_gradient = test_util.approximate_gradient(self.linear_matrix, self.variables_list)
+    for a, e in zip(actual_gradient, expected_gradient):
+      self.assertAllClose(a, e, atol=self.close_atol)
+
   def test_linear_jacobian(self):
     """Confirms correct Jacobian values for linear functions."""
 
