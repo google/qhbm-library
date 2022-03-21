@@ -314,12 +314,13 @@ def _five_point_stencil(f, var, i, delta):
   stencil = tf.nest.map_structure(lambda x: x / (12.0 * delta), numerator)
   return stencil
 
-def approximate_gradient(f, variables, delta=5e-2):
+
+def approximate_gradient(f, variables, delta=1e-1):
   """Approximates the gradient of f using five point stencil.
 
   Suppose the input function returns a possibly nested structure `r` under
   gradient tape `t`.  Then this function returns an approximation to
-  `t.gradient(r, variables)`.
+  `t.gradient(r, variables, unconnected_gradients=tf.UnconnectedGradients.ZERO)`
 
   Args:
     f: Callable taking no arguments and returning a possibly nested structure
@@ -349,11 +350,12 @@ def approximate_gradient(f, variables, delta=5e-2):
   return tf.nest.map_structure(var_gradient, variables)
 
 
-def approximate_jacobian(f, variables, delta=5e-2):
+def approximate_jacobian(f, variables, delta=1e-1):
   """Approximates the jacobian of f using five point stencil.
 
   Suppose the input function returns a tensor `r` under gradient tape `t`.  Then
-  this function returns an approximation to `t.jacobian(r, variables)`.
+  this function returns an approximation to
+  `t.jacobian(r, variables, unconnected_gradients=tf.UnconnectedGradients.ZERO)`
 
   Args:
     f: Callable taking no arguments and returning a `tf.Tensor`.
