@@ -412,7 +412,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
         actual_average, mu, unconnected_gradients=tf.UnconnectedGradients.ZERO)
     self.assertAllLess(tf.math.abs(actual_gradient_mu), self.zero_atol)
 
-  @test_util.toggle_eager_mode
+  @test_util.eager_mode_toggle
   def test_expectation_finite_difference(self):
     """Tests a function with nested structural output."""
 
@@ -467,7 +467,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
                                                        energy_var)
     tf.nest.map_structure(
         lambda x: self.assertAllGreater(tf.abs(x), self.not_zero_atol),
-        expected_derivative)
+        expected_gradient)
     self.assertAllClose(
         actual_gradient, expected_gradient, rtol=self.close_rtol)
 
@@ -681,8 +681,8 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
 
     actual_log_partition_grad = tape.gradient(actual_log_partition,
                                               actual_energy.trainable_variables)
-    expected_log_partition_grad(exact_log_partition,
-                                actual_energy.trainable_variables)
+    expected_log_partition_grad = test_util.approximate_gradient(
+        exact_log_partition, actual_energy.trainable_variables)
     self.assertAllClose(actual_log_partition_grad, expected_log_partition_grad,
                         self.close_rtol)
 

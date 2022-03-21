@@ -243,7 +243,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     actual_jacobian = tape.jacobian(actual_expectations,
                                     actual_circuit.trainable_variables)
     expected_jacobian = test_util.approximate_jacobian(
-        expectation_wrapper, actual_circuit.trainable_variables)
+        expectation_func, actual_circuit.trainable_variables)
 
     self.assertNotAllClose(
         expected_expectations_derivative,
@@ -337,14 +337,14 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     expected_jacobian_thetas = test_util.approximate_jacobian(
         expectation_func, hamiltonian_measure.energy.trainable_variables)
     self.assertNotAllClose(
-        expected_derivatives_thetas,
-        tf.zeros_like(expected_derivatives_thetas),
+        expected_jacobian_thetas,
+        tf.zeros_like(expected_jacobian_thetas),
         atol=self.not_zero_atol)
     expected_jacobian_phis = test_util.approximate_jacobian(
         expectation_func, hamiltonian_measure.circuit.trainable_variables)
     self.assertNotAllClose(
-        expected_derivatives_phis,
-        tf.zeros_like(expected_derivatives_phis),
+        expected_jacobian_phis,
+        tf.zeros_like(expected_jacobian_phis),
         atol=self.not_zero_atol)
     actual_jacobian_thetas, actual_jacobian_phis = tape.jacobian(
         actual_expectations, (hamiltonian_measure.energy.trainable_variables,
@@ -516,12 +516,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     self.assertAllEqual(
         tf.shape(actual_expectations), [len(initial_states_list), 1])
 
-    def expectation_func():
-      """Returns the current expectation values."""
-      return tf.squeeze(actual_qnn.expectation(initial_states, hamiltonian), -1)
-
     expected_derivatives = test_util.approximate_jacobian(
-        expectation_func, hamiltonian.trainable_variables)
+        expectation_wrapper, hamiltonian.trainable_variables)
     for derivative in expected_derivatives:
       # Checks that at last one entry in each variable's derivative is
       # not too close to zero.
