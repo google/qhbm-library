@@ -127,8 +127,10 @@ class VQTTest(tf.test.TestCase):
           actual_loss,
           (model_h.trainable_variables, data_h.trainable_variables))
 
-      expected_derivative_model = test_util.approximate_gradient(vqt_wrapper, model_h.trainable_variables)
-      expected_derivative_data = test_util.approximate_gradient(vqt_wrapper, data_h.trainable_variables)
+      expected_derivative_model = test_util.approximate_gradient(
+          vqt_wrapper, model_h.trainable_variables)
+      expected_derivative_data = test_util.approximate_gradient(
+          vqt_wrapper, data_h.trainable_variables)
       # Changing model parameters is working if finite difference derivatives
       # are non-zero.  Also confirms that model_h and data_h are different.
       tf.nest.map_structure(

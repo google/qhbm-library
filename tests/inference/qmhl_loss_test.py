@@ -121,7 +121,9 @@ class QMHLTest(tf.test.TestCase):
       actual_derivative = tape.gradient(actual_loss,
                                         model_h.trainable_variables)
 
-      expected_derivative = test_util.approximate_gradient(functools.partial(qmhl_wrapper, actual_data, model_qhbm), model_h.trainable_variables)
+      expected_derivative = test_util.approximate_gradient(
+          functools.partial(qmhl_wrapper, actual_data, model_qhbm),
+          model_h.trainable_variables)
 
       # Changing model parameters is working if finite difference derivatives
       # are non-zero.  Also confirms that model_h and data_h are different.

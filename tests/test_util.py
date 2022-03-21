@@ -268,7 +268,9 @@ def _five_point_stencil(f, var, i, delta):
   forward_once = perturb_function(f, var, i, delta)
   backward_once = perturb_function(f, var, i, -1.0 * delta)
   backward_twice = perturb_function(f, var, i, -2.0 * delta)
-  numerator = tf.nest.map_structure(lambda a, b, c, d: -1.0 * a + 8.0 * b - 8.0 * c + d, forward_twice, forward_once, backward_once, backward_twice)
+  numerator = tf.nest.map_structure(
+      lambda a, b, c, d: -1.0 * a + 8.0 * b - 8.0 * c + d, forward_twice,
+      forward_once, backward_once, backward_twice)
   stencil = tf.nest.map_structure(lambda x: x / (12.0 * delta), numerator)
   return stencil
 
@@ -293,17 +295,23 @@ def approximate_gradient(f, variables, delta=1e-1):
       sum over any non-variable dimensions of the jacobian of `f()` with respect
       to `variables[i]`, hence has shape `tf.shape(variables[i])`.
   """
+
   def var_gradient(var):
     """Returns gradient of `f()` with respect to `var`."""
+
     def mapper_func(i):
       """Function to map across indices of flat `var`."""
       stencil = _five_point_stencil(f, var, i, delta)
-      inner_sum = tf.nest.map_structure(lambda x: tf.math.reduce_sum(x), tf.nest.flatten(stencil))
+      inner_sum = tf.nest.map_structure(lambda x: tf.math.reduce_sum(x),
+                                        tf.nest.flatten(stencil))
       outer_sum = tf.math.reduce_sum(tf.stack(inner_sum))
       entry_derivative = tf.reduce_sum(outer_sum)
       return entry_derivative
-    derivatives = tf.map_fn(mapper_func, tf.range(tf.size(var)), fn_output_signature=tf.float32)
+
+    derivatives = tf.map_fn(
+        mapper_func, tf.range(tf.size(var)), fn_output_signature=tf.float32)
     return tf.reshape(derivatives, tf.shape(var))
+
   return tf.nest.map_structure(var_gradient, variables)
 
 
@@ -325,9 +333,13 @@ def approximate_jacobian(f, variables, delta=1e-1):
       contains the jacobian of `f()` with respect to `variables[i]`, and hence
       has shape `tf.shape(f()) + tf.shape(variables[i])`.
   """
+
   def var_jacobian(var):
     """Returns jacobian of `f()` with respect to `var`."""
-    derivatives = tf.map_fn(lambda x: _five_point_stencil(f, var, x, delta), tf.range(tf.size(var)), fn_output_signature=tf.float32)
+    derivatives = tf.map_fn(
+        lambda x: _five_point_stencil(f, var, x, delta),
+        tf.range(tf.size(var)),
+        fn_output_signature=tf.float32)
     f_shape = tf.shape(derivatives)[1:]  # shape of f()
     # swap function and variable dims
     transpose_perm = list(range(1, len(f_shape) + 1)) + [0]
@@ -335,4 +347,5 @@ def approximate_jacobian(f, variables, delta=1e-1):
     # reshape to correct Jacobian shape.
     reshape_shape = tf.concat([f_shape, tf.shape(var)], 0)
     return tf.reshape(transpose_derivatives, reshape_shape)
+
   return tf.nest.map_structure(var_jacobian, variables)

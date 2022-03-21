@@ -463,7 +463,8 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
         expected_expectation)
     self.assertAllClose(actual_expectation, expected_expectation)
 
-    expected_gradient = test_util.approximate_gradient(expectation_func, energy_var)
+    expected_gradient = test_util.approximate_gradient(expectation_func,
+                                                       energy_var)
     tf.nest.map_structure(
         lambda x: self.assertAllGreater(tf.abs(x), self.not_zero_atol),
         expected_derivative)
@@ -497,7 +498,8 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
 
     actual_log_partition_grad = tape.gradient(actual_log_partition,
                                               actual_energy.trainable_variables)
-    expected_log_partition_grad = test_util.approximate_gradient(exact_log_partition, actual_energy.trainable_variables)
+    expected_log_partition_grad = test_util.approximate_gradient(
+        exact_log_partition, actual_energy.trainable_variables)
     self.assertAllClose(actual_log_partition_grad, expected_log_partition_grad,
                         self.close_rtol)
 
@@ -679,7 +681,8 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
 
     actual_log_partition_grad = tape.gradient(actual_log_partition,
                                               actual_energy.trainable_variables)
-    expected_log_partition_grad(exact_log_partition, actual_energy.trainable_variables)
+    expected_log_partition_grad(exact_log_partition,
+                                actual_energy.trainable_variables)
     self.assertAllClose(actual_log_partition_grad, expected_log_partition_grad,
                         self.close_rtol)
 
