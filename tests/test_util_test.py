@@ -245,17 +245,17 @@ class ApproximateDerivativesTest(tf.test.TestCase):
 
     def linear_scalar():
       """Returns a scalar."""
-      return self.scalar_var.read_value()
+      return tf.identity(self.scalar_var)
     self.linear_scalar = linear_scalar
 
     def linear_vector():
       """Returns a vector."""
-      return self.vector_var.read_value()
+      return tf.identity(self.vector_var)
     self.linear_vector = linear_vector
 
     def linear_matrix():
       """Returns a matrix."""
-      return self.matrix_var.read_value()
+      return tf.identity(self.matrix_var)
     self.linear_matrix = linear_matrix
 
     def f_tensor():
@@ -263,24 +263,28 @@ class ApproximateDerivativesTest(tf.test.TestCase):
       return tf.linalg.matvec(self.matrix_var, self.vector_var) * self.scalar_var
     self.f_tensor = f_tensor
 
+  @test_util.eager_mode_toggle
   def test_linear_gradient(self):
     """Confirms correct Gradient values for linear functions."""
 
+    approximate_gradient_wrapper = tf.function(test_util.approximate_gradient)
+
     # scalar
     expected_gradient = [[tf.ones_like(self.scalar_var), tf.zeros_like(self.vector_var)], [tf.zeros_like(self.matrix_var)]]
-    actual_gradient = test_util.approximate_gradient(self.linear_scalar, self.variables_structure)
+    actual_gradient = approximate_gradient_wrapper(self.linear_scalar, self.variables_structure)
     tf.nest.map_structure(lambda a, e: self.assertAllClose(a, e, atol=self.close_atol), actual_gradient, expected_gradient)
 
     # vector
     expected_gradient = [[tf.zeros_like(self.scalar_var), tf.ones_like(self.vector_var)], [tf.zeros_like(self.matrix_var)]]
-    actual_gradient = test_util.approximate_gradient(self.linear_vector, self.variables_structure)
+    actual_gradient = approximate_gradient_wrapper(self.linear_vector, self.variables_structure)
     tf.nest.map_structure(lambda a, e: self.assertAllClose(a, e, atol=self.close_atol), actual_gradient, expected_gradient)
 
     # matrix
     expected_gradient = [[tf.zeros_like(self.scalar_var), tf.zeros_like(self.vector_var)], [tf.ones_like(self.matrix_var)]]
-    actual_gradient = test_util.approximate_gradient(self.linear_matrix, self.variables_structure)
+    actual_gradient = approximate_gradient_wrapper(self.linear_matrix, self.variables_structure)
     tf.nest.map_structure(lambda a, e: self.assertAllClose(a, e, atol=self.close_atol), actual_gradient, expected_gradient)
 
+  @test_util.eager_mode_toggle
   def test_linear_jacobian(self):
     """Confirms correct Jacobian values for linear functions."""
 
@@ -314,6 +318,7 @@ class ApproximateDerivativesTest(tf.test.TestCase):
     actual_jacobian = test_util.approximate_jacobian(self.linear_matrix, self.variables_structure)
     tf.nest.map_structure(lambda a, e: self.assertAllClose(a, e, atol=self.close_atol), actual_jacobian, expected_jacobian)
 
+  @test_util.eager_mode_toggle
   def test_gradient(self):
     """Compares approximation against exact gradient."""
 
@@ -338,6 +343,7 @@ class ApproximateDerivativesTest(tf.test.TestCase):
       tf.nest.map_structure(lambda a: self.assertNotAllClose(a, tf.zeros_like(a), atol=self.not_zero_atol), actual_gradient)
       tf.nest.map_structure(lambda a, e: self.assertAllClose(a, e, atol=self.close_atol), actual_gradient, expected_gradient)
 
+  @test_util.eager_mode_toggle
   def test_jacobian(self):
     """Compares approximation against exact jacobian."""
 
