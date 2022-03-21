@@ -288,16 +288,38 @@ def perturb_function(f, var, k, delta):
   return f_value
 
 
+def _five_point_stencil(f, var, i, delta):
+  """Computes the five point stencil.
+
+  See wikipedia page on "five point stencil",
+  https://en.wikipedia.org/wiki/Five-point_stencil
+  Note: the error of this method scales with delta ** 4.
+
+  Args:
+    f: Callable taking no arguments and returning a possibly nested structure
+      whose atomic elements are `tf.Tensor`.
+    var: `tf.Variable` in which to differentiate `f`.
+    i: Entry of `var` to perturb.
+    delta: Size of the fundamental perturbation in the stencil.
+
+  Returns:
+    stencil: The five point stencil approximation of the jacobian of `f()` with
+      respect to entry `i` of `var`.
+  """
+  forward_twice = perturb_function(f, var, i, 2.0 * delta)
+  forward_once = perturb_function(f, var, i, delta)
+  backward_once = perturb_function(f, var, i, -1.0 * delta)
+  backward_twice = perturb_function(f, var, i, -2.0 * delta)
+  numerator = tf.nest.map_structure(lambda a, b, c, d: -1.0 * a + 8.0 * b - 8.0 * c + d, forward_twice, forward_once, backward_once, backward_twice)
+  stencil = tf.nest.map_structure(lambda x: x / (12.0 * delta), numerator)
+  return stencil
+
 def approximate_gradient(f, variables, delta=5e-2):
   """Approximates the gradient of f using five point stencil.
 
   Suppose the input function returns a possibly nested structure `r` under
   gradient tape `t`.  Then this function returns an approximation to
   `t.gradient(r, variables)`.
-
-  See wikipedia page on "five point stencil",
-  https://en.wikipedia.org/wiki/Five-point_stencil
-  Note: the error of this method scales with delta ** 4.
 
   Args:
     f: Callable taking no arguments and returning a possibly nested structure
@@ -316,12 +338,10 @@ def approximate_gradient(f, variables, delta=5e-2):
     derivatives_list = []
     num_elts = tf.size(var)
     for i in range(num_elts):
-      forward_twice = perturb_function(f, var, i, 2.0 * delta)
-      forward_once = perturb_function(f, var, i, delta)
-      backward_once = perturb_function(f, var, i, -1.0 * delta)
-      backward_twice = perturb_function(f, var, i, -2.0 * delta)
-      numerator = (-1.0 * forward_twice + 8.0 * forward_once - 8.0 * backward_once + backward_twice)
-      entry_derivative = tf.reduce_sum(numerator / (12.0 * delta))
+      stencil = _five_point_stencil(f, var, i, delta)
+      inner_sum = tf.nest.map_structure(lambda x: tf.math.reduce_sum(x), tf.nest.flatten(stencil))
+      outer_sum = tf.math.reduce_sum(tf.stack(inner_sum))
+      entry_derivative = tf.reduce_sum(outer_sum)
       derivatives_list.append(entry_derivative)
     derivatives = tf.stack(derivatives_list)  # shape is: tf.shape(f())
     all_derivatives.append(tf.reshape(derivatives, tf.shape(var)))
@@ -333,10 +353,6 @@ def approximate_jacobian(f, variables, delta=5e-2):
 
   Suppose the input function returns a tensor `r` under gradient tape `t`.  Then
   this function returns an approximation to `t.jacobian(r, variables)`.
-
-  See wikipedia page on "five point stencil",
-  https://en.wikipedia.org/wiki/Five-point_stencil
-  Note: the error of this method scales with delta ** 4.
 
   Args:
     f: Callable taking no arguments and returning a `tf.Tensor`.
@@ -353,18 +369,14 @@ def approximate_jacobian(f, variables, delta=5e-2):
     derivatives_list = []
     num_elts = tf.size(var)
     for i in range(num_elts):
-      forward_twice = perturb_function(f, var, i, 2.0 * delta)
-      forward_once = perturb_function(f, var, i, delta)
-      backward_once = perturb_function(f, var, i, -1.0 * delta)
-      backward_twice = perturb_function(f, var, i, -2.0 * delta)
-      numerator = (-1.0 * forward_twice + 8.0 * forward_once - 8.0 * backward_once + backward_twice)
-      entry_derivative = numerator / (12.0 * delta)
-      derivatives_list.append(entry_derivative)
+      stencil = _five_point_stencil(f, var, i, delta)
+      derivatives_list.append(stencil)
     derivatives = tf.stack(derivatives_list)  # shape is: [num_elts] + tf.shape(f())
     # swap function and variable dims
-    transpose_perm = list(range(1, len(tf.shape(forward_twice)) + 1)) + [0]
+    # stencil has a shape since `f()` is a tensor.
+    transpose_perm = list(range(1, len(tf.shape(stencil)) + 1)) + [0]
     derivatives = tf.transpose(derivatives, transpose_perm)
     # reshape to correct Jacobian shape.
-    reshape_shape = tf.concat([tf.shape(forward_twice), tf.shape(var)], 0)
+    reshape_shape = tf.concat([tf.shape(stencil), tf.shape(var)], 0)
     all_derivatives.append(tf.reshape(derivatives, reshape_shape))
   return all_derivatives
