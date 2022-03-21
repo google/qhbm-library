@@ -114,7 +114,7 @@ class VQTTest(tf.test.TestCase):
           (model_h.trainable_variables, data_h.trainable_variables))
 
       expected_gradient_model, expected_gradient_date = test_util.approximate_gradient(
-          functools.partial(vqt_wrapper, mode_infer, data_h, beta),
+          functools.partial(vqt_wrapper, model_infer, data_h, beta),
           (model_h.trainable_variables, data_h.trainable_variables))
       # Changing model parameters is working if finite difference derivatives
       # are non-zero.  Also confirms that model_h and data_h are different.
