@@ -114,7 +114,8 @@ class VQTTest(tf.test.TestCase):
           (model_h.trainable_variables, data_h.trainable_variables))
 
       expected_gradient_model, expected_gradient_date = test_util.approximate_gradient(
-          functools.partiial(vqt_wrapper, mode_infer, data_h, beta), (model_h.trainable_variables, data_h.trainable_variables))
+          functools.partial(vqt_wrapper, mode_infer, data_h, beta),
+          (model_h.trainable_variables, data_h.trainable_variables))
       # Changing model parameters is working if finite difference derivatives
       # are non-zero.  Also confirms that model_h and data_h are different.
       tf.nest.map_structure(
@@ -124,13 +125,9 @@ class VQTTest(tf.test.TestCase):
           lambda x: self.assertAllGreater(tf.abs(x), self.not_zero_atol),
           expected_gradient_data)
       self.assertAllClose(
-          actual_gradient_model,
-          expected_gradient_model,
-          rtol=self.close_rtol)
+          actual_gradient_model, expected_gradient_model, rtol=self.close_rtol)
       self.assertAllClose(
-          actual_gradient_data,
-          expected_gradient_data,
-          rtol=self.close_rtol)
+          actual_gradient_data, expected_gradient_data, rtol=self.close_rtol)
 
   @test_util.eager_mode_toggle
   def test_loss_value_x_rot(self):

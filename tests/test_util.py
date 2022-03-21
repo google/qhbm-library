@@ -290,10 +290,8 @@ def approximate_gradient(f, variables, delta=1e-1):
     delta: Size of the fundamental perturbation in the stencil.
 
   Returns:
-    all_derivatives: List containing derivatives.  `all_derivatives[i]`
-      contains the gradient of `f()`with respect to `variables[i]`, which is the
-      sum over any non-variable dimensions of the jacobian of `f()` with respect
-      to `variables[i]`, hence has shape `tf.shape(variables[i])`.
+    The approximate gradient.  Has the same structure as the return from a
+      corresponding call to `tf.GradientTape().gradient`.
   """
 
   def var_gradient(var):
@@ -329,9 +327,8 @@ def approximate_jacobian(f, variables, delta=1e-1):
     delta: Size of the fundamental perturbation in the stencil.
 
   Returns:
-    all_derivatives: list containing derivatives.  `all_derivatives[i]`
-      contains the jacobian of `f()` with respect to `variables[i]`, and hence
-      has shape `tf.shape(f()) + tf.shape(variables[i])`.
+    The approximate jacobian.  Has the same structure as the return from a
+      corresponding call to `tf.GradientTape().jacobian`.
   """
 
   def var_jacobian(var):

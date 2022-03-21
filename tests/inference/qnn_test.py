@@ -246,12 +246,12 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         expectation_func, actual_circuit.trainable_variables)
 
     self.assertNotAllClose(
-        expected_expectations_derivative,
-        tf.zeros_like(expected_expectations_derivative),
+        expected_jacobian,
+        tf.zeros_like(expected_jacobian),
         atol=self.not_zero_atol)
     self.assertAllClose(
-        expected_expectations_derivative,
-        actual_expectations_derivative,
+        expected_jacobian,
+        actual_jacobian,
         atol=self.close_atol)
 
   @parameterized.parameters({
@@ -517,7 +517,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         tf.shape(actual_expectations), [len(initial_states_list), 1])
 
     expected_derivatives = test_util.approximate_jacobian(
-        expectation_wrapper, hamiltonian.trainable_variables)
+        functools.partial(expectation_wrapper, initial_states, hamiltonian), hamiltonian.trainable_variables)
     for derivative in expected_derivatives:
       # Checks that at last one entry in each variable's derivative is
       # not too close to zero.
