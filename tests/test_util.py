@@ -324,7 +324,8 @@ def approximate_gradient(f, variables, delta=5e-2):
   Args:
     f: Callable taking no arguments and returning a possibly nested structure
       whose atomic elements are `tf.Tensor`.
-    variables: List of `tf.Variable` in which to differentiate `f`.
+    variables: Possibly nested structure of `tf.Variable` in which to
+      differentiate `f`.
     delta: Size of the fundamental perturbation in the stencil.
 
   Returns:
@@ -333,8 +334,8 @@ def approximate_gradient(f, variables, delta=5e-2):
       sum over any non-variable dimensions of the jacobian of `f()` with respect
       to `variables[i]`, hence has shape `tf.shape(variables[i])`.
   """
-  all_derivatives = []
-  for var in variables:
+  def var_gradient(var):
+    """Returns gradient of `f()` with respect to `var`."""  
     derivatives_list = []
     num_elts = tf.size(var)
     for i in range(num_elts):
@@ -344,8 +345,8 @@ def approximate_gradient(f, variables, delta=5e-2):
       entry_derivative = tf.reduce_sum(outer_sum)
       derivatives_list.append(entry_derivative)
     derivatives = tf.stack(derivatives_list)  # shape is: tf.shape(f())
-    all_derivatives.append(tf.reshape(derivatives, tf.shape(var)))
-  return all_derivatives
+    return tf.reshape(derivatives, tf.shape(var))
+  return tf.nest.map_structure(var_gradient, variables)
 
 
 def approximate_jacobian(f, variables, delta=5e-2):
@@ -356,7 +357,8 @@ def approximate_jacobian(f, variables, delta=5e-2):
 
   Args:
     f: Callable taking no arguments and returning a `tf.Tensor`.
-    variables: List of `tf.Variable` in which to differentiate `f`.
+    variables: Possibly nested structure of `tf.Variable` in which to
+      differentiate `f`.
     delta: Size of the fundamental perturbation in the stencil.
 
   Returns:
@@ -364,8 +366,8 @@ def approximate_jacobian(f, variables, delta=5e-2):
       contains the jacobian of `f()` with respect to `variables[i]`, and hence
       has shape `tf.shape(f()) + tf.shape(variables[i])`.
   """
-  all_derivatives = []
-  for var in variables:
+  def var_jacobian(var):
+    """Returns jacobian of `f()` with respect to `var`."""  
     derivatives_list = []
     num_elts = tf.size(var)
     for i in range(num_elts):
@@ -378,5 +380,5 @@ def approximate_jacobian(f, variables, delta=5e-2):
     derivatives = tf.transpose(derivatives, transpose_perm)
     # reshape to correct Jacobian shape.
     reshape_shape = tf.concat([tf.shape(stencil), tf.shape(var)], 0)
-    all_derivatives.append(tf.reshape(derivatives, reshape_shape))
-  return all_derivatives
+    return tf.reshape(derivatives, reshape_shape)
+  return tf.nest.map_structure(var_jacobian, variables)

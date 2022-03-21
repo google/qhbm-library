@@ -314,7 +314,9 @@ class ApproximateDerivativesTest(tf.test.TestCase):
     actual_jacobian = test_util.approximate_jacobian(self.linear_matrix, self.variables_list)
     for a, e in zip(actual_jacobian, expected_jacobian):
       self.assertAllClose(a, e, atol=self.close_atol)
-    
+
+  # def test_gradient(self):
+  #   """Checks gradient of nested return function."""
 
   # def test_jacobian(self):
   #   """Compares approximation against exact jacobian."""
