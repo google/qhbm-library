@@ -99,21 +99,7 @@ class VQTTest(tf.test.TestCase):
       return delta_loss
 
     delta = 1e-1
-    vqt = tf.function(inference.vqt)
-
-    def vqt_derivative(variables_list, model_infer, data_h, beta):
-      """Approximately differentiates VQT with respect to the inputs"""
-      derivatives = []
-      for var in variables_list:
-        var_derivative_list = []
-        num_elts = tf.size(var)  # Assumes variable is 1D
-        for n in range(num_elts):
-          this_derivative = test_util.approximate_derivative(
-              functools.partial(delta_vqt, n, var, model_infer, data_h, beta),
-              delta=delta)
-          var_derivative_list.append(this_derivative.numpy())
-        derivatives.append(tf.constant(var_derivative_list))
-      return derivatives
+    vqt_wrapper = tf.function(inference.vqt)
 
     for num_qubits in self.num_qubits_list:
       qubits = cirq.GridQubit.rect(1, num_qubits)
@@ -136,15 +122,13 @@ class VQTTest(tf.test.TestCase):
       beta = tf.random.uniform([], 0.1, 10, tf.float32, self.tf_random_seed)
 
       with tf.GradientTape() as tape:
-        actual_loss = vqt(model_infer, data_h, beta)
+        actual_loss = vqt_wrapper(model_infer, data_h, beta)
       actual_derivative_model, actual_derivative_data = tape.gradient(
           actual_loss,
           (model_h.trainable_variables, data_h.trainable_variables))
 
-      expected_derivative_model = vqt_derivative(model_h.trainable_variables,
-                                                 model_infer, data_h, beta)
-      expected_derivative_data = vqt_derivative(data_h.trainable_variables,
-                                                model_infer, data_h, beta)
+      expected_derivative_model = test_util.approximate_gradient(vqt_wrapper, model_h.trainable_variables)
+      expected_derivative_data = test_util.approximate_gradient(vqt_wrapper, data_h.trainable_variables)
       # Changing model parameters is working if finite difference derivatives
       # are non-zero.  Also confirms that model_h and data_h are different.
       tf.nest.map_structure(

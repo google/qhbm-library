@@ -412,6 +412,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
         actual_average, mu, unconnected_gradients=tf.UnconnectedGradients.ZERO)
     self.assertAllLess(tf.math.abs(actual_gradient_mu), self.zero_atol)
 
+  @test_util.toggle_eager_mode
   def test_expectation_finite_difference(self):
     """Tests a function with nested structural output."""
 
@@ -443,9 +444,10 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
       ret_thetas = [tf.einsum("i,j->ij", reduced, energy_var)]
       return [ret_scalar, ret_vector, ret_thetas]
 
+    expectation_wrapper = tf.function(e_infer.expectation)
     with tf.GradientTape() as tape:
-      actual_expectation = e_infer.expectation(f)
-    actual_derivative = tape.gradient(actual_expectation, energy_var)
+      actual_expectation = expectation_wrapper(f)
+    actual_gradient = tape.gradient(actual_expectation, energy_var)
 
     def expectation_func():
       """Evaluate the current expectation value."""
@@ -461,19 +463,12 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
         expected_expectation)
     self.assertAllClose(actual_expectation, expected_expectation)
 
-    # TODO(#206)
-    derivative_list = []
-    for n in range(tf.size(energy_var)):
-      this_derivative = test_util.approximate_derivative(
-          functools.partial(test_util.perturb_function, expectation_func,
-                            energy_var, n))
-      derivative_list.append(this_derivative.numpy())
-    expected_derivative = tf.constant(derivative_list)
+    expected_gradient = test_util.approximate_gradient(expectation_func, energy_var)
     tf.nest.map_structure(
         lambda x: self.assertAllGreater(tf.abs(x), self.not_zero_atol),
         expected_derivative)
     self.assertAllClose(
-        actual_derivative, expected_derivative, rtol=self.close_rtol)
+        actual_gradient, expected_gradient, rtol=self.close_rtol)
 
   @test_util.eager_mode_toggle
   def test_log_partition(self):
@@ -496,24 +491,13 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     all_bitstrings = tf.constant([[0, 0], [0, 1], [1, 0], [1, 1]],
                                  dtype=tf.int8)
 
-    def exact_log_partition(k, delta):
-      """Perturbs the kth variable and calculates the log partition."""
-      new_kernel = old_kernel + delta * tf.one_hot(k, kernel_len, 1.0, 0.0)
-      actual_energy.set_weights([new_kernel])
-      delta_log_partition = tf.reduce_logsumexp(-1.0 *
-                                                actual_energy(all_bitstrings))
-      actual_energy.set_weights([old_kernel])
-      return delta_log_partition
+    def exact_log_partition():
+      """Calculates the current log partition."""
+      return tf.reduce_logsumexp(-1.0 * actual_energy(all_bitstrings))
 
-    derivative_list = []
-    for k in range(kernel_len):
-      this_derivative = test_util.approximate_derivative(
-          functools.partial(exact_log_partition, k))
-      derivative_list.append(this_derivative.numpy())
-
-    expected_log_partition_grad = tf.constant([derivative_list])
     actual_log_partition_grad = tape.gradient(actual_log_partition,
                                               actual_energy.trainable_variables)
+    expected_log_partition_grad = test_util.approximate_gradient(exact_log_partition, actual_energy.trainable_variables)
     self.assertAllClose(actual_log_partition_grad, expected_log_partition_grad,
                         self.close_rtol)
 
@@ -689,24 +673,13 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     old_kernel = actual_energy.post_process[0].kernel.read_value()
     kernel_len = tf.shape(old_kernel)[0].numpy().tolist()
 
-    def exact_log_partition(k, delta):
-      """Perturbs the kth variable and calculates the log partition."""
-      new_kernel = old_kernel + delta * tf.one_hot(k, kernel_len, 1.0, 0.0)
-      actual_energy.set_weights([new_kernel])
-      delta_log_partition = tf.reduce_logsumexp(-1.0 *
-                                                actual_energy(all_bitstrings))
-      actual_energy.set_weights([old_kernel])
-      return delta_log_partition
+    def exact_log_partition():
+      """Returns the current value of log partition."""
+      return tf.reduce_logsumexp(-1.0 * actual_energy(all_bitstrings))
 
-    derivative_list = []
-    for k in range(kernel_len):
-      this_derivative = test_util.approximate_derivative(
-          functools.partial(exact_log_partition, k))
-      derivative_list.append(this_derivative.numpy())
-
-    expected_log_partition_grad = tf.constant([derivative_list])
     actual_log_partition_grad = tape.gradient(actual_log_partition,
                                               actual_energy.trainable_variables)
+    expected_log_partition_grad(exact_log_partition, actual_energy.trainable_variables)
     self.assertAllClose(actual_log_partition_grad, expected_log_partition_grad,
                         self.close_rtol)
 
