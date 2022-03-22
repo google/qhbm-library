@@ -26,73 +26,45 @@ from qhbmlib import utils
 from tests import test_util
 
 
-class NullEnergy(models.BitstringEnergy):
-  """Simple empty energy."""
-
-  def __init__(self, bits):
-    """Initializes a NullEnergy."""
-    energy_layers = []
-    super().__init__(bits, energy_layers)
-
-
 class EnergyInferenceTest(tf.test.TestCase):
   """Tests a simple instantiation of EnergyInference."""
 
-  class TwoOutcomes(inference.EnergyInference):
-    """EnergyInference which is independent of the input energy."""
+  class EnergyInferenceBernoulliSampler(inference.EnergyInference):
+    """EnergyInference whose sampler is just a Bernoulli."""
 
-    def __init__(self, null_energy, num_expectation_samples, bitstring_1,
-                 bitstring_2, p_1):
-      """Initializes a simple inference class.
-
-      Args:
-        null_energy: Energy function that will be ignored.
-        num_expectation_samples: Number of samples to draw and use for
-          estimating the expectation value.
-        bitstring_1: First bitstring to sample.
-        bitstring_2: Second bitstring to sample.
-        p_1: probability of sampling the first bitstring.
-      """
-      super().__init__(null_energy, num_expectation_samples)
-      self.bitstring_1 = bitstring_1
-      self.bitstring_2 = bitstring_2
-      self.p_1 = p_1
+    def __init__(self, energy, num_expectation_samples, initial_seed):
+      """See base class docstring."""
+      super().__init__(energym, num_expectation_samples, initial_seed)
+      self._logits_variable = tf.Variable(input_energy.logits, trainable=False)
+      self._distribution = tfd.Bernoulli(
+          logits=self._logits_variable, dtype=tf.int8)
 
     def _ready_inference(self):
-      """Does nothing."""
-      pass
+      """See base class docstring."""
+      self._logits_variable.assign(self.energy.logits)
 
     def _call(self, inputs):
       """Pass through to sample."""
       return self.sample(inputs)
 
-    def _entropy(self):
-      """Not implemented in this test class."""
-      raise NotImplementedError()
-
-    def _log_partition_forward_pass(self):
-      """Not implemented in this test class."""
-      raise NotImplementedError()
-
     def _sample(self, num_samples: int):
-      """Deterministically samples bitstrings."""
-      n_1 = round(self.p_1 * num_samples)
-      n_2 = num_samples - n_1
-      bitstring_1_tile = tf.tile(tf.expand_dims(self.bitstring_1, 0), [n_1, 1])
-      bitstring_2_tile = tf.tile(tf.expand_dims(self.bitstring_2, 0), [n_2, 1])
-      return tf.concat([bitstring_1_tile, bitstring_2_tile], 0)
+      """See base class docstring"""
+      return self.distribution.sample(num_samples, seed=self.seed)
 
   def setUp(self):
     """Initializes test objects."""
     super().setUp()
+
+    self.close_rtol = 1e-3
+
+    self.num_bits = 5
     self.num_samples = int(1e6)
-    self.bitstring_1 = tf.constant([1, 1, 0, 1, 0], dtype=tf.int8)
-    self.bitstring_2 = tf.constant([0, 0, 0, 1, 1], dtype=tf.int8)
-    self.p_1 = 0.1
-    self.actual_energy = NullEnergy(list(range(5)))
-    self.e_infer = self.TwoOutcomes(self.actual_energy, self.num_samples,
-                                    self.bitstring_1, self.bitstring_2,
-                                    self.p_1)
+    self.tfp_seed = tf.constant([3, 4], tf.int32)
+    self.energy = model.BernoulliEnergy(list(range(self.num_bits)))
+    # TODO(#209)
+    _ = self.energy(tf.constant([[0] * self.num_bits], dtype=tf.int8))
+    self.ebm = self.EnergyInferenceBernoulliSampler(self.actual_energy, self.num_samples, self.tfp_seed)
+
     spins_from_bitstrings = models.SpinsFromBitstrings()
     parity = models.Parity(list(range(5)), 2)
 
@@ -102,23 +74,26 @@ class EnergyInferenceTest(tf.test.TestCase):
 
     self.test_function = test_function
 
-    self.tf_random_seed = 4
-    self.close_rtol = 1e-2
-
   @test_util.eager_mode_toggle
   def test_expectation(self):
     """Confirms correct averaging over input function."""
-    values = []
-    for b in [
-        tf.expand_dims(self.bitstring_1, 0),
-        tf.expand_dims(self.bitstring_2, 0)
-    ]:
-      values.append(self.test_function(tf.constant(b))[0])
-    expected_expectation = self.p_1 * values[0] + (1 - self.p_1) * values[1]
 
-    expectation_wrapper = tf.function(self.e_infer.expectation)
+    def manual_expectation(f):
+      """A manual function for taking expectation values."""
+      samples = tfp.distributions.Bernoulli(logits=self.energy.logits, self.tfp_seed).sample(self.num_samples)
+      values = f(samples)
+      return tf.math.reduce_mean(values)
+    
+    expected_expectation = manual_expectation(self.test_function)
+    expectation_wrapper = tf.function(self.ebm.expectation)
     actual_expectation = expectation_wrapper(self.test_function)
-    self.assertAllClose(actual_expectation, expected_expectation)
+    self.assertAllClose(actual_expectation, expected_expectation, self.close_rtol)
+
+    expected_gradient = test_util.approximate_gradient(functools.partial(manual_expectation, self.test_function), self.energy.trainable_variables)
+    with tf.GradientTape() as tape:
+      value = expectation_wrapper(self.test_function)
+    actual_gradient = tape.gradient(value)
+    self.assertAllClose(actual_gradient, expected_gradient)
 
 
 class AnalyticEnergyInferenceTest(tf.test.TestCase):
