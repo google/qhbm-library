@@ -86,13 +86,10 @@ def relaxed_categorical_probabilities(category_samples, input_samples):
 
   def get_bitstring_index(bitstring):
     """Finds the index of the bitstring in the unique samples."""
-    matches = tf.map_fn(lambda x: tf.math.reduce_all(tf.math.equal(bitstring, x)), unique_samples, fn_output_signature=tf.bool)
-    if tf.math.reduce_any(matches):
-      index = tf.where(matches)[0][0]
-    else:
-      index = tf.cast(num_unique_samples, tf.int64)
+    matches = tf.vectorized_map(lambda x: tf.math.reduce_all(tf.math.equal(bitstring, x)), unique_samples)
+    index = tf.cond(tf.math.reduce_any(matches), lambda: tf.where(matches)[0][0], lambda: tf.cast(num_unique_samples, tf.int64))
     return index
-  all_indices = tf.map_fn(get_bitstring_index, input_samples, fn_output_signature=tf.int64)
+  all_indices = tf.vectorized_map(get_bitstring_index, input_samples)
   return tf.gather(possible_probs, all_indices, axis=0)
 
 
