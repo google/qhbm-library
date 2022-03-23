@@ -85,6 +85,28 @@ class EnergyInferenceTest(tf.test.TestCase):
     self.test_function = test_function
 
   @test_util.eager_mode_toggle
+  def test_entropy(self):
+    """Compares estimated entropy to exact value."""
+
+    def manual_entropy():
+      """Returns the exact entropy of the distribution."""
+      return tf.reduce_sum(tfp.distributions.Bernoulli(logits=self.energy.logits).entropy())
+
+    expected_entropy = manual_entropy()
+    entropy_wrapper = tf.function(self.ebm.entropy)
+    actual_entropy = entropy_wrapper()
+    self.assertAllClose(actual_entropy, expected_entropy, rtol=self.close_rtol)
+
+    expected_gradient = test_util.approximate_gradient(
+        manual_entropy,
+        self.energy.trainable_variables)
+    with tf.GradientTape() as tape:
+      value = entropy_wrapper()
+    actual_gradient = tape.gradient(value, self.energy.trainable_variables)
+    self.assertAllClose(
+        actual_gradient, expected_gradient, rtol=self.close_rtol)
+
+  @test_util.eager_mode_toggle
   def test_expectation(self):
     """Confirms correct averaging over input function."""
 

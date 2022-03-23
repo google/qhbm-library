@@ -258,7 +258,7 @@ class EnergyInference(EnergyInferenceBase):
 
   def _entropy(self):
     """Default implementation wrapped by `self.entropy`."""
-    return self.expectation(self.energy) + self.log_partition_function()
+    return self.expectation(self.energy) + self.log_partition()
 
   def _expectation(self, function):
     """Default implementation wrapped by `self.expectation`.
