@@ -78,7 +78,7 @@ def relaxed_categorical_probabilities(category_samples, input_samples):
   num_bits = tf.shape(category_samples)[1]
   categorical_weight = _relaxed_categorical_ratio(num_bits, num_unique_samples)
 
-  uniform_probability = tf.math.pow(2.0, -tf.cast(num_bits, tf.float32))
+  uniform_probability = tf.math.pow(2.0, -1.0 * tf.cast(num_bits, tf.float32))
 
   def bitstring_prob(bitstring):
     """Returns the probability of a single bitstring."""
