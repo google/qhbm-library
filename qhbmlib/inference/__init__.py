@@ -19,8 +19,6 @@ from qhbmlib.inference.ebm import BernoulliEnergyInference
 from qhbmlib.inference.ebm import EnergyInference
 from qhbmlib.inference.ebm import EnergyInferenceBase
 from qhbmlib.inference.ebm_utils import probabilities
-from qhbmlib.inference.ebm_utils import relaxed_categorical_probabilities
-from qhbmlib.inference.ebm_utils import relaxed_categorical_samples
 from qhbmlib.inference.qhbm import QHBM
 from qhbmlib.inference.qhbm_utils import density_matrix
 from qhbmlib.inference.qhbm_utils import fidelity
@@ -40,8 +38,6 @@ __all__ = [
     "QHBM",
     "qmhl",
     "QuantumInference",
-    "relaxed_categorical_probabilities",
-    "relaxed_categorical_samples",
     "unitary",
     "vqt",
 ]
