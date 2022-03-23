@@ -38,13 +38,31 @@ def probabilities(input_energy: energy.BitstringEnergy):
   return energy_exp / partition
 
 
+def _relaxed_categorical_ratio(num_bits, num_unique):
+  """Sets the ratio between categorical and uniform distributions.
+
+  Args:
+    num_bits: Number of bits in a sample.
+    num_unique: Number of unique samples used to form the relaxed categorical.
+
+  Returns:
+    The probability that a sample of the relaxed categorical is drawn from the
+      categorical over constructor bitstrings.
+  """
+  # set so that if `num_unique == 0`, then return is 0
+  numerator = tf.math.log(tf.cast(num_unique + 1, tf.float32))
+  denominator = tf.math.reduce_logsumexp([num_bits * tf.math.log(2.0), 0.0])
+  return numerator / denominator
+
+
 def relaxed_categorical_probabilities(category_samples, input_samples):
   """Returns the probabilities of samples relative to a relaxed categorical.
 
   Args:
     category_samples: 2D `tf.int8` tensor whose rows are bitstrings sampled from
       the target distribution approximated by the relaxed categorical.
-    num_resamples: number of times to sample from the 
+    num_resamples: 2D `tf.int8` tensor whose rows are bitstrings whose
+      probabilities are to be computed against the relaxed categorical.
 
   Returns:
     The probability of each entry of `input_samples`.
@@ -54,11 +72,8 @@ def relaxed_categorical_probabilities(category_samples, input_samples):
   categorical_probabilities = tf.cast(counts, tf.float32) / tf.cast(normalizing_constant, tf.float32)
 
   num_unique_samples = tf.shape(unique_samples)[0]
-  # set so that if `num_unique_samples == 0`, then `categorical_weight == 0`
-  numerator = tf.math.log(tf.cast(num_unique_samples + 1, tf.float32))
   num_bits = tf.shape(category_samples)[1]
-  denominator = tf.math.reduce_logsumexp([num_bits * tf.math.log(2.0), 0.0])
-  categorical_weight = numerator / denominator
+  categorical_weight = _relaxed_categorical_ratio(num_bits, num_unique_samples)
 
   uniform_probability = tf.math.pow(2.0, -num_bits)
 
@@ -66,17 +81,17 @@ def relaxed_categorical_probabilities(category_samples, input_samples):
     """Returns the probability of a single bitstring."""
     tiled_bitstring = tf.tile(tf.expand_dims(bitstring, 0), [num_unique_samples, 1])
     bitstring_matches = tf.math.reduce_all(tf.math.equal(tiled_bitstring, unique_samples), 1)
+    prob = 0
     if tf.math.reduce_any(bitstring_matches):
       index = tf.where(bitstring_matches)[0][0]
-      prob = categorical_weight * categorical_probabilities[index]
-    else:
-      prob = (1.0 - categorical_weight) * uniform_probability
+      prob = prob + categorical_weight * categorical_probabilities[index]
+    prob = prob + (1.0 - categorical_weight) * uniform_probability
     return prob
 
   return tf.map_fn(bitstring_prob, input_samples, fn_output_signature=tf.float32)
 
 
-def relaxed_categorical_sampler(category_samples, num_resamples):
+def relaxed_categorical_samples(category_samples, num_resamples):
   """Returns samples from a relaxed categorical distribution.
 
   Args:
@@ -95,11 +110,8 @@ def relaxed_categorical_sampler(category_samples, num_resamples):
 
   # Choose how many times we sample from categorical versus uniform distribution
   num_unique_samples = tf.shape(unique_samples)[0]
-  # set so that if `num_unique_samples == 0`, then `categorical_weight == 0`
-  numerator = tf.math.log(tf.cast(num_unique_samples + 1, tf.float32))
   num_bits = tf.shape(category_samples)[1]
-  denominator = tf.math.reduce_logsumexp([num_bits * tf.math.log(2.0), 0.0])
-  categorical_weight = numerator / denominator
+  categorical_weight = _relaxed_categorical_ratio(num_bits, num_unique_samples)
   binary_samples = tfp.distributions.Bernoulli(probs=[categorical_weight]).sample(num_resamples)
   _, _, resample_choices = utils.unique_bitstrings_with_counts(binary_samples)
 

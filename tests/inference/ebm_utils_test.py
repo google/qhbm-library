@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for qhbmlib.inference.ebm_utils"""
 
+import itertools
 import random
 
 import tensorflow as tf
@@ -51,6 +52,35 @@ class ProbabilitiesTest(tf.test.TestCase):
 
     probabilities_wrapped = tf.function(inference.probabilities)
     actual_probabilities = probabilities_wrapped(actual_energy)
+    self.assertAllClose(actual_probabilities, expected_probabilities)
+
+
+class RelaxedCategoricalTest(tf.test.TestCase):
+  """Tests relaxed categorical utilities."""
+
+  def test_relaxed_categorical_probabilities(self):
+    """Checks probabilities of all bitstrings."""
+    num_bits = 3
+    category_bitstrings = tf.constant([
+        [0, 0, 0],
+        [0, 0, 0],
+        [0, 0, 0],
+        [0, 1, 0],
+        [1, 1, 0],
+        [1, 1, 0],
+        [1, 1, 1]], dtype=tf.int8)
+    num_unique = 4
+    categorical_prob_contributions = tf.constant([3.0/7, 0.0, 1.0/7, 0.0, 0.0, 0.0, 2.0/7, 1.0/7])
+    
+    uniform_prob_contributions = tf.constant([1.0/8] * 8)
+    ratio = inference.ebm_utils._relaxed_categorical_ratio(num_bits, num_unique)
+    expected_probabilities = ratio * categorical_prob_contributions + (1.0 - ratio) * uniform_prob_contributions
+    self.assertAllClose(tf.reduce_sum(expected_probabilities), 1.0)
+    
+    input_bitstrings = tf.constant(
+        list(itertools.product([0, 1], repeat=num_bits)),
+        dtype=tf.int8)
+    actual_probabilities = relaxed_categorical_probabilities(category_bitstrings, input_bitstrings)
     self.assertAllClose(actual_probabilities, expected_probabilities)
 
 
