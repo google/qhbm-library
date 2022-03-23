@@ -68,7 +68,8 @@ class EnergyInferenceTest(tf.test.TestCase):
     self.tfp_seed = tf.constant([3, 4], tf.int32)
     self.tf_random_seed = 4
     energy_init = tf.keras.initializers.RandomUniform(seed=self.tf_random_seed)
-    self.energy = models.BernoulliEnergy(list(range(self.num_bits)), initializer=energy_init)
+    self.energy = models.BernoulliEnergy(
+        list(range(self.num_bits)), initializer=energy_init)
     # TODO(#209)
     _ = self.energy(tf.constant([[0] * self.num_bits], dtype=tf.int8))
     self.ebm = self.EnergyInferenceBernoulliSampler(self.energy,
@@ -90,7 +91,8 @@ class EnergyInferenceTest(tf.test.TestCase):
 
     def manual_entropy():
       """Returns the exact entropy of the distribution."""
-      return tf.reduce_sum(tfp.distributions.Bernoulli(logits=self.energy.logits).entropy())
+      return tf.reduce_sum(
+          tfp.distributions.Bernoulli(logits=self.energy.logits).entropy())
 
     expected_entropy = manual_entropy()
     entropy_wrapper = tf.function(self.ebm.entropy)
@@ -98,8 +100,7 @@ class EnergyInferenceTest(tf.test.TestCase):
     self.assertAllClose(actual_entropy, expected_entropy, rtol=self.close_rtol)
 
     expected_gradient = test_util.approximate_gradient(
-        manual_entropy,
-        self.energy.trainable_variables)
+        manual_entropy, self.energy.trainable_variables)
     with tf.GradientTape() as tape:
       value = entropy_wrapper()
     actual_gradient = tape.gradient(value, self.energy.trainable_variables)
@@ -149,7 +150,10 @@ class EnergyInferenceTest(tf.test.TestCase):
 
     expected_gradient = test_util.approximate_gradient(
         manual_log_partition, self.energy.trainable_variables)
-    self.assertNotAllClose(tf.math.abs(expected_gradient), tf.zeros_like(expected_gradient), atol=self.not_zero_atol)
+    self.assertNotAllClose(
+        tf.math.abs(expected_gradient),
+        tf.zeros_like(expected_gradient),
+        atol=self.not_zero_atol)
     with tf.GradientTape() as tape:
       v = log_partition_wrapper()
     actual_gradient = tape.gradient(v, self.energy.trainable_variables)
@@ -576,7 +580,6 @@ class EnergyInferenceTest(tf.test.TestCase):
 #     _, _, counts = utils.unique_bitstrings_with_counts(samples)
 #     self.assertAllClose(1.0, counts[0] / counts[1], rtol=self.close_rtol)
 
-
 # class BernoulliEnergyInferenceTest(tf.test.TestCase):
 #   """Tests the BernoulliEnergyInference class."""
 
@@ -780,7 +783,6 @@ class EnergyInferenceTest(tf.test.TestCase):
 #     # Check that the fraction is approximately 0.5 (equal counts)
 #     _, _, counts = utils.unique_bitstrings_with_counts(samples)
 #     self.assertAllClose(1.0, counts[0] / counts[1], rtol=self.close_rtol)
-
 
 if __name__ == "__main__":
   print("Running ebm_test.py ...")
