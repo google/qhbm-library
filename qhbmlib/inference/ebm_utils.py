@@ -71,30 +71,29 @@ def relaxed_categorical_probabilities(category_samples, input_samples):
   unique_samples, _, counts = utils.unique_bitstrings_with_counts(
       category_samples)
   normalizing_constant = tf.math.reduce_sum(counts)
-  categorical_probabilities = tf.cast(counts, tf.float32) / tf.cast(
+  categorical_probs = tf.cast(counts, tf.float32) / tf.cast(
       normalizing_constant, tf.float32)
-
   num_unique_samples = tf.shape(unique_samples)[0]
   num_bits = tf.shape(category_samples)[1]
   categorical_weight = _relaxed_categorical_ratio(num_bits, num_unique_samples)
+  expanded_categorical_probs = tf.concat([categorical_weight * categorical_probs, tf.zeros([1])], 0)
 
-  uniform_probability = tf.math.pow(2.0, -1.0 * tf.cast(num_bits, tf.float32))
+  uniform_probs = tf.expand_dims(tf.math.pow(2.0, -1.0 * tf.cast(num_bits, tf.float32)), 0)
+  expanded_uniform_probs = (1.0 - categorical_weight) * tf.tile(uniform_probs, [num_unique_samples + 1])
+  # First num_unique_samples entries are the probabilities in the relaxed
+  # categorical for the corresponding unique_sample.
+  possible_probs = expanded_categorical_probs + expanded_uniform_probs
 
-  def bitstring_prob(bitstring):
-    """Returns the probability of a single bitstring."""
-    tiled_bitstring = tf.tile(
-        tf.expand_dims(bitstring, 0), [num_unique_samples, 1])
-    bitstring_matches = tf.math.reduce_all(
-        tf.math.equal(tiled_bitstring, unique_samples), 1)
-    prob = 0.0
-    if tf.math.reduce_any(bitstring_matches):
-      index = tf.where(bitstring_matches)[0][0]
-      prob = prob + categorical_weight * categorical_probabilities[index]
-    prob = prob + (1.0 - categorical_weight) * uniform_probability
-    return prob
-
-  return tf.map_fn(
-      bitstring_prob, input_samples, fn_output_signature=tf.float32)
+  def get_bitstring_index(bitstring):
+    """Finds the index of the bitstring in the unique samples."""
+    matches = tf.map_fn(lambda x: tf.math.reduce_all(tf.math.equal(bitstring, x)), unique_samples, fn_output_signature=tf.bool)
+    if tf.math.reduce_any(matches):
+      index = tf.where(matches)[0][0]
+    else:
+      index = tf.cast(num_unique_samples, tf.int64)
+    return index
+  all_indices = tf.map_fn(get_bitstring_index, input_samples, fn_output_signature=tf.int64)
+  return tf.gather(possible_probs, all_indices, axis=0)
 
 
 def relaxed_categorical_samples(category_samples, num_resamples):
@@ -124,10 +123,10 @@ def relaxed_categorical_samples(category_samples, num_resamples):
       probs=[1 - categorical_weight]).sample(num_resamples)
   (resample_choices_samples, _, resample_choices_counts) = utils.unique_bitstrings_with_counts(binary_samples)
   resample_choices = tf.constant([0, 0])
-  for i in [0, 1]:
-    if tf.math.reduce_all(tf.math.equal(resample_choices_samples[i], [0])):
+  for i in tf.range(tf.shape(resample_choices_counts)[0]):
+    if tf.math.equal(resample_choices_samples[i][0], 0):
       resample_choices = resample_choices + tf.stack([resample_choices_counts[i], 0])
-    if tf.math.reduce_all(tf.math.equal(resample_choices_samples[i], [1])):
+    if tf.math.equal(resample_choices_samples[i][0], 1):
       resample_choices = resample_choices + tf.stack([0, resample_choices_counts[i]])
 
   # Get samples

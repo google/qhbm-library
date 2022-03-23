@@ -16,6 +16,7 @@
 
 import functools
 import itertools
+import time
 
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -57,11 +58,11 @@ class EnergyInferenceTest(tf.test.TestCase):
     super().setUp()
 
     self.close_rtol = 2e-2
+    self.num_samples = int(1e5)
 
-    self.num_bits = 4
+    self.num_bits = 7
     self.all_bitstrings = tf.constant(
         list(itertools.product([0, 1], repeat=self.num_bits)), dtype=tf.int8)
-    self.num_samples = int(1e6)
     self.tfp_seed = tf.constant([3, 4], tf.int32)
     self.energy = models.BernoulliEnergy(list(range(self.num_bits)))
     # TODO(#209)
@@ -87,8 +88,9 @@ class EnergyInferenceTest(tf.test.TestCase):
       """A manual function for taking expectation values."""
       samples = tfp.distributions.Bernoulli(logits=self.energy.logits).sample(
           self.num_samples, seed=self.tfp_seed)
-      values = f(samples)
-      return tf.reduce_mean(values, 0)
+      unique_samples, _, counts = utils.unique_bitstrings_with_counts(samples)
+      values = f(unique_samples)
+      return utils.weighted_average(counts, values)
 
     expected_expectation = manual_expectation(self.test_function)
     expectation_wrapper = tf.function(self.ebm.expectation)
@@ -117,14 +119,14 @@ class EnergyInferenceTest(tf.test.TestCase):
 
     log_partition_wrapper = tf.function(self.ebm.log_partition)
     actual_value = log_partition_wrapper()
-    self.assertAllClose(actual_value, expected_value)
+    self.assertAllClose(actual_value, expected_value, rtol=self.close_rtol)
 
     expected_gradient = test_util.approximate_gradient(
         manual_log_partition, self.energy.trainable_variables)
     with tf.GradientTape() as tape:
       v = log_partition_wrapper()
     actual_gradient = tape.gradient(v, self.energy.trainable_variables)
-    self.assertAllClose(actual_gradient, expected_gradient)
+    self.assertAllClose(actual_gradient, expected_gradient, rtol=self.close_rtol)
 
 
 # class AnalyticEnergyInferenceTest(tf.test.TestCase):

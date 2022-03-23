@@ -17,6 +17,7 @@
 import abc
 import functools
 import itertools
+import time
 from typing import Union
 
 import tensorflow as tf
@@ -345,11 +346,22 @@ class EnergyInference(EnergyInferenceBase):
 
   def _log_partition_forward_pass(self):
     """Returns approximation to the log partition function."""
+    start = time.time()
     prior_samples = self.sample(self.num_expectation_samples)
+    end = time.time()
+    print(f"prior_samples time: {end - start}")
+
+    start = time.time()
     relaxed_samples = ebm_utils.relaxed_categorical_samples(
         prior_samples, self.num_expectation_samples)
+    end = time.time()
+    print(f"relaxed_samples time: {end - start}")
+
+    start = time.time()
     relaxed_probs = ebm_utils.relaxed_categorical_probabilities(
         prior_samples, relaxed_samples)
+    end = time.time()
+    print(f"relaxed_probs time: {end - start}")
     unnormalized_weights = tf.math.pow(relaxed_probs,
                                        -1.0 * tf.ones(tf.shape(relaxed_probs)))
     partition_function = (1.0 /
