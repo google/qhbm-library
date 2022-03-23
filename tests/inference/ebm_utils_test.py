@@ -80,7 +80,7 @@ class RelaxedCategoricalTest(tf.test.TestCase):
     input_bitstrings = tf.constant(
         list(itertools.product([0, 1], repeat=num_bits)),
         dtype=tf.int8)
-    actual_probabilities = relaxed_categorical_probabilities(category_bitstrings, input_bitstrings)
+    actual_probabilities = inference.relaxed_categorical_probabilities(category_bitstrings, input_bitstrings)
     self.assertAllClose(actual_probabilities, expected_probabilities)
 
 

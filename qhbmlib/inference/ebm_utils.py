@@ -51,7 +51,7 @@ def _relaxed_categorical_ratio(num_bits, num_unique):
   """
   # set so that if `num_unique == 0`, then return is 0
   numerator = tf.math.log(tf.cast(num_unique + 1, tf.float32))
-  denominator = tf.math.reduce_logsumexp([num_bits * tf.math.log(2.0), 0.0])
+  denominator = tf.math.reduce_logsumexp([tf.cast(num_bits, tf.float32) * tf.math.log(2.0), 0.0])
   return numerator / denominator
 
 
@@ -67,7 +67,7 @@ def relaxed_categorical_probabilities(category_samples, input_samples):
   Returns:
     The probability of each entry of `input_samples`.
   """
-  unique_samples, _, counts = utils.unique_bitstrings_with_counts(samples)
+  unique_samples, _, counts = utils.unique_bitstrings_with_counts(category_samples)
   normalizing_constant = tf.math.reduce_sum(counts)
   categorical_probabilities = tf.cast(counts, tf.float32) / tf.cast(normalizing_constant, tf.float32)
 
@@ -75,7 +75,7 @@ def relaxed_categorical_probabilities(category_samples, input_samples):
   num_bits = tf.shape(category_samples)[1]
   categorical_weight = _relaxed_categorical_ratio(num_bits, num_unique_samples)
 
-  uniform_probability = tf.math.pow(2.0, -num_bits)
+  uniform_probability = tf.math.pow(2.0, -tf.cast(num_bits, tf.float32))
 
   def bitstring_prob(bitstring):
     """Returns the probability of a single bitstring."""
