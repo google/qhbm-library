@@ -61,7 +61,7 @@ def relaxed_categorical_probabilities(category_samples, input_samples):
   Args:
     category_samples: 2D `tf.int8` tensor whose rows are bitstrings sampled from
       the target distribution approximated by the relaxed categorical.
-    num_resamples: 2D `tf.int8` tensor whose rows are bitstrings whose
+    num_samples: 2D `tf.int8` tensor whose rows are bitstrings whose
       probabilities are to be computed against the relaxed categorical.
 
   Returns:
@@ -103,7 +103,7 @@ def relaxed_categorical_samples(category_samples, num_resamples):
     Samples from the relaxed categorical.
   """
   # Set up categorical over given samples
-  unique_samples, _, counts = utils.unique_bitstrings_with_counts(samples)
+  unique_samples, _, counts = utils.unique_bitstrings_with_counts(category_samples)
   normalizing_constant = tf.math.reduce_sum(counts)
   categorical_probabilities = tf.cast(counts, tf.float32) / tf.cast(normalizing_constant, tf.float32)
   categorical = tfp.distributions.Categorical(probs=categorical_probabilities)
@@ -118,6 +118,6 @@ def relaxed_categorical_samples(category_samples, num_resamples):
   # Get samples
   raw_categorical_samples = categorical.sample(resample_choices[0])
   categorical_samples = tf.gather(unique_samples, raw_categorical_samples, axis=0)
-  uniform_samples = tfp.distributions.Bernoulli(logits=[0.0] * num_bits, dtype=tf.int8).sample(resample_choices[1])
+  uniform_samples = tfp.distributions.Bernoulli(logits=tf.zeros([num_bits]), dtype=tf.int8).sample(resample_choices[1])
 
   return tf.concat([categorical_samples, uniform_samples], 0)
