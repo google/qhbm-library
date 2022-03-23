@@ -51,7 +51,8 @@ def _relaxed_categorical_ratio(num_bits, num_unique):
   """
   # set so that if `num_unique == 0`, then return is 0
   numerator = tf.math.log(tf.cast(num_unique + 1, tf.float32))
-  denominator = tf.math.reduce_logsumexp([tf.cast(num_bits, tf.float32) * tf.math.log(2.0), 0.0])
+  denominator = tf.math.reduce_logsumexp(
+      [tf.cast(num_bits, tf.float32) * tf.math.log(2.0), 0.0])
   return numerator / denominator
 
 
@@ -67,9 +68,11 @@ def relaxed_categorical_probabilities(category_samples, input_samples):
   Returns:
     The probability of each entry of `input_samples`.
   """
-  unique_samples, _, counts = utils.unique_bitstrings_with_counts(category_samples)
+  unique_samples, _, counts = utils.unique_bitstrings_with_counts(
+      category_samples)
   normalizing_constant = tf.math.reduce_sum(counts)
-  categorical_probabilities = tf.cast(counts, tf.float32) / tf.cast(normalizing_constant, tf.float32)
+  categorical_probabilities = tf.cast(counts, tf.float32) / tf.cast(
+      normalizing_constant, tf.float32)
 
   num_unique_samples = tf.shape(unique_samples)[0]
   num_bits = tf.shape(category_samples)[1]
@@ -79,8 +82,10 @@ def relaxed_categorical_probabilities(category_samples, input_samples):
 
   def bitstring_prob(bitstring):
     """Returns the probability of a single bitstring."""
-    tiled_bitstring = tf.tile(tf.expand_dims(bitstring, 0), [num_unique_samples, 1])
-    bitstring_matches = tf.math.reduce_all(tf.math.equal(tiled_bitstring, unique_samples), 1)
+    tiled_bitstring = tf.tile(
+        tf.expand_dims(bitstring, 0), [num_unique_samples, 1])
+    bitstring_matches = tf.math.reduce_all(
+        tf.math.equal(tiled_bitstring, unique_samples), 1)
     prob = 0
     if tf.math.reduce_any(bitstring_matches):
       index = tf.where(bitstring_matches)[0][0]
@@ -88,7 +93,8 @@ def relaxed_categorical_probabilities(category_samples, input_samples):
     prob = prob + (1.0 - categorical_weight) * uniform_probability
     return prob
 
-  return tf.map_fn(bitstring_prob, input_samples, fn_output_signature=tf.float32)
+  return tf.map_fn(
+      bitstring_prob, input_samples, fn_output_signature=tf.float32)
 
 
 def relaxed_categorical_samples(category_samples, num_resamples):
@@ -103,21 +109,26 @@ def relaxed_categorical_samples(category_samples, num_resamples):
     Samples from the relaxed categorical.
   """
   # Set up categorical over given samples
-  unique_samples, _, counts = utils.unique_bitstrings_with_counts(category_samples)
+  unique_samples, _, counts = utils.unique_bitstrings_with_counts(
+      category_samples)
   normalizing_constant = tf.math.reduce_sum(counts)
-  categorical_probabilities = tf.cast(counts, tf.float32) / tf.cast(normalizing_constant, tf.float32)
+  categorical_probabilities = tf.cast(counts, tf.float32) / tf.cast(
+      normalizing_constant, tf.float32)
   categorical = tfp.distributions.Categorical(probs=categorical_probabilities)
 
   # Choose how many times we sample from categorical versus uniform distribution
   num_unique_samples = tf.shape(unique_samples)[0]
   num_bits = tf.shape(category_samples)[1]
   categorical_weight = _relaxed_categorical_ratio(num_bits, num_unique_samples)
-  binary_samples = tfp.distributions.Bernoulli(probs=[categorical_weight]).sample(num_resamples)
+  binary_samples = tfp.distributions.Bernoulli(
+      probs=[categorical_weight]).sample(num_resamples)
   _, _, resample_choices = utils.unique_bitstrings_with_counts(binary_samples)
 
   # Get samples
   raw_categorical_samples = categorical.sample(resample_choices[0])
-  categorical_samples = tf.gather(unique_samples, raw_categorical_samples, axis=0)
-  uniform_samples = tfp.distributions.Bernoulli(logits=tf.zeros([num_bits]), dtype=tf.int8).sample(resample_choices[1])
+  categorical_samples = tf.gather(
+      unique_samples, raw_categorical_samples, axis=0)
+  uniform_samples = tfp.distributions.Bernoulli(
+      logits=tf.zeros([num_bits]), dtype=tf.int8).sample(resample_choices[1])
 
   return tf.concat([categorical_samples, uniform_samples], 0)

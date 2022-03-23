@@ -71,7 +71,9 @@ class EnergyInferenceTest(tf.test.TestCase):
     self.energy = models.BernoulliEnergy(list(range(self.num_bits)))
     # TODO(#209)
     _ = self.energy(tf.constant([[0] * self.num_bits], dtype=tf.int8))
-    self.ebm = self.EnergyInferenceBernoulliSampler(self.energy, self.num_samples, self.tfp_seed)
+    self.ebm = self.EnergyInferenceBernoulliSampler(self.energy,
+                                                    self.num_samples,
+                                                    self.tfp_seed)
 
     spins_from_bitstrings = models.SpinsFromBitstrings()
     parity = models.Parity(list(range(self.num_bits)), 2)
@@ -88,20 +90,25 @@ class EnergyInferenceTest(tf.test.TestCase):
 
     def manual_expectation(f):
       """A manual function for taking expectation values."""
-      samples = tfp.distributions.Bernoulli(logits=self.energy.logits).sample(self.num_samples, seed=self.tfp_seed)
+      samples = tfp.distributions.Bernoulli(logits=self.energy.logits).sample(
+          self.num_samples, seed=self.tfp_seed)
       values = f(samples)
       return tf.reduce_mean(values, 0)
-    
+
     expected_expectation = manual_expectation(self.test_function)
     expectation_wrapper = tf.function(self.ebm.expectation)
     actual_expectation = expectation_wrapper(self.test_function)
-    self.assertAllClose(actual_expectation, expected_expectation, rtol=self.close_rtol)
+    self.assertAllClose(
+        actual_expectation, expected_expectation, rtol=self.close_rtol)
 
-    expected_gradient = test_util.approximate_gradient(functools.partial(manual_expectation, self.test_function), self.energy.trainable_variables)
+    expected_gradient = test_util.approximate_gradient(
+        functools.partial(manual_expectation, self.test_function),
+        self.energy.trainable_variables)
     with tf.GradientTape() as tape:
       value = expectation_wrapper(self.test_function)
     actual_gradient = tape.gradient(value, self.energy.trainable_variables)
-    self.assertAllClose(actual_gradient, expected_gradient, rtol=self.close_rtol)
+    self.assertAllClose(
+        actual_gradient, expected_gradient, rtol=self.close_rtol)
 
 
 # class AnalyticEnergyInferenceTest(tf.test.TestCase):
@@ -523,7 +530,6 @@ class EnergyInferenceTest(tf.test.TestCase):
 #     _, _, counts = utils.unique_bitstrings_with_counts(samples)
 #     self.assertAllClose(1.0, counts[0] / counts[1], rtol=self.close_rtol)
 
-
 # class BernoulliEnergyInferenceTest(tf.test.TestCase):
 #   """Tests the BernoulliEnergyInference class."""
 
@@ -727,7 +733,6 @@ class EnergyInferenceTest(tf.test.TestCase):
 #     # Check that the fraction is approximately 0.5 (equal counts)
 #     _, _, counts = utils.unique_bitstrings_with_counts(samples)
 #     self.assertAllClose(1.0, counts[0] / counts[1], rtol=self.close_rtol)
-
 
 if __name__ == "__main__":
   print("Running ebm_test.py ...")
