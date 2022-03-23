@@ -580,6 +580,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     _, _, counts = utils.unique_bitstrings_with_counts(samples)
     self.assertAllClose(1.0, counts[0] / counts[1], rtol=self.close_rtol)
 
+
 class BernoulliEnergyInferenceTest(tf.test.TestCase):
   """Tests the BernoulliEnergyInference class."""
 

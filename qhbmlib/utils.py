@@ -102,7 +102,7 @@ def bitstrings_to_integers(bitstrings):
     bitstrings: 2D `tf.int8` tensor whose rows are bitstrings.
 
   Returns:
-    Integer representation of each bitstring.
+    Integer representation of each input bitstring.
   """
   bitwidth = tf.shape(bitstrings)[1]
   twos = 2 * tf.ones([bitwidth], dtype=tf.int64)
@@ -117,9 +117,12 @@ def integers_to_bitstrings(integers, bitwidth):
 
   Assumes left most bit is most significant.
 
+  Args:
+    integers: 1D tensor of integers to convert to bitstrings.
+    bitwidth: Integer which sets the length of resulting bitstrings.
 
   Returns:
-    
+    Bitstring representation of each input integer.
   """
   expanded_integers = tf.expand_dims(tf.cast(integers, tf.int64), 1)
   shift_amounts = tf.reverse(tf.range(bitwidth, dtype=tf.int64), [0])
