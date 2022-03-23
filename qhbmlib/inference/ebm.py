@@ -23,6 +23,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow_probability import distributions as tfd
 
+from qhbmlib.inference import ebm_utils
 from qhbmlib.models import energy
 from qhbmlib import utils
 
@@ -255,6 +256,10 @@ class EnergyInference(EnergyInferenceBase):
     super().__init__(input_energy, initial_seed, name)
     self.num_expectation_samples = num_expectation_samples
 
+  def _entropy(self): 
+    """Default implementation wrapped by `self.entropy`."""
+    return self.expectation(self.energy) + self.log_partition_function()
+
   def _expectation(self, function):
     """Default implementation wrapped by `self.expectation`.
 
@@ -338,10 +343,14 @@ class EnergyInference(EnergyInferenceBase):
 
     return _inner_log_partition()
 
-  @abc.abstractmethod
   def _log_partition_forward_pass(self):
     """Returns approximation to the log partition function."""
-    raise NotImplementedError()
+    prior_samples = self.sample(self.num_expectation_samples)
+    relaxed_samples = ebm_utils.relaxed_categorical_samples(prior_samples, self.num_expectation_samples)
+    relaxed_probs = ebm_utils.relaxed_categorical_probabilities(prior_samples, relaxed_samples)
+    unnormalized_weights = tf.math.pow(relaxed_probs, -1.0 * tf.ones(tf.shape(relaxed_probs)))
+    partition_function = (1.0 / tf.cast(self.num_expectation_samples, tf.float32)) * tf.math.reduce_sum(unnormalized_weights)
+    return tf.math.log(partition_function)
 
   def _log_partition_grad_generator(self):
     """Returns default estimator for the log partition function derivative."""
