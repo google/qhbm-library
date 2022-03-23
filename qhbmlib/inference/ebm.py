@@ -23,7 +23,6 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow_probability import distributions as tfd
 
-from qhbmlib.inference import ebm_utils
 from qhbmlib.models import energy
 from qhbmlib import utils
 

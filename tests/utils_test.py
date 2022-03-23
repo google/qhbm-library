@@ -230,7 +230,7 @@ class TestBitstringConversions(tf.test.TestCase):
     self.assertAllEqual(actual_integer, [-1])
     with self.assertRaisesRegex(
         ValueError, expected_regex="out-of-range integer"):
-      bad_integer = tf.constant([2**(size_limit + 1) - 1], dtype=tf.int64)
+      _ = tf.constant([2**(size_limit + 1) - 1], dtype=tf.int64)
 
 
 if __name__ == "__main__":
