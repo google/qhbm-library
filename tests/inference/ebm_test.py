@@ -126,7 +126,8 @@ class EnergyInferenceTest(tf.test.TestCase):
     with tf.GradientTape() as tape:
       v = log_partition_wrapper()
     actual_gradient = tape.gradient(v, self.energy.trainable_variables)
-    self.assertAllClose(actual_gradient, expected_gradient, rtol=self.close_rtol)
+    self.assertAllClose(
+        actual_gradient, expected_gradient, rtol=self.close_rtol)
 
 
 class AnalyticEnergyInferenceTest(tf.test.TestCase):
@@ -547,6 +548,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     # Check that the fraction is approximately 0.5 (equal counts)
     _, _, counts = utils.unique_bitstrings_with_counts(samples)
     self.assertAllClose(1.0, counts[0] / counts[1], rtol=self.close_rtol)
+
 
 class BernoulliEnergyInferenceTest(tf.test.TestCase):
   """Tests the BernoulliEnergyInference class."""
