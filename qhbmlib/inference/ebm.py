@@ -347,7 +347,7 @@ class EnergyInference(EnergyInferenceBase):
     """Returns approximation to the log partition function.
 
     Note this simple estimator is biased.  See the paper appendix for its
-    motivation.
+    motivation.  TODO(#216)
     """
     samples = self.sample(self.num_expectation_samples)
     unique_samples, _, _ = utils.unique_bitstrings_with_counts(samples)
