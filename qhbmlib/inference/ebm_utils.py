@@ -86,7 +86,7 @@ def relaxed_categorical_probabilities(category_samples, input_samples):
         tf.expand_dims(bitstring, 0), [num_unique_samples, 1])
     bitstring_matches = tf.math.reduce_all(
         tf.math.equal(tiled_bitstring, unique_samples), 1)
-    prob = 0
+    prob = 0.0
     if tf.math.reduce_any(bitstring_matches):
       index = tf.where(bitstring_matches)[0][0]
       prob = prob + categorical_weight * categorical_probabilities[index]
