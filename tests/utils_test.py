@@ -15,6 +15,7 @@
 """Tests for qhbmlib.utils"""
 
 from absl.testing import parameterized
+import itertools
 
 import tensorflow as tf
 
@@ -184,6 +185,49 @@ class UniqueBitstringsWithCountsTest(parameterized.TestCase, tf.test.TestCase):
     actual_outputs = expand_unique_results_wrapper(compressed_outputs,
                                                    actual_idx)
     self.assertAllEqual(actual_outputs, expected_outputs)
+
+
+class TestBitstringConversions(tf.test.TestCase):
+  """Tests the conversions between bitstrings and integers."""
+
+  def setUp(self):
+    """Define test constants."""
+    self.num_bits = 3
+    seed = 11
+    tf.random.set_seed(seed)
+    all_bitstrings = tf.constant(list(itertools.product([0, 1], repeat=self.num_bits)), dtype=tf.int8)
+    tf.random.set_seed(seed)
+    self.bitstrings = tf.random.shuffle(all_bitstrings, seed=seed)
+    all_integers = tf.range(2 ** self.num_bits)
+    tf.random.set_seed(seed)
+    self.integers = tf.random.shuffle(all_integers, seed=seed)
+    
+  def test_bitstrings_to_integers(self):
+    """Confirms bitstrings convert to expected integers."""
+    actual_integers = utils.bitstrings_to_integers(self.bitstrings)
+    self.assertAllEqual(actual_integers, self.integers)
+
+  def test_integers_to_bitstrings(self):
+    """Confirms integers convert to expected bitstrings."""
+    actual_bitstrings = utils.integers_to_bitstrings(self.integers, self.num_bits)
+    self.assertAllEqual(actual_bitstrings, self.bitstrings)
+
+  def test_overflow(self):
+    """Confirms that going too large is broken."""
+    size_limit = 63
+    ok_bitstring = tf.ones([1, size_limit], tf.int8)
+    ok_integer = tf.constant([2 ** size_limit - 1], dtype=tf.int64)
+    actual_integer = utils.bitstrings_to_integers(ok_bitstring)
+    actual_bitstring = utils.integers_to_bitstrings(ok_integer, size_limit)
+    self.assertAllEqual(actual_integer, ok_integer)
+    self.assertAllEqual(actual_bitstring, ok_bitstring)
+
+    # Beyond 63, shift wraps around
+    bad_bitstring = tf.ones([1, size_limit + 1], tf.int8)
+    actual_integer = utils.bitstrings_to_integers(bad_bitstring)
+    self.assertAllEqual(actual_integer, [-1])
+    with self.assertRaisesRegex(ValueError, expected_regex="out-of-range integer"):
+      bad_integer = tf.constant([2 ** (size_limit + 1) - 1], dtype=tf.int64)
 
 
 if __name__ == "__main__":

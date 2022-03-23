@@ -38,6 +38,14 @@ def probabilities(input_energy: energy.BitstringEnergy):
   return energy_exp / partition
 
 
+def get_relaxed_categorical_distribution(category_samples):
+  """Returns the relaxed categorical distribution corresponding to the inputs.
+
+  Args:
+    category_samples: The bitstrings on which to base the distribution.
+"""
+  
+
 def _relaxed_categorical_ratio(num_bits, num_unique):
   """Sets the ratio between categorical and uniform distributions.
 
