@@ -121,8 +121,14 @@ def relaxed_categorical_samples(category_samples, num_resamples):
   num_bits = tf.shape(category_samples)[1]
   categorical_weight = _relaxed_categorical_ratio(num_bits, num_unique_samples)
   binary_samples = tfp.distributions.Bernoulli(
-      probs=[categorical_weight]).sample(num_resamples)
-  _, _, resample_choices = utils.unique_bitstrings_with_counts(binary_samples)
+      probs=[1 - categorical_weight]).sample(num_resamples)
+  (resample_choices_samples, _, resample_choices_counts) = utils.unique_bitstrings_with_counts(binary_samples)
+  resample_choices = tf.constant([0, 0])
+  for i in [0, 1]:
+    if tf.math.reduce_all(tf.math.equal(resample_choices_samples[i], [0])):
+      resample_choices = resample_choices + tf.stack([resample_choices_counts[i], 0])
+    if tf.math.reduce_all(tf.math.equal(resample_choices_samples[i], [1])):
+      resample_choices = resample_choices + tf.stack([0, resample_choices_counts[i]])
 
   # Get samples
   raw_categorical_samples = categorical.sample(resample_choices[0])

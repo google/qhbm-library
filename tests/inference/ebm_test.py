@@ -60,8 +60,7 @@ class EnergyInferenceTest(tf.test.TestCase):
 
     self.num_bits = 4
     self.all_bitstrings = tf.constant(
-        list(itertools.product([0, 1], repeat=self.num_bits)),
-        dtype=tf.int8)
+        list(itertools.product([0, 1], repeat=self.num_bits)), dtype=tf.int8)
     self.num_samples = int(1e6)
     self.tfp_seed = tf.constant([3, 4], tf.int32)
     self.energy = models.BernoulliEnergy(list(range(self.num_bits)))
@@ -109,21 +108,23 @@ class EnergyInferenceTest(tf.test.TestCase):
   @test_util.eager_mode_toggle
   def test_log_partition(self):
     """Confirms log partition function and derivative match analytic."""
+
     def manual_log_partition():
       """Returns the exact log partition function."""
       return tf.reduce_logsumexp(-1.0 * self.energy(self.all_bitstrings))
+
     expected_value = manual_log_partition()
 
     log_partition_wrapper = tf.function(self.ebm.log_partition)
     actual_value = log_partition_wrapper()
     self.assertAllClose(actual_value, expected_value)
 
-    expected_gradient = test_util.approximate_gradient(manual_log_partition, self.energy.trainable_variables)
+    expected_gradient = test_util.approximate_gradient(
+        manual_log_partition, self.energy.trainable_variables)
     with tf.GradientTape() as tape:
       v = log_partition_wrapper()
     actual_gradient = tape.gradient(v, self.energy.trainable_variables)
     self.assertAllClose(actual_gradient, expected_gradient)
-
 
 
 # class AnalyticEnergyInferenceTest(tf.test.TestCase):
@@ -748,7 +749,6 @@ class EnergyInferenceTest(tf.test.TestCase):
 #     # Check that the fraction is approximately 0.5 (equal counts)
 #     _, _, counts = utils.unique_bitstrings_with_counts(samples)
 #     self.assertAllClose(1.0, counts[0] / counts[1], rtol=self.close_rtol)
-
 
 if __name__ == "__main__":
   print("Running ebm_test.py ...")

@@ -80,7 +80,8 @@ class RelaxedCategoricalTest(tf.test.TestCase):
 
     input_bitstrings = tf.constant(
         list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
-    relaxed_categorical_probabilities_wrapper = tf.function(inference.relaxed_categorical_probabilities)
+    relaxed_categorical_probabilities_wrapper = tf.function(
+        inference.relaxed_categorical_probabilities)
     actual_probabilities = relaxed_categorical_probabilities_wrapper(
         category_bitstrings, input_bitstrings)
     self.assertAllClose(actual_probabilities, expected_probabilities)
@@ -108,7 +109,8 @@ class RelaxedCategoricalTest(tf.test.TestCase):
     expected_probabilities = inference.relaxed_categorical_probabilities(
         category_bitstrings, all_bitstrings_tensor)
 
-    relaxed_categorical_samples_wrapper = tf.function(inference.relaxed_categorical_samples)
+    relaxed_categorical_samples_wrapper = tf.function(
+        inference.relaxed_categorical_samples)
     relaxed_bitstrings = relaxed_categorical_samples_wrapper(
         category_bitstrings, num_relaxation_samples)
     unique_relaxed, _, counts_relaxed = utils.unique_bitstrings_with_counts(
