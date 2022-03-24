@@ -568,9 +568,11 @@ class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
     q_i_of_x = self._q_i_of_x(current_state)
     proposed_i = q_i_of_x.sample()
     if current_state[proposed_i] == 0:
-      x_prime = current_state + tf.one_hot(proposed_i, self._num_bits, dtype=tf.int8)
+      x_prime = current_state + tf.one_hot(
+          proposed_i, self._num_bits, dtype=tf.int8)
     else:
-      x_prime = current_state - tf.one_hot(proposed_i, self._num_bits, dtype=tf.int8)
+      x_prime = current_state - tf.one_hot(
+          proposed_i, self._num_bits, dtype=tf.int8)
     q_i_of_x_prime = self._q_i_of_x(x_prime)
     q_ratio = q_i_of_x_prime.probs_parameter(
     )[proposed_i] / q_i_of_x.probs_parameter()[proposed_i]
@@ -632,9 +634,12 @@ class GibbsWithGradientsInference(EnergyInference):
     super().__init__(input_energy, num_expectation_samples, initial_seed, name)
     self._num_burnin_samples = num_burnin_samples
     self._kernel = GibbsWithGradientsKernel(input_energy)
-    self._current_state = tf.Variable(tfp.distributions.Bernoulli(
-        probs=[0.5] * self.energy.num_bits, dtype=tf.int8).sample(), trainable=False)
-    self._traced_one_step = tf.function(self._kernel.one_step).get_concrete_function(self._current_state, [])
+    self._current_state = tf.Variable(
+        tfp.distributions.Bernoulli(
+            probs=[0.5] * self.energy.num_bits, dtype=tf.int8).sample(),
+        trainable=False)
+    self._traced_one_step = tf.function(
+        self._kernel.one_step).get_concrete_function(self._current_state, [])
 
   @property
   def num_burnin_samples(self):
@@ -647,8 +652,7 @@ class GibbsWithGradientsInference(EnergyInference):
 
   def _wrapped_one_step(self):
     """Returns the next state."""
-    next_state, _ = self._traced_one_step(
-          self._current_state, [])
+    next_state, _ = self._traced_one_step(self._current_state, [])
     self._current_state.assign(next_state)
     return next_state
 

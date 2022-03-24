@@ -882,13 +882,13 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
     bits = random.sample(range(1000), num_bits)
     units = random.sample(range(1, 100), num_layers)
     activations = random.sample([
-      "elu", "exponential", "gelu", "hard_sigmoid", "linear", "relu",
-      "selu", "sigmoid", "softmax", "softplus", "softsign", "swish", "tanh"
+        "elu", "exponential", "gelu", "hard_sigmoid", "linear", "relu", "selu",
+        "sigmoid", "softmax", "softplus", "softsign", "swish", "tanh"
     ], num_layers)
     expected_layer_list = []
     for i in range(num_layers):
       expected_layer_list.append(
-        tf.keras.layers.Dense(units[i], activation=activations[i]))
+          tf.keras.layers.Dense(units[i], activation=activations[i]))
     expected_layer_list.append(tf.keras.layers.Dense(1))
     expected_layer_list.append(utils.Squeeze(-1))
     actual_energy = models.BitstringEnergy(bits, expected_layer_list)
@@ -905,10 +905,13 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
     samples = sample_wrapper(num_expectation_samples)
 
     # Check that entyropy of samples is approximately entropy of distribution
-    expected_entropy = inference.AnalyticEnergyInference(actual_energy, num_expectation_samples).entropy()
+    expected_entropy = inference.AnalyticEnergyInference(
+        actual_energy, num_expectation_samples).entropy()
     _, _, actual_counts = utils.unique_bitstrings_with_counts(samples)
-    actual_probs = tf.cast(actual_counts, tf.float32) / tf.cast(tf.math.reduce_sum(actual_counts), tf.float32)
-    actual_entropy = -1.0 * tf.math.reduce_sum(actual_probs * tf.math.log(actual_probs))
+    actual_probs = tf.cast(actual_counts, tf.float32) / tf.cast(
+        tf.math.reduce_sum(actual_counts), tf.float32)
+    actual_entropy = -1.0 * tf.math.reduce_sum(
+        actual_probs * tf.math.log(actual_probs))
     self.assertAllClose(actual_entropy, expected_entropy, rtol=self.close_rtol)
 
 
