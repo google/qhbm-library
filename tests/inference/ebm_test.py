@@ -847,8 +847,6 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
   def setUp(self):
     """Initializes test objects."""
     super().setUp()
-    self.tf_random_seed = 4
-    self.tfp_seed = tf.constant([3, 4], tf.int32)
     self.close_rtol = 1e-2
     self.zero_atol = 1e-5
     self.not_zero_atol = 1e-1
@@ -864,14 +862,13 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
     expected_name = "test_analytic_dist_name"
     actual_layer = inference.GibbsWithGradientsInference(
         expected_energy, expected_num_expectation_samples,
-        expected_num_burnin_samples, expected_seed, expected_name)
+        expected_num_burnin_samples, expected_name)
 
     self.assertEqual(actual_layer.energy, expected_energy)
     self.assertAllEqual(actual_layer.num_expectation_samples,
                         expected_num_expectation_samples)
     self.assertAllEqual(actual_layer.num_burnin_samples,
                         expected_num_burnin_samples)
-    self.assertAllEqual(actual_layer.seed, expected_seed)
     self.assertEqual(actual_layer.name, expected_name)
 
   def test_sample(self):
@@ -904,7 +901,7 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
     sample_wrapper = tf.function(actual_layer.sample)
     samples = sample_wrapper(num_expectation_samples)
 
-    # Check that entyropy of samples is approximately entropy of distribution
+    # Check that entropy of samples is approximately entropy of distribution
     expected_entropy = inference.AnalyticEnergyInference(
         actual_energy, num_expectation_samples).entropy()
     _, _, actual_counts = utils.unique_bitstrings_with_counts(samples)
