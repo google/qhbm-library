@@ -520,6 +520,8 @@ class BernoulliEnergyInference(EnergyInference):
   def _sample(self, num_samples: int):
     """See base class docstring"""
     return self.distribution.sample(num_samples, seed=self.seed)
+
+
 class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
   """Implements the Gibbs With Gradients update rule.
 
@@ -632,6 +634,7 @@ class GibbsWithGradientsInference(EnergyInference):
     self._kernel = GibbsWithGradientsKernel(input_energy)
     self._current_state = tf.Variable(tfp.distributions.Bernoulli(
         probs=[0.5] * self.energy.num_bits, dtype=tf.int8).sample(), trainable=False)
+    self._traced_one_step = tf.function(self._kernel.one_step).get_concrete_function(self._current_state, [])
 
   @property
   def num_burnin_samples(self):
@@ -642,16 +645,21 @@ class GibbsWithGradientsInference(EnergyInference):
     """
     return self._num_burnin_samples
 
+  def _wrapped_one_step(self):
+    """Returns the next state."""
+    next_state, _ = self._traced_one_step(
+          self._current_state, [])
+    self._current_state.assign(next_state)
+    return next_state
+
   def _ready_inference(self):
     """See base class docstring.
 
     Runs the chain for a number of steps without saving the results, in order
     to better reach equilibrium before recording samples.
     """
-    for _ in range(self.num_burnin_samples):
-      next_state, _ = self._kernel.one_step(
-          self._current_state, [])
-      self._current_state.assign(next_state)
+    for _ in tf.range(self.num_burnin_samples):
+      _ = self._wrapped_one_step()
 
   def _call(self, inputs, *args, **kwargs):
     """See base class docstring."""
@@ -664,8 +672,5 @@ class GibbsWithGradientsInference(EnergyInference):
     """
     ta = tf.TensorArray(tf.int8, size=num_samples)
     for i in tf.range(num_samples):
-      next_state, _ = self._kernel.one_step(
-          self._current_state, [])
-      self._current_state.assign(next_state)
-      ta = ta.write(i, self._current_state)
+      ta = ta.write(i, self._wrapped_one_step())
     return ta.stack()
