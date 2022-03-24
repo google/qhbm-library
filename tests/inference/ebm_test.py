@@ -16,6 +16,7 @@
 
 import functools
 import itertools
+import random
 import time
 
 import tensorflow as tf
@@ -784,6 +785,135 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     # Check that the fraction is approximately 0.5 (equal counts)
     _, _, counts = utils.unique_bitstrings_with_counts(samples)
     self.assertAllClose(1.0, counts[0] / counts[1], rtol=self.close_rtol)
+
+
+class GibbsWithGradientsKernelTest(tf.test.TestCase):
+  """Tests the GibbsWithGradientsKernel class."""
+
+  def test_init(self):
+    """Confirms initialization works, and tests basic functions."""
+    bits = [0, 1, 3]
+    order = 2
+    expected_energy = models.KOBE(bits, order)
+    actual_kernel = inference.ebm.GibbsWithGradientsKernel(expected_energy)
+    self.assertEqual(actual_kernel._energy, expected_energy)
+
+    self.assertTrue(actual_kernel.is_calibrated)
+
+    test_initial_state = tf.constant([0] * len(bits), tf.int8)
+    self.assertEqual(actual_kernel.bootstrap_results(test_initial_state), [])
+
+  @test_util.eager_mode_toggle
+  def test_q_i_of_x(self):
+    """Confirms the distribution returned is correct."""
+    bits = [5, 7, 10]
+    test_energy = models.BernoulliEnergy(bits)
+    test_energy.build([None, len(bits)])
+    actual_kernel = inference.ebm.GibbsWithGradientsKernel(test_energy)
+    test_x = tf.constant([0, 1, 1], dtype=tf.int8)
+    q_i_of_x_wrapper = tf.function(actual_kernel._q_i_of_x)
+    actual_distribution = q_i_of_x_wrapper(test_x)
+
+    test_thetas = test_energy.get_weights()[0]
+    test_d_tilde = tf.constant([1, -1, -1], tf.float32) * (-2 * test_thetas)
+    expected_probs = tf.nn.softmax(test_d_tilde / 2)
+
+    self.assertAllClose(actual_distribution.probs_parameter(), expected_probs)
+
+  @test_util.eager_mode_toggle
+  def test_one_step(self):
+    """Confirms transitions occur from high to low energy states."""
+    num_bits = 5
+    test_energy = models.BernoulliEnergy(list(range(num_bits)))
+    test_energy.build([None, num_bits])
+    # Set the energy high for the all zeros state
+    test_energy.set_weights([tf.constant([1000] * num_bits, tf.float32)])
+    actual_kernel = inference.ebm.GibbsWithGradientsKernel(test_energy)
+
+    initial_state = tf.constant([0] * num_bits, tf.int8)
+    initial_energy = test_energy(tf.expand_dims(initial_state, 0))
+
+    one_step_wrapper = tf.function(actual_kernel.one_step)
+    next_state, _ = one_step_wrapper(initial_state, [])
+    next_energy = test_energy(tf.expand_dims(next_state, 0))
+
+    self.assertNotAllEqual(initial_state, next_state)
+    self.assertGreater(initial_energy, next_energy)
+
+
+class GibbsWithGradientsInferenceTest(tf.test.TestCase):
+  """Tests the GibbsWithGradientsInference class."""
+
+  def setUp(self):
+    """Initializes test objects."""
+    super().setUp()
+    self.tf_random_seed = 4
+    self.tfp_seed = tf.constant([3, 4], tf.int32)
+    self.close_rtol = 1e-2
+    self.zero_atol = 1e-5
+    self.not_zero_atol = 1e-1
+
+  def test_init(self):
+    """Confirms internal values are set correctly."""
+    bits = [0, 1, 3]
+    order = 2
+    expected_energy = models.KOBE(bits, order)
+    expected_num_expectation_samples = 14899
+    expected_num_burnin_samples = 32641
+    expected_seed = tf.constant([441, 1191], tf.int32)
+    expected_name = "test_analytic_dist_name"
+    actual_layer = inference.GibbsWithGradientsInference(
+        expected_energy, expected_num_expectation_samples,
+        expected_num_burnin_samples, expected_seed, expected_name)
+
+    self.assertEqual(actual_layer.energy, expected_energy)
+    self.assertAllEqual(actual_layer.num_expectation_samples,
+                        expected_num_expectation_samples)
+    self.assertAllEqual(actual_layer.num_burnin_samples,
+                        expected_num_burnin_samples)
+    self.assertAllEqual(actual_layer.seed, expected_seed)
+    self.assertEqual(actual_layer.name, expected_name)
+
+  def test_sample(self):
+    """Confirms that bitstrings are sampled as expected."""
+    # Set up energy function
+    num_bits = 5
+    num_layers = 3
+    bits = random.sample(range(1000), num_bits)
+    units = random.sample(range(1, 100), num_layers)
+    activations = random.sample([
+      "elu", "exponential", "gelu", "hard_sigmoid", "linear", "relu",
+      "selu", "sigmoid", "softmax", "softplus", "softsign", "swish", "tanh"
+    ], num_layers)
+    expected_layer_list = []
+    for i in range(num_layers):
+      expected_layer_list.append(
+        tf.keras.layers.Dense(units[i], activation=activations[i]))
+    expected_layer_list.append(tf.keras.layers.Dense(1))
+    expected_layer_list.append(utils.Squeeze(-1))
+    actual_energy = models.BitstringEnergy(bits, expected_layer_list)
+
+    # Sampler
+    num_expectation_samples = int(1e3)
+    num_burnin_samples = int(1e2)
+    actual_layer = inference.GibbsWithGradientsInference(
+        actual_energy, num_expectation_samples, num_burnin_samples)
+
+    sample_wrapper = tf.function(actual_layer.sample)
+
+    start = time.time()
+    samples = sample_wrapper(num_expectation_samples)
+    end = time.time()
+    delta = end - start
+    print(f"Initial call to sample_wrapper: {delta}")
+
+    start = time.time()
+    samples = sample_wrapper(num_expectation_samples)
+    end = time.time()
+    delta = end - start
+    print(f"Second call to sample_wrapper: {delta}")
+
+    assert False
 
 
 if __name__ == "__main__":

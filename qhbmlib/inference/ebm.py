@@ -520,3 +520,152 @@ class BernoulliEnergyInference(EnergyInference):
   def _sample(self, num_samples: int):
     """See base class docstring"""
     return self.distribution.sample(num_samples, seed=self.seed)
+class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
+  """Implements the Gibbs With Gradients update rule.
+
+  See Algorithm 1 of
+  https://arxiv.org/abs/2102.04509v2
+  for details.
+  """
+
+  def __init__(self, input_energy):
+    """Initializes a GibbsWithGradientsKernel.
+
+    Args:
+      input_energy: The parameterized energy function which helps define the
+        acceptance probabilities of the Markov chain.
+    """
+    self._energy = input_energy
+    self._num_bits = input_energy.num_bits
+    self._parameters = dict(input_energy=input_energy)
+
+  def _q_i_of_x(self, x):
+    """Sets the distribution written in equation 6 of the paper."""
+    x_float = tf.cast(x, tf.float32)
+    with tf.GradientTape() as tape:
+      tape.watch(x_float)
+      current_energy = tf.squeeze(self._energy(tf.expand_dims(x_float, 0)))
+    f_grad = tape.gradient(current_energy, x_float)
+    d_tilde = -(2 * tf.cast(x, tf.float32) - 1) * f_grad
+    i_probs = tf.nn.softmax(d_tilde / 2.0)
+    return tfp.distributions.Categorical(probs=i_probs)
+
+  def one_step(self, current_state, previous_kernel_results, seed=None):
+    """Takes one step of the TransitionKernel.
+
+    Args:
+      current_state: 1D `tf.Tensor` which is the current chain state.
+      previous_kernel_results: Required but unused argument.
+      seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
+
+    Returns:
+      next_state: 1D `Tensor` which is the next state in the chain.
+      kernel_results: Empty list.
+    """
+    del previous_kernel_results
+    q_i_of_x = self._q_i_of_x(current_state)
+    proposed_i = q_i_of_x.sample()
+    if current_state[proposed_i] == 0:
+      x_prime = current_state + tf.one_hot(proposed_i, self._num_bits, dtype=tf.int8)
+    else:
+      x_prime = current_state - tf.one_hot(proposed_i, self._num_bits, dtype=tf.int8)
+    q_i_of_x_prime = self._q_i_of_x(x_prime)
+    q_ratio = q_i_of_x_prime.probs_parameter(
+    )[proposed_i] / q_i_of_x.probs_parameter()[proposed_i]
+    exp_f = tf.math.exp(-self._energy(tf.expand_dims(x_prime, 0)) +
+                        self._energy(tf.expand_dims(current_state, 0)))
+    accept_prob = tf.math.minimum(exp_f * q_ratio, 1.0)
+    accept = tfp.distributions.Bernoulli(
+        probs=accept_prob, dtype=tf.bool).sample()
+    if accept:
+      next_state = x_prime
+    else:
+      next_state = current_state
+    kernel_results = []
+    return next_state, kernel_results
+
+  @property
+  def is_calibrated(self):
+    """Returns `True` if Markov chain converges to specified distribution."""
+    return True
+
+  def bootstrap_results(self, init_state):
+    """Returns an object with the same type as returned by `one_step(...)[1]`.
+
+    Args:
+      init_state: 1D `tf.Tensor` which is the initial chain state.
+
+    Returns:
+      kernel_results: Empty list.
+    """
+    del init_state
+    return []
+
+
+class GibbsWithGradientsInference(EnergyInference):
+  """Manages inference using a Gibbs With Gradients kernel."""
+
+  def __init__(self,
+               input_energy: energy.BitstringEnergy,
+               num_expectation_samples: int,
+               num_burnin_samples: int,
+               initial_seed: Union[None, tf.Tensor] = None,
+               name: Union[None, str] = None):
+    """Initializes a GibbsWithGradientsInference.
+
+    Args:
+      input_energy: The parameterized energy function which defines this
+        distribution via the equations of an energy based model.  This class
+        assumes that all parameters of `energy` are `tf.Variable`s and that
+        they are all returned by `energy.variables`.
+      num_expectation_samples: Number of samples to draw and use for estimating
+        the expectation value.
+      num_burnin_samples: Number of samples to discard when letting the chain
+        equilibrate after updating the parameters of `input_energy`.
+      initial_seed: PRNG seed; see tfp.random.sanitize_seed for details. This
+        seed will be used in the `sample` method.  If None, the seed is updated
+        after every inference call.  Otherwise, the seed is fixed.
+      name: Optional name for the model.
+    """
+    super().__init__(input_energy, num_expectation_samples, initial_seed, name)
+    self._num_burnin_samples = num_burnin_samples
+    self._kernel = GibbsWithGradientsKernel(input_energy)
+    self._current_state = tf.Variable(tfp.distributions.Bernoulli(
+        probs=[0.5] * self.energy.num_bits, dtype=tf.int8).sample(), trainable=False)
+
+  @property
+  def num_burnin_samples(self):
+    """Returns the number of burnin samples discarded by this class.
+
+    Number of samples to discard when letting the chain equilibrate after
+    updating the parameters of `self.energy`.
+    """
+    return self._num_burnin_samples
+
+  def _ready_inference(self):
+    """See base class docstring.
+
+    Runs the chain for a number of steps without saving the results, in order
+    to better reach equilibrium before recording samples.
+    """
+    for _ in range(self.num_burnin_samples):
+      next_state, _ = self._kernel.one_step(
+          self._current_state, [])
+      self._current_state.assign(next_state)
+
+  def _call(self, inputs, *args, **kwargs):
+    """See base class docstring."""
+    return self.sample(inputs)
+
+  def _sample(self, num_samples: int):
+    """See base class docstring.
+
+    The kernel is repeatedly called to traverse a chain of samples.
+    """
+    ta = tf.TensorArray(tf.int8, size=num_samples)
+    for i in tf.range(num_samples):
+      next_state, _ = self._kernel.one_step(
+          self._current_state, [])
+      self._current_state.assign(next_state)
+      ta = ta.write(i, self._current_state)
+    return ta.stack()
