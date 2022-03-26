@@ -222,48 +222,6 @@ def eager_mode_toggle(func):
   return toggled_function
 
 
-def approximate_derivative(f, delta=1e-1):
-  """Approximates the derivative of f using five point stencil.
-  See wikipedia page on "five point stencil",
-  https://en.wikipedia.org/wiki/Five-point_stencil
-  Note: the error of this method scales with delta ** 4.
-  Args:
-    f: Function to approximately differentiate.  Should take one input, which
-      is a parameter setting the perturbation to the parameter to differentiate.
-    delta: size of the fundamental perturbation in the stencil.
-  """
-  forward_twice = tf.nest.flatten(f(2.0 * delta))
-  forward_once = tf.nest.flatten(f(delta))
-  backward_once = tf.nest.flatten(f(-1.0 * delta))
-  backward_twice = tf.nest.flatten(f(-2.0 * delta))
-  numerator_flat = tf.nest.map_structure(
-      lambda a, b, c, d: -1.0 * a + 8.0 * b - 8.0 * c + d, forward_twice,
-      forward_once, backward_once, backward_twice)
-  numerator = tf.reduce_sum(
-      tf.stack(tf.nest.map_structure(tf.reduce_sum, numerator_flat)))
-  return numerator / (12.0 * delta)
-
-
-def approximate_derivative_unsummed(f, delta=1e-1):
-  """Approximates the derivative of f using five point stencil.
-  See wikipedia page on "five point stencil",
-  https://en.wikipedia.org/wiki/Five-point_stencil
-  Note: the error of this method scales with delta ** 4.
-  Args:
-    f: Function to approximately differentiate.  Should take one input, which
-      is a parameter setting the perturbation to the parameter to differentiate.
-    delta: size of the fundamental perturbation in the stencil.
-  """
-  forward_twice = f(2.0 * delta)
-  forward_once = f(delta)
-  backward_once = f(-1.0 * delta)
-  backward_twice = f(-2.0 * delta)
-  numerator = tf.nest.map_structure(
-      lambda a, b, c, d: -1.0 * a + 8.0 * b - 8.0 * c + d, forward_twice,
-      forward_once, backward_once, backward_twice)
-  return tf.nest.map_structure(lambda x: x / (12.0 * delta), numerator)
-
-
 def perturb_function(f, var, k, delta):
   """Evaluates the function with a specified variable perturbed.
 
@@ -286,3 +244,105 @@ def perturb_function(f, var, k, delta):
   f_value = f()
   var.assign(old_value)
   return f_value
+
+
+def _five_point_stencil(f, var, i, delta):
+  """Computes the five point stencil.
+
+  See wikipedia page on "five point stencil",
+  https://en.wikipedia.org/wiki/Five-point_stencil
+  Note: the error of this method scales with delta ** 4.
+
+  Args:
+    f: Callable taking no arguments and returning a possibly nested structure
+      whose atomic elements are `tf.Tensor`.
+    var: `tf.Variable` in which to differentiate `f`.
+    i: Entry of `var` to perturb.
+    delta: Size of the fundamental perturbation in the stencil.
+
+  Returns:
+    stencil: The five point stencil approximation of the jacobian of `f()` with
+      respect to entry `i` of `var`.
+  """
+  forward_twice = perturb_function(f, var, i, 2.0 * delta)
+  forward_once = perturb_function(f, var, i, delta)
+  backward_once = perturb_function(f, var, i, -1.0 * delta)
+  backward_twice = perturb_function(f, var, i, -2.0 * delta)
+  numerator = tf.nest.map_structure(
+      lambda a, b, c, d: -1.0 * a + 8.0 * b - 8.0 * c + d, forward_twice,
+      forward_once, backward_once, backward_twice)
+  stencil = tf.nest.map_structure(lambda x: x / (12.0 * delta), numerator)
+  return stencil
+
+
+def approximate_gradient(f, variables, delta=1e-1):
+  """Approximates the gradient of f using five point stencil.
+
+  Suppose the input function returns a possibly nested structure `r` under
+  gradient tape `t`.  Then this function returns an approximation to
+  `t.gradient(r, variables, unconnected_gradients=tf.UnconnectedGradients.ZERO)`
+
+  Args:
+    f: Callable taking no arguments and returning a possibly nested structure
+      whose atomic elements are `tf.Tensor`.
+    variables: Possibly nested structure of `tf.Variable` in which to
+      differentiate `f`.
+    delta: Size of the fundamental perturbation in the stencil.
+
+  Returns:
+    The approximate gradient.  Has the same structure as the return from a
+      corresponding call to `tf.GradientTape().gradient`.
+  """
+
+  def var_gradient(var):
+    """Returns gradient of `f()` with respect to `var`."""
+
+    def mapper_func(i):
+      """Function to map across indices of flat `var`."""
+      stencil = _five_point_stencil(f, var, i, delta)
+      inner_sum = tf.nest.map_structure(lambda x: tf.math.reduce_sum(x),
+                                        tf.nest.flatten(stencil))
+      outer_sum = tf.math.reduce_sum(tf.stack(inner_sum))
+      entry_derivative = tf.reduce_sum(outer_sum)
+      return entry_derivative
+
+    derivatives = tf.map_fn(
+        mapper_func, tf.range(tf.size(var)), fn_output_signature=tf.float32)
+    return tf.reshape(derivatives, tf.shape(var))
+
+  return tf.nest.map_structure(var_gradient, variables)
+
+
+def approximate_jacobian(f, variables, delta=1e-1):
+  """Approximates the jacobian of f using five point stencil.
+
+  Suppose the input function returns a tensor `r` under gradient tape `t`.  Then
+  this function returns an approximation to
+  `t.jacobian(r, variables, unconnected_gradients=tf.UnconnectedGradients.ZERO)`
+
+  Args:
+    f: Callable taking no arguments and returning a `tf.Tensor`.
+    variables: Possibly nested structure of `tf.Variable` in which to
+      differentiate `f`.
+    delta: Size of the fundamental perturbation in the stencil.
+
+  Returns:
+    The approximate jacobian.  Has the same structure as the return from a
+      corresponding call to `tf.GradientTape().jacobian`.
+  """
+
+  def var_jacobian(var):
+    """Returns jacobian of `f()` with respect to `var`."""
+    derivatives = tf.map_fn(
+        lambda x: _five_point_stencil(f, var, x, delta),
+        tf.range(tf.size(var)),
+        fn_output_signature=tf.float32)
+    f_shape = tf.shape(derivatives)[1:]  # shape of f()
+    # swap function and variable dims
+    transpose_perm = list(range(1, len(f_shape) + 1)) + [0]
+    transpose_derivatives = tf.transpose(derivatives, transpose_perm)
+    # reshape to correct Jacobian shape.
+    reshape_shape = tf.concat([f_shape, tf.shape(var)], 0)
+    return tf.reshape(transpose_derivatives, reshape_shape)
+
+  return tf.nest.map_structure(var_jacobian, variables)
