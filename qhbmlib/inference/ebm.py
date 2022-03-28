@@ -255,6 +255,10 @@ class EnergyInference(EnergyInferenceBase):
     super().__init__(input_energy, initial_seed, name)
     self.num_expectation_samples = num_expectation_samples
 
+  def _entropy(self):
+    """Default implementation wrapped by `self.entropy`."""
+    return self.expectation(self.energy) + self.log_partition()
+
   def _expectation(self, function):
     """Default implementation wrapped by `self.expectation`.
 
@@ -338,10 +342,15 @@ class EnergyInference(EnergyInferenceBase):
 
     return _inner_log_partition()
 
-  @abc.abstractmethod
   def _log_partition_forward_pass(self):
-    """Returns approximation to the log partition function."""
-    raise NotImplementedError()
+    """Returns approximation to the log partition function.
+
+    Note this simple estimator is biased.  See the paper appendix for its
+    motivation.  TODO(#216)
+    """
+    samples = self.sample(self.num_expectation_samples)
+    unique_samples, _, _ = utils.unique_bitstrings_with_counts(samples)
+    return tf.math.reduce_logsumexp(-1.0 * self.energy(unique_samples))
 
   def _log_partition_grad_generator(self):
     """Returns default estimator for the log partition function derivative."""
@@ -513,6 +522,8 @@ class BernoulliEnergyInference(EnergyInference):
     return self.distribution.sample(num_samples, seed=self.seed)
 
 
+
+
 class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
   """Implements the Gibbs With Gradients update rule.
 
@@ -531,8 +542,11 @@ class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
     self._energy = input_energy
     self._num_bits = input_energy.num_bits
     self._parameters = dict(input_energy=input_energy)
+    self._q_i_of_x_probs = tf.Variable([0.0] * self._num_bits, trainable=False)
+    self._q_i_of_x = tfp.distributions.Categorical(probs=self._q_i_of_x_probs)
+    self._eye_bool = tf.eye(self._num_bits, dtype=tf.bool)
 
-  def _q_i_of_x(self, x):
+  def _get_q_i_of_x_probs(self, x):
     """Sets the distribution written in equation 6 of the paper."""
     x_float = tf.cast(x, tf.float32)
     with tf.GradientTape() as tape:
@@ -540,40 +554,37 @@ class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
       current_energy = tf.squeeze(self._energy(tf.expand_dims(x_float, 0)))
     f_grad = tape.gradient(current_energy, x_float)
     d_tilde = -(2 * tf.cast(x, tf.float32) - 1) * f_grad
-    i_probs = tf.nn.softmax(d_tilde / 2.0)
-    return tfp.distributions.Categorical(probs=i_probs)
+    return tf.nn.softmax(d_tilde / 2.0)
 
-  def one_step(self, current_state, previous_kernel_results, seed=None):
+  def one_step(self, current_state, previous_kernel_results):
     """Takes one step of the TransitionKernel.
+
+    Follows algorithm 1 of
+    https://arxiv.org/abs/2102.04509v2
 
     Args:
       current_state: 1D `tf.Tensor` which is the current chain state.
       previous_kernel_results: Required but unused argument.
-      seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
     Returns:
       next_state: 1D `Tensor` which is the next state in the chain.
       kernel_results: Empty list.
     """
     del previous_kernel_results
-    q_i_of_x = self._q_i_of_x(current_state)
-    proposed_i = q_i_of_x.sample()
-    if current_state[proposed_i] == 0:
-      x_prime = current_state + tf.one_hot(proposed_i, self._num_bits, dtype=tf.int8)
-    else:
-      x_prime = current_state - tf.one_hot(proposed_i, self._num_bits, dtype=tf.int8)
-    q_i_of_x_prime = self._q_i_of_x(x_prime)
-    q_ratio = q_i_of_x_prime.probs_parameter(
-    )[proposed_i] / q_i_of_x.probs_parameter()[proposed_i]
-    exp_f = tf.math.exp(-self._energy(tf.expand_dims(x_prime, 0)) +
-                        self._energy(tf.expand_dims(current_state, 0)))
+    q_i_of_x_probs = self._get_q_i_of_x_probs(current_state)
+    self._q_i_of_x_probs.assign(q_i_of_x_probs)
+    proposed_i = self._q_i_of_x.sample()
+    flip_vec = self._eye_bool[proposed_i]
+    x_prime = tf.cast(tf.math.logical_xor(tf.cast(current_state, tf.bool), flip_vec), tf.int8)
+    q_i_of_x_prime_probs = self._get_q_i_of_x_probs(x_prime)
+    q_ratio = q_i_of_x_prime_probs[proposed_i] / q_i_of_x_probs[proposed_i]
+    energies = self._energy(tf.stack([x_prime, current_state]))
+    exp_f = tf.math.exp(-energies[0] + energies[1])
     accept_prob = tf.math.minimum(exp_f * q_ratio, 1.0)
-    accept = tfp.distributions.Bernoulli(
-        probs=accept_prob, dtype=tf.bool).sample()
-    if accept:
-      next_state = x_prime
-    else:
-      next_state = current_state
+    roll = tf.random.uniform([])
+    accept = tf.math.less_equal(roll, accept_prob)
+    flip_vec = tf.math.logical_and(accept, self._eye_bool[proposed_i])
+    next_state = tf.cast(tf.math.logical_xor(tf.cast(current_state, tf.bool), flip_vec), tf.int8)
     kernel_results = []
     return next_state, kernel_results
 
@@ -602,7 +613,6 @@ class GibbsWithGradientsInference(EnergyInference):
                input_energy: energy.BitstringEnergy,
                num_expectation_samples: int,
                num_burnin_samples: int,
-               initial_seed: Union[None, tf.Tensor] = None,
                name: Union[None, str] = None):
     """Initializes a GibbsWithGradientsInference.
 
@@ -620,11 +630,13 @@ class GibbsWithGradientsInference(EnergyInference):
         after every inference call.  Otherwise, the seed is fixed.
       name: Optional name for the model.
     """
-    super().__init__(input_energy, num_expectation_samples, initial_seed, name)
+    super().__init__(input_energy, num_expectation_samples, name=name)
     self._num_burnin_samples = num_burnin_samples
     self._kernel = GibbsWithGradientsKernel(input_energy)
-    self._current_state = tf.Variable(tfp.distributions.Bernoulli(
-        probs=[0.5] * self.energy.num_bits, dtype=tf.int8).sample(), trainable=False)
+    self._current_state = tf.Variable(
+        tfp.distributions.Bernoulli(
+            probs=[0.5] * self.energy.num_bits, dtype=tf.int8).sample(),
+        trainable=False)
 
   @property
   def num_burnin_samples(self):
@@ -641,32 +653,14 @@ class GibbsWithGradientsInference(EnergyInference):
     Runs the chain for a number of steps without saving the results, in order
     to better reach equilibrium before recording samples.
     """
-    for _ in range(self.num_burnin_samples):
-      next_state, _ = self._kernel.one_step(
-          self._current_state, [])
-      self._current_state.assign(next_state)
+    state = self._current_state.read_value()
+    for _ in tf.range(self.num_burnin_samples):
+      state, _ = self._kernel.one_step(state, [])
+    self._current_state.assign(state)
 
   def _call(self, inputs, *args, **kwargs):
     """See base class docstring."""
     return self.sample(inputs)
-
-  def _entropy(self):
-    """Returns an estimate of the entropy.
-    """
-    raise NotImplementedError()
-
-  def _log_partition_forward_pass(self):
-    """Returns an estimate of the log partition function.
-
-    See the importance sampling estimator above equation 1 of
-    https://auai.org/uai2015/proceedings/papers/120.pdf
-    where we replace p_0(x) with the observed relative frequency of x.
-    """
-    samples = self.sample(self.num_expectation_samples)
-    unique, _, counts = utils.unique_bitstrings_with_counts(samples)
-    n = tf.math.reduce_sum(counts)
-    
-    raise NotImplementedError()
 
   def _sample(self, num_samples: int):
     """See base class docstring.
@@ -674,9 +668,9 @@ class GibbsWithGradientsInference(EnergyInference):
     The kernel is repeatedly called to traverse a chain of samples.
     """
     ta = tf.TensorArray(tf.int8, size=num_samples)
+    state = self._current_state.read_value()
     for i in tf.range(num_samples):
-      next_state, _ = self._kernel.one_step(
-          self._current_state, [])
-      self._current_state.assign(next_state)
-      ta = ta.write(i, self._current_state)
+      state, _ = self._kernel.one_step(state, [])
+      ta = ta.write(i, state)
+    self._current_state.assign(state)
     return ta.stack()
