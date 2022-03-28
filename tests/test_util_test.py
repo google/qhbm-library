@@ -118,7 +118,7 @@ class RandomMatrixTest(tf.test.TestCase):
   def test_random_unitary_matrix(self):
     """Checks that returned matrix is unitary.
 
-    Unitary matrices are there own inverse.  See Wikipedia,
+    Unitary matrices are their own inverse.  See Wikipedia,
     https://en.wikipedia.org/wiki/Unitary_matrix
     """
     for n in self.num_qubits_list:
@@ -133,8 +133,8 @@ class RandomMatrixTest(tf.test.TestCase):
   def test_random_mixed_density_operator(self):
     """Checks return is a density matrix, and its eigenvalues match probs return
 
-    Density matrices are positive operators with trace one.  See Wikipedia,
-    https://en.wikipedia.org/wiki/Density_matrix
+    Density matrices are positive-semidefinite operators with trace one.
+    See Wikipedia, https://en.wikipedia.org/wiki/Density_matrix
     """
     for n in self.num_qubits_list:
       expected_dim = 2**n

@@ -113,7 +113,7 @@ def random_hermitian_matrix(num_qubits):
   random_real = tf.cast(
       tf.random.uniform([dim, dim], minval=-val_range, maxval=val_range),
       tf.complex128)
-  random_imag = tf.cast(
+  random_imag = 1j * tf.cast(
       tf.random.uniform([dim, dim], minval=-val_range, maxval=val_range),
       tf.complex128)
   random_matrix = random_real + random_imag
@@ -146,7 +146,7 @@ def random_mixed_density_matrix(num_qubits, num_mixtures=5):
     final_state: The mixed density matrix.
     mixture_probabilities: The probability of each state in the mixture.
   """
-  pre_probs = tf.random.uniform(shape=[num_mixtures])
+  pre_probs = tf.random.uniform(shape=[num_mixtures], minval=1e-9)
   mixture_probabilities = pre_probs / tf.reduce_sum(pre_probs)
   random_unitary = random_unitary_matrix(num_qubits)
   dim = 2**num_qubits
