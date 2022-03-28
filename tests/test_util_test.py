@@ -129,6 +129,31 @@ class RandomMatrixTest(tf.test.TestCase):
       self.assertAllClose(udu, tf.eye(expected_dim))
       self.assertAllClose(uud, tf.eye(expected_dim))
 
+  def test_random_mixed_density_operator(self):
+    """Checks return is a density matrix, and its eigenvalues match probs return
+
+    Density matrices are positive operators with trace one.  See Wikipedia,
+    https://en.wikipedia.org/wiki/Density_matrix
+    """
+    for n in self.num_qubits_list:
+      expected_dim = 2 ** n
+      mixture_list = list(range(1, expected_dim + 1))
+      for m in mixture_list:
+        actual_matrix, actual_probs = test_util.random_mixed_density_matrix(n, m)        
+        self.assertAllEqual(tf.shape(actual_matrix), [expected_dim, expected_dim])
+        self.assertAllEqual(tf.shape(actual_probs), [m])
+        self.assertAllEqual(actual_matrix, tf.linalg.adjoint(actual_matrix))
+        # Eigenvalues are real since we confirmed self-adjointness
+        eigvals = tf.cast(tf.linalg.eigvalsh(actual_matrix), tf.float32)
+        eigval_tol = 1e-7
+        self.assertAllGreaterEqual(eigvals, -eigval_tol)
+        self.assertAllClose(tf.linalg.trace(actual_matrix), 1.0)
+        # Check the non-zero eigenvalues
+        actual_sorted_probs = tf.sort(actual_probs, 0, "DESCENDING")
+        expected_sorted_probs = tf.sort(eigvals, 0, "DESCENDING")[:m]
+        self.assertAllClose(tf.reduce_sum(expected_sorted_probs), 1.0)
+        self.assertAllClose(actual_sorted_probs, expected_sorted_probs)
+
   def test_random_pure_density_operator(self):
     """Checks that the returned matrix is a pure density matrix.
 
