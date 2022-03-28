@@ -211,21 +211,15 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
       ]
       return [{**r, **base_resolver} for r in bitstring_resolvers]
 
-    def delta_expectations_func(k, var, delta):
-      """Calculate the expectation with kth entry of `var` perturbed."""
-      num_elts = tf.size(var)
-      old_value = var.read_value()
-      var.assign(old_value + delta * tf.one_hot(k, num_elts, 1.0, 0.0))
+    def expectation_func():
+      """Computes the current expectation values."""
       total_resolvers = generate_resolvers()
-      raw_delta_expectations = tf.constant([[
+      return tf.constant([[
           cirq.Simulator().simulate_expectation_values(total_circuit, o,
                                                        r)[0].real
           for o in raw_ops
       ]
-                                            for r in total_resolvers])
-      delta_expectations = tf.constant(raw_delta_expectations)
-      var.assign(old_value)
-      return delta_expectations
+                          for r in total_resolvers])
 
     # hamiltonian model and inference
     actual_circuit = models.QuantumCircuit(
@@ -234,8 +228,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     q_infer = inference.QuantumInference(actual_circuit)
 
     # calculate expected values
-    expected_expectations = delta_expectations_func(0, random_values, 0)
-    print(f"expected_expectations: {expected_expectations}")
+    expected_expectations = expectation_func()
 
     # Check that expectations are a reasonable size
     self.assertAllGreater(
@@ -247,32 +240,17 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     self.assertAllClose(
         actual_expectations, expected_expectations, rtol=self.close_rtol)
 
-    def expectations_derivative(variables_list):
-      """Approximately differentiates expectations with respect to the inputs"""
-      derivatives = []
-      for var in variables_list:
-        var_derivative_list = []
-        num_elts = tf.size(var)  # Assumes variable is 1D
-        for n in range(num_elts):
-          this_derivative = test_util.approximate_derivative_unsummed(
-              functools.partial(delta_expectations_func, n, var))
-          var_derivative_list.append(this_derivative.numpy())
-        derivatives.append(tf.constant(var_derivative_list))
-      return derivatives
-
-    expected_expectations_derivative = tf.transpose(
-        tf.squeeze(expectations_derivative(actual_circuit.trainable_variables)))
-    actual_expectations_derivative = tf.squeeze(
-        tape.jacobian(actual_expectations, actual_circuit.trainable_variables))
+    actual_jacobian = tape.jacobian(actual_expectations,
+                                    actual_circuit.trainable_variables)
+    expected_jacobian = test_util.approximate_jacobian(
+        expectation_func, actual_circuit.trainable_variables)
 
     self.assertNotAllClose(
-        expected_expectations_derivative,
-        tf.zeros_like(expected_expectations_derivative),
+        expected_jacobian,
+        tf.zeros_like(expected_jacobian),
         atol=self.not_zero_atol)
     self.assertAllClose(
-        expected_expectations_derivative,
-        actual_expectations_derivative,
-        atol=self.close_atol)
+        expected_jacobian, actual_jacobian, atol=self.close_atol)
 
   @parameterized.parameters({
       "energy_class": energy_class,
@@ -330,13 +308,10 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
       ]
       return [{**r, **base_resolver} for r in bitstring_resolvers]
 
-    def delta_expectations_func(k, var, delta):
-      """Calculate the expectation with kth entry of `var` perturbed."""
-      num_elts = tf.size(var)
-      old_value = var.read_value()
-      var.assign(old_value + delta * tf.one_hot(k, num_elts, 1.0, 0.0))
+    def expectation_func():
+      """Returns the current expectation values."""
       total_resolvers = generate_resolvers()
-      raw_delta_expectations = tf.stack([
+      return tf.stack([
           tf.stack([
               hamiltonian_measure.energy.operator_expectation([
                   cirq.Simulator().simulate_expectation_values(
@@ -344,12 +319,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
               ])
           ]) for r in total_resolvers
       ])
-      delta_expectations = tf.constant(raw_delta_expectations)
-      var.assign(old_value)
-      return delta_expectations
 
-    expected_expectations = delta_expectations_func(
-        0, circuit_h.trainable_variables[0], 0)
+    expected_expectations = expectation_func()
     self.assertNotAllClose(
         expected_expectations,
         tf.zeros_like(expected_expectations),
@@ -361,48 +332,25 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
                                                 hamiltonian_measure)
     self.assertAllClose(actual_expectations, expected_expectations)
 
-    def expectations_derivative(variables_list):
-      """Approximately differentiates expectations with respect to the inputs"""
-      derivatives = []
-      for var in variables_list:
-        var_derivative_list = []
-        num_elts = tf.size(var)  # Assumes variable is 1D
-        for n in range(num_elts):
-          this_derivative = test_util.approximate_derivative_unsummed(
-              functools.partial(delta_expectations_func, n, var))
-          var_derivative_list.append(this_derivative.numpy())
-        derivatives.append(tf.constant(var_derivative_list))
-      return derivatives
-
-    expected_derivatives_thetas = tf.transpose(
-        tf.squeeze(
-            expectations_derivative(
-                hamiltonian_measure.energy.trainable_variables)))
+    expected_jacobian_thetas = test_util.approximate_jacobian(
+        expectation_func, hamiltonian_measure.energy.trainable_variables)
     self.assertNotAllClose(
-        expected_derivatives_thetas,
-        tf.zeros_like(expected_derivatives_thetas),
+        expected_jacobian_thetas,
+        tf.zeros_like(expected_jacobian_thetas),
         atol=self.not_zero_atol)
-    expected_derivatives_phis = tf.transpose(
-        tf.squeeze(
-            expectations_derivative(
-                hamiltonian_measure.circuit.trainable_variables)))
+    expected_jacobian_phis = test_util.approximate_jacobian(
+        expectation_func, hamiltonian_measure.circuit.trainable_variables)
     self.assertNotAllClose(
-        expected_derivatives_phis,
-        tf.zeros_like(expected_derivatives_phis),
+        expected_jacobian_phis,
+        tf.zeros_like(expected_jacobian_phis),
         atol=self.not_zero_atol)
-    actual_derivatives_thetas, actual_derivatives_phis = tape.jacobian(
+    actual_jacobian_thetas, actual_jacobian_phis = tape.jacobian(
         actual_expectations, (hamiltonian_measure.energy.trainable_variables,
                               hamiltonian_measure.circuit.trainable_variables))
-    actual_derivatives_thetas = tf.squeeze(actual_derivatives_thetas)
-    actual_derivatives_phis = tf.squeeze(actual_derivatives_phis)
     self.assertAllClose(
-        actual_derivatives_phis,
-        expected_derivatives_phis,
-        rtol=self.close_rtol)
+        actual_jacobian_phis, expected_jacobian_phis, rtol=self.close_rtol)
     self.assertAllClose(
-        actual_derivatives_thetas,
-        expected_derivatives_thetas,
-        rtol=self.close_rtol)
+        actual_jacobian_thetas, expected_jacobian_thetas, rtol=self.close_rtol)
 
   @test_util.eager_mode_toggle
   def test_expectation_bitstring_energy(self):
@@ -566,47 +514,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     self.assertAllEqual(
         tf.shape(actual_expectations), [len(initial_states_list), 1])
 
-    # TODO(#205) function seems to be ripe for refactoring
-    def delta_expectations_func(k, var, delta):
-      """Calculate the expectation with kth entry of `var` perturbed."""
-      num_elts = tf.size(var)
-      old_value = var.read_value()
-      # Can no longer assume var is 1D, since energy uses matrix variables now
-      old_value_flat = tf.reshape(old_value, [num_elts])
-      new_value_flat = old_value_flat + delta * tf.one_hot(
-          k, num_elts, 1.0, 0.0)
-      new_value = tf.reshape(new_value_flat, tf.shape(var))
-      var.assign(new_value)
-      delta_expectations = tf.squeeze(
-          actual_qnn.expectation(initial_states, hamiltonian), -1)
-      var.assign(old_value)
-      return delta_expectations
-
-    delta = 1e-1
-
-    # TODO(#206)
-    def expectations_derivative(variables_list):
-      """Approximately differentiates expectations with respect to the inputs"""
-      derivatives = []
-      for var in variables_list:
-        per_bitstring_derivative_list = []
-        num_elts = tf.size(var)
-        for n in range(num_elts):
-          this_derivative = test_util.approximate_derivative_unsummed(
-              functools.partial(delta_expectations_func, n, var), delta=delta)
-          per_bitstring_derivative_list.append(this_derivative)
-        # shape is now [num_elts, len(initial_states_list)]
-        var_derivatives = tf.stack(per_bitstring_derivative_list)
-        # transpose to shape [len(initial_states_list), num_elts]
-        var_derivatives_transpose = tf.transpose(var_derivatives)
-        # reshape the trailing dimensions to match the original variable
-        derivatives.append(
-            tf.reshape(var_derivatives_transpose,
-                       [len(initial_states_list), 1] +
-                       tf.shape(var).numpy().tolist()))
-      return derivatives
-
-    expected_derivatives = expectations_derivative(
+    expected_derivatives = test_util.approximate_jacobian(
+        functools.partial(expectation_wrapper, initial_states, hamiltonian),
         hamiltonian.trainable_variables)
     for derivative in expected_derivatives:
       # Checks that at last one entry in each variable's derivative is

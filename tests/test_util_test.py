@@ -17,6 +17,7 @@
 from absl.testing import parameterized
 
 import cirq
+import numpy as np
 import sympy
 import tensorflow as tf
 
@@ -94,7 +95,7 @@ class RPQCTest(tf.test.TestCase, parameterized.TestCase):
     self.assertEqual(actual_circuit, expected_circuit)
 
 
-class EagerModeToggle(tf.test.TestCase):
+class EagerModeToggleTest(tf.test.TestCase):
   """Tests eager_mode_toggle."""
 
   def test_eager_mode_toggle(self):
@@ -118,3 +119,306 @@ class EagerModeToggle(tf.test.TestCase):
 
     with self.assertRaises(AssertionError):
       test_util.eager_mode_toggle(fail_out_of_eager)()
+
+
+class PerturbFunctionTest(tf.test.TestCase, parameterized.TestCase):
+  """Tests perturb_function."""
+
+  @test_util.eager_mode_toggle
+  def test_side_effects(self):
+    """Checks that variable is perturbed and then returned to initial value."""
+    initial_value = tf.constant([4.5, -1.3])
+    basic_variable = tf.Variable(initial_value)
+
+    def f():
+      """Basic test function."""
+      return basic_variable.read_value()
+
+    test_delta = 0.5
+    wrapped_perturb_function = tf.function(test_util.perturb_function)
+    actual_return = wrapped_perturb_function(f, basic_variable, 1, test_delta)
+    expected_return = initial_value + [0, test_delta]
+    self.assertIsInstance(actual_return, tf.Tensor)
+    self.assertAllClose(actual_return, expected_return)
+    self.assertAllClose(basic_variable, initial_value)
+
+  @parameterized.parameters([{
+      "this_type": t
+  } for t in [tf.float16, tf.float32, tf.float64, tf.complex64, tf.complex128]])
+  def test_multi_variable(self, this_type):
+    """Tests perturbation when there are multiple differently shaped vars."""
+    dimension = 7
+    minval = -5
+    maxval = 5
+    scalar_initial_value = tf.cast(
+        tf.random.uniform([], minval, maxval), this_type)
+    scalar_var = tf.Variable(scalar_initial_value)
+    vector_initial_value = tf.cast(
+        tf.random.uniform([dimension], minval, maxval), this_type)
+    vector_var = tf.Variable(vector_initial_value)
+    matrix_initial_value = tf.cast(
+        tf.random.uniform([dimension, dimension], minval, maxval), this_type)
+    matrix_var = tf.Variable(matrix_initial_value)
+
+    def f():
+      """Vector result of combining the variables."""
+      val = tf.linalg.matvec(matrix_var, vector_var) * scalar_var
+      return [val, [val, val]]
+
+    test_delta_raw = tf.random.uniform([], dtype=tf.float32)
+    test_delta_python = test_delta_raw.numpy().tolist()
+    test_delta = tf.cast(test_delta_raw, this_type)
+    wrapped_perturb_function = tf.function(test_util.perturb_function)
+
+    # check scalar perturbation
+    perturbed_scalar = scalar_var + test_delta
+    expected_val = tf.linalg.matvec(matrix_var, vector_var) * perturbed_scalar
+    expected_return = [expected_val, [expected_val, expected_val]]
+    actual_return = wrapped_perturb_function(f, scalar_var, 0, test_delta)
+    tf.nest.map_structure(lambda x: self.assertIsInstance(x, tf.Tensor),
+                          actual_return)
+    tf.nest.map_structure(self.assertAllClose, actual_return, expected_return)
+    self.assertAllClose(scalar_var, scalar_initial_value)
+
+    # check vector perturbations
+    for i in range(dimension):
+      vector_list = vector_initial_value.numpy().tolist()
+      perturbation_vector = [
+          test_delta_python if j == i else 0 for j in range(dimension)
+      ]
+      perturbed_vector_list = [
+          v + v_p for v, v_p in zip(vector_list, perturbation_vector)
+      ]
+      perturbed_vector = tf.constant(perturbed_vector_list, this_type)
+      expected_val = tf.linalg.matvec(matrix_var, perturbed_vector) * scalar_var
+      expected_return = [expected_val, [expected_val, expected_val]]
+      actual_return = wrapped_perturb_function(f, vector_var, i, test_delta)
+      tf.nest.map_structure(lambda x: self.assertIsInstance(x, tf.Tensor),
+                            actual_return)
+      tf.nest.map_structure(self.assertAllClose, actual_return, expected_return)
+      self.assertAllClose(vector_var, vector_initial_value)
+
+    # check matrix perturbations
+    for i in range(dimension * dimension):
+      matrix_list = tf.reshape(matrix_initial_value,
+                               [dimension * dimension]).numpy().tolist()
+      perturbation_matrix = [
+          test_delta_python if j == i else 0
+          for j in range(dimension * dimension)
+      ]
+      perturbed_matrix_list = [
+          m + m_p for m, m_p in zip(matrix_list, perturbation_matrix)
+      ]
+      perturbed_matrix = tf.reshape(
+          tf.constant(perturbed_matrix_list, this_type), [dimension, dimension])
+      expected_val = tf.linalg.matvec(perturbed_matrix, vector_var) * scalar_var
+      expected_return = [expected_val, [expected_val, expected_val]]
+      actual_return = wrapped_perturb_function(f, matrix_var, i, test_delta)
+      tf.nest.map_structure(lambda x: self.assertIsInstance(x, tf.Tensor),
+                            actual_return)
+      tf.nest.map_structure(self.assertAllClose, actual_return, expected_return)
+      self.assertAllClose(matrix_var, matrix_initial_value)
+
+
+class ApproximateDerivativesTest(tf.test.TestCase):
+  """Tests approximate_gradient and approximate_jacobian functions."""
+
+  def setUp(self):
+    super().setUp()
+    self.close_atol = 1e-4
+    self.not_zero_atol = 2e-4
+    dimension_0 = 7
+    dimension_1 = 4
+    minval = -5
+    maxval = 5
+    self.scalar_shape = []
+    self.scalar_initial_value = tf.random.uniform(self.scalar_shape, minval,
+                                                  maxval)
+    self.scalar_var = tf.Variable(self.scalar_initial_value)
+    self.vector_shape = [dimension_0]
+    self.vector_initial_value = tf.random.uniform(self.vector_shape, minval,
+                                                  maxval)
+    self.vector_var = tf.Variable(self.vector_initial_value)
+    self.matrix_shape = [dimension_1, dimension_0]
+    self.matrix_initial_value = tf.random.uniform(self.matrix_shape, minval,
+                                                  maxval)
+    self.matrix_var = tf.Variable(self.matrix_initial_value)
+    self.variables_structure = [[self.scalar_var, self.vector_var],
+                                [self.matrix_var]]
+
+    def linear_scalar():
+      """Returns a scalar."""
+      return tf.identity(self.scalar_var)
+
+    self.linear_scalar = linear_scalar
+
+    def linear_vector():
+      """Returns a vector."""
+      return tf.identity(self.vector_var)
+
+    self.linear_vector = linear_vector
+
+    def linear_matrix():
+      """Returns a matrix."""
+      return tf.identity(self.matrix_var)
+
+    self.linear_matrix = linear_matrix
+
+    def f_tensor():
+      """Returns a combination of all three variables."""
+      return tf.linalg.matvec(self.matrix_var,
+                              self.vector_var) * self.scalar_var
+
+    self.f_tensor = f_tensor
+
+  @test_util.eager_mode_toggle
+  def test_linear_gradient(self):
+    """Confirms correct Gradient values for linear functions."""
+
+    approximate_gradient_wrapper = tf.function(test_util.approximate_gradient)
+
+    # scalar
+    expected_gradient = [[
+        tf.ones_like(self.scalar_var),
+        tf.zeros_like(self.vector_var)
+    ], [tf.zeros_like(self.matrix_var)]]
+    actual_gradient = approximate_gradient_wrapper(self.linear_scalar,
+                                                   self.variables_structure)
+    tf.nest.map_structure(
+        lambda a, e: self.assertAllClose(a, e, atol=self.close_atol),
+        actual_gradient, expected_gradient)
+
+    # vector
+    expected_gradient = [[
+        tf.zeros_like(self.scalar_var),
+        tf.ones_like(self.vector_var)
+    ], [tf.zeros_like(self.matrix_var)]]
+    actual_gradient = approximate_gradient_wrapper(self.linear_vector,
+                                                   self.variables_structure)
+    tf.nest.map_structure(
+        lambda a, e: self.assertAllClose(a, e, atol=self.close_atol),
+        actual_gradient, expected_gradient)
+
+    # matrix
+    expected_gradient = [[
+        tf.zeros_like(self.scalar_var),
+        tf.zeros_like(self.vector_var)
+    ], [tf.ones_like(self.matrix_var)]]
+    actual_gradient = approximate_gradient_wrapper(self.linear_matrix,
+                                                   self.variables_structure)
+    tf.nest.map_structure(
+        lambda a, e: self.assertAllClose(a, e, atol=self.close_atol),
+        actual_gradient, expected_gradient)
+
+  @test_util.eager_mode_toggle
+  def test_linear_jacobian(self):
+    """Confirms correct Jacobian values for linear functions."""
+
+    # scalar
+    scalar_jacobian = tf.constant(1.0)
+    expected_jacobian = [[scalar_jacobian,
+                          tf.zeros(self.vector_shape)],
+                         [tf.zeros(self.matrix_shape)]]
+    actual_jacobian = test_util.approximate_jacobian(self.linear_scalar,
+                                                     self.variables_structure)
+    tf.nest.map_structure(
+        lambda a, e: self.assertAllClose(a, e, atol=self.close_atol),
+        actual_jacobian, expected_jacobian)
+
+    # vector
+    vector_jacobian = np.zeros(self.vector_shape + self.vector_shape)
+    for i in range(self.vector_shape[0]):
+      for j in range(self.vector_shape[0]):
+        if i == j:
+          vector_jacobian[i, j] = 1.0
+    vector_jacobian = tf.constant(vector_jacobian)
+    expected_jacobian = [[tf.zeros(self.vector_shape), vector_jacobian],
+                         [tf.zeros(self.vector_shape + self.matrix_shape)]]
+    actual_jacobian = test_util.approximate_jacobian(self.linear_vector,
+                                                     self.variables_structure)
+    tf.nest.map_structure(
+        lambda a, e: self.assertAllClose(a, e, atol=self.close_atol),
+        actual_jacobian, expected_jacobian)
+
+    # matrix
+    matrix_jacobian = np.zeros(self.matrix_shape + self.matrix_shape)
+    for i in range(self.matrix_shape[0]):
+      for j in range(self.matrix_shape[1]):
+        for k in range(self.matrix_shape[0]):
+          for l in range(self.matrix_shape[1]):
+            if i == k and j == l:
+              matrix_jacobian[i, j, k, l] = 1.0
+    matrix_jacobian = tf.constant(matrix_jacobian)
+    expected_jacobian = [[
+        tf.zeros(self.matrix_shape),
+        tf.zeros(self.matrix_shape + self.vector_shape)
+    ], [matrix_jacobian]]
+    actual_jacobian = test_util.approximate_jacobian(self.linear_matrix,
+                                                     self.variables_structure)
+    tf.nest.map_structure(
+        lambda a, e: self.assertAllClose(a, e, atol=self.close_atol),
+        actual_jacobian, expected_jacobian)
+
+  @test_util.eager_mode_toggle
+  def test_gradient(self):
+    """Compares approximation against exact gradient."""
+
+    def f_nested():
+      """Returns a nested structure."""
+      return [self.f_tensor(), [[self.f_tensor()], self.f_tensor()]]
+
+    for f in [self.f_tensor, f_nested]:
+      # test with respect to single variable
+      with tf.GradientTape() as tape:
+        value = f()
+      expected_gradient = tape.gradient(value, self.vector_var)
+      actual_gradient = test_util.approximate_gradient(f, self.vector_var)
+      self.assertNotAllClose(
+          expected_gradient,
+          tf.zeros_like(expected_gradient),
+          atol=self.not_zero_atol)
+      self.assertAllClose(
+          actual_gradient, expected_gradient, atol=self.close_atol)
+
+      # test with respect to nested variable structure
+      with tf.GradientTape() as tape:
+        value = f()
+      expected_gradient = tape.gradient(value, self.variables_structure)
+      actual_gradient = test_util.approximate_gradient(f,
+                                                       self.variables_structure)
+      tf.nest.map_structure(
+          lambda a: self.assertNotAllClose(
+              a, tf.zeros_like(a), atol=self.not_zero_atol), actual_gradient)
+      tf.nest.map_structure(
+          lambda a, e: self.assertAllClose(a, e, atol=self.close_atol),
+          actual_gradient, expected_gradient)
+
+  @test_util.eager_mode_toggle
+  def test_jacobian(self):
+    """Compares approximation against exact jacobian."""
+
+    # test with respect to single variable
+    with tf.GradientTape() as tape:
+      value = self.f_tensor()
+    expected_jacobian = tape.jacobian(value, self.vector_var)
+    actual_jacobian = test_util.approximate_jacobian(self.f_tensor,
+                                                     self.vector_var)
+    self.assertNotAllClose(
+        expected_jacobian,
+        tf.zeros_like(expected_jacobian),
+        atol=self.not_zero_atol)
+    self.assertAllClose(
+        actual_jacobian, expected_jacobian, atol=self.close_atol)
+
+    # test with respect to nested variable structure
+    with tf.GradientTape() as tape:
+      value = self.f_tensor()
+    expected_jacobian = tape.jacobian(value, self.variables_structure)
+    actual_jacobian = test_util.approximate_jacobian(self.f_tensor,
+                                                     self.variables_structure)
+    tf.nest.map_structure(
+        lambda a: self.assertNotAllClose(
+            a, tf.zeros_like(a), atol=self.not_zero_atol), expected_jacobian)
+    tf.nest.map_structure(
+        lambda a, e: self.assertAllClose(a, e, atol=self.close_atol),
+        actual_jacobian, expected_jacobian)

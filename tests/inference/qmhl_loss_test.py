@@ -95,19 +95,6 @@ class QMHLTest(tf.test.TestCase):
 
     qmhl_wrapper = tf.function(inference.qmhl)
 
-    def qmhl_derivative(variables_list, actual_data, model_qhbm):
-      """Approximately differentiates QMHL wih respect to the inputs."""
-      derivatives = []
-      for var in variables_list:
-        var_derivative_list = []
-        num_elts = tf.size(var)  # Assumes variable is 1D
-        for n in range(num_elts):
-          this_derivative = test_util.approximate_derivative(
-              functools.partial(delta_qmhl, n, var, actual_data, model_qhbm))
-          var_derivative_list.append(this_derivative.numpy())
-        derivatives.append(tf.constant(var_derivative_list))
-      return derivatives
-
     for num_qubits in self.num_qubits_list:
       qubits = cirq.GridQubit.rect(1, num_qubits)
       num_layers = 2
@@ -134,8 +121,10 @@ class QMHLTest(tf.test.TestCase):
       actual_derivative = tape.gradient(actual_loss,
                                         model_h.trainable_variables)
 
-      expected_derivative = qmhl_derivative(model_h.trainable_variables,
-                                            actual_data, model_qhbm)
+      expected_derivative = test_util.approximate_gradient(
+          functools.partial(qmhl_wrapper, actual_data, model_qhbm),
+          model_h.trainable_variables)
+
       # Changing model parameters is working if finite difference derivatives
       # are non-zero.  Also confirms that model_h and data_h are different.
       tf.nest.map_structure(
