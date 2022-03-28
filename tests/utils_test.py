@@ -15,7 +15,6 @@
 """Tests for qhbmlib.utils"""
 
 from absl.testing import parameterized
-import itertools
 
 import tensorflow as tf
 
