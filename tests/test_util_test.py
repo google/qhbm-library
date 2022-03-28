@@ -95,6 +95,61 @@ class RPQCTest(tf.test.TestCase, parameterized.TestCase):
     self.assertEqual(actual_circuit, expected_circuit)
 
 
+class RandomMatrixTest(tf.test.TestCase):
+  """Tests the random matrix functions for expected properties."""
+
+  def setUp(self):
+    """Initialize test objects."""
+    self.num_qubits_list = [1, 2, 3, 4, 5]
+
+  def test_random_hermitian_matrix(self):
+    """Checks that returned matrix is Hermitian.
+
+    Hermitian matrices are equal to their complex conjugates.  See Wikipedia,
+    https://en.wikipedia.org/wiki/Hermitian_matrix
+    """
+    for n in self.num_qubits_list:
+      actual_matrix = test_util.random_hermitian_matrix(n)
+      expected_dim = 2 ** n
+      self.assertAllEqual(tf.shape(actual_matrix), [expected_dim, expected_dim])
+      self.assertAllEqual(actual_matrix, tf.linalg.adjoint(actual_matrix))
+
+  def test_random_unitary_matrix(self):
+    """Checks that returned matrix is unitary.
+
+    Unitary matrices are there own inverse.  See Wikipedia,
+    https://en.wikipedia.org/wiki/Unitary_matrix
+    """
+    for n in self.num_qubits_list:
+      actual_matrix = test_util.random_unitary_matrix(n)
+      expected_dim = 2 ** n
+      self.assertAllEqual(tf.shape(actual_matrix), [expected_dim, expected_dim])
+      udu = tf.linalg.matmul(tf.linalg.adjoint(actual_matrix), actual_matrix)
+      uud = tf.linalg.matmul(actual_matrix, tf.linalg.adjoint(actual_matrix))
+      self.assertAllClose(udu, tf.eye(expected_dim))
+      self.assertAllClose(uud, tf.eye(expected_dim))
+
+  def test_random_pure_density_operator(self):
+    """Checks that the returned matrix is a pure density matrix.
+
+    Density matrices are positive operators with trace one.  Additionally, a
+    pure density operator is idempotent.  See Wikipedia,
+    https://en.wikipedia.org/wiki/Density_matrix
+    """
+    for n in self.num_qubits_list:
+      actual_matrix = test_util.random_pure_density_matrix(n)
+      expected_dim = 2 ** n
+      self.assertAllEqual(tf.shape(actual_matrix), [expected_dim, expected_dim])
+      self.assertAllEqual(actual_matrix, tf.linalg.adjoint(actual_matrix))
+      # Eigenvalues are real since we confirmed self-adjointness
+      eigvals = tf.cast(tf.linalg.eigvalsh(actual_matrix), tf.float32)
+      eigval_tol = 1e-7
+      self.assertAllGreaterEqual(eigvals, -eigval_tol)
+      self.assertAllClose(tf.linalg.trace(actual_matrix), 1.0)
+      # Confirm purity
+      self.assertAllClose(tf.linalg.trace(tf.linalg.matmul(actual_matrix, actual_matrix)), 1.0)
+
+
 class EagerModeToggleTest(tf.test.TestCase):
   """Tests eager_mode_toggle."""
 
