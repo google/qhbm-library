@@ -100,34 +100,6 @@ def get_random_hamiltonian_and_inference(qubits,
   return random_qhbm.modular_hamiltonian, random_qhbm
 
 
-def get_random_pauli_sum(qubits):
-  """Test fixture.
-    Args:
-      qubits: A list of `cirq.GridQubit`s on which to build the pauli sum.
-    Returns:
-      pauli_sum: A `cirq.PauliSum` which is a linear combination of random pauli
-      strings on `qubits`.
-    """
-  paulis = [cirq.X, cirq.Y, cirq.Z]
-
-  coeff_max = 1.5
-  coeff_min = -1.0 * coeff_max
-
-  num_qubits = len(qubits)
-  num_pauli_terms = max(1, num_qubits - 1)
-  num_pauli_factors = max(1, num_qubits - 1)
-
-  pauli_sum = cirq.PauliSum()
-  for _ in range(num_pauli_terms):
-    pauli_term = random.uniform(coeff_min, coeff_max) * cirq.I(qubits[0])
-    sub_qubits = random.sample(qubits, num_pauli_factors)
-    for q in sub_qubits:
-      pauli_factor = random.choice(paulis)(q)
-      pauli_term *= pauli_factor
-    pauli_sum += pauli_term
-  return pauli_sum
-
-
 def random_hermitian_matrix(num_qubits):
   """Returns a random Hermitian matrix.
 
@@ -188,11 +160,6 @@ def random_mixed_density_matrix(num_qubits, num_mixtures=5):
         mixture_probabilities[i], tf.complex128) * tf.einsum(
             "i,j->ij", evolved_pure_state, adjoint_evolved_pure_state)
   return final_state, mixture_probabilities
-
-
-def stable_classical_entropy(probs):
-  """Entropy function for a list of probabilities, allowing zeros."""
-  return -tf.reduce_sum(tf.math.multiply_no_nan(tf.math.log(probs), probs))
 
 
 def check_bitstring_exists(bitstring, bitstring_list):
