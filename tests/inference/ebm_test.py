@@ -15,8 +15,6 @@
 """Tests for qhbmlib.inference.ebm"""
 
 import functools
-import itertools
-import time
 
 import tensorflow as tf
 import tensorflow_probability as tfp

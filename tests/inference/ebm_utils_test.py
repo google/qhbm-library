@@ -14,7 +14,6 @@
 # ==============================================================================
 """Tests for qhbmlib.inference.ebm_utils"""
 
-import itertools
 import random
 
 import tensorflow as tf
