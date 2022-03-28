@@ -19,7 +19,6 @@ import random
 
 import cirq
 import numpy as np
-import scipy
 import sympy
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -101,102 +100,66 @@ def get_random_hamiltonian_and_inference(qubits,
   return random_qhbm.modular_hamiltonian, random_qhbm
 
 
-def get_random_pauli_sum(qubits):
-  """Test fixture.
-    Args:
-      qubits: A list of `cirq.GridQubit`s on which to build the pauli sum.
-    Returns:
-      pauli_sum: A `cirq.PauliSum` which is a linear combination of random pauli
-      strings on `qubits`.
-    """
-  paulis = [cirq.X, cirq.Y, cirq.Z]
+def random_hermitian_matrix(num_qubits):
+  """Returns a random Hermitian matrix.
 
-  coeff_max = 1.5
-  coeff_min = -1.0 * coeff_max
+  Uses the property that A + A* is Hermitian for any matrix A.
 
-  num_qubits = len(qubits)
-  num_pauli_terms = max(1, num_qubits - 1)
-  num_pauli_factors = max(1, num_qubits - 1)
-
-  pauli_sum = cirq.PauliSum()
-  for _ in range(num_pauli_terms):
-    pauli_term = random.uniform(coeff_min, coeff_max) * cirq.I(qubits[0])
-    sub_qubits = random.sample(qubits, num_pauli_factors)
-    for q in sub_qubits:
-      pauli_factor = random.choice(paulis)(q)
-      pauli_term *= pauli_factor
-    pauli_sum += pauli_term
-  return pauli_sum
-
-
-def generate_pure_random_density_operator(num_qubits):
+  Args:
+    num_qubits: Number of qubits on which the matrix acts.
+  """
   dim = 2**num_qubits
-  unitary = scipy.stats.unitary_group.rvs(dim)
-  u_vec = unitary[:, 0:1]
-  return tf.matmul(u_vec, u_vec, adjoint_b=True)
+  val_range = 2
+  random_real = tf.cast(
+      tf.random.uniform([dim, dim], minval=-val_range, maxval=val_range),
+      tf.complex128)
+  random_imag = 1j * tf.cast(
+      tf.random.uniform([dim, dim], minval=-val_range, maxval=val_range),
+      tf.complex128)
+  random_matrix = random_real + random_imag
+  return random_matrix + tf.linalg.adjoint(random_matrix)
 
 
-def generate_mixed_random_density_operator(num_qubits, num_mixtures=5):
-  """Generates a random mixed density matrix.
-    Generates `num_mixtures` random quantum states, takes their outer products,
-    and generates a random convex combination of them.
-    NOTE: the states in the mixture are all orthogonal.
-    Args:
-      num_qubits: 2**num_qubits is the size of the density matrix.
-      num_mixtures: the number of pure states in the mixture.  Must be greater
-        than 2**num_qubits.
-    Returns:
-      final_state: The mixed density matrix.
-      prob: The probability of each random state in the mixture.
-    """
-  prob = tf.random.uniform(shape=[num_mixtures])
-  prob = prob / tf.reduce_sum(prob)
-  final_state = tf.zeros((2**num_qubits, 2**num_qubits), dtype=tf.complex128)
+def random_unitary_matrix(num_qubits):
+  """Returns a random unitary matrix.
+
+  Uses the property that e^{-iH} is unitary for any Hermitian matrix H.
+
+  Args:
+    num_qubits: Number of qubits on which the matrix acts.
+  """
+  hermitian_matrix = random_hermitian_matrix(num_qubits)
+  return tf.linalg.expm(-1j * hermitian_matrix)
+
+
+def random_mixed_density_matrix(num_qubits, num_mixtures=5):
+  """Returns a random pure density matrix.
+
+  Applies a common random unitary to `num_mixtures` orthogonal states, then
+  mixes them with random weights.
+
+  Args:
+    num_qubits: Number of qubits on which the matrix acts.
+    num_mixtures: The number of orthogonal pure states to mix.
+
+  Returns:
+    final_state: The mixed density matrix.
+    mixture_probabilities: The probability of each state in the mixture.
+  """
+  pre_probs = tf.random.uniform(shape=[num_mixtures], minval=1e-9)
+  mixture_probabilities = pre_probs / tf.reduce_sum(pre_probs)
+  random_unitary = random_unitary_matrix(num_qubits)
   dim = 2**num_qubits
-  unitary = scipy.stats.unitary_group.rvs(dim)
+  final_state = tf.zeros([dim, dim], tf.complex128)
   for i in range(num_mixtures):
-    u_vec = unitary[:, i:i + 1]
-    final_state += tf.multiply(
-        tf.cast(prob[i], dtype=tf.complex128),
-        tf.matmul(u_vec, u_vec, adjoint_b=True),
-    )
-  return final_state, prob
-
-
-def generate_mixed_random_density_operator_pair(num_qubits, perm_basis=False):
-  num_mixtures = 5
-  dim = 2**num_qubits
-  # Use common basis
-  unitary = scipy.stats.unitary_group.rvs(dim)
-
-  prob = tf.random.uniform(shape=[num_mixtures])
-  prob = prob / tf.reduce_sum(prob)
-  final_state1 = tf.zeros((dim, dim), dtype=tf.complex128)
-  basis_indices = np.random.permutation(dim)[:num_mixtures]
-  for i, idx in enumerate(basis_indices):
-    u_vec = unitary[:, idx:idx + 1]
-    final_state1 += tf.multiply(
-        tf.cast(prob[i], dtype=tf.complex128),
-        tf.matmul(u_vec, u_vec, adjoint_b=True),
-    )
-
-  prob = tf.random.uniform(shape=[num_mixtures])
-  prob = prob / tf.reduce_sum(prob)
-  final_state2 = tf.zeros((dim, dim), dtype=tf.complex128)
-  if perm_basis:
-    basis_indices = np.random.permutation(dim)[:num_mixtures]
-  for i, idx in enumerate(basis_indices):
-    u_vec = unitary[:, idx:idx + 1]
-    final_state2 += tf.multiply(
-        tf.cast(prob[i], dtype=tf.complex128),
-        tf.matmul(u_vec, u_vec, adjoint_b=True),
-    )
-  return final_state1, final_state2
-
-
-def stable_classical_entropy(probs):
-  """Entropy function for a list of probabilities, allowing zeros."""
-  return -tf.reduce_sum(tf.math.multiply_no_nan(tf.math.log(probs), probs))
+    pure_state = tf.one_hot(i, dim, dtype=tf.complex128)
+    evolved_pure_state = tf.linalg.matvec(random_unitary, pure_state)
+    adjoint_evolved_pure_state = tf.squeeze(
+        tf.linalg.adjoint(tf.expand_dims(evolved_pure_state, 0)))
+    final_state = final_state + tf.cast(
+        mixture_probabilities[i], tf.complex128) * tf.einsum(
+            "i,j->ij", evolved_pure_state, adjoint_evolved_pure_state)
+  return final_state, mixture_probabilities
 
 
 def check_bitstring_exists(bitstring, bitstring_list):
