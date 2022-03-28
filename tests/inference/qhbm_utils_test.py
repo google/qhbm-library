@@ -90,8 +90,8 @@ class FidelityTest(tf.test.TestCase):
     num_rerolls = 5
     for _ in range(num_rerolls):
       num_qubits = 4
-      sigma, _ = test_util.random_mixed_density_matrix(
-          num_qubits, 2**num_qubits)
+      sigma, _ = test_util.random_mixed_density_matrix(num_qubits,
+                                                       2**num_qubits)
       sigma_complex64 = tf.cast(sigma, tf.complex64)
       sigma_complex128 = tf.cast(sigma, tf.complex128)
 
