@@ -193,37 +193,6 @@ def random_pure_density_matrix(num_qubits):
   return matrix
 
 
-def generate_mixed_random_density_operator_pair(num_qubits, perm_basis=False):
-  num_mixtures = 5
-  dim = 2**num_qubits
-  # Use common basis
-  unitary = scipy.stats.unitary_group.rvs(dim)
-
-  prob = tf.random.uniform(shape=[num_mixtures])
-  prob = prob / tf.reduce_sum(prob)
-  final_state1 = tf.zeros((dim, dim), dtype=tf.complex128)
-  basis_indices = np.random.permutation(dim)[:num_mixtures]
-  for i, idx in enumerate(basis_indices):
-    u_vec = unitary[:, idx:idx + 1]
-    final_state1 += tf.multiply(
-        tf.cast(prob[i], dtype=tf.complex128),
-        tf.matmul(u_vec, u_vec, adjoint_b=True),
-    )
-
-  prob = tf.random.uniform(shape=[num_mixtures])
-  prob = prob / tf.reduce_sum(prob)
-  final_state2 = tf.zeros((dim, dim), dtype=tf.complex128)
-  if perm_basis:
-    basis_indices = np.random.permutation(dim)[:num_mixtures]
-  for i, idx in enumerate(basis_indices):
-    u_vec = unitary[:, idx:idx + 1]
-    final_state2 += tf.multiply(
-        tf.cast(prob[i], dtype=tf.complex128),
-        tf.matmul(u_vec, u_vec, adjoint_b=True),
-    )
-  return final_state1, final_state2
-
-
 def stable_classical_entropy(probs):
   """Entropy function for a list of probabilities, allowing zeros."""
   return -tf.reduce_sum(tf.math.multiply_no_nan(tf.math.log(probs), probs))
