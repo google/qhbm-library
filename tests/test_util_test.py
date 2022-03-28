@@ -110,7 +110,7 @@ class RandomMatrixTest(tf.test.TestCase):
     """
     for n in self.num_qubits_list:
       actual_matrix = test_util.random_hermitian_matrix(n)
-      expected_dim = 2 ** n
+      expected_dim = 2**n
       self.assertAllEqual(tf.shape(actual_matrix), [expected_dim, expected_dim])
       self.assertAllEqual(actual_matrix, tf.linalg.adjoint(actual_matrix))
 
@@ -122,7 +122,7 @@ class RandomMatrixTest(tf.test.TestCase):
     """
     for n in self.num_qubits_list:
       actual_matrix = test_util.random_unitary_matrix(n)
-      expected_dim = 2 ** n
+      expected_dim = 2**n
       self.assertAllEqual(tf.shape(actual_matrix), [expected_dim, expected_dim])
       udu = tf.linalg.matmul(tf.linalg.adjoint(actual_matrix), actual_matrix)
       uud = tf.linalg.matmul(actual_matrix, tf.linalg.adjoint(actual_matrix))
@@ -136,11 +136,13 @@ class RandomMatrixTest(tf.test.TestCase):
     https://en.wikipedia.org/wiki/Density_matrix
     """
     for n in self.num_qubits_list:
-      expected_dim = 2 ** n
+      expected_dim = 2**n
       mixture_list = list(range(1, expected_dim + 1))
       for m in mixture_list:
-        actual_matrix, actual_probs = test_util.random_mixed_density_matrix(n, m)        
-        self.assertAllEqual(tf.shape(actual_matrix), [expected_dim, expected_dim])
+        actual_matrix, actual_probs = test_util.random_mixed_density_matrix(
+            n, m)
+        self.assertAllEqual(
+            tf.shape(actual_matrix), [expected_dim, expected_dim])
         self.assertAllEqual(tf.shape(actual_probs), [m])
         self.assertAllEqual(actual_matrix, tf.linalg.adjoint(actual_matrix))
         # Eigenvalues are real since we confirmed self-adjointness
@@ -163,7 +165,7 @@ class RandomMatrixTest(tf.test.TestCase):
     """
     for n in self.num_qubits_list:
       actual_matrix = test_util.random_pure_density_matrix(n)
-      expected_dim = 2 ** n
+      expected_dim = 2**n
       self.assertAllEqual(tf.shape(actual_matrix), [expected_dim, expected_dim])
       self.assertAllEqual(actual_matrix, tf.linalg.adjoint(actual_matrix))
       # Eigenvalues are real since we confirmed self-adjointness
@@ -172,7 +174,8 @@ class RandomMatrixTest(tf.test.TestCase):
       self.assertAllGreaterEqual(eigvals, -eigval_tol)
       self.assertAllClose(tf.linalg.trace(actual_matrix), 1.0)
       # Confirm purity
-      self.assertAllClose(tf.linalg.trace(tf.linalg.matmul(actual_matrix, actual_matrix)), 1.0)
+      self.assertAllClose(
+          tf.linalg.trace(tf.linalg.matmul(actual_matrix, actual_matrix)), 1.0)
 
 
 class EagerModeToggleTest(tf.test.TestCase):

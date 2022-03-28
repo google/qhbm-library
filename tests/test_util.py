@@ -138,8 +138,12 @@ def random_hermitian_matrix(num_qubits):
   """
   dim = 2**num_qubits
   val_range = 2
-  random_real = tf.cast(tf.random.uniform([dim, dim], minval=-val_range, maxval=val_range), tf.complex128)
-  random_imag = tf.cast(tf.random.uniform([dim, dim], minval=-val_range, maxval=val_range), tf.complex128)
+  random_real = tf.cast(
+      tf.random.uniform([dim, dim], minval=-val_range, maxval=val_range),
+      tf.complex128)
+  random_imag = tf.cast(
+      tf.random.uniform([dim, dim], minval=-val_range, maxval=val_range),
+      tf.complex128)
   random_matrix = random_real + random_imag
   return random_matrix + tf.linalg.adjoint(random_matrix)
 
@@ -173,13 +177,16 @@ def random_mixed_density_matrix(num_qubits, num_mixtures=5):
   pre_probs = tf.random.uniform(shape=[num_mixtures])
   mixture_probabilities = pre_probs / tf.reduce_sum(pre_probs)
   random_unitary = random_unitary_matrix(num_qubits)
-  dim = 2 ** num_qubits
+  dim = 2**num_qubits
   final_state = tf.zeros([dim, dim], tf.complex128)
   for i in range(num_mixtures):
     pure_state = tf.one_hot(i, dim, dtype=tf.complex128)
     evolved_pure_state = tf.linalg.matvec(random_unitary, pure_state)
-    adjoint_evolved_pure_state = tf.squeeze(tf.linalg.adjoint(tf.expand_dims(evolved_pure_state, 0)))
-    final_state = final_state + tf.cast(mixture_probabilities[i], tf.complex128) * tf.einsum("i,j->ij", evolved_pure_state, adjoint_evolved_pure_state)
+    adjoint_evolved_pure_state = tf.squeeze(
+        tf.linalg.adjoint(tf.expand_dims(evolved_pure_state, 0)))
+    final_state = final_state + tf.cast(
+        mixture_probabilities[i], tf.complex128) * tf.einsum(
+            "i,j->ij", evolved_pure_state, adjoint_evolved_pure_state)
   return final_state, mixture_probabilities
 
 
