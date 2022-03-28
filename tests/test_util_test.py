@@ -100,7 +100,7 @@ class RandomMatrixTest(tf.test.TestCase):
 
   def setUp(self):
     """Initialize test objects."""
-    self.setUp()
+    super().setUp()
     self.num_qubits_list = [1, 2, 3, 4, 5]
 
   def test_random_hermitian_matrix(self):
