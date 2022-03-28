@@ -195,7 +195,7 @@ class DirectQuantumCircuit(QuantumCircuit):
       initializer: A `tf.keras.initializers.Initializer` which specifies how to
         initialize the values of the parameters in `circuit`.  The default
         initializer assumes parameters of gates are exponents, so that one full
-        period is covered by the parameter range 0 to 2. 
+        period is covered by the parameter range 0 to 2.
       name: Optional name for the model.
     """
     raw_symbol_names = list(sorted(tfq.util.get_circuit_symbols(pqc)))
