@@ -17,12 +17,14 @@
 import absl
 import itertools
 import random
+import string
 
 import cirq
 import sympy
 import tensorflow as tf
 from tensorflow.python.framework import errors
 import tensorflow_quantum as tfq
+from tensorflow_quantum.python import util as tfq_util
 
 from qhbmlib import models
 from qhbmlib import utils
@@ -264,6 +266,19 @@ class DirectQuantumCircuitTest(tf.test.TestCase):
     self.assertAllEqual(
         tfq.from_tensor(actual_qnn.pqc),
         tfq.from_tensor(tfq.convert_to_tensor([expected_pqc])))
+
+  def test_default_init(self):
+    """Confirms default initializer sets values in expected range."""
+    num_qubits = 10
+    qubits = cirq.GridQubit.rect(num_qubits, 1)
+    symbols = set()
+    num_symbols = 100
+    for _ in range(num_symbols):
+      symbols.add("".join(random.sample(string.ascii_letters, 10)))
+    pqc = tfq_util.random_symbol_circuit(qubits, symbols)
+    actual_circuit = models.DirectQuantumCircuit(pqc)
+    actual_circuit.build([])
+    self.assertAllInRange(actual_circuit.symbol_values, 0, 2)
 
 
 class QAIATest(tf.test.TestCase):
