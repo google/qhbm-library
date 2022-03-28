@@ -156,27 +156,6 @@ class RandomMatrixTest(tf.test.TestCase):
         self.assertAllClose(tf.reduce_sum(expected_sorted_probs), 1.0)
         self.assertAllClose(actual_sorted_probs, expected_sorted_probs)
 
-  def test_random_pure_density_operator(self):
-    """Checks that the returned matrix is a pure density matrix.
-
-    Density matrices are positive operators with trace one.  Additionally, a
-    pure density operator is idempotent.  See Wikipedia,
-    https://en.wikipedia.org/wiki/Density_matrix
-    """
-    for n in self.num_qubits_list:
-      actual_matrix = test_util.random_pure_density_matrix(n)
-      expected_dim = 2**n
-      self.assertAllEqual(tf.shape(actual_matrix), [expected_dim, expected_dim])
-      self.assertAllEqual(actual_matrix, tf.linalg.adjoint(actual_matrix))
-      # Eigenvalues are real since we confirmed self-adjointness
-      eigvals = tf.cast(tf.linalg.eigvalsh(actual_matrix), tf.float32)
-      eigval_tol = 1e-7
-      self.assertAllGreaterEqual(eigvals, -eigval_tol)
-      self.assertAllClose(tf.linalg.trace(actual_matrix), 1.0)
-      # Confirm purity
-      self.assertAllClose(
-          tf.linalg.trace(tf.linalg.matmul(actual_matrix, actual_matrix)), 1.0)
-
 
 class EagerModeToggleTest(tf.test.TestCase):
   """Tests eager_mode_toggle."""
