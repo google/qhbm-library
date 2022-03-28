@@ -540,8 +540,11 @@ class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
     self._energy = input_energy
     self._num_bits = input_energy.num_bits
     self._parameters = dict(input_energy=input_energy)
+    self._q_i_of_x_probs = tf.Variable([0.0] * self._num_bits, trainable=False)
+    self._q_i_of_x = tfp.distributions.Categorical(probs=self._q_i_of_x_probs)
+    self._eye_bool = tf.eye(self._num_bits, dtype=tf.bool)
 
-  def _q_i_of_x(self, x):
+  def _get_q_i_of_x_probs(self, x):
     """Sets the distribution written in equation 6 of the paper."""
     x_float = tf.cast(x, tf.float32)
     with tf.GradientTape() as tape:
@@ -549,8 +552,7 @@ class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
       current_energy = tf.squeeze(self._energy(tf.expand_dims(x_float, 0)))
     f_grad = tape.gradient(current_energy, x_float)
     d_tilde = -(2 * tf.cast(x, tf.float32) - 1) * f_grad
-    i_probs = tf.nn.softmax(d_tilde / 2.0)
-    return tfp.distributions.Categorical(probs=i_probs)
+    return tf.nn.softmax(d_tilde / 2.0)
 
   def one_step(self, current_state, previous_kernel_results):
     """Takes one step of the TransitionKernel.
@@ -565,26 +567,20 @@ class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
       kernel_results: Empty list.
     """
     del previous_kernel_results
-    q_i_of_x = self._q_i_of_x(current_state)
-    proposed_i = q_i_of_x.sample()
-    if current_state[proposed_i] == 0:
-      x_prime = current_state + tf.one_hot(proposed_i, self._num_bits, 1, 0, 0,
-                                           tf.int8)
-    else:
-      x_prime = current_state - tf.one_hot(proposed_i, self._num_bits, 1, 0, 0,
-                                           tf.int8)
-    q_i_of_x_prime = self._q_i_of_x(x_prime)
-    q_ratio = q_i_of_x_prime.probs_parameter(
-    )[proposed_i] / q_i_of_x.probs_parameter()[proposed_i]
-    exp_f = tf.math.exp(-self._energy(tf.expand_dims(x_prime, 0)) +
-                        self._energy(tf.expand_dims(current_state, 0)))
+    q_i_of_x_probs = self._get_q_i_of_x_probs(current_state)
+    self._q_i_of_x_probs.assign(q_i_of_x_probs)
+    proposed_i = self._q_i_of_x.sample()
+    flip_vec = self._eye_bool[proposed_i]
+    x_prime = tf.cast(tf.math.logical_xor(tf.cast(current_state, tf.bool), flip_vec), tf.int8)
+    q_i_of_x_prime_probs = self._get_q_i_of_x_probs(x_prime)
+    q_ratio = q_i_of_x_prime_probs[proposed_i] / q_i_of_x_probs[proposed_i]
+    energies = self._energy(tf.stack([x_prime, current_state]))
+    exp_f = tf.math.exp(-energies[0] + energies[1])
     accept_prob = tf.math.minimum(exp_f * q_ratio, 1.0)
-    accept = tfp.distributions.Bernoulli(
-        probs=accept_prob, dtype=tf.bool).sample()
-    if accept:
-      next_state = x_prime
-    else:
-      next_state = current_state
+    roll = tf.random.uniform([])
+    accept = tf.math.less_equal(roll, accept_prob)
+    flip_vec = tf.math.logical_and(accept, self._eye_bool[proposed_i])
+    next_state = tf.cast(tf.math.logical_xor(tf.cast(current_state, tf.bool), flip_vec), tf.int8)
     kernel_results = []
     return next_state, kernel_results
 
@@ -647,20 +643,16 @@ class GibbsWithGradientsInference(EnergyInference):
     """
     return self._num_burnin_samples
 
-  def _wrapped_one_step(self):
-    """Returns the next state."""
-    next_state, _ = self._kernel.one_step(self._current_state, [])
-    self._current_state.assign(next_state)
-    return next_state
-
   def _ready_inference(self):
     """See base class docstring.
 
     Runs the chain for a number of steps without saving the results, in order
     to better reach equilibrium before recording samples.
     """
+    state = self._current_state.read_value()
     for _ in tf.range(self.num_burnin_samples):
-      _ = self._wrapped_one_step()
+      state, _ = self._kernel.one_step(state, [])
+    self._current_state.assign(state)
 
   def _call(self, inputs, *args, **kwargs):
     """See base class docstring."""
@@ -672,6 +664,9 @@ class GibbsWithGradientsInference(EnergyInference):
     The kernel is repeatedly called to traverse a chain of samples.
     """
     ta = tf.TensorArray(tf.int8, size=num_samples)
+    state = self._current_state.read_value()
     for i in tf.range(num_samples):
-      ta = ta.write(i, self._wrapped_one_step())
+      state, _ = self._kernel.one_step(state, [])
+      ta = ta.write(i, state)
+    self._current_state.assign(state)
     return ta.stack()
