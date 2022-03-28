@@ -185,7 +185,7 @@ class DirectQuantumCircuit(QuantumCircuit):
       self,
       pqc: cirq.Circuit,
       initializer: tf.keras.initializers.Initializer = tf.keras.initializers
-      .RandomUniform(0, 2 * np.pi),
+      .RandomUniform(0, 2),
       name: Union[None, str] = None,
   ):
     """Initializes a DirectQuantumCircuit.
@@ -193,7 +193,9 @@ class DirectQuantumCircuit(QuantumCircuit):
     Args:
       pqc: Representation of a parameterized quantum circuit.
       initializer: A `tf.keras.initializers.Initializer` which specifies how to
-        initialize the values of the parameters in `circuit`.
+        initialize the values of the parameters in `circuit`.  The default
+        initializer assumes parameters of gates are exponents, so that one full
+        period is covered by the parameter range 0 to 2.
       name: Optional name for the model.
     """
     raw_symbol_names = list(sorted(tfq.util.get_circuit_symbols(pqc)))
