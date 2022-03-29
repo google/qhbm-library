@@ -765,21 +765,21 @@ class GibbsWithGradientsKernelTest(tf.test.TestCase):
     self.assertEqual(actual_kernel.bootstrap_results(test_initial_state), [])
 
   @test_util.eager_mode_toggle
-  def test_q_i_of_x(self):
+  def test_get_q_i_of_x_probs(self):
     """Confirms the distribution returned is correct."""
     bits = [5, 7, 10]
     test_energy = models.BernoulliEnergy(bits)
     test_energy.build([None, len(bits)])
     actual_kernel = inference.ebm.GibbsWithGradientsKernel(test_energy)
     test_x = tf.constant([0, 1, 1], dtype=tf.int8)
-    q_i_of_x_wrapper = tf.function(actual_kernel._q_i_of_x)
-    actual_distribution = q_i_of_x_wrapper(test_x)
+    get_q_i_of_x_probs_wrapper = tf.function(actual_kernel._get_q_i_of_x_probs)
+    actual_probs = get_q_i_of_x_probs_wrapper(test_x)
 
     test_thetas = test_energy.get_weights()[0]
     test_d_tilde = tf.constant([1, -1, -1], tf.float32) * (-2 * test_thetas)
     expected_probs = tf.nn.softmax(test_d_tilde / 2)
 
-    self.assertAllClose(actual_distribution.probs_parameter(), expected_probs)
+    self.assertAllClose(actual_probs, expected_probs)
 
   @test_util.eager_mode_toggle
   def test_one_step(self):
@@ -820,19 +820,18 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
     order = 2
     expected_energy = models.KOBE(bits, order)
     expected_num_expectation_samples = 14899
-    expected_num_burnin_samples = 32641
-    expected_seed = tf.constant([441, 1191], tf.int32)
+    expected_num_burnin_samples_per_chain = 32641
+    
     expected_name = "test_analytic_dist_name"
     actual_layer = inference.GibbsWithGradientsInference(
         expected_energy, expected_num_expectation_samples,
-        expected_num_burnin_samples, expected_seed, expected_name)
+        expected_num_burnin_samples, expected_name)
 
     self.assertEqual(actual_layer.energy, expected_energy)
     self.assertAllEqual(actual_layer.num_expectation_samples,
                         expected_num_expectation_samples)
-    self.assertAllEqual(actual_layer.num_burnin_samples,
-                        expected_num_burnin_samples)
-    self.assertAllEqual(actual_layer.seed, expected_seed)
+    self.assertAllEqual(actual_layer.num_burnin_samples_per_chain,
+                        expected_num_burnin_samples_per_chain)
     self.assertEqual(actual_layer.name, expected_name)
 
   def test_sample(self):
@@ -875,7 +874,17 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
     print(f"Second call to sample_wrapper: {delta}")
 
     assert False
-
+    
+    # Check that entropy of samples is approximately entropy of distribution
+    expected_entropy = inference.AnalyticEnergyInference(
+        actual_energy, num_expectation_samples).entropy()
+    _, _, actual_counts = utils.unique_bitstrings_with_counts(samples)
+    actual_probs = tf.cast(actual_counts, tf.float32) / tf.cast(
+        tf.math.reduce_sum(actual_counts), tf.float32)
+    actual_entropy = -1.0 * tf.math.reduce_sum(
+        actual_probs * tf.math.log(actual_probs))
+    self.assertAllClose(actual_entropy, expected_entropy, rtol=self.close_rtol)
+    
 
 if __name__ == "__main__":
   print("Running ebm_test.py ...")
