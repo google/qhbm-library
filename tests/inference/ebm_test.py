@@ -878,6 +878,7 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
     # Set up energy function
     num_bits = 5
     num_layers = 3
+    num_independent_chains = 5
     bits = random.sample(range(1000), num_bits)
     units = random.sample(range(1, 100), num_layers)
     activations = random.sample([
@@ -891,12 +892,13 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
     expected_layer_list.append(tf.keras.layers.Dense(1))
     expected_layer_list.append(utils.Squeeze(-1))
     actual_energy = models.BitstringEnergy(bits, expected_layer_list)
+    _ = actual_energy(tf.constant([[0] * num_bits], dtype=tf.int8))
 
     # Sampler
-    num_expectation_samples = int(1e3)
+    num_expectation_samples = int(1e2)
     num_burnin_samples = int(1e2)
     actual_layer = inference.GibbsWithGradientsInference(
-        actual_energy, num_expectation_samples, num_burnin_samples)
+        actual_energy, num_expectation_samples, num_burnin_samples, num_independent_chains)
 
     sample_wrapper = tf.function(actual_layer.sample)
 
@@ -912,9 +914,17 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
     delta = end - start
     print(f"Second call to sample_wrapper: {delta}")
 
+    actual_energy.set_weights([tf.zeros_like(v) for v in actual_energy.get_weights()])
+    start = time.time()
+    samples = sample_wrapper(num_expectation_samples)
+    end = time.time()
+    delta = end - start
+    print(f"Third call to sample_wrapper: {delta}")
+
     assert False
     
-    # Check that entropy of samples is approximately entropy of distribution
+    # Check that entropy of samples is approximately entropy of distribution,
+    # as a way to check that the sample distribution is approximately correct
     expected_entropy = inference.AnalyticEnergyInference(
         actual_energy, num_expectation_samples).entropy()
     _, _, actual_counts = utils.unique_bitstrings_with_counts(samples)

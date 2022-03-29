@@ -605,13 +605,12 @@ class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
 
 
 class GibbsWithGradientsInference(EnergyInference):
-  """Manages inference using a Gibbs With Gradients kernel."""
+  """Manages inference using multiple Gibbs With Gradients kernels."""
 
   def __init__(self,
                input_energy: energy.BitstringEnergy,
                num_expectation_samples: int,
-               num_burnin_samples_per_chain: int,
-               num_independent_chains: int = 1,
+               num_burnin_samples: int,
                name: Union[None, str] = None):
     """Initializes a GibbsWithGradientsInference.
 
@@ -631,21 +630,31 @@ class GibbsWithGradientsInference(EnergyInference):
       name: Optional name for the model.
     """
     super().__init__(input_energy, num_expectation_samples, name=name)
-    self.num_burnin_samples_per_chain = num_burnin_samples_per_chain
+
     self._num_independent_chains = num_independent_chains
     self._kernels = [GibbsWithGradientsKernel(input_energy) for _ in range(num_independent_chains)]
     self._chain_states = [tf.Variable(tfp.distributions.Bernoulli(
             probs=[0.5] * self.energy.num_bits, dtype=tf.int8).sample(),
                                       trainable=False) for _ in range(num_independent_chains)]
+    self.num_burnin_samples_per_chain = num_burnin_samples_per_chain
+    self.null_state = tf.zeros_like(self._chain_states[0])
 
-    # def chain_burnin(s, k):
-    #   """Burns in the given chain."""
-    #   state = s.read_value()
-    #   for _ in tf.range(self.num_burnin_samples_per_chain):
-    #     state, _ = k.one_step(state, [])
-    #   s.assign(state)
-    # for s, k in zip(self._chain_states, self._kernels):
-    #   chain_burnin(s, k)
+    def get_chain_burnin_func(s, k):
+      def chain_burnin():
+        state = s.read_value()
+        for _ in tf.range(self.num_burnin_samples_per_chain):
+          state, _ = k.one_step(state, [])
+          s.assign(state)
+        return state
+      return chain_burnin
+    self._chain_burnin_list = [get_chain_burnin_func(s, k) for s, k in zip(self._chain_states, self._kernels)]
+
+  @tf.function
+  def _chain_burnin_select(self, input_i):
+    for e in 
+    for i in range(self._num_independent_chains):
+      if i == input_i:
+        return self._chain_burnin_list[i]()
 
   def _ready_inference(self):
     """See base class docstring.
@@ -653,13 +662,7 @@ class GibbsWithGradientsInference(EnergyInference):
     Runs the chains for a number of steps without saving the results, in order
     to better reach equilibrium before recording samples.
     """
-    def chain_burnin(k):
-      """Burns in the given chain."""
-      state = self._chain_states[i].read_value()
-      for _ in tf.range(self.num_burnin_samples_per_chain):
-        state, _ = k.one_step(state, [])
-      self._chain_states[i].assign(state)
-    tf.vectorized_map(chain_burnin, tf.range(self._num_independent_chains))
+    tf.vectorized_map(self._chain_burnin_select, tf.range(self._num_independent_chains))
 
   def _call(self, inputs, *args, **kwargs):
     """See base class docstring."""
