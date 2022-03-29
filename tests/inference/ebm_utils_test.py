@@ -21,11 +21,13 @@ import tensorflow as tf
 from qhbmlib import inference
 from qhbmlib import models
 from qhbmlib import utils
+from tests import test_util
 
 
 class ProbabilitiesTest(tf.test.TestCase):
   """Tests the probabilities function."""
 
+  @test_util.eager_mode_toggle
   def test_probabilities(self):
     """Confirms probabilities are correct for an MLP."""
     num_bits = 5

@@ -255,6 +255,10 @@ class EnergyInference(EnergyInferenceBase):
     super().__init__(input_energy, initial_seed, name)
     self.num_expectation_samples = num_expectation_samples
 
+  def _entropy(self):
+    """Default implementation wrapped by `self.entropy`."""
+    return self.expectation(self.energy) + self.log_partition()
+
   def _expectation(self, function):
     """Default implementation wrapped by `self.expectation`.
 
@@ -338,10 +342,15 @@ class EnergyInference(EnergyInferenceBase):
 
     return _inner_log_partition()
 
-  @abc.abstractmethod
   def _log_partition_forward_pass(self):
-    """Returns approximation to the log partition function."""
-    raise NotImplementedError()
+    """Returns approximation to the log partition function.
+
+    Note this simple estimator is biased.  See the paper appendix for its
+    motivation.  TODO(#216)
+    """
+    samples = self.sample(self.num_expectation_samples)
+    unique_samples, _, _ = utils.unique_bitstrings_with_counts(samples)
+    return tf.math.reduce_logsumexp(-1.0 * self.energy(unique_samples))
 
   def _log_partition_grad_generator(self):
     """Returns default estimator for the log partition function derivative."""
