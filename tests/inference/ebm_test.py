@@ -859,8 +859,7 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
     order = 2
     expected_energy = models.KOBE(bits, order)
     expected_num_expectation_samples = 14899
-    expected_num_burnin_samples_per_chain = 32641
-    
+    expected_num_burnin_samples = 32641
     expected_name = "test_analytic_dist_name"
     actual_layer = inference.GibbsWithGradientsInference(
         expected_energy, expected_num_expectation_samples,
@@ -869,8 +868,8 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
     self.assertEqual(actual_layer.energy, expected_energy)
     self.assertAllEqual(actual_layer.num_expectation_samples,
                         expected_num_expectation_samples)
-    self.assertAllEqual(actual_layer.num_burnin_samples_per_chain,
-                        expected_num_burnin_samples_per_chain)
+    self.assertAllEqual(actual_layer.num_burnin_samples,
+                        expected_num_burnin_samples)
     self.assertEqual(actual_layer.name, expected_name)
 
   def test_sample(self):
@@ -895,10 +894,10 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
     _ = actual_energy(tf.constant([[0] * num_bits], dtype=tf.int8))
 
     # Sampler
-    num_expectation_samples = int(1e2)
+    num_expectation_samples = int(1e3)
     num_burnin_samples = int(1e2)
     actual_layer = inference.GibbsWithGradientsInference(
-        actual_energy, num_expectation_samples, num_burnin_samples, num_independent_chains)
+        actual_energy, num_expectation_samples, num_burnin_samples)
 
     sample_wrapper = tf.function(actual_layer.sample)
 

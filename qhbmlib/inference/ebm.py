@@ -605,7 +605,7 @@ class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
 
 
 class GibbsWithGradientsInference(EnergyInference):
-  """Manages inference using multiple Gibbs With Gradients kernels."""
+  """Manages inference using a Gibbs With Gradients kernel."""
 
   def __init__(self,
                input_energy: energy.BitstringEnergy,
@@ -621,48 +621,35 @@ class GibbsWithGradientsInference(EnergyInference):
         they are all returned by `energy.variables`.
       num_expectation_samples: Number of samples to draw and use for estimating
         the expectation value.
-      num_burnin_samples_per_chain: Number of samples to discard when letting
-        each chain equilibrate after updating the parameters of `input_energy`.
-      num_independent_chains: Number of kernels to update in parallel.
-      initial_seed: PRNG seed; see tfp.random.sanitize_seed for details. This
-        seed will be used in the `sample` method.  If None, the seed is updated
-        after every inference call.  Otherwise, the seed is fixed.
+      num_burnin_samples: Number of samples to discard when letting the chain
+        equilibrate after updating the parameters of `input_energy`.
       name: Optional name for the model.
     """
     super().__init__(input_energy, num_expectation_samples, name=name)
 
     self._num_independent_chains = num_independent_chains
-    self._kernels = [GibbsWithGradientsKernel(input_energy) for _ in range(num_independent_chains)]
-    self._chain_states = [tf.Variable(tfp.distributions.Bernoulli(
+    self._kernel = GibbsWithGradientsKernel(input_energy)
+    self._chain_state = tf.Variable(tfp.distributions.Bernoulli(
             probs=[0.5] * self.energy.num_bits, dtype=tf.int8).sample(),
-                                      trainable=False) for _ in range(num_independent_chains)]
-    self.num_burnin_samples_per_chain = num_burnin_samples_per_chain
-    self.null_state = tf.zeros_like(self._chain_states[0])
+                                      trainable=False)
+    self._num_burnin_samples = num_burnin_samples
 
     def get_chain_burnin_func(s, k):
       def chain_burnin():
-        state = s.read_value()
-        for _ in tf.range(self.num_burnin_samples_per_chain):
-          state, _ = k.one_step(state, [])
-          s.assign(state)
-        return state
       return chain_burnin
     self._chain_burnin_list = [get_chain_burnin_func(s, k) for s, k in zip(self._chain_states, self._kernels)]
 
-  @tf.function
-  def _chain_burnin_select(self, input_i):
-    for e in 
-    for i in range(self._num_independent_chains):
-      if i == input_i:
-        return self._chain_burnin_list[i]()
 
   def _ready_inference(self):
     """See base class docstring.
 
-    Runs the chains for a number of steps without saving the results, in order
+    Runs the chain for a number of steps without saving the results, in order
     to better reach equilibrium before recording samples.
     """
-    tf.vectorized_map(self._chain_burnin_select, tf.range(self._num_independent_chains))
+    state = self._chain_state.read_value()
+    for _ in tf.range(self._num_burnin_samples):
+      state, _ = self._kernel.one_step(state, [])
+    self._chain_state.assign(state)
 
   def _call(self, inputs, *args, **kwargs):
     """See base class docstring."""
@@ -674,17 +661,9 @@ class GibbsWithGradientsInference(EnergyInference):
     The kernels are repeatedly called to traverse chains of samples.
     """
     ta = tf.TensorArray(tf.int8, size=num_samples)
-    chain_samples_floor = tf.math.floordiv(num_samples, self._num_independent_chains)
-    chain_samples_remain = tf.math.floormod(num_samples, self._num_independent_chains)
-    for i, k in enumerate(self._kernels):
-      state = self._chain_states[i].read_value()
-      if i == self._num_independent_chains - 1:
-        # last kernel does the extra work
-        limit = chain_samples_floor + chain_samples_remain
-      else:
-        limit = chain_samples_floor
-      for j in tf.range(limit):
-        state, _ = k.one_step(state, [])
-        ta = ta.write(i * chain_samples_floor + j, state)
-      self._chain_states[i].assign(state)
+    state = self._chain_state.read_value()
+    for i in tf.range(num_samples):
+      state, _ = self._kernel.one_step(state, [])
+      ta = ta.write(i, state)
+    self._chain_state.assign(state)
     return ta.stack()
