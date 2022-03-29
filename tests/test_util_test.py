@@ -51,9 +51,9 @@ class RPQCTest(tf.test.TestCase, parameterized.TestCase):
     name = "test_rot"
     expected_circuit = cirq.Circuit()
     for n, q in enumerate(qubits):
-      s = sympy.Symbol("sx_{0}_{1}_{2}".format(name, layer_num, n))
+      s = sympy.Symbol(f"sx_{name}_{layer_num}_{n}")
       expected_circuit += cirq.Circuit(cirq.X(q)**s)
-      s = sympy.Symbol("sz_{0}_{1}_{2}".format(name, layer_num, n))
+      s = sympy.Symbol(f"sz_{name}_{layer_num}_{n}")
       expected_circuit += cirq.Circuit(cirq.Z(q)**s)
     actual_circuit = test_util.get_xz_rotation_layer(qubits, layer_num, name)
     self.assertEqual(actual_circuit, expected_circuit)
@@ -67,11 +67,11 @@ class RPQCTest(tf.test.TestCase, parameterized.TestCase):
     expected_circuit = cirq.Circuit()
     for n, (q0, q1) in enumerate(zip(qubits, qubits[1:])):
       if n % 2 == 0:
-        s = sympy.Symbol("sc_{0}_{1}_{2}".format(name, layer_num, n))
+        s = sympy.Symbol(f"sc_{name}_{layer_num}_{n}")
         expected_circuit += cirq.Circuit(cirq.CZ(q0, q1)**s)
     for n, (q0, q1) in enumerate(zip(qubits, qubits[1:])):
       if n % 2 == 1:
-        s = sympy.Symbol("sc_{0}_{1}_{2}".format(name, layer_num, n))
+        s = sympy.Symbol(f"sc_{name}_{layer_num}_{n}")
         expected_circuit += cirq.Circuit(cirq.CZ(q0, q1)**s)
     actual_circuit = test_util.get_cz_exp_layer(qubits, layer_num, name)
     self.assertEqual(actual_circuit, expected_circuit)
