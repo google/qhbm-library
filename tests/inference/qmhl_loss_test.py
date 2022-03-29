@@ -36,7 +36,7 @@ class QMHLTest(tf.test.TestCase):
     super().setUp()
     self.num_qubits_list = [1, 2]
     self.tf_random_seed = 4
-    self.tf_random_seed_alt = 6
+    self.tf_random_seed_alt = 7
     self.tfp_seed = tf.constant([3, 6], tf.int32)
     # TODO(#190)
     self.num_samples = int(1e6)

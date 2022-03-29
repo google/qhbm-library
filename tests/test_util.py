@@ -1,4 +1,3 @@
-# pylint: skip-file
 # Copyright 2021 The QHBM Library Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,13 +14,9 @@
 # ==============================================================================
 """Utility functions for running tests."""
 
-import random
-
 import cirq
-import numpy as np
 import sympy
 import tensorflow as tf
-import tensorflow_probability as tfp
 
 from qhbmlib import inference
 from qhbmlib import models
@@ -41,8 +36,8 @@ def get_xz_rotation_layer(qubits, layer_num, name):
   """Apply two-axis single qubit rotations to all the given qubits."""
   circuit = cirq.Circuit()
   for n, q in enumerate(qubits):
-    sx, sz = sympy.symbols("sx_{0}_{1}_{2} sz_{0}_{1}_{2}".format(
-        name, layer_num, n))
+    sx, sz = sympy.symbols(
+        f"sx_{name}_{layer_num}_{n} sz_{name}_{layer_num}_{n}")
     circuit += get_xz_rotation(q, sx, sz)
   return circuit
 
@@ -51,11 +46,11 @@ def get_cz_exp_layer(qubits, layer_num, name):
   """Apply parameterized CZ gates to all pairs of nearest-neighbor qubits."""
   circuit = cirq.Circuit()
   for n, (q0, q1) in enumerate(zip(qubits[::2], qubits[1::2])):
-    a = sympy.symbols("sc_{0}_{1}_{2}".format(name, layer_num, 2 * n))
+    a = sympy.symbols(f"sc_{name}_{layer_num}_{2 * n}")
     circuit += get_cz_exp(q0, q1, a)
   shifted_qubits = qubits[1::]
   for n, (q0, q1) in enumerate(zip(shifted_qubits[::2], shifted_qubits[1::2])):
-    a = sympy.symbols("sc_{0}_{1}_{2}".format(name, layer_num, 2 * n + 1))
+    a = sympy.symbols(f"sc_{name}_{layer_num}_{2 * n + 1}")
     circuit += get_cz_exp(q0, q1, a)
   return circuit
 
@@ -84,14 +79,14 @@ def get_random_hamiltonian_and_inference(qubits,
                                          ebm_seed=None):
   """Create a random QHBM for use in testing."""
   num_qubits = len(qubits)
-  ebm_init = tf.keras.initializers.RandomUniform(
-      minval=minval_thetas, maxval=maxval_thetas)
+  ebm_init = tf.keras.initializers.RandomUniform(minval_thetas, maxval_thetas,
+                                                 initializer_seed)
   actual_energy = models.KOBE(list(range(num_qubits)), num_qubits, ebm_init)
   e_infer = inference.AnalyticEnergyInference(
       actual_energy, num_samples, name=identifier, initial_seed=ebm_seed)
 
-  qnn_init = tf.keras.initializers.RandomUniform(
-      minval=minval_phis, maxval=maxval_phis)
+  qnn_init = tf.keras.initializers.RandomUniform(minval_phis, maxval_phis,
+                                                 initializer_seed)
   unitary = get_hardware_efficient_model_unitary(qubits, num_layers, identifier)
   actual_circuit = models.DirectQuantumCircuit(unitary, qnn_init)
   q_infer = inference.QuantumInference(actual_circuit, name=identifier)
@@ -111,11 +106,9 @@ def random_hermitian_matrix(num_qubits):
   dim = 2**num_qubits
   val_range = 2
   random_real = tf.cast(
-      tf.random.uniform([dim, dim], minval=-val_range, maxval=val_range),
-      tf.complex128)
+      tf.random.uniform([dim, dim], -val_range, val_range), tf.complex128)
   random_imag = 1j * tf.cast(
-      tf.random.uniform([dim, dim], minval=-val_range, maxval=val_range),
-      tf.complex128)
+      tf.random.uniform([dim, dim], -val_range, val_range), tf.complex128)
   random_matrix = random_real + random_imag
   return random_matrix + tf.linalg.adjoint(random_matrix)
 
@@ -146,13 +139,13 @@ def random_mixed_density_matrix(num_qubits, num_mixtures=5):
     final_state: The mixed density matrix.
     mixture_probabilities: The probability of each state in the mixture.
   """
-  pre_probs = tf.random.uniform(shape=[num_mixtures], minval=1e-9)
+  pre_probs = tf.random.uniform([num_mixtures], 1e-9)
   mixture_probabilities = pre_probs / tf.reduce_sum(pre_probs)
   random_unitary = random_unitary_matrix(num_qubits)
   dim = 2**num_qubits
   final_state = tf.zeros([dim, dim], tf.complex128)
   for i in range(num_mixtures):
-    pure_state = tf.one_hot(i, dim, dtype=tf.complex128)
+    pure_state = tf.one_hot(i, dim, 1.0, 0.0, 0, tf.complex128)
     evolved_pure_state = tf.linalg.matvec(random_unitary, pure_state)
     adjoint_evolved_pure_state = tf.squeeze(
         tf.linalg.adjoint(tf.expand_dims(evolved_pure_state, 0)))
@@ -263,7 +256,7 @@ def approximate_gradient(f, variables, delta=1e-1):
     def mapper_func(i):
       """Function to map across indices of flat `var`."""
       stencil = _five_point_stencil(f, var, i, delta)
-      inner_sum = tf.nest.map_structure(lambda x: tf.math.reduce_sum(x),
+      inner_sum = tf.nest.map_structure(tf.math.reduce_sum,
                                         tf.nest.flatten(stencil))
       outer_sum = tf.math.reduce_sum(tf.stack(inner_sum))
       entry_derivative = tf.reduce_sum(outer_sum)
