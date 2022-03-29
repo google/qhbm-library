@@ -633,7 +633,7 @@ class GibbsWithGradientsInference(EnergyInference):
         tfp.distributions.Bernoulli(
             probs=[0.5] * self.energy.num_bits, dtype=tf.int8).sample(),
         trainable=False)
-    self._num_burnin_samples = num_burnin_samples
+    self.num_burnin_samples = num_burnin_samples
 
   def _ready_inference(self):
     """See base class docstring.
@@ -642,7 +642,7 @@ class GibbsWithGradientsInference(EnergyInference):
     to better reach equilibrium before recording samples.
     """
     state = self._chain_state.read_value()
-    for _ in tf.range(self._num_burnin_samples):
+    for _ in tf.range(self.num_burnin_samples):
       state, _ = self._kernel.one_step(state, [])
     self._chain_state.assign(state)
 

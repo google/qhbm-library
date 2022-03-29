@@ -862,7 +862,7 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
     expected_name = "test_analytic_dist_name"
     actual_layer = inference.GibbsWithGradientsInference(
         expected_energy, expected_num_expectation_samples,
-        expected_num_burnin_samples_per_chain, expected_name)
+        expected_num_burnin_samples, expected_name)
 
     self.assertEqual(actual_layer.energy, expected_energy)
     self.assertAllEqual(actual_layer.num_expectation_samples,
