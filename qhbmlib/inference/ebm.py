@@ -638,17 +638,28 @@ class GibbsWithGradientsInference(EnergyInference):
             probs=[0.5] * self.energy.num_bits, dtype=tf.int8).sample(),
                                       trainable=False) for _ in range(num_independent_chains)]
 
+    # def chain_burnin(s, k):
+    #   """Burns in the given chain."""
+    #   state = s.read_value()
+    #   for _ in tf.range(self.num_burnin_samples_per_chain):
+    #     state, _ = k.one_step(state, [])
+    #   s.assign(state)
+    # for s, k in zip(self._chain_states, self._kernels):
+    #   chain_burnin(s, k)
+
   def _ready_inference(self):
     """See base class docstring.
 
     Runs the chains for a number of steps without saving the results, in order
     to better reach equilibrium before recording samples.
     """
-    for i, k in enumerate(self._kernels):
+    def chain_burnin(k):
+      """Burns in the given chain."""
       state = self._chain_states[i].read_value()
       for _ in tf.range(self.num_burnin_samples_per_chain):
         state, _ = k.one_step(state, [])
       self._chain_states[i].assign(state)
+    tf.vectorized_map(chain_burnin, tf.range(self._num_independent_chains))
 
   def _call(self, inputs, *args, **kwargs):
     """See base class docstring."""
@@ -670,7 +681,7 @@ class GibbsWithGradientsInference(EnergyInference):
       else:
         limit = chain_samples_floor
       for j in tf.range(limit):
-        state, _ = self._kernel.one_step(state, [])
+        state, _ = k.one_step(state, [])
         ta = ta.write(i * chain_samples_floor + j, state)
       self._chain_states[i].assign(state)
     return ta.stack()
