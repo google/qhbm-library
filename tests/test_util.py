@@ -79,14 +79,14 @@ def get_random_hamiltonian_and_inference(qubits,
                                          ebm_seed=None):
   """Create a random QHBM for use in testing."""
   num_qubits = len(qubits)
-  ebm_init = tf.keras.initializers.RandomUniform(
-      minval_thetas, maxval_thetas, initializer_seed)
+  ebm_init = tf.keras.initializers.RandomUniform(minval_thetas, maxval_thetas,
+                                                 initializer_seed)
   actual_energy = models.KOBE(list(range(num_qubits)), num_qubits, ebm_init)
   e_infer = inference.AnalyticEnergyInference(
       actual_energy, num_samples, name=identifier, initial_seed=ebm_seed)
 
-  qnn_init = tf.keras.initializers.RandomUniform(
-      minval_phis, maxval_phis, initializer_seed)
+  qnn_init = tf.keras.initializers.RandomUniform(minval_phis, maxval_phis,
+                                                 initializer_seed)
   unitary = get_hardware_efficient_model_unitary(qubits, num_layers, identifier)
   actual_circuit = models.DirectQuantumCircuit(unitary, qnn_init)
   q_infer = inference.QuantumInference(actual_circuit, name=identifier)
@@ -106,11 +106,9 @@ def random_hermitian_matrix(num_qubits):
   dim = 2**num_qubits
   val_range = 2
   random_real = tf.cast(
-      tf.random.uniform([dim, dim], -val_range, val_range),
-      tf.complex128)
+      tf.random.uniform([dim, dim], -val_range, val_range), tf.complex128)
   random_imag = 1j * tf.cast(
-      tf.random.uniform([dim, dim], -val_range, val_range),
-      tf.complex128)
+      tf.random.uniform([dim, dim], -val_range, val_range), tf.complex128)
   random_matrix = random_real + random_imag
   return random_matrix + tf.linalg.adjoint(random_matrix)
 
