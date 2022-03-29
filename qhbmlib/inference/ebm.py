@@ -580,7 +580,7 @@ class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
     energies = self._energy(tf.stack([x_prime, current_state]))
     exp_f = tf.math.exp(-energies[0] + energies[1])
     accept_prob = tf.math.minimum(exp_f * q_ratio, 1.0)
-    roll = tf.random.uniform([])
+    roll = tf.random.uniform([], dtype=tf.float32)
     accept = tf.math.less_equal(roll, accept_prob)
     flip_vec = tf.math.logical_and(accept, self._eye_bool[proposed_i])
     next_state = tf.cast(
