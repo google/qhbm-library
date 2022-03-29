@@ -881,13 +881,13 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
     bits = random.sample(range(1000), num_bits)
     units = random.sample(range(1, 100), num_layers)
     activations = random.sample([
-      "elu", "exponential", "gelu", "hard_sigmoid", "linear", "relu",
-      "selu", "sigmoid", "softmax", "softplus", "softsign", "swish", "tanh"
+        "elu", "exponential", "gelu", "hard_sigmoid", "linear", "relu", "selu",
+        "sigmoid", "softmax", "softplus", "softsign", "swish", "tanh"
     ], num_layers)
     expected_layer_list = []
     for i in range(num_layers):
       expected_layer_list.append(
-        tf.keras.layers.Dense(units[i], activation=activations[i]))
+          tf.keras.layers.Dense(units[i], activation=activations[i]))
     expected_layer_list.append(tf.keras.layers.Dense(1))
     expected_layer_list.append(utils.Squeeze(-1))
     actual_energy = models.BitstringEnergy(bits, expected_layer_list)
@@ -901,7 +901,7 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
 
     sample_wrapper = tf.function(actual_layer.sample)
     samples = sample_wrapper(num_expectation_samples)
-    
+
     # Check that entropy of samples is approximately entropy of distribution,
     # as a way to check that the sample distribution is approximately correct
     expected_entropy = inference.AnalyticEnergyInference(
@@ -912,7 +912,7 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
     actual_entropy = -1.0 * tf.math.reduce_sum(
         actual_probs * tf.math.log(actual_probs))
     self.assertAllClose(actual_entropy, expected_entropy, rtol=self.close_rtol)
-    
+
 
 if __name__ == "__main__":
   print("Running ebm_test.py ...")

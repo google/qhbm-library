@@ -573,7 +573,8 @@ class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
     self._q_i_of_x_probs.assign(q_i_of_x_probs)
     proposed_i = self._q_i_of_x.sample()
     flip_vec = self._eye_bool[proposed_i]
-    x_prime = tf.cast(tf.math.logical_xor(tf.cast(current_state, tf.bool), flip_vec), tf.int8)
+    x_prime = tf.cast(
+        tf.math.logical_xor(tf.cast(current_state, tf.bool), flip_vec), tf.int8)
     q_i_of_x_prime_probs = self._get_q_i_of_x_probs(x_prime)
     q_ratio = q_i_of_x_prime_probs[proposed_i] / q_i_of_x_probs[proposed_i]
     energies = self._energy(tf.stack([x_prime, current_state]))
@@ -582,7 +583,8 @@ class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
     roll = tf.random.uniform([])
     accept = tf.math.less_equal(roll, accept_prob)
     flip_vec = tf.math.logical_and(accept, self._eye_bool[proposed_i])
-    next_state = tf.cast(tf.math.logical_xor(tf.cast(current_state, tf.bool), flip_vec), tf.int8)
+    next_state = tf.cast(
+        tf.math.logical_xor(tf.cast(current_state, tf.bool), flip_vec), tf.int8)
     kernel_results = []
     return next_state, kernel_results
 
@@ -627,9 +629,10 @@ class GibbsWithGradientsInference(EnergyInference):
     """
     super().__init__(input_energy, num_expectation_samples, name=name)
     self._kernel = GibbsWithGradientsKernel(input_energy)
-    self._chain_state = tf.Variable(tfp.distributions.Bernoulli(
+    self._chain_state = tf.Variable(
+        tfp.distributions.Bernoulli(
             probs=[0.5] * self.energy.num_bits, dtype=tf.int8).sample(),
-                                      trainable=False)
+        trainable=False)
     self._num_burnin_samples = num_burnin_samples
 
   def _ready_inference(self):
