@@ -626,19 +626,11 @@ class GibbsWithGradientsInference(EnergyInference):
       name: Optional name for the model.
     """
     super().__init__(input_energy, num_expectation_samples, name=name)
-
-    self._num_independent_chains = num_independent_chains
     self._kernel = GibbsWithGradientsKernel(input_energy)
     self._chain_state = tf.Variable(tfp.distributions.Bernoulli(
             probs=[0.5] * self.energy.num_bits, dtype=tf.int8).sample(),
                                       trainable=False)
     self._num_burnin_samples = num_burnin_samples
-
-    def get_chain_burnin_func(s, k):
-      def chain_burnin():
-      return chain_burnin
-    self._chain_burnin_list = [get_chain_burnin_func(s, k) for s, k in zip(self._chain_states, self._kernels)]
-
 
   def _ready_inference(self):
     """See base class docstring.

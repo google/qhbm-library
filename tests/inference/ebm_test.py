@@ -17,7 +17,6 @@
 import functools
 import itertools
 import random
-import time
 
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -872,6 +871,7 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
                         expected_num_burnin_samples)
     self.assertEqual(actual_layer.name, expected_name)
 
+  @test_util.eager_mode_toggle
   def test_sample(self):
     """Confirms that bitstrings are sampled as expected."""
     # Set up energy function
@@ -900,27 +900,7 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
         actual_energy, num_expectation_samples, num_burnin_samples)
 
     sample_wrapper = tf.function(actual_layer.sample)
-
-    start = time.time()
     samples = sample_wrapper(num_expectation_samples)
-    end = time.time()
-    delta = end - start
-    print(f"Initial call to sample_wrapper: {delta}")
-    
-    start = time.time()
-    samples = sample_wrapper(num_expectation_samples)
-    end = time.time()
-    delta = end - start
-    print(f"Second call to sample_wrapper: {delta}")
-
-    actual_energy.set_weights([tf.zeros_like(v) for v in actual_energy.get_weights()])
-    start = time.time()
-    samples = sample_wrapper(num_expectation_samples)
-    end = time.time()
-    delta = end - start
-    print(f"Third call to sample_wrapper: {delta}")
-
-    assert False
     
     # Check that entropy of samples is approximately entropy of distribution,
     # as a way to check that the sample distribution is approximately correct
