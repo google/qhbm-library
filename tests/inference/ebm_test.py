@@ -805,18 +805,22 @@ class GibbsWithGradientsKernelTest(tf.test.TestCase):
   @test_util.eager_mode_toggle
   def test_get_index_proposal_probs(self):
     """Confirms the distribution returned is correct."""
-    bits = [5, 7, 10]
-    test_energy = models.BernoulliEnergy(bits)
-    test_energy.build([None, len(bits)])
-    actual_kernel = inference.ebm.GibbsWithGradientsKernel(test_energy)
+    num_bits = 3
+    bits = random.sample(range(1000), num_bits)
+    bernoulli_energy = models.BernoulliEnergy(bits)
+    bernoulli_energy.build([None, num_bits])
+    # make sure the probabilities are unique
+    bernoulli_energy.set_weights([tf.constant([-2.0, 1.0, 3.0])])
+    actual_kernel = inference.ebm.GibbsWithGradientsKernel(bernoulli_energy)
     test_x = tf.constant([0, 1, 1], dtype=tf.int8)
     get_index_proposal_probs_wrapper = tf.function(actual_kernel._get_index_proposal_probs)
     actual_probs = get_index_proposal_probs_wrapper(test_x)
-
-    test_thetas = test_energy.get_weights()[0]
-    test_d_tilde = tf.constant([1, -1, -1], tf.float32) * (-2 * test_thetas)
-    expected_probs = tf.nn.softmax(test_d_tilde / 2)
-
+    
+    hamming_ball_energies = bernoulli_energy(tf.constant([[1, 1, 1], [0, 0, 1], [0, 1, 0]], dtype=tf.int8))
+    test_x_energies = bernoulli_energy(tf.tile(tf.expand_dims(test_x, 0), [3, 1]))
+    # f(x') - f(x) = -E(x') + E(x)
+    direct_energy_diff = - hamming_ball_energies + test_x_energies
+    expected_probs = tf.nn.softmax(direct_energy_diff / 2)
     self.assertAllClose(actual_probs, expected_probs)
 
   @test_util.eager_mode_toggle
@@ -826,12 +830,11 @@ class GibbsWithGradientsKernelTest(tf.test.TestCase):
     test_energy = models.BernoulliEnergy(list(range(num_bits)))
     test_energy.build([None, num_bits])
     # Set the energy high for the all zeros state
-    test_energy.set_weights([tf.constant([1000] * num_bits, tf.float32)])
+    test_energy.set_weights([tf.constant([10] * num_bits, tf.float32)])
     actual_kernel = inference.ebm.GibbsWithGradientsKernel(test_energy)
 
     initial_state = tf.constant([0] * num_bits, tf.int8)
     initial_energy = test_energy(tf.expand_dims(initial_state, 0))
-
     one_step_wrapper = tf.function(actual_kernel.one_step)
     next_state, _ = one_step_wrapper(initial_state, [])
     next_energy = test_energy(tf.expand_dims(next_state, 0))

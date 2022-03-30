@@ -598,7 +598,7 @@ class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
       The conditional probabilities q(i | x) given in equation 6.
     """
     x_float = tf.cast(x, tf.float32)
-    with tf.GradientTape() as tape:
+    with tf.GradientTape(watch_accessed_variables=False) as tape:
       tape.watch(x_float)
       current_energy = tf.squeeze(self._energy(tf.expand_dims(x_float, 0)))
     # f(x) = -E(x)
