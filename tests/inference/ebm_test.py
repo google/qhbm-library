@@ -915,7 +915,7 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
     actual_entropy = -1.0 * tf.math.reduce_sum(
         actual_probs * tf.math.log(actual_probs))
     self.assertAllClose(actual_entropy, expected_entropy, rtol=self.close_rtol)
-
+    
 
 if __name__ == "__main__":
   print("Running ebm_test.py ...")
