@@ -527,7 +527,34 @@ class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
 
   See Algorithm 1 of
   https://arxiv.org/abs/2102.04509v2
-  for details.
+  for details.  Here we summarize the motivations for Gibbs With Gradients
+  given in the paper at the link.
+
+  Consider Gibbs sampling, a special case of Metropolis-Hastings for discrete
+  distributions.  For a distribution over bitstrings, the Gibbs sampler works as
+  follows: given bitstring x, propose an index, say i, drawn from some proposal
+  distribution q; form the conditional distribution of x[i] given all other
+  entries; sample a new bit b from the conditional and set x[i] = b.
+
+  The core difficulty with this simple strategy is intelligently choosing the
+  index to update.  This mean the proposal distribution q(i) should have more
+  mass on indices that are more likely to require updates.  For example, in
+  sampling from a model of the MNIST dataset one can take advantage of the fact
+  that almost all dimensions represent the background and therefore are unlikely
+  to change sample-to-sample.
+
+  A previously known way to achieve this behavior is to use a proposal
+  distribution which is "locally-informed".  The local information used is the
+  difference in log probability between the current state and states in a
+  Hamming ball around the current state, as in equation 2.  This focuses
+  probability on the indices most likely to lower the energy.
+
+  However, locally-informed proposals scale poorly in the data dimensionality:
+  they require evaluating the log probability at every point in the Hamming ball
+  around the current state.  The authors propose a method which requires only a
+  single evaluation of the log probability function and its derivative.
+  Since it uses derivative information, the authors name it Gibbs With Gradients.
+  This is the update rule implemented by this kernel.
   """
 
   def __init__(self, input_energy):
