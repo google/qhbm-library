@@ -551,10 +551,12 @@ class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
 
   However, locally-informed proposals scale poorly in the data dimensionality:
   they require evaluating the log probability at every point in the Hamming ball
-  around the current state.  The authors propose a method which requires only a
-  single evaluation of the log probability function and its derivative.
-  Since it uses derivative information, the authors name it Gibbs With Gradients.
-  This is the update rule implemented by this kernel.
+  around the current state.  The authors propose a method to approximate these
+  evaluations, which requires only a single evaluation of the log probability
+  function as well as the derivative.  Since the method uses derivative
+  information, the authors name it Gibbs With Gradients.
+
+  This transition kernel implements the Gibbs With Gradients update rule.
   """
 
   def __init__(self, input_energy):
@@ -567,19 +569,43 @@ class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
     self._energy = input_energy
     self._num_bits = input_energy.num_bits
     self._parameters = dict(input_energy=input_energy)
-    self._q_i_of_x_probs = tf.Variable([0.0] * self._num_bits, trainable=False)
-    self._q_i_of_x = tfp.distributions.Categorical(probs=self._q_i_of_x_probs)
+    # q(i | x) in Algorithm 1
+    self._index_proposal_probs = tf.Variable([0.0] * self._num_bits, trainable=False)
+    self._index_proposal_dist = tfp.distributions.Categorical(probs=self._index_proposal_probs)
     self._eye_bool = tf.eye(self._num_bits, dtype=tf.bool)
 
-  def _get_q_i_of_x_probs(self, x):
-    """Sets the distribution written in equation 6 of the paper."""
+  def _get_index_proposal_probs(self, x):
+    """Returns the value of equation 6 of the paper.
+
+    Given current state x, the locally-informed proposal evaluates f(x') - f(x)
+    for each x' in a Hamming ball of radius 1 around x, written H(x).  Let
+    d(x) = [f(x') - f(x) for x' in H(x)].  The locally-informed conditional
+    distribution is then q(i | x) = C * e^(d(x) / T) for some temperature T,
+    where C is the normalization constant (T is often fixed at 2).
+
+    The insight of the paper is that d(x) can be approximated using a Taylor
+    series, yielding d(x) ~ -(2x - 1) * df(x)/dx.  This function computes the
+    locally-informed conditional probabilities q(i | x) using the approximation.
+
+    Note that in terms of the unnormalized log probability of the state, f(x),
+    used in the paper, the energy of the state is: E(x) = -f(x).  So we have
+    d(x) ~ (2x - 1) * dE(x)/dx
+
+    Args:
+      x: 1D tensor which is the current state of the chain.
+
+    Returns:
+      The conditional probabilities q(i | x) given in equation 6.
+    """
     x_float = tf.cast(x, tf.float32)
     with tf.GradientTape() as tape:
       tape.watch(x_float)
       current_energy = tf.squeeze(self._energy(tf.expand_dims(x_float, 0)))
-    f_grad = tape.gradient(current_energy, x_float)
-    d_tilde = -(2 * tf.cast(x, tf.float32) - 1) * f_grad
-    return tf.nn.softmax(d_tilde / 2.0)
+    # f(x) = -E(x)
+    f_grad = -1.0 * tape.gradient(current_energy, x_float)
+    # Equation 3
+    approx_energy_diff = -(2 * tf.cast(x, tf.float32) - 1) * f_grad
+    return tf.nn.softmax(approx_energy_diff / 2.0)
 
   def one_step(self, current_state, previous_kernel_results):
     """Takes one step of the TransitionKernel.
@@ -596,14 +622,14 @@ class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
       kernel_results: Empty list.
     """
     del previous_kernel_results
-    q_i_of_x_probs = self._get_q_i_of_x_probs(current_state)
-    self._q_i_of_x_probs.assign(q_i_of_x_probs)
-    proposed_i = self._q_i_of_x.sample()
+    index_proposal_probs = self._get_index_proposal_probs(current_state)
+    self._index_proposal_probs.assign(index_proposal_probs)
+    proposed_i = self._index_proposal_dist.sample()
     flip_vec = self._eye_bool[proposed_i]
     x_prime = tf.cast(
         tf.math.logical_xor(tf.cast(current_state, tf.bool), flip_vec), tf.int8)
-    q_i_of_x_prime_probs = self._get_q_i_of_x_probs(x_prime)
-    q_ratio = q_i_of_x_prime_probs[proposed_i] / q_i_of_x_probs[proposed_i]
+    index_proposal_probs_prime = self._get_index_proposal_probs(x_prime)
+    q_ratio = index_proposal_probs_prime[proposed_i] / index_proposal_probs[proposed_i]
     energies = self._energy(tf.stack([x_prime, current_state]))
     exp_f = tf.math.exp(-energies[0] + energies[1])
     accept_prob = tf.math.minimum(exp_f * q_ratio, 1.0)

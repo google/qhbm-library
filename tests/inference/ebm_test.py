@@ -803,15 +803,15 @@ class GibbsWithGradientsKernelTest(tf.test.TestCase):
     self.assertEqual(actual_kernel.bootstrap_results(test_initial_state), [])
 
   @test_util.eager_mode_toggle
-  def test_get_q_i_of_x_probs(self):
+  def test_get_index_proposal_probs(self):
     """Confirms the distribution returned is correct."""
     bits = [5, 7, 10]
     test_energy = models.BernoulliEnergy(bits)
     test_energy.build([None, len(bits)])
     actual_kernel = inference.ebm.GibbsWithGradientsKernel(test_energy)
     test_x = tf.constant([0, 1, 1], dtype=tf.int8)
-    get_q_i_of_x_probs_wrapper = tf.function(actual_kernel._get_q_i_of_x_probs)
-    actual_probs = get_q_i_of_x_probs_wrapper(test_x)
+    get_index_proposal_probs_wrapper = tf.function(actual_kernel._get_index_proposal_probs)
+    actual_probs = get_index_proposal_probs_wrapper(test_x)
 
     test_thetas = test_energy.get_weights()[0]
     test_d_tilde = tf.constant([1, -1, -1], tf.float32) * (-2 * test_thetas)
