@@ -18,6 +18,7 @@ from qhbmlib.inference.ebm import AnalyticEnergyInference
 from qhbmlib.inference.ebm import BernoulliEnergyInference
 from qhbmlib.inference.ebm import EnergyInference
 from qhbmlib.inference.ebm import EnergyInferenceBase
+from qhbmlib.inference.ebm import GibbsWithGradientsInference
 from qhbmlib.inference.ebm_utils import probabilities
 from qhbmlib.inference.qhbm import QHBM
 from qhbmlib.inference.qhbm_utils import density_matrix
@@ -34,6 +35,7 @@ __all__ = [
     "EnergyInference",
     "EnergyInferenceBase",
     "fidelity",
+    "GibbsWithGradientsInference",
     "probabilities",
     "QHBM",
     "qmhl",

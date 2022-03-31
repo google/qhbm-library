@@ -16,6 +16,7 @@
 
 import functools
 import itertools
+import random
 
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -783,6 +784,161 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     # Check that the fraction is approximately 0.5 (equal counts)
     _, _, counts = utils.unique_bitstrings_with_counts(samples)
     self.assertAllClose(1.0, counts[0] / counts[1], rtol=self.close_rtol)
+
+
+class GibbsWithGradientsKernelTest(tf.test.TestCase):
+  """Tests the GibbsWithGradientsKernel class."""
+
+  def test_init(self):
+    """Confirms initialization works, and tests basic functions."""
+    bits = [0, 1, 3]
+    order = 2
+    expected_energy = models.KOBE(bits, order)
+    actual_kernel = inference.ebm.GibbsWithGradientsKernel(expected_energy)
+    self.assertEqual(actual_kernel._energy, expected_energy)
+
+    self.assertTrue(actual_kernel.is_calibrated)
+
+    test_initial_state = tf.constant([0] * len(bits), tf.int8)
+    self.assertEqual(actual_kernel.bootstrap_results(test_initial_state), [])
+
+  @test_util.eager_mode_toggle
+  def test_get_index_proposal_probs(self):
+    """Confirms the distribution returned is correct."""
+    num_bits = 3
+    bits = random.sample(range(1000), num_bits)
+    bernoulli_energy = models.BernoulliEnergy(bits)
+    bernoulli_energy.build([None, num_bits])
+    # make sure the probabilities are unique
+    bernoulli_energy.set_weights([tf.constant([-2.0, 1.0, 3.0])])
+    actual_kernel = inference.ebm.GibbsWithGradientsKernel(bernoulli_energy)
+    test_x = tf.constant([0, 1, 1], dtype=tf.int8)
+    get_index_proposal_probs_wrapper = tf.function(
+        actual_kernel._get_index_proposal_probs)
+    actual_probs = get_index_proposal_probs_wrapper(test_x)
+
+    hamming_ball_energies = bernoulli_energy(
+        tf.constant([[1, 1, 1], [0, 0, 1], [0, 1, 0]], dtype=tf.int8))
+    test_x_energies = bernoulli_energy(
+        tf.tile(tf.expand_dims(test_x, 0), [3, 1]))
+    # f(x') - f(x) = -E(x') + E(x)
+    direct_energy_diff = -hamming_ball_energies + test_x_energies
+    expected_probs = tf.nn.softmax(direct_energy_diff / 2)
+    self.assertAllClose(actual_probs, expected_probs)
+
+  @test_util.eager_mode_toggle
+  def test_one_step(self):
+    """Confirms transitions occur from high to low energy states."""
+    num_bits = 5
+    test_energy = models.BernoulliEnergy(list(range(num_bits)))
+    test_energy.build([None, num_bits])
+    # Set the energy high for the all zeros state
+    test_energy.set_weights([tf.constant([10] * num_bits, tf.float32)])
+    actual_kernel = inference.ebm.GibbsWithGradientsKernel(test_energy)
+
+    initial_state = tf.constant([0] * num_bits, tf.int8)
+    initial_energy = test_energy(tf.expand_dims(initial_state, 0))
+    one_step_wrapper = tf.function(actual_kernel.one_step)
+    next_state, _ = one_step_wrapper(initial_state, [])
+    next_energy = test_energy(tf.expand_dims(next_state, 0))
+
+    self.assertNotAllEqual(initial_state, next_state)
+    self.assertGreater(initial_energy, next_energy)
+
+
+class GibbsWithGradientsInferenceTest(tf.test.TestCase):
+  """Tests the GibbsWithGradientsInference class."""
+
+  def setUp(self):
+    """Initializes test objects."""
+    super().setUp()
+    self.tf_random_seed = 11
+    self.tfp_seed = tf.constant([3, 4], tf.int32)
+    self.close_rtol = 1e-2
+
+  def test_init(self):
+    """Confirms internal values are set correctly."""
+    bits = [0, 1, 3]
+    order = 2
+    expected_energy = models.KOBE(bits, order)
+    expected_num_expectation_samples = 14899
+    expected_num_burnin_samples = 32641
+    expected_name = "test_analytic_dist_name"
+    actual_layer = inference.GibbsWithGradientsInference(
+        expected_energy, expected_num_expectation_samples,
+        expected_num_burnin_samples, expected_name)
+
+    self.assertEqual(actual_layer.energy, expected_energy)
+    self.assertAllEqual(actual_layer.num_expectation_samples,
+                        expected_num_expectation_samples)
+    self.assertAllEqual(actual_layer.num_burnin_samples,
+                        expected_num_burnin_samples)
+    self.assertEqual(actual_layer.name, expected_name)
+
+  @test_util.eager_mode_toggle
+  def test_sample(self):
+    """Confirms that bitstrings are sampled as expected."""
+    # Set up energy function
+    num_bits = 4
+    # one layer so that probabilities are less uniform
+    num_layers = 2
+    bits = random.sample(range(1000), num_bits)
+    units = num_bits
+    expected_layer_list = []
+    for i in range(num_layers):
+      initializer = tf.keras.initializers.Orthogonal(seed=self.tf_random_seed +
+                                                     i)
+      expected_layer_list.append(
+          tf.keras.layers.Dense(units, kernel_initializer=initializer))
+    expected_layer_list.append(
+        tf.keras.layers.Dense(1, kernel_initializer=initializer))
+    expected_layer_list.append(utils.Squeeze(-1))
+    actual_energy = models.BitstringEnergy(bits, expected_layer_list)
+    # TODO(#209)
+    _ = actual_energy(tf.constant([[0] * num_bits], dtype=tf.int8))
+
+    # Sampler
+    num_expectation_samples = int(2e4)
+    num_burnin_samples = int(2e3)
+    actual_layer = inference.GibbsWithGradientsInference(
+        actual_energy, num_expectation_samples, num_burnin_samples)
+
+    sample_wrapper = tf.function(actual_layer.sample)
+    samples = sample_wrapper(num_expectation_samples)
+
+    all_bitstrings = tf.constant(
+        list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
+    expected_probs = tf.math.softmax(-actual_energy(all_bitstrings))
+    expected_entropy = test_util.entropy(expected_probs)
+    unique_samples, _, unique_counts = utils.unique_bitstrings_with_counts(
+        samples)
+    actual_probs_unsorted = tf.cast(unique_counts, tf.float32) / tf.cast(
+        tf.math.reduce_sum(unique_counts), tf.float32)
+    actual_entropy = test_util.entropy(actual_probs_unsorted)
+    self.assertAllClose(actual_entropy, expected_entropy, rtol=self.close_rtol)
+
+    # make sure the distribution is not uniform
+    num_bitstrings = 2**num_bits
+    uniform_probs = tf.constant([1 / num_bitstrings] * num_bitstrings)
+    uniform_entropy = test_util.entropy(uniform_probs)
+    self.assertNotAllClose(
+        actual_entropy, uniform_entropy, rtol=2 * self.close_rtol)
+
+    # ensure all bitstrings have been sampled
+    self.assertAllEqual(tf.shape(all_bitstrings), tf.shape(unique_samples))
+
+    def get_corresponding_sample_prob(b):
+      """Get the actual probability corresponding to the given bitstring."""
+      index_truth = tf.reduce_all(tf.math.equal(b, unique_samples), 1)
+      index = tf.where(index_truth)[0][0]
+      return actual_probs_unsorted[index]
+
+    actual_probs = tf.map_fn(
+        get_corresponding_sample_prob,
+        all_bitstrings,
+        fn_output_signature=tf.float32)
+    histogram_rtol = 0.1
+    self.assertAllClose(actual_probs, expected_probs, rtol=histogram_rtol)
 
 
 if __name__ == "__main__":
