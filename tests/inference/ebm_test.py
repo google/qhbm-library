@@ -852,11 +852,9 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
   def setUp(self):
     """Initializes test objects."""
     super().setUp()
-    self.tf_random_seed = 4
+    self.tf_random_seed = 11
     self.tfp_seed = tf.constant([3, 4], tf.int32)
     self.close_rtol = 1e-2
-    self.zero_atol = 1e-5
-    self.not_zero_atol = 1e-1
 
   def test_init(self):
     """Confirms internal values are set correctly."""
@@ -883,25 +881,23 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
     # Set up energy function
     num_bits = 4
     # one layer so that probabilities are less uniform
-    num_layers = 1
+    num_layers = 2
     bits = random.sample(range(1000), num_bits)
-    units = random.sample(range(1, 100), num_layers)
-    activations = random.sample([
-        "elu", "exponential", "gelu", "hard_sigmoid", "linear", "relu", "selu",
-        "sigmoid", "softmax", "softplus", "softsign", "swish", "tanh"
-    ], num_layers)
+    units = num_bits
     expected_layer_list = []
     for i in range(num_layers):
+      initializer = tf.keras.initializers.Orthogonal(seed=self.tf_random_seed+i)
       expected_layer_list.append(
-          tf.keras.layers.Dense(units[i], activation=activations[i]))
-    expected_layer_list.append(tf.keras.layers.Dense(1))
+          tf.keras.layers.Dense(units, kernel_initializer=initializer))
+    expected_layer_list.append(tf.keras.layers.Dense(1, kernel_initializer=initializer))
     expected_layer_list.append(utils.Squeeze(-1))
     actual_energy = models.BitstringEnergy(bits, expected_layer_list)
+    # TODO(#209)
     _ = actual_energy(tf.constant([[0] * num_bits], dtype=tf.int8))
 
     # Sampler
-    num_expectation_samples = int(1e3)
-    num_burnin_samples = int(1e3)
+    num_expectation_samples = int(2e4)
+    num_burnin_samples = int(2e3)
     actual_layer = inference.GibbsWithGradientsInference(
         actual_energy, num_expectation_samples, num_burnin_samples)
 
@@ -912,19 +908,19 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
         list(itertools.product([0, 1], repeat=num_bits)),
         dtype=tf.int8)
     expected_probs = tf.math.softmax(-actual_energy(all_bitstrings))
-    expected_entropy = -1.0 * tf.math.reduce_sum(expected_probs * tf.math.log(expected_probs))
+    expected_entropy = test_util.entropy(expected_probs)
     unique_samples, _, unique_counts = utils.unique_bitstrings_with_counts(
         samples)
     actual_probs_unsorted = tf.cast(unique_counts, tf.float32) / tf.cast(
         tf.math.reduce_sum(unique_counts), tf.float32)
-    actual_entropy = -1.0 * tf.math.reduce_sum(actual_probs_unsorted * tf.math.log(actual_probs_unsorted))
-    self.assertAllClose(actual_entropy, expected_entropy)
+    actual_entropy = test_util.entropy(actual_probs_unsorted)
+    self.assertAllClose(actual_entropy, expected_entropy, rtol=self.close_rtol)
 
     # make sure the distribution is not uniform
     num_bitstrings = 2 ** num_bits
-    uniform_entropy = -num_bitstrings * (1/num_bitstrings) * tf.math.log(1/num_bitstrings)
-    not_close_entropy_rtol = 0.1
-    self.assertNotAllClose(actual_entropy, uniform_entropy, rtol=not_close_entropy_rtol)
+    uniform_probs = tf.constant([1/num_bitstrings] * num_bitstrings)
+    uniform_entropy = test_util.entropy(uniform_probs)
+    self.assertNotAllClose(actual_entropy, uniform_entropy, rtol=2 * self.close_rtol)
 
     # ensure all bitstrings have been sampled
     self.assertAllEqual(tf.shape(all_bitstrings), tf.shape(unique_samples))
