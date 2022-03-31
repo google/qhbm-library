@@ -160,8 +160,9 @@ class SampledQuantumInference(tf.keras.layers.Layer):
     self._expectation_layer = tfq.layers.SampledExpectation()
 
   def _sampled_expectation(self, circuits, symbol_names, symbol_values, observable):
+
     @tf.custom_gradient
-    def _inner_expectation():
+    def _inner_expectation(circuits, symbol_names, symbol_values):
       """Enables derivatives."""
       num_circuits = tf.shape(circuits)[0]
       unique_samples = self._sample_layer(
@@ -221,11 +222,11 @@ class SampledQuantumInference(tf.keras.layers.Layer):
             unconnected_gradients=tf.UnconnectedGradients.ZERO)
 
         # Note: upstream gradient is already a coefficient below.
-        return (None, None, symbol_values_gradients, None), thetas_gradients
+        return (None, None, symbol_values_gradients), thetas_gradients
 
       return forward_pass, grad_fn
 
-    return _inner_expectation()
+    return _inner_expectation(circuits, symbol_names, symbol_values)
 
   def _expectation(self, circuits, symbol_names, symbol_values, observables):
     if isinstance(observables, tf.Tensor):
