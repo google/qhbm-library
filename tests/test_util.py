@@ -155,6 +155,11 @@ def random_mixed_density_matrix(num_qubits, num_mixtures=5):
   return final_state, mixture_probabilities
 
 
+def stable_classical_entropy(probs):
+  """Entropy function for a list of probabilities, allowing zeros."""
+  return -tf.reduce_sum(tf.math.multiply_no_nan(tf.math.log(probs), probs))
+
+
 def check_bitstring_exists(bitstring, bitstring_list):
   """True if `bitstring` is an entry of `bitstring_list`."""
   return tf.math.reduce_any(
