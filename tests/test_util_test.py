@@ -20,6 +20,7 @@ import cirq
 import numpy as np
 import sympy
 import tensorflow as tf
+import tensorflow_probability as tfp
 
 from tests import test_util
 
@@ -157,6 +158,23 @@ class RandomMatrixTest(tf.test.TestCase):
         self.assertAllClose(tf.reduce_sum(expected_sorted_probs), 1.0)
         self.assertAllClose(actual_sorted_probs, expected_sorted_probs)
 
+
+class EntropyTest(tf.test.TestCase):
+  """Tests the entropy function."""
+
+  @test_util.eager_mode_toggle
+  def test_exact_entropy(self):
+    """Compares function against analytic entropy."""
+    num_probs = 10
+    num_zeros = 3
+    pre_probs = tf.concat([tf.random.uniform([num_probs], dtype=tf.float32), tf.zeros([num_zeros])], 0)
+    probs = pre_probs / tf.math.reduce_sum(pre_probs)
+    expected_entropy = tfp.distributions.Categorical(probs=probs).entropy()
+
+    entropy_wrapper = tf.function(test_util.entropy)
+    actual_entropy = entropy_wrapper(probs)
+    self.assertAllClose(actual_entropy, expected_entropy)
+    
 
 class EagerModeToggleTest(tf.test.TestCase):
   """Tests eager_mode_toggle."""

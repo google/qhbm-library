@@ -155,7 +155,7 @@ def random_mixed_density_matrix(num_qubits, num_mixtures=5):
   return final_state, mixture_probabilities
 
 
-def stable_classical_entropy(probs):
+def entropy(probs):
   """Entropy function for a list of probabilities, allowing zeros."""
   return -tf.reduce_sum(tf.math.multiply_no_nan(tf.math.log(probs), probs))
 
