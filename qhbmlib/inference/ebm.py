@@ -585,7 +585,7 @@ class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
     distribution is then q(i | x) = C * e^(d(x) / T) for some temperature T,
     where C is the normalization constant (T=2 is optimal under a standard
     criterion).
-    
+
     The insight of the paper is that d(x) can be approximated using a Taylor
     series, yielding d(x) ~ -(2x - 1) * df(x)/dx.  This function computes the
     locally-informed conditional probabilities q(i | x) using the approximation.
