@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tools for inference on quantum circuits represented by QuantumCircuit."""
 
+import abc
 from typing import Union
 
 import cirq
@@ -26,15 +27,46 @@ from qhbmlib.models import hamiltonian
 from qhbmlib import utils
 
 
-class QuantumInference(tf.keras.layers.Layer):
+class QuantumInference(tf.keras.layers.Layer, abc.ABC):
+  """Interface for inference on quantum circuits."""
+
+  def __init__(self, input_circuit, name):
+    """Initializes a generic QuantumInference layer."""
+    super().__init__(name=name)
+    input_circuit.build([])
+    self._circuit = input_circuit
+
+  @property
+  def circuit(self):
+    return self._circuit
+
+  @abc.abstractmethod
+  def expectation(self, initial_states: tf.Tensor,
+                  observables: Union[tf.Tensor, hamiltonian.Hamiltonian]):
+    """Returns the expectation values of the observables against the QNN.
+
+    Args:
+      initial_states: Shape [batch_size, num_qubits] of dtype `tf.int8`.
+        Each entry is an initial state for the set of qubits.  For each state,
+        `qnn` is applied and the pure state expectation value is calculated.
+      observables: Hermitian operators to measure.  If `tf.Tensor`, strings with
+        shape [n_ops], result of calling `tfq.convert_to_tensor` on a list of
+        cirq.PauliSum, `[op1, op2, ...]`.  Otherwise, a Hamiltonian.  Will be
+        tiled to measure `<op_j>_((qnn)|initial_states[i]>)` for each i and j.
+
+    Returns:
+      `tf.Tensor` with shape [batch_size, n_ops] whose entries are the
+      unaveraged expectation values of each `operator` against each
+      transformed initial state.
+    """
+    raise NotImplementedError()
+
+
+class AnalyticQuantumInference(tf.keras.layers.Layer):
   """Methods for inference on QuantumCircuit objects."""
 
   def __init__(self,
                input_circuit: circuit.QuantumCircuit,
-               expectation_samples: Union[None, int] = None,
-               backend: Union[str, cirq.Sampler] = "noiseless",
-               differentiator: Union[None,
-                                     tfq.differentiators.Differentiator] = None,
                name: Union[None, str] = None):
     """Initialize a QuantumInference layer.
 
