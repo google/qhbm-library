@@ -886,10 +886,12 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
     units = num_bits
     expected_layer_list = []
     for i in range(num_layers):
-      initializer = tf.keras.initializers.Orthogonal(seed=self.tf_random_seed+i)
+      initializer = tf.keras.initializers.Orthogonal(seed=self.tf_random_seed +
+                                                     i)
       expected_layer_list.append(
           tf.keras.layers.Dense(units, kernel_initializer=initializer))
-    expected_layer_list.append(tf.keras.layers.Dense(1, kernel_initializer=initializer))
+    expected_layer_list.append(
+        tf.keras.layers.Dense(1, kernel_initializer=initializer))
     expected_layer_list.append(utils.Squeeze(-1))
     actual_energy = models.BitstringEnergy(bits, expected_layer_list)
     # TODO(#209)
@@ -905,8 +907,7 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
     samples = sample_wrapper(num_expectation_samples)
 
     all_bitstrings = tf.constant(
-        list(itertools.product([0, 1], repeat=num_bits)),
-        dtype=tf.int8)
+        list(itertools.product([0, 1], repeat=num_bits)), dtype=tf.int8)
     expected_probs = tf.math.softmax(-actual_energy(all_bitstrings))
     expected_entropy = test_util.entropy(expected_probs)
     unique_samples, _, unique_counts = utils.unique_bitstrings_with_counts(
@@ -917,10 +918,11 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
     self.assertAllClose(actual_entropy, expected_entropy, rtol=self.close_rtol)
 
     # make sure the distribution is not uniform
-    num_bitstrings = 2 ** num_bits
-    uniform_probs = tf.constant([1/num_bitstrings] * num_bitstrings)
+    num_bitstrings = 2**num_bits
+    uniform_probs = tf.constant([1 / num_bitstrings] * num_bitstrings)
     uniform_entropy = test_util.entropy(uniform_probs)
-    self.assertNotAllClose(actual_entropy, uniform_entropy, rtol=2 * self.close_rtol)
+    self.assertNotAllClose(
+        actual_entropy, uniform_entropy, rtol=2 * self.close_rtol)
 
     # ensure all bitstrings have been sampled
     self.assertAllEqual(tf.shape(all_bitstrings), tf.shape(unique_samples))
@@ -931,7 +933,10 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
       index = tf.where(index_truth)[0][0]
       return actual_probs_unsorted[index]
 
-    actual_probs = tf.map_fn(get_corresponding_sample_prob, all_bitstrings, fn_output_signature=tf.float32)
+    actual_probs = tf.map_fn(
+        get_corresponding_sample_prob,
+        all_bitstrings,
+        fn_output_signature=tf.float32)
     histogram_rtol = 0.1
     self.assertAllClose(actual_probs, expected_probs, rtol=histogram_rtol)
 

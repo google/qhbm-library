@@ -167,14 +167,17 @@ class EntropyTest(tf.test.TestCase):
     """Compares function against analytic entropy."""
     num_probs = 10
     num_zeros = 3
-    pre_probs = tf.concat([tf.random.uniform([num_probs], dtype=tf.float32), tf.zeros([num_zeros])], 0)
+    pre_probs = tf.concat([
+        tf.random.uniform([num_probs], dtype=tf.float32),
+        tf.zeros([num_zeros])
+    ], 0)
     probs = pre_probs / tf.math.reduce_sum(pre_probs)
     expected_entropy = tfp.distributions.Categorical(probs=probs).entropy()
 
     entropy_wrapper = tf.function(test_util.entropy)
     actual_entropy = entropy_wrapper(probs)
     self.assertAllClose(actual_entropy, expected_entropy)
-    
+
 
 class EagerModeToggleTest(tf.test.TestCase):
   """Tests eager_mode_toggle."""
