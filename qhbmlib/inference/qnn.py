@@ -73,6 +73,7 @@ class QuantumInference(tf.keras.layers.Layer, abc.ABC):
     else:
       total_circuit = self.circuit + observables.circuit_dagger
     circuits = total_circuit(unique_states)
+    num_circuits = tf.shape(circuits)[0]
     tiled_values = tf.tile(
         tf.expand_dims(total_circuit.symbol_values, 0), [num_circuits, 1])
     unique_expectations = self._expectation(circuits, total_circuit.symbol_names, tiled_values, observables)
@@ -83,7 +84,7 @@ class QuantumInference(tf.keras.layers.Layer, abc.ABC):
     raise NotImplementedError()
 
 
-class AnalyticQuantumInference(tf.keras.layers.Layer):
+class AnalyticQuantumInference(QuantumInference):
   """Analytic methods for inference on QuantumCircuit objects.
 
   This class uses the TensorFlow Quantum `Expectation` layer to compute
@@ -126,7 +127,7 @@ class AnalyticQuantumInference(tf.keras.layers.Layer):
     expectations = self._expectation_layer(
             circuits,
             symbol_names=symbol_names,
-            symbol_values=tiled_values,
+            symbol_values=symbol_values,
             operators=tiled_ops)
     return post_process(expectations)
 

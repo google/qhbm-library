@@ -61,9 +61,9 @@ class AnalyticQuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         name="p_qnn")
 
   def test_init(self):
-    """Confirms QuantumInference is initialized correctly."""
+    """Confirms AnalyticQuantumInference is initialized correctly."""
     expected_name = "TestOE"
-    actual_exp = inference.QuantumInference(self.p_qnn, name=expected_name)
+    actual_exp = inference.AnalyticQuantumInference(self.p_qnn, name=expected_name)
     self.assertEqual(actual_exp.name, expected_name)
     self.assertEqual(actual_exp.circuit, self.p_qnn)
 

@@ -24,7 +24,7 @@ from qhbmlib.inference.qhbm import QHBM
 from qhbmlib.inference.qhbm_utils import density_matrix
 from qhbmlib.inference.qhbm_utils import fidelity
 from qhbmlib.inference.qmhl_loss import qmhl
-from qhbmlib.inference.qnn import QuantumInference
+from qhbmlib.inference.qnn import AnalyticQuantumInference
 from qhbmlib.inference.qnn_utils import unitary
 from qhbmlib.inference.vqt_loss import vqt
 
@@ -39,7 +39,7 @@ __all__ = [
     "probabilities",
     "QHBM",
     "qmhl",
-    "QuantumInference",
+    "AnalyticQuantumInference",
     "unitary",
     "vqt",
 ]
