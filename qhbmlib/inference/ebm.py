@@ -537,7 +537,7 @@ class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
   entries; sample a new bit b from the conditional and set x[i] = b.
 
   The core difficulty with this simple strategy is intelligently choosing the
-  index to update.  This mean the proposal distribution q(i) should have more
+  index to update.  This means the proposal distribution q(i) should have more
   mass on indices that are more likely to require updates.  For example, in
   sampling from a model of the MNIST dataset one can take advantage of the fact
   that almost all dimensions represent the background and therefore are unlikely
@@ -583,8 +583,9 @@ class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
     for each x' in a Hamming ball of radius 1 around x, written H(x).  Let
     d(x) = [f(x') - f(x) for x' in H(x)].  The locally-informed conditional
     distribution is then q(i | x) = C * e^(d(x) / T) for some temperature T,
-    where C is the normalization constant (T is often fixed at 2).
-
+    where C is the normalization constant (T=2 is optimal under a standard
+    criterion).
+    
     The insight of the paper is that d(x) can be approximated using a Taylor
     series, yielding d(x) ~ -(2x - 1) * df(x)/dx.  This function computes the
     locally-informed conditional probabilities q(i | x) using the approximation.
