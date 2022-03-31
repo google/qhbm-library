@@ -520,3 +520,202 @@ class BernoulliEnergyInference(EnergyInference):
   def _sample(self, num_samples: int):
     """See base class docstring"""
     return self.distribution.sample(num_samples, seed=self.seed)
+
+
+class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
+  """Implements the Gibbs With Gradients update rule.
+
+  See Algorithm 1 of
+  https://arxiv.org/abs/2102.04509v2
+  for details.  Here we summarize the motivations for Gibbs With Gradients
+  given in the paper at the link.
+
+  Consider Gibbs sampling, a special case of Metropolis-Hastings for discrete
+  distributions.  For a distribution over bitstrings, the Gibbs sampler works as
+  follows: given bitstring x, propose an index, say i, drawn from some proposal
+  distribution q; form the conditional distribution of x[i] given all other
+  entries; sample a new bit b from the conditional and set x[i] = b.
+
+  The core difficulty with this simple strategy is intelligently choosing the
+  index to update.  This means the proposal distribution q(i) should have more
+  mass on indices that are more likely to require updates.  For example, in
+  sampling from a model of the MNIST dataset one can take advantage of the fact
+  that almost all dimensions represent the background and therefore are unlikely
+  to change sample-to-sample.
+
+  A previously known way to achieve this behavior is to use a proposal
+  distribution which is "locally-informed".  The local information used is the
+  difference in log probability between the current state and states in a
+  Hamming ball around the current state, as in equation 2.  This focuses
+  probability on the indices most likely to lower the energy.
+
+  However, locally-informed proposals scale poorly in the data dimensionality:
+  they require evaluating the log probability at every point in the Hamming ball
+  around the current state.  The authors propose a method to approximate these
+  evaluations, which requires only a single evaluation of the log probability
+  function as well as the derivative.  Since the method uses derivative
+  information, the authors name it Gibbs With Gradients.
+
+  This transition kernel implements the Gibbs With Gradients update rule.
+  """
+
+  def __init__(self, input_energy):
+    """Initializes a GibbsWithGradientsKernel.
+
+    Args:
+      input_energy: The parameterized energy function which helps define the
+        acceptance probabilities of the Markov chain.
+    """
+    self._energy = input_energy
+    self._num_bits = input_energy.num_bits
+    self._parameters = dict(input_energy=input_energy)
+    # q(i | x) in Algorithm 1
+    self._index_proposal_probs = tf.Variable(
+        [0.0] * self._num_bits, trainable=False)
+    self._index_proposal_dist = tfp.distributions.Categorical(
+        probs=self._index_proposal_probs)
+    self._eye_bool = tf.eye(self._num_bits, dtype=tf.bool)
+
+  def _get_index_proposal_probs(self, x):
+    """Returns the value of equation 6 of the paper.
+
+    Given current state x, the locally-informed proposal evaluates f(x') - f(x)
+    for each x' in a Hamming ball of radius 1 around x, written H(x).  Let
+    d(x) = [f(x') - f(x) for x' in H(x)].  The locally-informed conditional
+    distribution is then q(i | x) = C * e^(d(x) / T) for some temperature T,
+    where C is the normalization constant (T=2 is optimal under a standard
+    criterion).
+
+    The insight of the paper is that d(x) can be approximated using a Taylor
+    series, yielding d(x) ~ -(2x - 1) * df(x)/dx.  This function computes the
+    locally-informed conditional probabilities q(i | x) using the approximation.
+
+    Note that in terms of the unnormalized log probability of the state, f(x),
+    used in the paper, the energy of the state is: E(x) = -f(x).  So we have
+    d(x) ~ (2x - 1) * dE(x)/dx
+
+    Args:
+      x: 1D tensor which is the current state of the chain.
+
+    Returns:
+      The conditional probabilities q(i | x) given in equation 6.
+    """
+    x_float = tf.cast(x, tf.float32)
+    with tf.GradientTape(watch_accessed_variables=False) as tape:
+      tape.watch(x_float)
+      current_energy = tf.squeeze(self._energy(tf.expand_dims(x_float, 0)))
+    # f(x) = -E(x)
+    f_grad = -1.0 * tape.gradient(current_energy, x_float)
+    # Equation 3
+    approx_energy_diff = -(2 * tf.cast(x, tf.float32) - 1) * f_grad
+    return tf.nn.softmax(approx_energy_diff / 2.0)
+
+  def one_step(self, current_state, previous_kernel_results):
+    """Takes one step of the TransitionKernel.
+
+    Follows algorithm 1 of
+    https://arxiv.org/abs/2102.04509v2
+
+    Args:
+      current_state: 1D `tf.Tensor` which is the current chain state.
+      previous_kernel_results: Required but unused argument.
+
+    Returns:
+      next_state: 1D `Tensor` which is the next state in the chain.
+      kernel_results: Empty list.
+    """
+    del previous_kernel_results
+    index_proposal_probs = self._get_index_proposal_probs(current_state)
+    self._index_proposal_probs.assign(index_proposal_probs)
+    proposed_i = self._index_proposal_dist.sample()
+    flip_vec = self._eye_bool[proposed_i]
+    x_prime = tf.cast(
+        tf.math.logical_xor(tf.cast(current_state, tf.bool), flip_vec), tf.int8)
+    index_proposal_probs_prime = self._get_index_proposal_probs(x_prime)
+    q_ratio = index_proposal_probs_prime[proposed_i] / index_proposal_probs[
+        proposed_i]
+    energies = self._energy(tf.stack([x_prime, current_state]))
+    exp_f = tf.math.exp(-energies[0] + energies[1])
+    accept_prob = tf.math.minimum(exp_f * q_ratio, 1.0)
+    roll = tf.random.uniform([], dtype=tf.float32)
+    accept = tf.math.less_equal(roll, accept_prob)
+    flip_vec = tf.math.logical_and(accept, self._eye_bool[proposed_i])
+    next_state = tf.cast(
+        tf.math.logical_xor(tf.cast(current_state, tf.bool), flip_vec), tf.int8)
+    kernel_results = []
+    return next_state, kernel_results
+
+  @property
+  def is_calibrated(self):
+    """Returns `True` if Markov chain converges to specified distribution."""
+    return True
+
+  def bootstrap_results(self, init_state):
+    """Returns an object with the same type as returned by `one_step(...)[1]`.
+
+    Args:
+      init_state: 1D `tf.Tensor` which is the initial chain state.
+
+    Returns:
+      kernel_results: Empty list.
+    """
+    del init_state
+    return []
+
+
+class GibbsWithGradientsInference(EnergyInference):
+  """Manages inference using a Gibbs With Gradients kernel."""
+
+  def __init__(self,
+               input_energy: energy.BitstringEnergy,
+               num_expectation_samples: int,
+               num_burnin_samples: int,
+               name: Union[None, str] = None):
+    """Initializes a GibbsWithGradientsInference.
+
+    Args:
+      input_energy: The parameterized energy function which defines this
+        distribution via the equations of an energy based model.  This class
+        assumes that all parameters of `energy` are `tf.Variable`s and that
+        they are all returned by `energy.variables`.
+      num_expectation_samples: Number of samples to draw and use for estimating
+        the expectation value.
+      num_burnin_samples: Number of samples to discard when letting the chain
+        equilibrate after updating the parameters of `input_energy`.
+      name: Optional name for the model.
+    """
+    super().__init__(input_energy, num_expectation_samples, name=name)
+    self._kernel = GibbsWithGradientsKernel(input_energy)
+    self._chain_state = tf.Variable(
+        tfp.distributions.Bernoulli(
+            probs=[0.5] * self.energy.num_bits, dtype=tf.int8).sample(),
+        trainable=False)
+    self.num_burnin_samples = num_burnin_samples
+
+  def _ready_inference(self):
+    """See base class docstring.
+
+    Runs the chain for a number of steps without saving the results, in order
+    to better reach equilibrium before recording samples.
+    """
+    state = self._chain_state.read_value()
+    for _ in tf.range(self.num_burnin_samples):
+      state, _ = self._kernel.one_step(state, [])
+    self._chain_state.assign(state)
+
+  def _call(self, inputs, *args, **kwargs):
+    """See base class docstring."""
+    return self.sample(inputs)
+
+  def _sample(self, num_samples: int):
+    """See base class docstring.
+
+    The kernels are repeatedly called to traverse chains of samples.
+    """
+    ta = tf.TensorArray(tf.int8, size=num_samples)
+    state = self._chain_state.read_value()
+    for i in tf.range(num_samples):
+      state, _ = self._kernel.one_step(state, [])
+      ta = ta.write(i, state)
+    self._chain_state.assign(state)
+    return ta.stack()
