@@ -34,8 +34,8 @@ from qhbmlib import utils
 from tests import test_util
 
 
-class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
-  """Tests the QuantumInference class."""
+class AnalyticQuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
+  """Tests the AnalyticQuantumInference class."""
 
   def setUp(self):
     """Initializes test objects."""
@@ -62,18 +62,10 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
 
   def test_init(self):
     """Confirms QuantumInference is initialized correctly."""
-    expected_backend = "noiseless"
-    expected_differentiator = None
     expected_name = "TestOE"
-    actual_exp = inference.QuantumInference(
-        self.p_qnn,
-        backend=expected_backend,
-        differentiator=expected_differentiator,
-        name=expected_name)
+    actual_exp = inference.QuantumInference(self.p_qnn, name=expected_name)
     self.assertEqual(actual_exp.name, expected_name)
-    self.assertEqual(actual_exp.backend, expected_backend)
     self.assertEqual(actual_exp.circuit, self.p_qnn)
-    self.assertEqual(actual_exp.differentiator, expected_differentiator)
 
   @test_util.eager_mode_toggle
   def test_expectation(self):
@@ -113,7 +105,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     """
 
     # Build inference object
-    exp_infer = inference.QuantumInference(self.p_qnn)
+    exp_infer = inference.AnalyticQuantumInference(self.p_qnn)
 
     # Get all the bitstrings multiple times.
     initial_states_list = 5 * list(
@@ -225,7 +217,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     actual_circuit = models.QuantumCircuit(
         tfq.convert_to_tensor([raw_circuit]), qubits, tf.constant(symbols),
         [random_values], [[]])
-    q_infer = inference.QuantumInference(actual_circuit)
+    q_infer = inference.AnalyticQuantumInference(actual_circuit)
 
     # calculate expected values
     expected_expectations = expectation_func()
@@ -290,7 +282,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     model_raw_circuit = cirq.testing.random_circuit(qubits, n_moments,
                                                     act_fraction)
     model_circuit = models.DirectQuantumCircuit(model_raw_circuit)
-    model_infer = inference.QuantumInference(model_circuit)
+    model_infer = inference.AnalyticQuantumInference(model_circuit)
 
     # bitstring injectors
     all_bitstrings = list(itertools.product([0, 1], repeat=self.num_bits))
@@ -352,250 +344,184 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     self.assertAllClose(
         actual_jacobian_thetas, expected_jacobian_thetas, rtol=self.close_rtol)
 
-  @test_util.eager_mode_toggle
-  def test_expectation_bitstring_energy(self):
-    """Tests Hamiltonian containing a general BitstringEnergy diagonal."""
+  # @test_util.eager_mode_toggle
+  # def test_expectation_bitstring_energy(self):
+  #   """Tests Hamiltonian containing a general BitstringEnergy diagonal."""
 
-    # Circuit preparation
-    qubits = cirq.GridQubit.rect(1, self.num_bits)
-    batch_size = 1
-    n_moments = 3
-    act_fraction = 1.0
-    num_symbols = 4
-    symbols = set()
-    for _ in range(num_symbols):
-      symbols.add("".join(random.sample(string.ascii_letters, 10)))
-    symbols = sorted(list(symbols))
+  #   # Circuit preparation
+  #   qubits = cirq.GridQubit.rect(1, self.num_bits)
+  #   batch_size = 1
+  #   n_moments = 3
+  #   act_fraction = 1.0
+  #   num_symbols = 4
+  #   symbols = set()
+  #   for _ in range(num_symbols):
+  #     symbols.add("".join(random.sample(string.ascii_letters, 10)))
+  #   symbols = sorted(list(symbols))
 
-    # state circuit
-    state_qnn_symbols = symbols[num_symbols // 2:]
-    state_raw_circuits, _ = tfq_util.random_symbol_circuit_resolver_batch(
-        qubits,
-        state_qnn_symbols,
-        batch_size,
-        n_moments=n_moments,
-        p=act_fraction)
-    state_raw_circuit = state_raw_circuits[0]
-    qnn_minval = 0.25
-    qnn_maxval = 0.75
-    state_circuit_initializer = tf.keras.initializers.RandomUniform(
-        minval=qnn_minval, maxval=qnn_maxval, seed=self.tf_random_seed)
-    state_circuit = models.DirectQuantumCircuit(state_raw_circuit,
-                                                state_circuit_initializer)
+  #   # state circuit
+  #   state_qnn_symbols = symbols[num_symbols // 2:]
+  #   state_raw_circuits, _ = tfq_util.random_symbol_circuit_resolver_batch(
+  #       qubits,
+  #       state_qnn_symbols,
+  #       batch_size,
+  #       n_moments=n_moments,
+  #       p=act_fraction)
+  #   state_raw_circuit = state_raw_circuits[0]
+  #   qnn_minval = 0.25
+  #   qnn_maxval = 0.75
+  #   state_circuit_initializer = tf.keras.initializers.RandomUniform(
+  #       minval=qnn_minval, maxval=qnn_maxval, seed=self.tf_random_seed)
+  #   state_circuit = models.DirectQuantumCircuit(state_raw_circuit,
+  #                                               state_circuit_initializer)
 
-    # state qnn
-    expectation_samples = int(1e6)
-    actual_qnn = inference.QuantumInference(
-        state_circuit,
-        expectation_samples=expectation_samples,
-        differentiator=tfq.differentiators.ParameterShift())
+  #   # state qnn
+  #   expectation_samples = int(1e6)
+  #   actual_qnn = inference.QuantumInference(
+  #       state_circuit,
+  #       expectation_samples=expectation_samples,
+  #       differentiator=tfq.differentiators.ParameterShift())
 
-    # hamiltonian circuit
-    hamiltonian_qnn_symbols = symbols[:num_symbols // 2]
-    hamiltonian_raw_circuits, _ = tfq_util.random_symbol_circuit_resolver_batch(
-        qubits,
-        hamiltonian_qnn_symbols,
-        batch_size,
-        n_moments=n_moments,
-        p=act_fraction)
-    hamiltonian_raw_circuit = hamiltonian_raw_circuits[0]
-    # Note that this initializer uses a different seed than the `state_circuit`
-    # initializer does.  This is to make sure `state_circuit` and
-    # `hamiltonian_circuit` have different parameter values, to assuage a worry
-    # about pathological behavior if
-    # `state_circuit.circuit + hamiltonian.circuit_dagger` was possibly identity
-    hamiltonian_circuit_initializer = tf.keras.initializers.RandomUniform(
-        minval=qnn_minval, maxval=qnn_maxval, seed=self.tf_random_seed_alt)
-    hamiltonian_circuit = models.DirectQuantumCircuit(
-        hamiltonian_raw_circuit, hamiltonian_circuit_initializer)
-    hamiltonian_circuit.build([])
+  #   # hamiltonian circuit
+  #   hamiltonian_qnn_symbols = symbols[:num_symbols // 2]
+  #   hamiltonian_raw_circuits, _ = tfq_util.random_symbol_circuit_resolver_batch(
+  #       qubits,
+  #       hamiltonian_qnn_symbols,
+  #       batch_size,
+  #       n_moments=n_moments,
+  #       p=act_fraction)
+  #   hamiltonian_raw_circuit = hamiltonian_raw_circuits[0]
+  #   # Note that this initializer uses a different seed than the `state_circuit`
+  #   # initializer does.  This is to make sure `state_circuit` and
+  #   # `hamiltonian_circuit` have different parameter values, to assuage a worry
+  #   # about pathological behavior if
+  #   # `state_circuit.circuit + hamiltonian.circuit_dagger` was possibly identity
+  #   hamiltonian_circuit_initializer = tf.keras.initializers.RandomUniform(
+  #       minval=qnn_minval, maxval=qnn_maxval, seed=self.tf_random_seed_alt)
+  #   hamiltonian_circuit = models.DirectQuantumCircuit(
+  #       hamiltonian_raw_circuit, hamiltonian_circuit_initializer)
+  #   hamiltonian_circuit.build([])
 
-    # Total circuit
-    bitstring_circuit = models.circuit_utils.bit_circuit(qubits)
-    measurement_circuit = cirq.Circuit(
-        cirq.measure(q, key=f"measure_qubit_{n}") for n, q in enumerate(qubits))
-    total_circuit = (
-        bitstring_circuit + state_raw_circuit + hamiltonian_raw_circuit**-1 +
-        measurement_circuit)
+  #   # Total circuit
+  #   bitstring_circuit = models.circuit_utils.bit_circuit(qubits)
+  #   measurement_circuit = cirq.Circuit(
+  #       cirq.measure(q, key=f"measure_qubit_{n}") for n, q in enumerate(qubits))
+  #   total_circuit = (
+  #       bitstring_circuit + state_raw_circuit + hamiltonian_raw_circuit**-1 +
+  #       measurement_circuit)
 
-    # Resolvers for total circuit
-    bitstring_symbols = sorted(tfq.util.get_circuit_symbols(bitstring_circuit))
-    num_unique_bitstrings = 3
-    num_repetitions = 2  # to ensure sending multiple identical inputs works
-    initial_states_list = num_repetitions * random.sample(
-        list(itertools.product([0, 1], repeat=self.num_bits)),
-        num_unique_bitstrings)
-    initial_states = tf.constant(initial_states_list, dtype=tf.int8)
+  #   # Resolvers for total circuit
+  #   bitstring_symbols = sorted(tfq.util.get_circuit_symbols(bitstring_circuit))
+  #   num_unique_bitstrings = 3
+  #   num_repetitions = 2  # to ensure sending multiple identical inputs works
+  #   initial_states_list = num_repetitions * random.sample(
+  #       list(itertools.product([0, 1], repeat=self.num_bits)),
+  #       num_unique_bitstrings)
+  #   initial_states = tf.constant(initial_states_list, dtype=tf.int8)
 
-    # TODO(#171): consider refactoring to accept symbol and variable tensors
-    def generate_resolvers():
-      """Return the current resolver."""
-      state_values_list = state_circuit.trainable_variables[0].numpy().tolist()
-      state_resolver = dict(zip(state_qnn_symbols, state_values_list))
-      hamiltonian_values_list = hamiltonian_circuit.trainable_variables[
-          0].numpy().tolist()
-      hamiltonian_resolver = dict(
-          zip(hamiltonian_qnn_symbols, hamiltonian_values_list))
-      bitstring_resolvers = [
-          dict(zip(bitstring_symbols, b)) for b in initial_states_list
-      ]
-      return [{
-          **r,
-          **state_resolver,
-          **hamiltonian_resolver
-      } for r in bitstring_resolvers]
+  #   # TODO(#171): consider refactoring to accept symbol and variable tensors
+  #   def generate_resolvers():
+  #     """Return the current resolver."""
+  #     state_values_list = state_circuit.trainable_variables[0].numpy().tolist()
+  #     state_resolver = dict(zip(state_qnn_symbols, state_values_list))
+  #     hamiltonian_values_list = hamiltonian_circuit.trainable_variables[
+  #         0].numpy().tolist()
+  #     hamiltonian_resolver = dict(
+  #         zip(hamiltonian_qnn_symbols, hamiltonian_values_list))
+  #     bitstring_resolvers = [
+  #         dict(zip(bitstring_symbols, b)) for b in initial_states_list
+  #     ]
+  #     return [{
+  #         **r,
+  #         **state_resolver,
+  #         **hamiltonian_resolver
+  #     } for r in bitstring_resolvers]
 
-    # hamiltonian energy
-    num_layers = 2
-    random.seed(self.python_random_seed)
-    bits = random.sample(range(1000), self.num_bits)
-    units = [2] * num_layers
-    activations = random.sample([
-        "elu", "exponential", "gelu", "hard_sigmoid", "linear", "relu", "selu",
-        "sigmoid", "softmax", "softplus", "softsign", "swish", "tanh"
-    ], num_layers)
-    expected_layer_list = []
-    min_val = -0.75
-    max_val = 0.75
-    for i in range(num_layers):
-      kernel_initializer = tf.keras.initializers.RandomUniform(
-          minval=min_val, maxval=max_val, seed=(self.tf_random_seed_alt + i))
-      bias_initializer = tf.keras.initializers.RandomUniform(
-          minval=min_val,
-          maxval=max_val,
-          seed=(self.tf_random_seed_alt + 2 * i + 1))
-      expected_layer_list.append(
-          tf.keras.layers.Dense(
-              units[i],
-              activation=activations[i],
-              kernel_initializer=kernel_initializer,
-              bias_initializer=bias_initializer))
-    kernel_initializer = tf.keras.initializers.RandomUniform(
-        minval=min_val, maxval=max_val, seed=(self.tf_random_seed_alt + 2 * i))
-    bias_initializer = tf.keras.initializers.RandomUniform(
-        minval=min_val,
-        maxval=max_val,
-        seed=(self.tf_random_seed_alt + 2 * i + 1))
-    expected_layer_list.append(
-        tf.keras.layers.Dense(
-            1,
-            kernel_initializer=kernel_initializer,
-            bias_initializer=bias_initializer))
-    expected_layer_list.append(utils.Squeeze(-1))
-    hamiltonian_energy = models.BitstringEnergy(bits, expected_layer_list)
-    hamiltonian_energy.build([None, self.num_bits])
-    # TODO(#209)
-    _ = hamiltonian_energy(tf.constant([[0] * self.num_bits], tf.int8))
-    hamiltonian = models.Hamiltonian(hamiltonian_energy, hamiltonian_circuit)
+  #   # hamiltonian energy
+  #   num_layers = 2
+  #   random.seed(self.python_random_seed)
+  #   bits = random.sample(range(1000), self.num_bits)
+  #   units = [2] * num_layers
+  #   activations = random.sample([
+  #       "elu", "exponential", "gelu", "hard_sigmoid", "linear", "relu", "selu",
+  #       "sigmoid", "softmax", "softplus", "softsign", "swish", "tanh"
+  #   ], num_layers)
+  #   expected_layer_list = []
+  #   min_val = -0.75
+  #   max_val = 0.75
+  #   for i in range(num_layers):
+  #     kernel_initializer = tf.keras.initializers.RandomUniform(
+  #         minval=min_val, maxval=max_val, seed=(self.tf_random_seed_alt + i))
+  #     bias_initializer = tf.keras.initializers.RandomUniform(
+  #         minval=min_val,
+  #         maxval=max_val,
+  #         seed=(self.tf_random_seed_alt + 2 * i + 1))
+  #     expected_layer_list.append(
+  #         tf.keras.layers.Dense(
+  #             units[i],
+  #             activation=activations[i],
+  #             kernel_initializer=kernel_initializer,
+  #             bias_initializer=bias_initializer))
+  #   kernel_initializer = tf.keras.initializers.RandomUniform(
+  #       minval=min_val, maxval=max_val, seed=(self.tf_random_seed_alt + 2 * i))
+  #   bias_initializer = tf.keras.initializers.RandomUniform(
+  #       minval=min_val,
+  #       maxval=max_val,
+  #       seed=(self.tf_random_seed_alt + 2 * i + 1))
+  #   expected_layer_list.append(
+  #       tf.keras.layers.Dense(
+  #           1,
+  #           kernel_initializer=kernel_initializer,
+  #           bias_initializer=bias_initializer))
+  #   expected_layer_list.append(utils.Squeeze(-1))
+  #   hamiltonian_energy = models.BitstringEnergy(bits, expected_layer_list)
+  #   hamiltonian_energy.build([None, self.num_bits])
+  #   # TODO(#209)
+  #   _ = hamiltonian_energy(tf.constant([[0] * self.num_bits], tf.int8))
+  #   hamiltonian = models.Hamiltonian(hamiltonian_energy, hamiltonian_circuit)
 
-    # Get expectations
-    total_resolvers = generate_resolvers()
-    raw_expectations = []
-    # Note the keys must match those used in `measurement_circuit`.
-    qb_keys = [(q, f"measure_qubit_{i}") for i, q in enumerate(qubits)]
-    for r in total_resolvers:
-      samples_pd = cirq.Simulator().sample(
-          total_circuit, repetitions=expectation_samples, params=r)
-      samples = samples_pd[[x[1] for x in qb_keys]].to_numpy()
-      current_energies = hamiltonian_energy(samples)
-      raw_expectations.append(
-          tf.math.reduce_mean(current_energies, keepdims=True))
-    expected_expectations = tf.stack(raw_expectations)
-    self.assertNotAllClose(
-        expected_expectations,
-        tf.zeros_like(expected_expectations),
-        atol=self.not_zero_atol)
+  #   # Get expectations
+  #   total_resolvers = generate_resolvers()
+  #   raw_expectations = []
+  #   # Note the keys must match those used in `measurement_circuit`.
+  #   qb_keys = [(q, f"measure_qubit_{i}") for i, q in enumerate(qubits)]
+  #   for r in total_resolvers:
+  #     samples_pd = cirq.Simulator().sample(
+  #         total_circuit, repetitions=expectation_samples, params=r)
+  #     samples = samples_pd[[x[1] for x in qb_keys]].to_numpy()
+  #     current_energies = hamiltonian_energy(samples)
+  #     raw_expectations.append(
+  #         tf.math.reduce_mean(current_energies, keepdims=True))
+  #   expected_expectations = tf.stack(raw_expectations)
+  #   self.assertNotAllClose(
+  #       expected_expectations,
+  #       tf.zeros_like(expected_expectations),
+  #       atol=self.not_zero_atol)
 
-    # Compare
-    expectation_wrapper = tf.function(actual_qnn.expectation)
-    actual_expectations = expectation_wrapper(initial_states, hamiltonian)
-    self.assertAllClose(
-        actual_expectations, expected_expectations, rtol=self.close_rtol)
-    self.assertAllEqual(
-        tf.shape(actual_expectations), [len(initial_states_list), 1])
+  #   # Compare
+  #   expectation_wrapper = tf.function(actual_qnn.expectation)
+  #   actual_expectations = expectation_wrapper(initial_states, hamiltonian)
+  #   self.assertAllClose(
+  #       actual_expectations, expected_expectations, rtol=self.close_rtol)
+  #   self.assertAllEqual(
+  #       tf.shape(actual_expectations), [len(initial_states_list), 1])
 
-    expected_derivatives = test_util.approximate_jacobian(
-        functools.partial(expectation_wrapper, initial_states, hamiltonian),
-        hamiltonian.trainable_variables)
-    for derivative in expected_derivatives:
-      # Checks that at last one entry in each variable's derivative is
-      # not too close to zero.
-      self.assertNotAllClose(derivative, tf.zeros_like(derivative), 0.011)
+  #   expected_derivatives = test_util.approximate_jacobian(
+  #       functools.partial(expectation_wrapper, initial_states, hamiltonian),
+  #       hamiltonian.trainable_variables)
+  #   for derivative in expected_derivatives:
+  #     # Checks that at last one entry in each variable's derivative is
+  #     # not too close to zero.
+  #     self.assertNotAllClose(derivative, tf.zeros_like(derivative), 0.011)
 
-    with tf.GradientTape() as tape:
-      actual_expectations = expectation_wrapper(initial_states, hamiltonian)
-    actual_derivatives = tape.jacobian(actual_expectations,
-                                       hamiltonian.trainable_variables)
-    self.assertEqual(len(actual_derivatives), len(expected_derivatives))
-    for actual, expected in zip(actual_derivatives, expected_derivatives):
-      # atol is ok here because we checked above derivatives are not all zero
-      self.assertAllClose(actual, expected, atol=0.01)
-
-  @test_util.eager_mode_toggle
-  def test_sample_basic(self):
-    """Confirms correct sampling from identity, bit flip, and GHZ QNNs."""
-    bitstrings = tf.constant(
-        list(itertools.product([0, 1], repeat=self.num_bits)), dtype=tf.int8)
-    counts = tf.random.uniform([tf.shape(bitstrings)[0]], 100, 1000, tf.int32)
-
-    ident_qnn = models.DirectQuantumCircuit(
-        cirq.Circuit(cirq.I(q) for q in self.raw_qubits), name="identity")
-    q_infer = inference.QuantumInference(ident_qnn)
-    sample_wrapper = tf.function(q_infer.sample)
-    test_samples = sample_wrapper(bitstrings, counts)
-    for i, (b, c) in enumerate(zip(bitstrings, counts)):
-      self.assertEqual(tf.shape(test_samples[i].to_tensor())[0], c)
-      for j in range(c):
-        self.assertAllEqual(test_samples[i][j], b)
-
-    flip_qnn = models.DirectQuantumCircuit(
-        cirq.Circuit(cirq.X(q) for q in self.raw_qubits), name="flip")
-    q_infer = inference.QuantumInference(flip_qnn)
-    sample_wrapper = tf.function(q_infer.sample)
-    test_samples = sample_wrapper(bitstrings, counts)
-    for i, (b, c) in enumerate(zip(bitstrings, counts)):
-      self.assertEqual(tf.shape(test_samples[i].to_tensor())[0], c)
-      for j in range(c):
-        self.assertAllEqual(
-            test_samples[i][j],
-            tf.cast(tf.math.logical_not(tf.cast(b, tf.bool)), tf.int8))
-
-    ghz_param = sympy.Symbol("ghz")
-    ghz_circuit = cirq.Circuit(cirq.X(
-        self.raw_qubits[0])**ghz_param) + cirq.Circuit(
-            cirq.CNOT(q0, q1)
-            for q0, q1 in zip(self.raw_qubits, self.raw_qubits[1:]))
-    ghz_qnn = models.DirectQuantumCircuit(
-        ghz_circuit,
-        initializer=tf.keras.initializers.Constant(value=0.5),
-        name="ghz")
-    q_infer = inference.QuantumInference(ghz_qnn)
-    sample_wrapper = tf.function(q_infer.sample)
-    test_samples = sample_wrapper(
-        tf.expand_dims(tf.constant([0] * self.num_bits, dtype=tf.int8), 0),
-        tf.expand_dims(counts[0], 0))[0].to_tensor()
-    # Both |0...0> and |1...1> should be among the measured bitstrings
-    self.assertTrue(
-        test_util.check_bitstring_exists(
-            tf.constant([0] * self.num_bits, dtype=tf.int8), test_samples))
-    self.assertTrue(
-        test_util.check_bitstring_exists(
-            tf.constant([1] * self.num_bits, dtype=tf.int8), test_samples))
-
-  @test_util.eager_mode_toggle
-  def test_sample_uneven(self):
-    """Check for discrepancy in samples when count entries differ."""
-    max_counts = int(1e7)
-    counts = tf.constant([max_counts // 2, max_counts])
-    test_qnn = models.DirectQuantumCircuit(
-        cirq.Circuit(cirq.H(cirq.GridQubit(0, 0))))
-    test_infer = inference.QuantumInference(test_qnn)
-    sample_wrapper = tf.function(test_infer.sample)
-    bitstrings = tf.constant([[0], [0]], dtype=tf.int8)
-    _, samples_counts = sample_wrapper(bitstrings, counts)
-    # QNN samples should be half 0 and half 1.
-    self.assertAllClose(
-        samples_counts[0], samples_counts[1], atol=max_counts // 1000)
+  #   with tf.GradientTape() as tape:
+  #     actual_expectations = expectation_wrapper(initial_states, hamiltonian)
+  #   actual_derivatives = tape.jacobian(actual_expectations,
+  #                                      hamiltonian.trainable_variables)
+  #   self.assertEqual(len(actual_derivatives), len(expected_derivatives))
+  #   for actual, expected in zip(actual_derivatives, expected_derivatives):
+  #     # atol is ok here because we checked above derivatives are not all zero
+  #     self.assertAllClose(actual, expected, atol=0.01)
 
 
 if __name__ == "__main__":
