@@ -813,13 +813,16 @@ class GibbsWithGradientsKernelTest(tf.test.TestCase):
     bernoulli_energy.set_weights([tf.constant([-2.0, 1.0, 3.0])])
     actual_kernel = inference.ebm.GibbsWithGradientsKernel(bernoulli_energy)
     test_x = tf.constant([0, 1, 1], dtype=tf.int8)
-    get_index_proposal_probs_wrapper = tf.function(actual_kernel._get_index_proposal_probs)
+    get_index_proposal_probs_wrapper = tf.function(
+        actual_kernel._get_index_proposal_probs)
     actual_probs = get_index_proposal_probs_wrapper(test_x)
-    
-    hamming_ball_energies = bernoulli_energy(tf.constant([[1, 1, 1], [0, 0, 1], [0, 1, 0]], dtype=tf.int8))
-    test_x_energies = bernoulli_energy(tf.tile(tf.expand_dims(test_x, 0), [3, 1]))
+
+    hamming_ball_energies = bernoulli_energy(
+        tf.constant([[1, 1, 1], [0, 0, 1], [0, 1, 0]], dtype=tf.int8))
+    test_x_energies = bernoulli_energy(
+        tf.tile(tf.expand_dims(test_x, 0), [3, 1]))
     # f(x') - f(x) = -E(x') + E(x)
-    direct_energy_diff = - hamming_ball_energies + test_x_energies
+    direct_energy_diff = -hamming_ball_energies + test_x_energies
     expected_probs = tf.nn.softmax(direct_energy_diff / 2)
     self.assertAllClose(actual_probs, expected_probs)
 
@@ -905,17 +908,27 @@ class GibbsWithGradientsInferenceTest(tf.test.TestCase):
     sample_wrapper = tf.function(actual_layer.sample)
     samples = sample_wrapper(num_expectation_samples)
 
-    # Check that entropy of samples is approximately entropy of distribution,
-    # as a way to check that the sample distribution is approximately correct
-    expected_entropy = inference.AnalyticEnergyInference(
-        actual_energy, num_expectation_samples).entropy()
-    _, _, actual_counts = utils.unique_bitstrings_with_counts(samples)
-    actual_probs = tf.cast(actual_counts, tf.float32) / tf.cast(
-        tf.math.reduce_sum(actual_counts), tf.float32)
-    actual_entropy = -1.0 * tf.math.reduce_sum(
-        actual_probs * tf.math.log(actual_probs))
-    self.assertAllClose(actual_entropy, expected_entropy, rtol=self.close_rtol)
-    
+    all_bitstrings = tf.constant(
+        list(itertools.product([0, 1], repeat=input_energy.num_bits)),
+        dtype=tf.int8)
+    expected_probs = tf.math.softmax(-actual_energy(all_bitstrings))
+    unique_samples, _, unique_counts = utils.unique_bitstrings_with_counts(
+        samples)
+    actual_probs_unsorted = tf.cast(unique_counts, tf.float32) / tf.cast(
+        tf.math.reduce_sum(unique_counts), tf.float32)
+
+    # ensure all bitstrings have been sampled
+    self.assertAllEqual(tf.shape(all_bitstrings), tf.shape(unique_samples))
+
+    def get_corresponding_sample_prob(b):
+      """Get the actual probability corresponding to the given bitstring."""
+      index_truth = tf.reduce_all(tf.math.equal(b, unique_samples), 1)
+      index = tf.where(index_truth)[0][0]
+      return actual_probs_unsorted[index]
+
+    actual_probs = tf.map_fn(get_corresponding_sample_prob, all_bitstrings)
+    self.assertAllClose(actual_probs, expected_probs, rtol=self.close_rtol)
+
 
 if __name__ == "__main__":
   print("Running ebm_test.py ...")

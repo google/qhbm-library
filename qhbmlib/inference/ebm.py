@@ -570,8 +570,10 @@ class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
     self._num_bits = input_energy.num_bits
     self._parameters = dict(input_energy=input_energy)
     # q(i | x) in Algorithm 1
-    self._index_proposal_probs = tf.Variable([0.0] * self._num_bits, trainable=False)
-    self._index_proposal_dist = tfp.distributions.Categorical(probs=self._index_proposal_probs)
+    self._index_proposal_probs = tf.Variable(
+        [0.0] * self._num_bits, trainable=False)
+    self._index_proposal_dist = tfp.distributions.Categorical(
+        probs=self._index_proposal_probs)
     self._eye_bool = tf.eye(self._num_bits, dtype=tf.bool)
 
   def _get_index_proposal_probs(self, x):
@@ -629,7 +631,8 @@ class GibbsWithGradientsKernel(tfp.mcmc.TransitionKernel):
     x_prime = tf.cast(
         tf.math.logical_xor(tf.cast(current_state, tf.bool), flip_vec), tf.int8)
     index_proposal_probs_prime = self._get_index_proposal_probs(x_prime)
-    q_ratio = index_proposal_probs_prime[proposed_i] / index_proposal_probs[proposed_i]
+    q_ratio = index_proposal_probs_prime[proposed_i] / index_proposal_probs[
+        proposed_i]
     energies = self._energy(tf.stack([x_prime, current_state]))
     exp_f = tf.math.exp(-energies[0] + energies[1])
     accept_prob = tf.math.minimum(exp_f * q_ratio, 1.0)
