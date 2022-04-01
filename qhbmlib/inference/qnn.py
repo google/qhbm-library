@@ -132,7 +132,7 @@ class AnalyticQuantumInference(QuantumInference):
     return post_process(expectations)
 
 
-class SampledQuantumInference(tf.keras.layers.Layer):
+class SampledQuantumInference(QuantumInference):
   """Sampling methods for inference on QuantumCircuit objects.
 
   This class uses the TensorFlow Quantum `SampledExpectation` and `Sample`
@@ -158,6 +158,7 @@ class SampledQuantumInference(tf.keras.layers.Layer):
                                             dtype=tf.int32)
     self._sample_layer = tfq.layers.Sample()
     self._expectation_layer = tfq.layers.SampledExpectation()
+    self._differentiator = tfq.differentiators.ParameterShift()
 
   def _sampled_expectation(self, circuits, symbol_names, symbol_values, observable):
 
@@ -181,7 +182,7 @@ class SampledQuantumInference(tf.keras.layers.Layer):
         """Use `get_gradient_circuits` method to get QNN variable derivatives"""
         # This block adapted from my `differentiate_sampled` in TFQ.
         (batch_programs, new_symbol_names, batch_symbol_values, batch_weights,
-         batch_mapper) = self.differentiator.get_gradient_circuits(
+         batch_mapper) = self._differentiator.get_gradient_circuits(
              circuits, symbol_names, symbol_values)
         m_i = tf.shape(batch_programs)[1]
         # shape is [num_circuits, m_i, n_ops]
