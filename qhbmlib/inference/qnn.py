@@ -17,7 +17,6 @@
 import abc
 from typing import Union
 
-import cirq
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
@@ -66,8 +65,7 @@ class QuantumInference(tf.keras.layers.Layer, abc.ABC):
       unaveraged expectation values of each `operator` against each
       transformed initial state.
     """
-    unique_states, idx, counts = utils.unique_bitstrings_with_counts(
-        initial_states)
+    unique_states, idx, _ = utils.unique_bitstrings_with_counts(initial_states)
     if isinstance(observables, tf.Tensor):
       total_circuit = self.circuit
     else:
