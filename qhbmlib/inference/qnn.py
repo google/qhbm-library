@@ -76,7 +76,9 @@ class QuantumInference(tf.keras.layers.Layer, abc.ABC):
     num_circuits = tf.shape(circuits)[0]
     tiled_values = tf.tile(
         tf.expand_dims(total_circuit.symbol_values, 0), [num_circuits, 1])
-    unique_expectations = self._expectation(circuits, total_circuit.symbol_names, tiled_values, observables)
+    unique_expectations = self._expectation(circuits,
+                                            total_circuit.symbol_names,
+                                            tiled_values, observables)
     return utils.expand_unique_results(unique_expectations, idx)
 
   @abc.abstractmethod
@@ -125,10 +127,10 @@ class AnalyticQuantumInference(QuantumInference):
     num_circuits = tf.shape(circuits)[0]
     tiled_ops = tf.tile(tf.expand_dims(ops, 0), [num_circuits, 1])
     expectations = self._expectation_layer(
-            circuits,
-            symbol_names=symbol_names,
-            symbol_values=symbol_values,
-            operators=tiled_ops)
+        circuits,
+        symbol_names=symbol_names,
+        symbol_values=symbol_values,
+        operators=tiled_ops)
     return post_process(expectations)
 
 
@@ -160,7 +162,8 @@ class SampledQuantumInference(QuantumInference):
     self._expectation_layer = tfq.layers.SampledExpectation()
     self._differentiator = tfq.differentiators.ParameterShift()
 
-  def _sampled_expectation(self, circuits, symbol_names, symbol_values, observable):
+  def _sampled_expectation(self, circuits, symbol_names, symbol_values,
+                           observable):
 
     @tf.custom_gradient
     def _inner_expectation(circuits, symbol_names, symbol_values):
@@ -239,16 +242,18 @@ class SampledQuantumInference(QuantumInference):
           lambda x: tf.expand_dims(
               observables.energy.operator_expectation(x), 0), y)
     else:
-      return self._sampled_expectation(circuits, symbol_names, symbol_values, observables)
+      return self._sampled_expectation(circuits, symbol_names, symbol_values,
+                                       observables)
 
     num_circuits = tf.shape(circuits)[0]
     num_ops = tf.shape(ops)[0]
     tiled_ops = tf.tile(tf.expand_dims(ops, 0), [num_circuits, 1])
-    repetitions = tf.tile(tf.expand_dims(self._expectation_samples, 1), [num_circuits, num_ops])
+    repetitions = tf.tile(
+        tf.expand_dims(self._expectation_samples, 1), [num_circuits, num_ops])
     expectations = self._expectation_layer(
-      circuits,
-      symbol_names=symbol_names,
-      symbol_values=symbol_values,
-      operators=tiled_ops,
-      repetitions=repetitions)
+        circuits,
+        symbol_names=symbol_names,
+        symbol_values=symbol_values,
+        operators=tiled_ops,
+        repetitions=repetitions)
     return post_process(expectations)
