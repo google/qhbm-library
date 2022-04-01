@@ -34,8 +34,8 @@ from qhbmlib import utils
 from tests import test_util
 
 
-class AnalyticQuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
-  """Tests the AnalyticQuantumInference class."""
+class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
+  """Tests the Analytic and Sampled QuantumInference classes."""
 
   def setUp(self):
     """Initializes test objects."""
@@ -63,7 +63,7 @@ class AnalyticQuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         name="p_qnn")
 
   def test_init(self):
-    """Confirms AnalyticQuantumInference is initialized correctly."""
+    """Confirms QuantumInference classes are initialized correctly."""
     expected_name = "test_qnn_name"
     actual_exp = inference.AnalyticQuantumInference(self.p_qnn, name=expected_name)
     self.assertEqual(actual_exp.name, expected_name)
