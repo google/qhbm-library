@@ -158,7 +158,7 @@ class VQTTest(tf.test.TestCase):
       qnn_init = tf.keras.initializers.RandomUniform(
           minval=-1, maxval=1, seed=self.tf_random_seed)
       actual_circuit = models.DirectQuantumCircuit(r_circuit, qnn_init)
-      q_infer = inference.QuantumInference(actual_circuit)
+      q_infer = inference.AnalyticQuantumInference(actual_circuit)
       qhbm_infer = inference.QHBM(e_infer, q_infer)
 
       # TODO(#171): code around here seems like boilerplate.
