@@ -349,7 +349,7 @@ class AnalyticQuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
       with tf.GradientTape() as tape:
         actual_expectations = expectation_wrapper(all_bitstrings,
                                                   hamiltonian_measure)
-      self.assertAllClose(actual_expectations, expected_expectations)
+      self.assertAllClose(actual_expectations, expected_expectations, atol=atol)
 
       actual_jacobian_thetas, actual_jacobian_phis = tape.jacobian(
           actual_expectations, (hamiltonian_measure.energy.trainable_variables,
@@ -526,7 +526,7 @@ class AnalyticQuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     for derivative in expected_derivatives:
       # Checks that at last one entry in each variable's derivative is
       # not too close to zero.
-      self.assertNotAllClose(derivative, tf.zeros_like(derivative), self.non_zero_atol)
+      self.assertNotAllClose(derivative, tf.zeros_like(derivative), self.not_zero_atol)
 
     with tf.GradientTape() as tape:
       actual_expectations = expectation_wrapper(initial_states, hamiltonian)
