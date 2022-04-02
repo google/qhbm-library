@@ -41,7 +41,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     """Initializes test objects."""
     super().setUp()
     self.python_random_seed = 11
-    self.tf_random_seed = 10
+    self.tf_random_seed = 11
+    tf.random.set_seed(self.tf_random_seed)
     self.tf_random_seed_alt = 201
     self.tfp_seed = tf.constant([5, 6], dtype=tf.int32)
 
