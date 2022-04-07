@@ -15,8 +15,8 @@ jobs:
           architecture: 'x64'
       - name: Install dependencies
         run: |
-          curl -sSL https://install.python-poetry.org | python3.9
-          poetry self update --preview
+          python -m pip install --upgrade pip
+          pip install --user poetry==1.2.0b1
           poetry install --only dev
       - name: Run Linter
         run: ./scripts/check_lint.sh
@@ -33,8 +33,8 @@ jobs:
           architecture: 'x64'
       - name: Install dependencies
         run: |
-          curl -sSL https://install.python-poetry.org | python3.9
-          poetry self update --preview
+          python -m pip install --upgrade pip
+          pip install --user poetry==1.2.0b1
           poetry install --only dev
       - name: Check format
         run: ./scripts/check_format.sh
@@ -51,8 +51,8 @@ jobs:
           architecture: 'x64'
       - name: Install dependencies
         run: |
-          curl -sSL https://install.python-poetry.org | python3.9
-          poetry self update --preview
+          python -m pip install --upgrade pip
+          pip install --user poetry==1.2.0b1
           poetry install
       - name: Run tests
         run: |
