@@ -16,7 +16,8 @@ jobs:
       - name: Install dependencies
         run: |
           curl -sSL https://install.python-poetry.org | python3.9
-          poetry install --dev-only
+          poetry self update --preview
+          poetry install --only dev
       - name: Run Linter
         run: ./scripts/check_lint.sh
 
@@ -33,7 +34,8 @@ jobs:
       - name: Install dependencies
         run: |
           curl -sSL https://install.python-poetry.org | python3.9
-          poetry install --dev-only
+          poetry self update --preview
+          poetry install --only dev
       - name: Check format
         run: ./scripts/check_format.sh
 
@@ -50,6 +52,7 @@ jobs:
       - name: Install dependencies
         run: |
           curl -sSL https://install.python-poetry.org | python3.9
+          poetry self update --preview
           poetry install
       - name: Run tests
         run: |
