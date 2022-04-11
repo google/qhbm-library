@@ -269,7 +269,7 @@ class EnergyInference(EnergyInferenceBase):
     def _inner_expectation():
       """Enables derivatives."""
       samples = tf.stop_gradient(self.sample(self.num_expectation_samples))
-#      bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
+      #      bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
 
       # TODO(#157): try to parameterize the persistence.
       with tf.GradientTape() as values_tape:
@@ -302,8 +302,8 @@ class EnergyInference(EnergyInferenceBase):
             unconnected_gradients=tf.UnconnectedGradients.ZERO)
 
         # <d E_theta(x) / d theta_j>
-        average_energies_grads = tf.nest.map_structure(
-            tf.math.reduce_mean, energies_grads)
+        average_energies_grads = tf.nest.map_structure(tf.math.reduce_mean,
+                                                       energies_grads)
 
         # d g / d <f_i>
         # This is a list where `i` indexes the atomic elements of `upstream`.
@@ -341,8 +341,7 @@ class EnergyInference(EnergyInferenceBase):
         # sum over all internal indices as well.
         inner_upstream_times_values = tf.nest.map_structure(
             lambda g, v: tf.map_fn(lambda v_x: tf.math.reduce_sum(g * v_x), v),
-            flat_upstream,
-            flat_values)
+            flat_upstream, flat_values)
 
         # Sum over non-bitstring index.
         upstream_times_values = tf.math.reduce_sum(
@@ -352,14 +351,14 @@ class EnergyInference(EnergyInferenceBase):
         energies_grads_times_sums = tf.nest.map_structure(
             lambda g: upstream_times_values * g, energies_grads)
 
-        middle_summand = tf.nest.map_structure(
-            tf.math.reduce_mean, energues_grads_times_sums)
+        middle_summand = tf.nest.map_structure(tf.math.reduce_mean,
+                                               energies_grads_times_sums)
 
         ####
         # Last summand in equation A5.
         # `output_gradients` is  d g / d <f_i>
         # See discussion in the docstring for details.
-        
+
         last_summand = values_tape.gradient(
             average_of_values,
             variables,
@@ -368,8 +367,8 @@ class EnergyInference(EnergyInferenceBase):
 
         # Note: upstream gradient is already a coefficient in poa, aop, and fg.
         return tuple(), [
-            fs - ms + ls for fs, ms, ls in zip(
-                first_summand, middle_summand, last_summand)
+            fs - ms + ls
+            for fs, ms, ls in zip(first_summand, middle_summand, last_summand)
         ]
 
       return average_of_values, grad_fn
