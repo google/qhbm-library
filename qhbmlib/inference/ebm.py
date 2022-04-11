@@ -269,7 +269,7 @@ class EnergyInference(EnergyInferenceBase):
     def _inner_expectation():
       """Enables derivatives."""
       samples = tf.stop_gradient(self.sample(self.num_expectation_samples))
-      #      bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
+      unique_samples, idx, counts = utils.unique_bitstrings_with_counts(samples)
 
       # TODO(#157): try to parameterize the persistence.
       with tf.GradientTape() as values_tape:
@@ -288,22 +288,21 @@ class EnergyInference(EnergyInferenceBase):
         ####
         # Compute first summand in equation A5.
 
-        # Compute grad E terms.
         with tf.GradientTape() as tape:
-          energies = self.energy(samples)
+          unique_energies = self.energy(unique_samples)
 
         # d E_theta(x) / d theta_j
         # Returned value is a list, one entry for each variable.
-        # Each entry is a tensor; first index x is the bitstring, remaining
+        # Each entry is a tensor; first index is the unique bitstring, remaining
         # indices are the same as the corresponding entry of `variables`
-        energies_grads = tape.jacobian(
-            energies,
+        unique_energies_grads = tape.jacobian(
+            unique_energies,
             variables,
             unconnected_gradients=tf.UnconnectedGradients.ZERO)
 
         # <d E_theta(x) / d theta_j>
-        average_energies_grads = tf.nest.map_structure(tf.math.reduce_mean,
-                                                       energies_grads)
+        average_energies_grads = tf.nest.map_structure(
+            lambda g: utils.weighted_average(counts, g), unique_energies_grads)
 
         # d g / d <f_i>
         # This is a list where `i` indexes the atomic elements of `upstream`.
@@ -340,7 +339,8 @@ class EnergyInference(EnergyInferenceBase):
         # Multiply d g / d <f_i> times f_i(x) for each i;
         # sum over all internal indices as well.
         inner_upstream_times_values = tf.nest.map_structure(
-            lambda g, v: tf.map_fn(lambda v_x: tf.math.reduce_sum(g * v_x), v),
+            lambda g, v: tf.vectorized_map(
+                lambda v_x: tf.math.reduce_sum(g * v_x), v),
             flat_upstream, flat_values)
 
         # Sum over non-bitstring index.
@@ -349,7 +349,10 @@ class EnergyInference(EnergyInferenceBase):
 
         # d E_theta(x) / d theta_j times sum_i d g / d <f_i> times f_i(x)
         energies_grads_times_sums = tf.nest.map_structure(
-            lambda g: upstream_times_values * g, energies_grads)
+            lambda g: tf.vectorized_map(
+                lambda i: upstream_times_values[i] * g[idx[i]],
+                tf.range(tf.shape(samples)[0])),
+            unique_energies_grads)
 
         middle_summand = tf.nest.map_structure(tf.math.reduce_mean,
                                                energies_grads_times_sums)
@@ -357,8 +360,6 @@ class EnergyInference(EnergyInferenceBase):
         ####
         # Last summand in equation A5.
         # `output_gradients` is  d g / d <f_i>
-        # See discussion in the docstring for details.
-
         last_summand = values_tape.gradient(
             average_of_values,
             variables,
@@ -405,19 +406,19 @@ class EnergyInference(EnergyInferenceBase):
     def grad_fn(upstream, variables):
       """See equation C2 in the appendix.  TODO(#119)"""
 
-      def energy_grad(bitstrings):
-        """Calculates the derivative with respect to the current variables."""
-        with tf.GradientTape() as tape:
-          energies = self.energy(bitstrings)
-        jac = tape.jacobian(
-            energies,
-            variables,
-            unconnected_gradients=tf.UnconnectedGradients.ZERO)
-        return jac
+      samples = self.sample(self.num_expectation_samples)
+      unique_samples, _, counts = utils.unique_bitstrings_with_counts(samples)
 
-      energy_grad_expectation_list = self.expectation(energy_grad)
+      with tf.GradientTape() as tape:
+        unique_energies = self.energy(unique_samples)
+      unique_jacobians = tape.jacobian(
+          unique_energies,
+          variables,
+          unconnected_gradients=tf.UnconnectedGradients.ZERO)
+      average_jacobians = tf.nest.map_structure(
+          lambda j: utils.weighted_average(counts, j), unique_jacobians)
       return tuple(), [
-          upstream * (-1.0 * ege) for ege in energy_grad_expectation_list
+          upstream * (-1.0 * aj) for aj in average_jacobians
       ]
 
     return grad_fn
