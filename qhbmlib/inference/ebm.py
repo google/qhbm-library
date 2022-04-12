@@ -184,9 +184,8 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
     """Returns an estimate of the expectation value of the given function.
 
     Args:
-      function: Mapping from a 2D tensor of bitstrings to a possibly nested
-        structure.  The structure must have atomic elements all of which are
-        float tensors with the same batch size as the input bitstrings.
+      function: Mapping from a 2D tensor of bitstrings to a float tensor
+        with the same batch size as the input bitstrings.
     """
     return self._expectation(function)
 
@@ -276,13 +275,21 @@ class EnergyInference(EnergyInferenceBase):
         # Adds variables in `self.energy` to `variables` argument of `grad_fn`.
         values_tape.watch(self.energy.trainable_variables)
         values = function(samples)
-        average_of_values = tf.nest.map_structure(
-            lambda x: tf.math.reduce_mean(x, 0), values)
+        average_of_values = tf.math.reduce_mean(values, 0)
 
-      def grad_fn(*upstream, variables):
+      def grad_fn(upstream, variables):
         """See equation A5 in the QHBM paper appendix for details.
 
         # TODO(#119): confirm equation number.
+
+        Args:
+          upstream: The derivative of the final node in the computational graph
+            backpropagated to `average_of_values`, since that is the output of
+            `_inner_expectation`.  Is d g / d <f_i> from the notes.
+          variables: List of variables encountered while computing the forward
+            pass of the function (everything in `_inner_expectation` outside of
+            this `grad_fn`.  For example, see the _eager_mode_decorator function
+            inside tensorflow/python/ops/custom_gradient.py
         """
 
         ####
@@ -293,38 +300,24 @@ class EnergyInference(EnergyInferenceBase):
 
         # d E_theta(x) / d theta_j
         # Returned value is a list, one entry for each variable.
-        # Each entry is a tensor; first index is the unique bitstring, remaining
+        # Each entry is a tensor; first index indexes unique energies, remaining
         # indices are the same as the corresponding entry of `variables`
         unique_energies_grads = tape.jacobian(
             unique_energies,
             variables,
             unconnected_gradients=tf.UnconnectedGradients.ZERO)
+        energies_grads = tf.nest.map_structure(
+            lambda g: utils.expand_unique_results(g, idx),
+            unique_energies_grads)
 
         # <d E_theta(x) / d theta_j>
         average_energies_grads = tf.nest.map_structure(
             lambda g: utils.weighted_average(counts, g), unique_energies_grads)
 
-        # d g / d <f_i>
-        # This is a list where `i` indexes the atomic elements of `upstream`.
-        # Note `upstream` has the same structure as `average_of_values`.
-        flat_upstream = tf.nest.flatten(upstream)
-
-        # <f_i>
-        flat_average_of_values = tf.nest.flatten(average_of_values)
-
-        # Multiply d g / d <f_i> times <f_i> for each i
-        upstream_times_average_of_values = tf.nest.map_structure(
-            lambda x, y: x * y, flat_upstream, flat_average_of_values)
-
-        # Summing over i first requires summing over all inner indices.
-        # In the notes is only the outermost summation over i is shown.
-        # This is now a list of scalars.
-        inner_upstream_times_average_of_values = tf.nest.map_structure(
-            tf.reduce_sum, upstream_times_average_of_values)
-
-        # Do the outer sum over i.
+        # Multiply d g / d <f_i> times <f_i>, then do the sum.
+        # This is now a scalar.
         summed_upstream_times_average_of_values = tf.math.reduce_sum(
-            tf.stack(inner_upstream_times_average_of_values))
+            upstream * average_of_values)
 
         first_summand = tf.nest.map_structure(
             lambda x: x * summed_upstream_times_average_of_values,
@@ -333,26 +326,17 @@ class EnergyInference(EnergyInferenceBase):
         ####
         # Compute middle summand in equation A5.
 
-        # List of f_i(x), where `i` indexes the atomic elements.
-        flat_values = tf.nest.flatten(values)
-
-        # Multiply d g / d <f_i> times f_i(x) for each i;
-        # sum over all internal indices as well.
-        inner_upstream_times_values = tf.nest.map_structure(
-            lambda g, v: tf.vectorized_map(
-                lambda v_x: tf.math.reduce_sum(g * v_x), v),
-            flat_upstream, flat_values)
-
-        # Sum over non-bitstring index.
-        upstream_times_values = tf.math.reduce_sum(
-            tf.stack(inner_upstream_times_values), 0)
+        # Multiply d g / d <f_i> times f_i(x), summing over
+        # non-bitstring indices.  This is now a 1D tensor.
+        summed_upstream_times_values = tf.vectorized_map(
+            lambda v_x: tf.math.reduce_sum(upstream * v_x),
+            values,
+            fallback_to_while_loop=False)
 
         # d E_theta(x) / d theta_j times sum_i d g / d <f_i> times f_i(x)
         energies_grads_times_sums = tf.nest.map_structure(
-            lambda g: tf.vectorized_map(
-                lambda i: upstream_times_values[i] * g[idx[i]],
-                tf.range(tf.shape(samples)[0])),
-            unique_energies_grads)
+            lambda g: tf.einsum("i,i...->i...", summed_upstream_times_values, g),
+            energies_grads)
 
         middle_summand = tf.nest.map_structure(tf.math.reduce_mean,
                                                energies_grads_times_sums)
