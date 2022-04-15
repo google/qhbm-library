@@ -345,12 +345,26 @@ class EnergyInference(EnergyInferenceBase):
   def _log_partition_forward_pass(self):
     """Returns approximation to the log partition function.
 
-    Note this simple estimator is biased.  See the paper appendix for its
-    motivation.  TODO(#216)
+    The calculation uses the uniform distribution to approximate the
+    partition function using importance sampling.  See section 11.5 of [1] for
+    details on importance sampling, in particular 11.5.2 on self-normalized
+    importance sampling.  TODO (#216): decrease variance of this estimator.
+
+    #### References
+    [1]: Murphy, Kevin P. (2023).
+         Probabilistic Machine Learning: Advanced Topics.
+         MIT Press.
     """
-    samples = self.sample(self.num_expectation_samples)
-    unique_samples, _, _ = utils.unique_bitstrings_with_counts(samples)
-    return tf.math.reduce_logsumexp(-1.0 * self.energy(unique_samples))
+    # Sample from the uniform distribution
+    samples = tfp.distributions.Bernoulli(
+        logits=tf.zeros([self.energy.num_bits])).sample(
+        self.num_expectation_samples)
+    # gamma tilde
+    unnormalized_probabilities = tf.math.exp(-1.0 * self.energy(samples))
+    # Equation 11.39
+    weights = unnormalized_probabilities * 2 ** self.energy.num_bits
+    return tf.math.log(
+        tf.math.reduce_sum(weights) / tf.cast(tf.shape(samples)[0], tf.float32))
 
   def _log_partition_grad_generator(self):
     """Returns default estimator for the log partition function derivative."""
@@ -358,19 +372,19 @@ class EnergyInference(EnergyInferenceBase):
     def grad_fn(upstream, variables):
       """See equation C2 in the appendix.  TODO(#119)"""
 
-      def energy_grad(bitstrings):
-        """Calculates the derivative with respect to the current variables."""
-        with tf.GradientTape() as tape:
-          energies = self.energy(bitstrings)
-        jac = tape.jacobian(
-            energies,
-            variables,
-            unconnected_gradients=tf.UnconnectedGradients.ZERO)
-        return jac
+      samples = self.sample(self.num_expectation_samples)
+      unique_samples, _, counts = utils.unique_bitstrings_with_counts(samples)
 
-      energy_grad_expectation_list = self.expectation(energy_grad)
+      with tf.GradientTape() as tape:
+        unique_energies = self.energy(unique_samples)
+      unique_jacobians = tape.jacobian(
+          unique_energies,
+          variables,
+          unconnected_gradients=tf.UnconnectedGradients.ZERO)
+      average_jacobians = tf.nest.map_structure(
+          lambda j: utils.weighted_average(counts, j), unique_jacobians)
       return tuple(), [
-          upstream * (-1.0 * ege) for ege in energy_grad_expectation_list
+          upstream * (-1.0 * aj) for aj in average_jacobians
       ]
 
     return grad_fn
