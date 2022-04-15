@@ -328,10 +328,9 @@ class EnergyInference(EnergyInferenceBase):
 
         # Multiply d g / d <f_i> times f_i(x), summing over
         # non-bitstring indices.  This is now a 1D tensor.
+        expanded_upstream = tf.expand_dims(upstream, 0)
         summed_upstream_times_values = tf.vectorized_map(
-            lambda v_x: tf.math.reduce_sum(upstream * v_x),
-            values,
-            fallback_to_while_loop=False)
+            tf.math.reduce_sum, values * expanded_upstream, fallback_to_while_loop=False)
 
         # d E_theta(x) / d theta_j times sum_i d g / d <f_i> times f_i(x)
         energies_grads_times_sums = tf.nest.map_structure(
@@ -350,7 +349,7 @@ class EnergyInference(EnergyInferenceBase):
             output_gradients=upstream,
             unconnected_gradients=tf.UnconnectedGradients.ZERO)
 
-        # Note: upstream gradient is already a coefficient in poa, aop, and fg.
+        # Note: upstream gradient is already a coefficient in fs, ms, and ls.
         return tuple(), [
             fs - ms + ls
             for fs, ms, ls in zip(first_summand, middle_summand, last_summand)
@@ -377,12 +376,26 @@ class EnergyInference(EnergyInferenceBase):
   def _log_partition_forward_pass(self):
     """Returns approximation to the log partition function.
 
-    Note this simple estimator is biased.  See the paper appendix for its
-    motivation.  TODO(#216)
+    The calculation uses the uniform distribution to approximate the
+    partition function using importance sampling.  See section 11.5 of [1] for
+    details on importance sampling, in particular 11.5.2 on self-normalized
+    importance sampling.  TODO (#216): decrease variance of this estimator.
+
+    #### References
+    [1]: Murphy, Kevin P. (2023).
+         Probabilistic Machine Learning: Advanced Topics.
+         MIT Press.
     """
-    samples = self.sample(self.num_expectation_samples)
-    unique_samples, _, _ = utils.unique_bitstrings_with_counts(samples)
-    return tf.math.reduce_logsumexp(-1.0 * self.energy(unique_samples))
+    # Sample from the uniform distribution
+    samples = tfp.distributions.Bernoulli(
+        logits=tf.zeros([self.energy.num_bits])).sample(
+        self.num_expectation_samples)
+    # gamma tilde
+    unnormalized_probabilities = tf.math.exp(-1.0 * self.energy(samples))
+    # Equation 11.39
+    weights = unnormalized_probabilities * 2 ** self.energy.num_bits
+    return tf.math.log(
+        tf.math.reduce_sum(weights) / tf.cast(tf.shape(samples)[0], tf.float32))
 
   def _log_partition_grad_generator(self):
     """Returns default estimator for the log partition function derivative."""
