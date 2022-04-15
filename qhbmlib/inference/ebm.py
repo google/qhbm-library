@@ -389,11 +389,11 @@ class EnergyInference(EnergyInferenceBase):
     # Sample from the uniform distribution
     samples = tfp.distributions.Bernoulli(
         logits=tf.zeros([self.energy.num_bits])).sample(
-        self.num_expectation_samples)
+            self.num_expectation_samples)
     # gamma tilde
     unnormalized_probabilities = tf.math.exp(-1.0 * self.energy(samples))
     # Equation 11.39
-    weights = unnormalized_probabilities * 2 ** self.energy.num_bits
+    weights = unnormalized_probabilities * 2**self.energy.num_bits
     return tf.math.log(
         tf.math.reduce_sum(weights) / tf.cast(tf.shape(samples)[0], tf.float32))
 
@@ -414,9 +414,7 @@ class EnergyInference(EnergyInferenceBase):
           unconnected_gradients=tf.UnconnectedGradients.ZERO)
       average_jacobians = tf.nest.map_structure(
           lambda j: utils.weighted_average(counts, j), unique_jacobians)
-      return tuple(), [
-          upstream * (-1.0 * aj) for aj in average_jacobians
-      ]
+      return tuple(), [upstream * (-1.0 * aj) for aj in average_jacobians]
 
     return grad_fn
 
