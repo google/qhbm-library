@@ -86,10 +86,12 @@ class EnergyInferenceTest(tf.test.TestCase):
     self.test_function = test_function
 
 #  @test_util.eager_mode_toggle
+
   def test_entropy(self):
     """Compares estimated entropy to exact value."""
 
-    analytic_inference = inference.AnalyticEnergyInference(self.energy, self.num_samples)
+    analytic_inference = inference.AnalyticEnergyInference(
+        self.energy, self.num_samples)
 
     def manual_entropy():
       """Returns the exact entropy of the distribution."""
@@ -110,6 +112,7 @@ class EnergyInferenceTest(tf.test.TestCase):
         actual_gradient, expected_gradient, rtol=self.close_rtol)
 
 #  @test_util.eager_mode_toggle
+
   def test_expectation(self):
     """Confirms correct averaging over input function."""
 
@@ -136,6 +139,7 @@ class EnergyInferenceTest(tf.test.TestCase):
         actual_gradient, expected_gradient, rtol=self.close_rtol)
 
 #  @test_util.eager_mode_toggle
+
   def test_log_partition(self):
     """Confirms log partition function and derivative match analytic."""
 
@@ -581,7 +585,6 @@ class EnergyInferenceTest(tf.test.TestCase):
 #     _, _, counts = utils.unique_bitstrings_with_counts(samples)
 #     self.assertAllClose(1.0, counts[0] / counts[1], rtol=self.close_rtol)
 
-
 # class BernoulliEnergyInferenceTest(tf.test.TestCase):
 #   """Tests the BernoulliEnergyInference class."""
 
@@ -786,7 +789,6 @@ class EnergyInferenceTest(tf.test.TestCase):
 #     _, _, counts = utils.unique_bitstrings_with_counts(samples)
 #     self.assertAllClose(1.0, counts[0] / counts[1], rtol=self.close_rtol)
 
-
 # class GibbsWithGradientsKernelTest(tf.test.TestCase):
 #   """Tests the GibbsWithGradientsKernel class."""
 
@@ -845,7 +847,6 @@ class EnergyInferenceTest(tf.test.TestCase):
 
 #     self.assertNotAllEqual(initial_state, next_state)
 #     self.assertGreater(initial_energy, next_energy)
-
 
 # class GibbsWithGradientsInferenceTest(tf.test.TestCase):
 #   """Tests the GibbsWithGradientsInference class."""

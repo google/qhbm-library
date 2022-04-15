@@ -330,12 +330,14 @@ class EnergyInference(EnergyInferenceBase):
         # non-bitstring indices.  This is now a 1D tensor.
         expanded_upstream = tf.expand_dims(upstream, 0)
         summed_upstream_times_values = tf.vectorized_map(
-            tf.math.reduce_sum, values * expanded_upstream, fallback_to_while_loop=False)
+            tf.math.reduce_sum,
+            values * expanded_upstream,
+            fallback_to_while_loop=False)
 
         # d E_theta(x) / d theta_j times sum_i d g / d <f_i> times f_i(x)
         energies_grads_times_sums = tf.nest.map_structure(
-            lambda g: tf.einsum("i,i...->i...", summed_upstream_times_values, g),
-            energies_grads)
+            lambda g: tf.einsum("i,i...->i...", summed_upstream_times_values, g
+                               ), energies_grads)
 
         middle_summand = tf.nest.map_structure(tf.math.reduce_mean,
                                                energies_grads_times_sums)
