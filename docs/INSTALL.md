@@ -33,9 +33,9 @@ git remote add upstream https://github.com/google/qhbm-library.git
 
 We use a Python dependency manager called [poetry](https://python-poetry.org/). Install it from source:
 ```
-curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/install-poetry.py | python3 -
+curl -sSL https://install.python-poetry.org | python<X> -
 ```
-After installation, follow the on screen instructions to ensure the `poetry` command can be found by your shell. Restart the shell and confirm successful installation:
+where `<X>` is your desired version of Python; we currently support 3.7, 3.8, or 3.9.  You may be prompted to install additional development packages; you may also need to add poetry to your PATH variable, see the [poetry documentation](https://python-poetry.org/docs/master/#installing-with-the-official-installer) for details.  Restart the shell and confirm successful installation:
 ```
 poetry --version
 ```
