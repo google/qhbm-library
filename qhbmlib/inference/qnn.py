@@ -96,7 +96,7 @@ class AnalyticQuantumInference(QuantumInference):
   of the chosen differentiator.  Second, parameter shift derivatives are exactly
   equal to the true derivative in the noiseless, exact-expectation regime.  Thus
   using it would just increase computational overhead without gaining additional
-  accuracy.  
+  accuracy.
   """
 
   def __init__(self,
