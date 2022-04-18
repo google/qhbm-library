@@ -346,25 +346,53 @@ class EnergyInference(EnergyInferenceBase):
     """Returns approximation to the log partition function.
 
     The calculation uses the uniform distribution to approximate the
-    partition function using importance sampling.  See section 11.5 of [1] for
-    details on importance sampling, in particular 11.5.2 on self-normalized
-    importance sampling.  TODO (#216): decrease variance of this estimator.
+    partition function using Monte Carlo integration.  See section 11.2 of [1]
+    for details on Monte Carlo integration.
+
+    TODO (#216): decrease variance of this estimator.
+
+    Given an energy function $E$, the associated partition function is defined
+    $$
+    Z = \sum_x e^{-E(x)},
+    $$
+    where $x$ ranges over the domain of $E$.  We do not want to compute this sum
+    directly because it is over a set exponentially large in the number of bits.
+    Instead, we can use Monte Carlo integration.  To support this consider
+    rewriting the sum as an expectation value with respect to the uniform
+    distribution $u(x)$:
+    $$
+    Z = \sum_x e^{-E(x)}
+      = \sum_x u(x) 2^n e^{-E(x)}
+      = \mathbb{E}\left[2^n e^{-E(\cdot)}\right],
+    $$
+    where $n$ is the number of bits in each uniform sample.  Now draw $N_s$
+    samples from the uniform distribution.  Then we can approximate the
+    expectation value as (equation 11.2)
+    $$
+    \mathbb{E}\left[2^n e^{-E(\cdot)}\right]
+      \approx\frac{1}{N_s}\sum_{i=1}^{N_s} 2^n e^{-E(x_i)}.
+    $$
+    Next, what we are really interested in is the logarithm of the partition
+    function.  Then we have
+    $$
+    \log Z
+      \approx \log \left(\frac{1}{N_s}\sum_{i=1}^{N_s} 2^n e^{-E(x_i)}\right)
+      = n \log 2 - \log N_s + \log \sum_{i=1}^{N_s}  e^{-E(x_i)}
+    $$
 
     #### References
     [1]: Murphy, Kevin P. (2023).
          Probabilistic Machine Learning: Advanced Topics.
          MIT Press.
     """
+    n = self.energy.num_bits
+    n_s = self.num_expectation_samples
     # Sample from the uniform distribution
-    samples = tfp.distributions.Bernoulli(
-        logits=tf.zeros([self.energy.num_bits])).sample(
-            self.num_expectation_samples)
-    # gamma tilde
-    unnormalized_probabilities = tf.math.exp(-1.0 * self.energy(samples))
-    # Equation 11.39
-    weights = unnormalized_probabilities * 2**self.energy.num_bits
-    return tf.math.log(
-        tf.math.reduce_sum(weights) / tf.cast(tf.shape(samples)[0], tf.float32))
+    samples = tfp.distributions.Bernoulli(logits=tf.zeros([n])).sample(n_s)
+
+    energies = self.energy(samples)
+    return n * tf.math.log(2.0) - tf.math.log(n_s) + tf.math.reduce_logsumexp(
+        -1.0 * energies)
 
   def _log_partition_grad_generator(self):
     """Returns default estimator for the log partition function derivative."""
