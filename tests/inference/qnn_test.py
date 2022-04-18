@@ -549,6 +549,73 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
       self.assertAllClose(actual, expected, atol=self.close_atol_sampled)
 
 
+  @test_util.eager_mode_toggle
+  def test_sample_basic(self):
+    """Confirms correct sampling from identity, bit flip, and GHZ QNNs."""
+    bitstrings = tf.constant(
+        list(itertools.product([0, 1], repeat=self.num_bits)), dtype=tf.int8)
+    counts = tf.random.uniform([tf.shape(bitstrings)[0]], 100, 1000, tf.int32)
+
+    ident_qnn = models.DirectQuantumCircuit(
+        cirq.Circuit(cirq.I(q) for q in self.raw_qubits), name="identity")
+    q_infer = inference.QuantumInference(ident_qnn)
+    sample_wrapper = tf.function(q_infer.sample)
+    test_samples = sample_wrapper(bitstrings, counts)
+    for i, (b, c) in enumerate(zip(bitstrings, counts)):
+      self.assertEqual(tf.shape(test_samples[i].to_tensor())[0], c)
+      for j in range(c):
+        self.assertAllEqual(test_samples[i][j], b)
+
+    flip_qnn = models.DirectQuantumCircuit(
+        cirq.Circuit(cirq.X(q) for q in self.raw_qubits), name="flip")
+    q_infer = inference.QuantumInference(flip_qnn)
+    sample_wrapper = tf.function(q_infer.sample)
+    test_samples = sample_wrapper(bitstrings, counts)
+    for i, (b, c) in enumerate(zip(bitstrings, counts)):
+      self.assertEqual(tf.shape(test_samples[i].to_tensor())[0], c)
+      for j in range(c):
+        self.assertAllEqual(
+            test_samples[i][j],
+            tf.cast(tf.math.logical_not(tf.cast(b, tf.bool)), tf.int8))
+
+    ghz_param = sympy.Symbol("ghz")
+    ghz_circuit = cirq.Circuit(cirq.X(
+        self.raw_qubits[0])**ghz_param) + cirq.Circuit(
+            cirq.CNOT(q0, q1)
+            for q0, q1 in zip(self.raw_qubits, self.raw_qubits[1:]))
+    ghz_qnn = models.DirectQuantumCircuit(
+        ghz_circuit,
+        initializer=tf.keras.initializers.Constant(value=0.5),
+        name="ghz")
+    q_infer = inference.QuantumInference(ghz_qnn)
+    sample_wrapper = tf.function(q_infer.sample)
+    test_samples = sample_wrapper(
+        tf.expand_dims(tf.constant([0] * self.num_bits, dtype=tf.int8), 0),
+        tf.expand_dims(counts[0], 0))[0].to_tensor()
+    # Both |0...0> and |1...1> should be among the measured bitstrings
+    self.assertTrue(
+        test_util.check_bitstring_exists(
+            tf.constant([0] * self.num_bits, dtype=tf.int8), test_samples))
+    self.assertTrue(
+        test_util.check_bitstring_exists(
+            tf.constant([1] * self.num_bits, dtype=tf.int8), test_samples))
+
+  @test_util.eager_mode_toggle
+  def test_sample_uneven(self):
+    """Check for discrepancy in samples when count entries differ."""
+    max_counts = int(1e7)
+    counts = tf.constant([max_counts // 2, max_counts])
+    test_qnn = models.DirectQuantumCircuit(
+        cirq.Circuit(cirq.H(cirq.GridQubit(0, 0))))
+    test_infer = inference.QuantumInference(test_qnn)
+    sample_wrapper = tf.function(test_infer.sample)
+    bitstrings = tf.constant([[0], [0]], dtype=tf.int8)
+    _, samples_counts = sample_wrapper(bitstrings, counts)
+    # QNN samples should be half 0 and half 1.
+    self.assertAllClose(
+        samples_counts[0], samples_counts[1], atol=max_counts // 1000)
+
+
 if __name__ == "__main__":
   logging.info("Running qnn_test.py ...")
   tf.test.main()

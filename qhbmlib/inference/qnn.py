@@ -255,3 +255,31 @@ class SampledQuantumInference(QuantumInference):
         operators=tiled_ops,
         repetitions=repetitions)
     return post_process(expectations)
+
+  def _sample(self, initial_states: tf.Tensor, counts: tf.Tensor):
+    """Returns bitstring samples from the QNN.
+
+      Args:
+        initial_states: Shape [batch_size, num_qubits] of dtype `tf.int8`.
+          These are the initial states of each qubit in the circuit.
+        counts: Shape [batch_size] of dtype `tf.int32` such that `counts[i]` is
+          the number of samples to draw from `(qnn)|initial_states[i]>`.
+
+      Returns:
+        ragged_samples: `tf.RaggedTensor` of DType `tf.int8` structured such
+          that `ragged_samples[i]` contains `counts[i]` bitstrings drawn from
+          `(qnn)|initial_states[i]>`.
+    """
+    circuits = self.circuit(initial_states)
+    num_circuits = tf.shape(circuits)[0]
+    tiled_values = tf.tile(
+        tf.expand_dims(self.circuit.symbol_values, 0), [num_circuits, 1])
+    num_samples_mask = tf.cast((tf.ragged.range(counts) + 1).to_tensor(),
+                               tf.bool)
+    num_samples_mask = tf.map_fn(tf.random.shuffle, num_samples_mask)
+    samples = self._sample_layer(
+        circuits,
+        symbol_names=self.circuit.symbol_names,
+        symbol_values=tiled_values,
+        repetitions=tf.expand_dims(tf.math.reduce_max(counts), 0))
+    return tf.ragged.boolean_mask(samples, num_samples_mask)
