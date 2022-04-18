@@ -343,7 +343,7 @@ class EnergyInference(EnergyInferenceBase):
     return _inner_log_partition()
 
   def _log_partition_forward_pass(self):
-    """Returns approximation to the log partition function.
+    r"""Returns approximation to the log partition function.
 
     The calculation uses the uniform distribution to approximate the
     partition function using Monte Carlo integration.  See section 11.2 of [1]
