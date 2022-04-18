@@ -390,8 +390,8 @@ class EnergyInference(EnergyInferenceBase):
     # Sample from the uniform distribution
     samples = tfp.distributions.Bernoulli(logits=tf.zeros([n])).sample(n_s)
     energies = self.energy(samples)
-    return n * tf.math.log(2.0) - tf.math.log(tf.cast(n_s, tf.float32)) + tf.math.reduce_logsumexp(
-        -1.0 * energies)
+    return n * tf.math.log(2.0) - tf.math.log(tf.cast(
+        n_s, tf.float32)) + tf.math.reduce_logsumexp(-1.0 * energies)
 
   def _log_partition_grad_generator(self):
     """Returns default estimator for the log partition function derivative."""
