@@ -89,7 +89,7 @@ def get_random_hamiltonian_and_inference(qubits,
                                                  initializer_seed)
   unitary = get_hardware_efficient_model_unitary(qubits, num_layers, identifier)
   actual_circuit = models.DirectQuantumCircuit(unitary, qnn_init)
-  q_infer = inference.QuantumInference(actual_circuit, name=identifier)
+  q_infer = inference.AnalyticQuantumInference(actual_circuit, name=identifier)
   random_qhbm = inference.QHBM(e_infer, q_infer)
 
   return random_qhbm.modular_hamiltonian, random_qhbm
