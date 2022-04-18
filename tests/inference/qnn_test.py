@@ -559,7 +559,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     ident_qnn = models.DirectQuantumCircuit(
         cirq.Circuit(cirq.I(q) for q in self.raw_qubits), name="identity")
     q_infer = inference.QuantumInference(ident_qnn)
-    sample_wrapper = tf.function(q_infer.sample)
+    sample_wrapper = tf.function(q_infer._sample)
     test_samples = sample_wrapper(bitstrings, counts)
     for i, (b, c) in enumerate(zip(bitstrings, counts)):
       self.assertEqual(tf.shape(test_samples[i].to_tensor())[0], c)
@@ -569,7 +569,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     flip_qnn = models.DirectQuantumCircuit(
         cirq.Circuit(cirq.X(q) for q in self.raw_qubits), name="flip")
     q_infer = inference.QuantumInference(flip_qnn)
-    sample_wrapper = tf.function(q_infer.sample)
+    sample_wrapper = tf.function(q_infer._sample)
     test_samples = sample_wrapper(bitstrings, counts)
     for i, (b, c) in enumerate(zip(bitstrings, counts)):
       self.assertEqual(tf.shape(test_samples[i].to_tensor())[0], c)
@@ -588,7 +588,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         initializer=tf.keras.initializers.Constant(value=0.5),
         name="ghz")
     q_infer = inference.QuantumInference(ghz_qnn)
-    sample_wrapper = tf.function(q_infer.sample)
+    sample_wrapper = tf.function(q_infer._sample)
     test_samples = sample_wrapper(
         tf.expand_dims(tf.constant([0] * self.num_bits, dtype=tf.int8), 0),
         tf.expand_dims(counts[0], 0))[0].to_tensor()
@@ -608,7 +608,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     test_qnn = models.DirectQuantumCircuit(
         cirq.Circuit(cirq.H(cirq.GridQubit(0, 0))))
     test_infer = inference.QuantumInference(test_qnn)
-    sample_wrapper = tf.function(test_infer.sample)
+    sample_wrapper = tf.function(test_infer._sample)
     bitstrings = tf.constant([[0], [0]], dtype=tf.int8)
     _, samples_counts = sample_wrapper(bitstrings, counts)
     # QNN samples should be half 0 and half 1.

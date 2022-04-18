@@ -90,6 +90,13 @@ class AnalyticQuantumInference(QuantumInference):
   This class uses the TensorFlow Quantum `Expectation` layer to compute
   expectation values of observables.  It uses adjoint gradients to compute
   the derivatives of those expectation values.
+
+  Why shouldn't we use the `ParameterShift` differentiator with this class?
+  First, in this class expectation values of observables are exact irrespective
+  of the chosen differentiator.  Second, parameter shift derivatives are exactly
+  equal to the true derivative in the noiseless, exact-expectation regime.  Thus
+  using it would just increase computational overhead without gaining additional
+  accuracy.  
   """
 
   def __init__(self,
