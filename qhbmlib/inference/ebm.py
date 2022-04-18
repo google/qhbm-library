@@ -357,7 +357,7 @@ class EnergyInference(EnergyInferenceBase):
     $$
     where $x$ ranges over the domain of $E$.  We do not want to compute this sum
     directly because it is over a set exponentially large in the number of bits.
-    Instead, we can use Monte Carlo integration.  To support this consider
+    Instead, we can use Monte Carlo integration.  To support this, consider
     rewriting the sum as an expectation value with respect to the uniform
     distribution $u(x)$:
     $$
@@ -377,7 +377,7 @@ class EnergyInference(EnergyInferenceBase):
     $$
     \log Z
       \approx \log \left(\frac{1}{N_s}\sum_{i=1}^{N_s} 2^n e^{-E(x_i)}\right)
-      = n \log 2 - \log N_s + \log \sum_{i=1}^{N_s}  e^{-E(x_i)}
+      = n \log 2 - \log N_s + \log \sum_{i=1}^{N_s}  e^{-E(x_i)}.
     $$
 
     #### References
@@ -389,9 +389,8 @@ class EnergyInference(EnergyInferenceBase):
     n_s = self.num_expectation_samples
     # Sample from the uniform distribution
     samples = tfp.distributions.Bernoulli(logits=tf.zeros([n])).sample(n_s)
-
     energies = self.energy(samples)
-    return n * tf.math.log(2.0) - tf.math.log(n_s) + tf.math.reduce_logsumexp(
+    return n * tf.math.log(2.0) - tf.math.log(tf.cast(n_s, tf.float32)) + tf.math.reduce_logsumexp(
         -1.0 * energies)
 
   def _log_partition_grad_generator(self):
