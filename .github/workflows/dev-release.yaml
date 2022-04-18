@@ -10,6 +10,7 @@ jobs:
     if: github.repository == 'google/qhbm-library'
     name: push_to_pypi
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       NAME: dev-release
     steps:
