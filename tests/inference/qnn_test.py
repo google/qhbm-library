@@ -548,7 +548,6 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
       # atol is ok here because we checked above derivatives are not all zero
       self.assertAllClose(actual, expected, atol=self.close_atol_sampled)
 
-
   @test_util.eager_mode_toggle
   def test_sample_basic(self):
     """Confirms correct sampling from identity, bit flip, and GHZ QNNs."""
