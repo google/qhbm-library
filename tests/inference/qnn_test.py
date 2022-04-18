@@ -557,7 +557,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
 
     ident_qnn = models.DirectQuantumCircuit(
         cirq.Circuit(cirq.I(q) for q in self.raw_qubits), name="identity")
-    q_infer = inference.AnalyticQuantumInference(ident_qnn)
+    q_infer = inference.SampledQuantumInference(ident_qnn,
+                                                self.expectation_samples)
     sample_wrapper = tf.function(q_infer._sample)
     test_samples = sample_wrapper(bitstrings, counts)
     for i, (b, c) in enumerate(zip(bitstrings, counts)):
@@ -567,7 +568,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
 
     flip_qnn = models.DirectQuantumCircuit(
         cirq.Circuit(cirq.X(q) for q in self.raw_qubits), name="flip")
-    q_infer = inference.QuantumInference(flip_qnn)
+    q_infer = inference.SampledQuantumInference(flip_qnn,
+                                                self.expectation_samples)
     sample_wrapper = tf.function(q_infer._sample)
     test_samples = sample_wrapper(bitstrings, counts)
     for i, (b, c) in enumerate(zip(bitstrings, counts)):
@@ -586,7 +588,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         ghz_circuit,
         initializer=tf.keras.initializers.Constant(value=0.5),
         name="ghz")
-    q_infer = inference.QuantumInference(ghz_qnn)
+    q_infer = inference.SampledQuantumInference(ghz_qnn,
+                                                self.expectation_samples)
     sample_wrapper = tf.function(q_infer._sample)
     test_samples = sample_wrapper(
         tf.expand_dims(tf.constant([0] * self.num_bits, dtype=tf.int8), 0),
@@ -606,7 +609,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     counts = tf.constant([max_counts // 2, max_counts])
     test_qnn = models.DirectQuantumCircuit(
         cirq.Circuit(cirq.H(cirq.GridQubit(0, 0))))
-    test_infer = inference.AnalyticQuantumInference(test_qnn)
+    test_infer = inference.SampledQuantumInference(test_qnn,
+                                                   self.expectation_samples)
     sample_wrapper = tf.function(test_infer._sample)
     bitstrings = tf.constant([[0], [0]], dtype=tf.int8)
     _, samples_counts = sample_wrapper(bitstrings, counts)
