@@ -582,6 +582,7 @@ class AnalyticEnergyInferenceTest(tf.test.TestCase):
     _, _, counts = utils.unique_bitstrings_with_counts(samples)
     self.assertAllClose(1.0, counts[0] / counts[1], rtol=self.close_rtol)
 
+
 class BernoulliEnergyInferenceTest(tf.test.TestCase):
   """Tests the BernoulliEnergyInference class."""
 
@@ -786,6 +787,7 @@ class BernoulliEnergyInferenceTest(tf.test.TestCase):
     _, _, counts = utils.unique_bitstrings_with_counts(samples)
     self.assertAllClose(1.0, counts[0] / counts[1], rtol=self.close_rtol)
 
+
 class GibbsWithGradientsKernelTest(tf.test.TestCase):
   """Tests the GibbsWithGradientsKernel class."""
 
@@ -844,6 +846,7 @@ class GibbsWithGradientsKernelTest(tf.test.TestCase):
 
     self.assertNotAllEqual(initial_state, next_state)
     self.assertGreater(initial_energy, next_energy)
+
 
 class GibbsWithGradientsInferenceTest(tf.test.TestCase):
   """Tests the GibbsWithGradientsInference class."""
