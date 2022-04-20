@@ -35,19 +35,22 @@ from tests import test_util
 
 
 class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
-  """Tests the QuantumInference class."""
+  """Tests the Analytic and Sampled QuantumInference classes."""
 
   def setUp(self):
     """Initializes test objects."""
     super().setUp()
     self.python_random_seed = 11
-    self.tf_random_seed = 10
+    self.tf_random_seed = 11
+    tf.random.set_seed(self.tf_random_seed)
     self.tf_random_seed_alt = 201
     self.tfp_seed = tf.constant([5, 6], dtype=tf.int32)
 
-    self.close_atol = 2e-3
-    self.close_rtol = 2e-3
-    self.not_zero_atol = 3e-3
+    self.close_atol_analytic = 2e-3
+    self.close_atol_sampled = 2e-2
+    self.not_zero_atol = max(self.close_atol_analytic, self.close_atol_sampled)
+
+    self.expectation_samples = int(1e6)
 
     # Build QNN representing X^p|s>
     self.num_bits = 3
@@ -61,19 +64,20 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         name="p_qnn")
 
   def test_init(self):
-    """Confirms QuantumInference is initialized correctly."""
-    expected_backend = "noiseless"
-    expected_differentiator = None
-    expected_name = "TestOE"
-    actual_exp = inference.QuantumInference(
-        self.p_qnn,
-        backend=expected_backend,
-        differentiator=expected_differentiator,
-        name=expected_name)
+    """Confirms QuantumInference classes are initialized correctly."""
+    expected_name = "test_qnn_name"
+    actual_exp = inference.AnalyticQuantumInference(
+        self.p_qnn, name=expected_name)
     self.assertEqual(actual_exp.name, expected_name)
-    self.assertEqual(actual_exp.backend, expected_backend)
     self.assertEqual(actual_exp.circuit, self.p_qnn)
-    self.assertEqual(actual_exp.differentiator, expected_differentiator)
+
+    expected_expectation_samples = 41827
+    actual_exp = inference.SampledQuantumInference(
+        self.p_qnn, expected_expectation_samples, name=expected_name)
+    self.assertEqual(actual_exp.name, expected_name)
+    self.assertEqual(actual_exp._expectation_samples,
+                     expected_expectation_samples)
+    self.assertEqual(actual_exp.circuit, self.p_qnn)
 
   @test_util.eager_mode_toggle
   def test_expectation(self):
@@ -111,9 +115,6 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     d/dp <s|(X^p)^dagger Y X^p|s> = -(-1)^s pi cos(pi * p)
     d/dp <s|(X^p)^dagger Z X^p|s> = -(-1)^s pi sin(pi * p)
     """
-
-    # Build inference object
-    exp_infer = inference.QuantumInference(self.p_qnn)
 
     # Get all the bitstrings multiple times.
     initial_states_list = 5 * list(
@@ -156,19 +157,27 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     z_ops = tfq.convert_to_tensor([1 * cirq.Z(q) for q in self.raw_qubits])
     all_ops = [x_ops, y_ops, z_ops]
 
-    expectation_wrapper = tf.function(exp_infer.expectation)
-    actual = []
-    actual_grad = []
-    for op in all_ops:
-      with tf.GradientTape() as tape:
-        current_exp = expectation_wrapper(initial_states, op)
-      current_grad = tf.squeeze(
-          tape.jacobian(current_exp, self.p_qnn.trainable_variables))
-      actual.append(current_exp)
-      actual_grad.append(current_grad)
+    qnn_analytic = inference.AnalyticQuantumInference(self.p_qnn)
+    qnn_sampled = inference.SampledQuantumInference(self.p_qnn,
+                                                    self.expectation_samples)
 
-    self.assertAllClose(actual, expected, rtol=self.close_rtol)
-    self.assertAllClose(actual_grad, expected_grad, rtol=self.close_rtol)
+    for qnn, atol in [(qnn_analytic, self.close_atol_analytic),
+                      (qnn_sampled, self.close_atol_sampled)]:
+      expectation_wrapper = tf.function(qnn.expectation)
+      actual = []
+      actual_grad = []
+      for op in all_ops:
+        with tf.GradientTape() as tape:
+          current_exp = expectation_wrapper(initial_states, op)
+        current_grad = tf.squeeze(
+            tape.jacobian(current_exp, self.p_qnn.trainable_variables))
+        actual.append(current_exp)
+        actual_grad.append(current_grad)
+
+      for a, e in zip(actual, expected):
+        self.assertAllClose(a, e, atol=atol)
+      for a, e in zip(actual_grad, expected_grad):
+        self.assertAllClose(a, e, atol=atol)
 
   @test_util.eager_mode_toggle
   def test_expectation_cirq(self):
@@ -225,32 +234,34 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     actual_circuit = models.QuantumCircuit(
         tfq.convert_to_tensor([raw_circuit]), qubits, tf.constant(symbols),
         [random_values], [[]])
-    q_infer = inference.QuantumInference(actual_circuit)
 
     # calculate expected values
     expected_expectations = expectation_func()
+    expected_jacobian = test_util.approximate_jacobian(
+        expectation_func, actual_circuit.trainable_variables)
 
     # Check that expectations are a reasonable size
     self.assertAllGreater(
         tf.math.abs(expected_expectations), self.not_zero_atol)
 
-    expectation_wrapper = tf.function(q_infer.expectation)
-    with tf.GradientTape() as tape:
-      actual_expectations = expectation_wrapper(all_bitstrings, ops)
-    self.assertAllClose(
-        actual_expectations, expected_expectations, rtol=self.close_rtol)
+    qnn_analytic = inference.AnalyticQuantumInference(actual_circuit)
+    qnn_sampled = inference.SampledQuantumInference(actual_circuit,
+                                                    self.expectation_samples)
+    for qnn, atol in [(qnn_analytic, self.close_atol_analytic),
+                      (qnn_sampled, self.close_atol_sampled)]:
+      expectation_wrapper = tf.function(qnn.expectation)
+      with tf.GradientTape() as tape:
+        actual_expectations = expectation_wrapper(all_bitstrings, ops)
+      self.assertAllClose(actual_expectations, expected_expectations, atol=atol)
 
-    actual_jacobian = tape.jacobian(actual_expectations,
-                                    actual_circuit.trainable_variables)
-    expected_jacobian = test_util.approximate_jacobian(
-        expectation_func, actual_circuit.trainable_variables)
+      actual_jacobian = tape.jacobian(actual_expectations,
+                                      actual_circuit.trainable_variables)
 
-    self.assertNotAllClose(
-        expected_jacobian,
-        tf.zeros_like(expected_jacobian),
-        atol=self.not_zero_atol)
-    self.assertAllClose(
-        expected_jacobian, actual_jacobian, atol=self.close_atol)
+      self.assertNotAllClose(
+          expected_jacobian,
+          tf.zeros_like(expected_jacobian),
+          atol=self.not_zero_atol)
+      self.assertAllClose(expected_jacobian, actual_jacobian, atol=atol)
 
   @parameterized.parameters({
       "energy_class": energy_class,
@@ -290,7 +301,6 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     model_raw_circuit = cirq.testing.random_circuit(qubits, n_moments,
                                                     act_fraction)
     model_circuit = models.DirectQuantumCircuit(model_raw_circuit)
-    model_infer = inference.QuantumInference(model_circuit)
 
     # bitstring injectors
     all_bitstrings = list(itertools.product([0, 1], repeat=self.num_bits))
@@ -325,13 +335,6 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         expected_expectations,
         tf.zeros_like(expected_expectations),
         atol=self.not_zero_atol)
-
-    expectation_wrapper = tf.function(model_infer.expectation)
-    with tf.GradientTape() as tape:
-      actual_expectations = expectation_wrapper(all_bitstrings,
-                                                hamiltonian_measure)
-    self.assertAllClose(actual_expectations, expected_expectations)
-
     expected_jacobian_thetas = test_util.approximate_jacobian(
         expectation_func, hamiltonian_measure.energy.trainable_variables)
     self.assertNotAllClose(
@@ -344,13 +347,26 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         expected_jacobian_phis,
         tf.zeros_like(expected_jacobian_phis),
         atol=self.not_zero_atol)
-    actual_jacobian_thetas, actual_jacobian_phis = tape.jacobian(
-        actual_expectations, (hamiltonian_measure.energy.trainable_variables,
-                              hamiltonian_measure.circuit.trainable_variables))
-    self.assertAllClose(
-        actual_jacobian_phis, expected_jacobian_phis, rtol=self.close_rtol)
-    self.assertAllClose(
-        actual_jacobian_thetas, expected_jacobian_thetas, rtol=self.close_rtol)
+
+    qnn_analytic = inference.AnalyticQuantumInference(model_circuit)
+    qnn_sampled = inference.SampledQuantumInference(model_circuit,
+                                                    self.expectation_samples)
+    for qnn, atol in [(qnn_analytic, self.close_atol_analytic),
+                      (qnn_sampled, self.close_atol_sampled)]:
+      expectation_wrapper = tf.function(qnn.expectation)
+      with tf.GradientTape() as tape:
+        actual_expectations = expectation_wrapper(all_bitstrings,
+                                                  hamiltonian_measure)
+      self.assertAllClose(actual_expectations, expected_expectations, atol=atol)
+
+      actual_jacobian_thetas, actual_jacobian_phis = tape.jacobian(
+          actual_expectations,
+          (hamiltonian_measure.energy.trainable_variables,
+           hamiltonian_measure.circuit.trainable_variables))
+      self.assertAllClose(
+          actual_jacobian_phis, expected_jacobian_phis, atol=atol)
+      self.assertAllClose(
+          actual_jacobian_thetas, expected_jacobian_thetas, atol=atol)
 
   @test_util.eager_mode_toggle
   def test_expectation_bitstring_energy(self):
@@ -385,10 +401,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
 
     # state qnn
     expectation_samples = int(1e6)
-    actual_qnn = inference.QuantumInference(
-        state_circuit,
-        expectation_samples=expectation_samples,
-        differentiator=tfq.differentiators.ParameterShift())
+    actual_qnn = inference.SampledQuantumInference(
+        state_circuit, expectation_samples=expectation_samples)
 
     # hamiltonian circuit
     hamiltonian_qnn_symbols = symbols[:num_symbols // 2]
@@ -510,7 +524,9 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     expectation_wrapper = tf.function(actual_qnn.expectation)
     actual_expectations = expectation_wrapper(initial_states, hamiltonian)
     self.assertAllClose(
-        actual_expectations, expected_expectations, rtol=self.close_rtol)
+        actual_expectations,
+        expected_expectations,
+        atol=self.close_atol_sampled)
     self.assertAllEqual(
         tf.shape(actual_expectations), [len(initial_states_list), 1])
 
@@ -520,7 +536,8 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     for derivative in expected_derivatives:
       # Checks that at last one entry in each variable's derivative is
       # not too close to zero.
-      self.assertNotAllClose(derivative, tf.zeros_like(derivative), 0.011)
+      self.assertNotAllClose(derivative, tf.zeros_like(derivative),
+                             self.not_zero_atol)
 
     with tf.GradientTape() as tape:
       actual_expectations = expectation_wrapper(initial_states, hamiltonian)
@@ -529,7 +546,7 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     self.assertEqual(len(actual_derivatives), len(expected_derivatives))
     for actual, expected in zip(actual_derivatives, expected_derivatives):
       # atol is ok here because we checked above derivatives are not all zero
-      self.assertAllClose(actual, expected, atol=0.01)
+      self.assertAllClose(actual, expected, atol=self.close_atol_sampled)
 
   @test_util.eager_mode_toggle
   def test_sample_basic(self):
@@ -540,8 +557,9 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
 
     ident_qnn = models.DirectQuantumCircuit(
         cirq.Circuit(cirq.I(q) for q in self.raw_qubits), name="identity")
-    q_infer = inference.QuantumInference(ident_qnn)
-    sample_wrapper = tf.function(q_infer.sample)
+    q_infer = inference.SampledQuantumInference(ident_qnn,
+                                                self.expectation_samples)
+    sample_wrapper = tf.function(q_infer._sample)
     test_samples = sample_wrapper(bitstrings, counts)
     for i, (b, c) in enumerate(zip(bitstrings, counts)):
       self.assertEqual(tf.shape(test_samples[i].to_tensor())[0], c)
@@ -550,8 +568,9 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
 
     flip_qnn = models.DirectQuantumCircuit(
         cirq.Circuit(cirq.X(q) for q in self.raw_qubits), name="flip")
-    q_infer = inference.QuantumInference(flip_qnn)
-    sample_wrapper = tf.function(q_infer.sample)
+    q_infer = inference.SampledQuantumInference(flip_qnn,
+                                                self.expectation_samples)
+    sample_wrapper = tf.function(q_infer._sample)
     test_samples = sample_wrapper(bitstrings, counts)
     for i, (b, c) in enumerate(zip(bitstrings, counts)):
       self.assertEqual(tf.shape(test_samples[i].to_tensor())[0], c)
@@ -569,8 +588,9 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
         ghz_circuit,
         initializer=tf.keras.initializers.Constant(value=0.5),
         name="ghz")
-    q_infer = inference.QuantumInference(ghz_qnn)
-    sample_wrapper = tf.function(q_infer.sample)
+    q_infer = inference.SampledQuantumInference(ghz_qnn,
+                                                self.expectation_samples)
+    sample_wrapper = tf.function(q_infer._sample)
     test_samples = sample_wrapper(
         tf.expand_dims(tf.constant([0] * self.num_bits, dtype=tf.int8), 0),
         tf.expand_dims(counts[0], 0))[0].to_tensor()
@@ -589,8 +609,9 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     counts = tf.constant([max_counts // 2, max_counts])
     test_qnn = models.DirectQuantumCircuit(
         cirq.Circuit(cirq.H(cirq.GridQubit(0, 0))))
-    test_infer = inference.QuantumInference(test_qnn)
-    sample_wrapper = tf.function(test_infer.sample)
+    test_infer = inference.SampledQuantumInference(test_qnn,
+                                                   self.expectation_samples)
+    sample_wrapper = tf.function(test_infer._sample)
     bitstrings = tf.constant([[0], [0]], dtype=tf.int8)
     _, samples_counts = sample_wrapper(bitstrings, counts)
     # QNN samples should be half 0 and half 1.

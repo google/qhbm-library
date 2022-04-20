@@ -164,7 +164,7 @@ class QMHLTest(tf.test.TestCase):
       qnn_init = tf.keras.initializers.RandomUniform(
           minval=q_const / 4, maxval=q_const, seed=self.tf_random_seed)
       actual_circuit = models.DirectQuantumCircuit(r_circuit, qnn_init)
-      q_infer = inference.QuantumInference(actual_circuit)
+      q_infer = inference.AnalyticQuantumInference(actual_circuit)
       qhbm_infer = inference.QHBM(e_infer, q_infer)
       model = qhbm_infer.modular_hamiltonian
 
@@ -198,7 +198,7 @@ class QMHLTest(tf.test.TestCase):
       y_rot = cirq.Circuit(
           cirq.ry(r.numpy())(q) for r, q in zip(alphas, qubits))
       data_circuit = models.DirectQuantumCircuit(y_rot)
-      data_q_infer = inference.QuantumInference(data_circuit)
+      data_q_infer = inference.AnalyticQuantumInference(data_circuit)
       data_probs = tf.random.uniform([num_qubits],
                                      dtype=tf.float32,
                                      seed=self.tf_random_seed)

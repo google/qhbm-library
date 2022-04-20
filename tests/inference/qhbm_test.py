@@ -54,7 +54,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
       symbols.add("".join(random.sample(string.ascii_letters, 10)))
     self.pqc = tfq_util.random_symbol_circuit(qubits, symbols)
     actual_circuit = models.DirectQuantumCircuit(self.pqc)
-    self.expected_qnn = inference.QuantumInference(actual_circuit)
+    self.expected_qnn = inference.AnalyticQuantumInference(actual_circuit)
 
     # Inference
     self.expected_name = "nameforaQHBM"
@@ -120,7 +120,7 @@ class QHBMTest(parameterized.TestCase, tf.test.TestCase):
     qubits = cirq.GridQubit.rect(1, num_bits)
     pqc = cirq.Circuit(cirq.Y(q) for q in qubits)
     actual_circuit = models.DirectQuantumCircuit(pqc)
-    q_infer = inference.QuantumInference(actual_circuit)
+    q_infer = inference.AnalyticQuantumInference(actual_circuit)
 
     h_infer = inference.QHBM(e_infer, q_infer)
     circuits_wrapper = tf.function(h_infer.circuits)
