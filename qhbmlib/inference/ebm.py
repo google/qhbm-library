@@ -363,20 +363,20 @@ class EnergyInference(EnergyInferenceBase):
     $$
     Z = \sum_x e^{-E(x)}
       = \sum_x u(x) 2^n e^{-E(x)}
-      = \mathbb{E}\left[2^n e^{-E(\cdot)}\right],
+      = 2^n \mathbb{E}\left[e^{-E(\cdot)}\right],
     $$
     where $n$ is the number of bits in each uniform sample.  Now draw $N_s$
     samples from the uniform distribution.  Then we can approximate the
     expectation value as (equation 11.2)
     $$
-    \mathbb{E}\left[2^n e^{-E(\cdot)}\right]
-      \approx\frac{1}{N_s}\sum_{i=1}^{N_s} 2^n e^{-E(x_i)}.
+    2^n \mathbb{E}\left[e^{-E(\cdot)}\right]
+      \approx\frac{2^n}{N_s}\sum_{i=1}^{N_s} e^{-E(x_i)}.
     $$
     Next, what we are really interested in is the logarithm of the partition
     function.  Then we have
     $$
     \log Z
-      \approx \log \left(\frac{1}{N_s}\sum_{i=1}^{N_s} 2^n e^{-E(x_i)}\right)
+      \approx \log \left(\frac{2^n}{N_s}\sum_{i=1}^{N_s} e^{-E(x_i)}\right)
       = n \log 2 - \log N_s + \log \sum_{i=1}^{N_s}  e^{-E(x_i)}.
     $$
 
