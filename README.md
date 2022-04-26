@@ -5,17 +5,18 @@ Quantum Hamiltonian-Based Models.  These tools depend on
 [TensorFlow Quantum](https://www.tensorflow.org/quantum),
 and are thus compatible with both real and simulated quantum computers.
 
+To get started, see [the installation instructions](https://github.com/google/qhbm-library#installation).  To contribute, please read [our contribution guide](https://github.com/google/qhbm-library#how-to-contribute).
 
 ## Installation
 
 There are two ways to start developing with the QHBM Library:
-* Install the package in a local environment.
-* Work from the source code.
+* [Install the package in a local environment.](https://github.com/google/qhbm-library#pip-package)
+* [Work directly from the source code.](https://github.com/google/qhbm-library#install-from-source)
 
 
 ### Pip package
 
-To install, simply run:
+To install the latest QHBM Library package `qhbmlib` from PyPI, simply run:
 ```
 pip install qhbmlib
 ```
@@ -32,7 +33,7 @@ git clone https://github.com/USERNAME/qhbm-library.git
 cd qhbm-library
 ```
 
-Now you need to tell your local git client about the parent repo of your fork:
+Then, tell your local git client about the parent repo of your fork:
 ```
 git remote add upstream https://github.com/google/qhbm-library.git
 ```
@@ -99,7 +100,7 @@ information on using pull requests.  What follows is a step-by-step guide for co
 
 #### 1. Get the source code
 
-Before starting, be sure to follow the instructions to [install from source](https://github.com/google/qhbm-library/blob/main/docs/INSTALL.md#install-from-source).
+Before starting, be sure to follow the instructions to [install from source](https://github.com/google/qhbm-library#install-from-source).
 
 
 #### 2. Update your fork
