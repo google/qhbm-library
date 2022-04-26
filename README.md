@@ -14,14 +14,14 @@ There are two ways to start developing with the QHBM Library:
 * [Work directly from the source code.](https://github.com/google/qhbm-library#install-from-source)
 
 
-### Pip package
+### Pip Package
 
 To install the latest QHBM Library package `qhbmlib` from PyPI, simply run:
 ```
 pip install qhbmlib
 ```
 
-### Install from source
+### Install from Source
 
 #### 1. Fork and clone the repository
 
