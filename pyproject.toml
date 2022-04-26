@@ -3,7 +3,6 @@ name = "qhbmlib"
 version = "0.3.0"
 description = "Quantum Hamiltonian-Based Models built on TensorFlow Quantum"
 license = "Apache-2.0"
-readme = "README.md"
 homepage = "https://github.com/google/qhbm-library"
 repository = "https://github.com/google/qhbm-library"
 keywords = ["quantum-computing"]
