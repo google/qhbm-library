@@ -30,13 +30,13 @@ python = "~3.7 || ~3.8 || ~3.9"
 tensorflow = "2.7.0"
 tensorflow-probability = "0.15.0"
 tensorflow-quantum = "0.6.1"
-Sphinx = "^4.5.0"
 
 [tool.poetry.group.dev.dependencies]
 coverage = {extras = ["toml"], version = "5.5"}
 pylint = "2.13.3"
 pytest = "6.2.4"
 pytest-cov = "2.11.1"
+sphinx = "^4.5.0"
 yapf = "0.31.0"
 
 [tool.coverage.paths]
