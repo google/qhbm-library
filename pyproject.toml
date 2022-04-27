@@ -40,7 +40,7 @@ docs = [
     "myst-parser",
 ]
 
-[tool.poetry.group.dev.dependencies]
+[tool.poetry.dev-dependencies]
 coverage = {extras = ["toml"], version = "5.5"}
 pylint = "2.13.3"
 pytest = "6.2.4"
@@ -58,7 +58,7 @@ source = ["qhbmlib"]
 show_missing = true
 
 [build-system]
-requires = ["poetry-core~=1.2.0"]
+requires = ["poetry-core~=1.1.13"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.yapf]
