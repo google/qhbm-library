@@ -35,10 +35,11 @@ release = '0.3'
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-  'sphinx.ext.mathjax',
-  'sphinx.ext.viewcode',
+  'sphinx.ext.autodoc',
   'sphinx.ext.autosummary',
+  'sphinx.ext.mathjax',
   'sphinx.ext.napoleon',
+  'sphinx.ext.viewcode',
   'sphinx_rtd_theme',
 ]
 
