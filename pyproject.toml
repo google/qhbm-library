@@ -30,14 +30,14 @@ python = "~3.7 || ~3.8 || ~3.9"
 tensorflow = "2.7.0"
 tensorflow-probability = "0.15.0"
 tensorflow-quantum = "0.6.1"
+cirq-core = "0.13.1"
+cirq-google = "0.13.1"
+numpy = "1.19.5"
 
 # Documentation tools are only installed on RTD if they are in this main group
 Sphinx = "^4.5.0"
 sphinx-rtd-theme = "^1.0.0"
 myst-parser = "^0.17.2"
-cirq-core = "0.13.1"
-cirq-google = "0.13.1"
-numpy = "1.19.5"
 
 [tool.poetry.dev-dependencies]
 coverage = {extras = ["toml"], version = "5.5"}
