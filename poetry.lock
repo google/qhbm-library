@@ -1118,13 +1118,10 @@ python-versions = ">=3.7"
 docs = ["sphinx", "jaraco.packaging (>=9)", "rst.linker (>=1.9)"]
 testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytest-cov", "pytest-enabler (>=1.0.1)", "jaraco.itertools", "func-timeout", "pytest-black (>=0.3.7)", "pytest-mypy (>=0.9.1)"]
 
-[extras]
-docs = ["sphinx-rtd-theme"]
-
 [metadata]
 lock-version = "1.1"
 python-versions = "~3.7 || ~3.8 || ~3.9"
-content-hash = "1d2c6d736cf9cc05a7f1ad683094860f6d1fc85ce90e8ea0c619a097e97ff14e"
+content-hash = "2890fa36d875789cd4a839aa86135cf265ef578f38de5bd2a9396361ac46cba5"
 
 [metadata.files]
 absl-py = [
