@@ -38,6 +38,7 @@ pytest = "6.2.4"
 pytest-cov = "2.11.1"
 sphinx = "^4.5.0"
 yapf = "0.31.0"
+myst-parser = "^0.17.2"
 
 [tool.coverage.paths]
 source = ["qhbmlib"]
