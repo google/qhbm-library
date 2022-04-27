@@ -3,11 +3,10 @@ Welcome to QHBM Library's documentation!
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
 
    install
    contributing
-   modules
+   api
 
 
 Indices and tables

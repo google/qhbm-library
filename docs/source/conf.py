@@ -17,6 +17,7 @@ import sys
 sys.path.insert(0, os.path.abspath("../"))
 
 import myst_parser
+import qhbmlib
 import sphinx_rtd_theme
 
 
@@ -44,6 +45,7 @@ extensions = [
   'sphinx.ext.viewcode',
   'sphinx_rtd_theme',
 ]
+autosummary_generate = True
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
