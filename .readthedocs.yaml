@@ -6,12 +6,10 @@ build:
     python: "3.9"
   jobs:
     pre_create_environment:
-      - ASDF_POETRY_INSTALL_URL=https://install.python-poetry.org
-      - asdf plugin add poetry
-      - asdf install poetry latest
-      - asdf global poetry latest
+      - curl -sSL https://install.python-poetry.org | python3.9 -
       - poetry self update --preview
       - poetry config virtualenvs.create false
+      - asdf global poetry system
     post_install:
       - poetry install
 
