@@ -32,7 +32,6 @@ tensorflow-probability = "0.15.0"
 tensorflow-quantum = "0.6.1"
 
 sphinx = "^4.5.0"
-myst-parser = "^0.17.2"
 
 [tool.poetry.extras]
 docs = [
