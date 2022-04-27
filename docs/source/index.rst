@@ -1,13 +1,11 @@
 Welcome to QHBM Library's documentation!
 ========================================
 
-.. automodule:: my_project.main
-    :members:
-
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
+   modules
 
 
 Indices and tables
@@ -16,11 +14,3 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-
-
-Contents
---------
-
-.. toctree::
-
-   api
