@@ -33,7 +33,6 @@ release = '0.3'
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-  'myst_parser',
   'sphinx.ext.mathjax',
   'sphinx.ext.viewcode',
   'sphinx.ext.autosummary',
@@ -48,10 +47,9 @@ templates_path = ['_templates']
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = []
 
-# Add .rst for the index .md for use with myst-parser
+# Add .rst for the index
 source_suffix = {
     '.rst': 'restructuredtext',
-    '.md': 'markdown',
 }
 
 
