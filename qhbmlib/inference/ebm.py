@@ -343,55 +343,14 @@ class EnergyInference(EnergyInferenceBase):
     return _inner_log_partition()
 
   def _log_partition_forward_pass(self):
-    r"""Returns approximation to the log partition function.
+    """Returns approximation to the log partition function.
 
-    The calculation uses the uniform distribution to approximate the
-    partition function using Monte Carlo integration.  See section 11.2 of [1]
-    for details on Monte Carlo integration.
-
-    TODO (#216): decrease variance of this estimator.
-
-    Given an energy function $E$, the associated partition function is defined
-    $$
-    Z = \sum_x e^{-E(x)},
-    $$
-    where $x$ ranges over the domain of $E$.  We do not want to compute this sum
-    directly because it is over a set exponentially large in the number of bits.
-    Instead, we can use Monte Carlo integration.  To support this, consider
-    rewriting the sum as an expectation value with respect to the uniform
-    distribution $u(x)$:
-    $$
-    Z = \sum_x e^{-E(x)}
-      = \sum_x u(x) 2^n e^{-E(x)}
-      = 2^n \mathbb{E}\left[e^{-E(\cdot)}\right],
-    $$
-    where $n$ is the number of bits in each uniform sample.  Now draw $N_s$
-    samples from the uniform distribution.  Then we can approximate the
-    expectation value as (equation 11.2)
-    $$
-    2^n \mathbb{E}\left[e^{-E(\cdot)}\right]
-      \approx\frac{2^n}{N_s}\sum_{i=1}^{N_s} e^{-E(x_i)}.
-    $$
-    Next, what we are really interested in is the logarithm of the partition
-    function.  Then we have
-    $$
-    \log Z
-      \approx \log \left(\frac{2^n}{N_s}\sum_{i=1}^{N_s} e^{-E(x_i)}\right)
-      = n \log 2 - \log N_s + \log \sum_{i=1}^{N_s}  e^{-E(x_i)}.
-    $$
-
-    #### References
-    [1]: Murphy, Kevin P. (2023).
-         Probabilistic Machine Learning: Advanced Topics.
-         MIT Press.
+    Note this simple estimator is biased.  See the paper appendix for its
+    motivation.  TODO(#216)
     """
-    n = self.energy.num_bits
-    n_s = self.num_expectation_samples
-    # Sample from the uniform distribution
-    samples = tfp.distributions.Bernoulli(logits=tf.zeros([n])).sample(n_s)
-    energies = self.energy(samples)
-    return n * tf.math.log(2.0) - tf.math.log(tf.cast(
-        n_s, tf.float32)) + tf.math.reduce_logsumexp(-1.0 * energies)
+    samples = self.sample(self.num_expectation_samples)
+    unique_samples, _, _ = utils.unique_bitstrings_with_counts(samples)
+    return tf.math.reduce_logsumexp(-1.0 * self.energy(unique_samples))
 
   def _log_partition_grad_generator(self):
     """Returns default estimator for the log partition function derivative."""
@@ -399,18 +358,20 @@ class EnergyInference(EnergyInferenceBase):
     def grad_fn(upstream, variables):
       """See equation C2 in the appendix.  TODO(#119)"""
 
-      samples = self.sample(self.num_expectation_samples)
-      unique_samples, _, counts = utils.unique_bitstrings_with_counts(samples)
+      def energy_grad(bitstrings):
+        """Calculates the derivative with respect to the current variables."""
+        with tf.GradientTape() as tape:
+          energies = self.energy(bitstrings)
+        jac = tape.jacobian(
+            energies,
+            variables,
+            unconnected_gradients=tf.UnconnectedGradients.ZERO)
+        return jac
 
-      with tf.GradientTape() as tape:
-        unique_energies = self.energy(unique_samples)
-      unique_jacobians = tape.jacobian(
-          unique_energies,
-          variables,
-          unconnected_gradients=tf.UnconnectedGradients.ZERO)
-      average_jacobians = tf.nest.map_structure(
-          lambda j: utils.weighted_average(counts, j), unique_jacobians)
-      return tuple(), [upstream * (-1.0 * aj) for aj in average_jacobians]
+      energy_grad_expectation_list = self.expectation(energy_grad)
+      return tuple(), [
+          upstream * (-1.0 * ege) for ege in energy_grad_expectation_list
+      ]
 
     return grad_fn
 
