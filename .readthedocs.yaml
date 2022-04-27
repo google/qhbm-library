@@ -4,15 +4,6 @@ build:
   os: "ubuntu-20.04"
   tools:
     python: "3.9"
-  jobs:
-    pre_create_environment:
-      - curl -sSL https://install.python-poetry.org | python3.9 -
-      - source ~/.bash_profile
-      - poetry self update --preview
-      - poetry config virtualenvs.create false
-      - asdf global poetry system
-    post_install:
-      - poetry install
 
 sphinx:
   fail_on_warning: true
