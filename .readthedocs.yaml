@@ -7,8 +7,10 @@ build:
   # See https://github.com/readthedocs/readthedocs.org/issues/4912
   jobs:
     pre_create_environment:
-      - python -m pip install --upgrade pip
-      - pip install --user poetry==1.2.0b1
+      - asdf plugin add poetry
+      - asdf install poetry latest
+      - asdf global poetry latest
+      - poetry --version
       - poetry config virtualenvs.create false
     post_install:
       - poetry install
