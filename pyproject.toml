@@ -57,6 +57,10 @@ source = ["qhbmlib"]
 [tool.coverage.report]
 show_missing = true
 
+[build-system]
+requires = ["poetry_core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
 [tool.yapf]
 based_on_style = "yapf"
 indent_width = "2"
