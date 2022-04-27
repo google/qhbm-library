@@ -53,7 +53,7 @@ source = ["qhbmlib"]
 show_missing = true
 
 [tool.poetry.extras]
-docs = ["sphinx", "sphinx-rtd-theme"]
+doc = ["sphinx", "sphinx-rtd-theme"]
 
 [build-system]
 requires = ["poetry_core>=1.0.0"]
