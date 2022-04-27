@@ -5,6 +5,8 @@ Welcome to QHBM Library's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   install
+   contributing
    modules
 
 
