@@ -30,6 +30,7 @@ python = "~3.7 || ~3.8 || ~3.9"
 tensorflow = "2.7.0"
 tensorflow-probability = "0.15.0"
 tensorflow-quantum = "0.6.1"
+Sphinx = "^4.5.0"
 
 [tool.poetry.group.dev.dependencies]
 coverage = {extras = ["toml"], version = "5.5"}
