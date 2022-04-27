@@ -32,11 +32,12 @@ tensorflow-probability = "0.15.0"
 tensorflow-quantum = "0.6.1"
 
 sphinx = "^4.5.0"
+sphinx-rtd-theme = "^1.0.0"
 
 [tool.poetry.extras]
 docs = [
     "sphinx",
-    "myst-parser",
+    "sphinx-rtd-theme",
 ]
 
 [tool.poetry.dev-dependencies]
