@@ -31,13 +31,6 @@ tensorflow = "2.7.0"
 tensorflow-probability = "0.15.0"
 tensorflow-quantum = "0.6.1"
 
-
-[tool.poetry.extras]
-docs = [
-    "sphinx",
-    "sphinx-rtd-theme",
-]
-
 [tool.poetry.dev-dependencies]
 coverage = {extras = ["toml"], version = "5.5"}
 pylint = "2.13.3"
