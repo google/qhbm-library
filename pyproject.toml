@@ -31,16 +31,16 @@ tensorflow = "2.7.0"
 tensorflow-probability = "0.15.0"
 tensorflow-quantum = "0.6.1"
 
-[tool.poetry.group.dev.dependencies]
-Sphinx = "^4.5.0"
-sphinx-rtd-theme = "^1.0.0"
-
 [tool.poetry.dev-dependencies]
 coverage = {extras = ["toml"], version = "5.5"}
 pylint = "2.13.3"
 pytest = "6.2.4"
 pytest-cov = "2.11.1"
 yapf = "0.31.0"
+
+# Documentation
+Sphinx = "^4.5.0"
+sphinx-rtd-theme = "^1.0.0"
 
 [tool.coverage.paths]
 source = ["qhbmlib"]
@@ -51,6 +51,9 @@ source = ["qhbmlib"]
 
 [tool.coverage.report]
 show_missing = true
+
+[tool.poetry.extras]
+docs = ["sphinx", "sphinx-rtd-theme"]
 
 [build-system]
 requires = ["poetry_core>=1.0.0"]
