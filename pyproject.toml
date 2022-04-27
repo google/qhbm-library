@@ -35,6 +35,9 @@ tensorflow-quantum = "0.6.1"
 Sphinx = "^4.5.0"
 sphinx-rtd-theme = "^1.0.0"
 myst-parser = "^0.17.2"
+cirq-core = "0.13.1"
+cirq-google = "0.13.1"
+numpy = "1.19.5"
 
 [tool.poetry.dev-dependencies]
 coverage = {extras = ["toml"], version = "5.5"}
