@@ -4,6 +4,15 @@ build:
   os: "ubuntu-20.04"
   tools:
     python: "3.9"
+  jobs:
+    pre_create_environment:
+      - asdf plugin add poetry
+      - asdf install poetry latest
+      - asdf global poetry latest
+      - poetry self update --preview
+      - poetry config virtualenvs.create false
+    post_install:
+      - poetry install
 
 sphinx:
   fail_on_warning: true
