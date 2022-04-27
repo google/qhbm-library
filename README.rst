@@ -1,4 +1,0 @@
-QHBM Library
-============
-
-Test documentation
