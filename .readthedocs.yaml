@@ -4,16 +4,6 @@ build:
   os: "ubuntu-20.04"
   tools:
     python: "3.9"
-  # See https://github.com/readthedocs/readthedocs.org/issues/4912
-  jobs:
-    pre_create_environment:
-      - asdf plugin add poetry
-      - asdf install poetry latest
-      - asdf global poetry latest
-      - poetry --version
-      - poetry config virtualenvs.create false
-    post_install:
-      - poetry install
 
 sphinx:
   fail_on_warning: true
@@ -23,3 +13,5 @@ python:
   install:
     - method: pip
       path: .
+      extra_requirements:
+         - docs
