@@ -6,8 +6,7 @@ Welcome to QHBM Library's documentation!
 
    install
    contributing
-   api
-
+   reference
 
 Indices and tables
 ==================

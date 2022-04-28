@@ -24,11 +24,11 @@ import sphinx_rtd_theme
 # -- Project information -----------------------------------------------------
 
 project = 'QHBM Library'
-copyright = '2022, zaqqwerty'
-author = 'zaqqwerty'
+copyright = '2022, The QHBM Library Authors'
+author = 'The QHBM Library Authors'
 
 # The full version, including alpha/beta/rc tags
-release = '0.3'
+release = '0.3.0'
 
 
 # -- General configuration ---------------------------------------------------
@@ -39,13 +39,11 @@ release = '0.3'
 extensions = [
   'myst_parser',
   'sphinx.ext.autodoc',
-  'sphinx.ext.autosummary',
   'sphinx.ext.mathjax',
   'sphinx.ext.napoleon',
   'sphinx.ext.viewcode',
   'sphinx_rtd_theme',
 ]
-autosummary_generate = True
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
