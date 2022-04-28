@@ -31,7 +31,12 @@ tensorflow = "2.7.0"
 tensorflow-probability = "0.15.0"
 tensorflow-quantum = "0.6.1"
 
-[tool.poetry.group.dev.dependencies]
+# Documentation tools are only installed on RTD if they are in this main group
+Sphinx = "^4.5.0"
+sphinx-rtd-theme = "^1.0.0"
+myst-parser = "^0.17.2"
+
+[tool.poetry.dev-dependencies]
 coverage = {extras = ["toml"], version = "5.5"}
 pylint = "2.13.3"
 pytest = "6.2.4"
@@ -48,8 +53,13 @@ source = ["qhbmlib"]
 [tool.coverage.report]
 show_missing = true
 
+[tool.poetry.extras]
+# Everything needed for docs building goes here.
+# The 'doc' command under 'extra_requirements' in the RTD yaml uses this line.
+doc = ["myst-parser", "sphinx", "sphinx-rtd-theme"]
+
 [build-system]
-requires = ["poetry-core~=1.2.0"]
+requires = ["poetry_core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.yapf]
