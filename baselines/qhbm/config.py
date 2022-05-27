@@ -50,7 +50,7 @@ def get_config():
   training.train = True
   training.samples = 500
   training.head_of_snake_steps = 10 + 1 #500
-  training.max_steps = 10 + 1 #100
+  training.num_steps = 10 + 1 #100
   training.method = 'vanilla'
   training.optimizer = 'Adam'
   training.learning_rate = 0.1
@@ -74,13 +74,13 @@ def get_config():
 
   # hyperparameters
   hparams = ml_collections.ConfigDict()
-  hparams.ebm_mean = 0.0
-  hparams.ebm_stddev = 0.1
-  hparams.qnn_mean = 0.0
-  hparams.qnn_stddev = 0.1
+  hparams.energy_mean = 0.0
+  hparams.energy_stddev = 0.1
+  hparams.circuit_mean = 0.0
+  hparams.circuit_stddev = 0.1
   # Fraction of loss within which to converge
-  hparams.max_iterations = 1
-  hparams.p = 7  # default
+  hparams.num_iterations = 1
+  hparams.num_layers = 7  # default
   hparams.tied = False
   config.hparams = hparams
 
