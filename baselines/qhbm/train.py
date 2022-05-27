@@ -245,11 +245,11 @@ def train_model(qhbm: inference.QHBM,
               "circuit_variables", modular_hamiltonian.circuit.trainable_variables, step=step)
         if config.logging.energy_grads:
           tf.summary.histogram("energy_grads", grads[:-1], step=step)
+          tf.summary.scalar(
+            "energy_grad_size", tf.reduce_max(tf.abs(grads[:-1])), step=step)
         if config.logging.circuit_grads:
           tf.summary.histogram("circuit_grads", grads[-1:], step=step)
-        tf.summary.histogram(
-            "energy_grad_size", tf.reduce_max(tf.abs(grads[:-1])), step=step)
-        tf.summary.histogram(
+          tf.summary.scalar(
             "circuit_grad_size", tf.reduce_max(tf.abs(grads[-1:])), step=step)
 
       elif config.training.ansatz == "qaia":
@@ -410,13 +410,11 @@ def main(argv):
         model_metrics_writer = tf.summary.create_file_writer(model_dir)
         initial_t = time.time()
 
-        num_steps = config.training.head_of_snake_steps if sequence_step == 0 else config.training.num_steps
-        method = config.training.method
+        num_steps = config.training.init_steps if sequence_step == 0 else config.training.num_steps
         if vqt:
           train_model(
               qhbm,
               modular_hamiltonian,
-              method,
               optimizer,
               num_steps,
               target_hamiltonian_shards,
@@ -429,7 +427,6 @@ def main(argv):
           train_model(
               qhbm,
               modular_hamiltonian,
-              method,
               optimizer,
               num_steps,
               target_hamiltonian_shards,
@@ -455,9 +452,7 @@ def main(argv):
       with summary_writer.as_default():
         hp.hparams({
             "qnn_layers":
-                config.hparams.p,
-            "training_method":
-                config.training.method,
+                config.hparams.num_layers,
             "learning_rate":
                 config.training.learning_rate
         })
