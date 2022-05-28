@@ -253,17 +253,27 @@ def train_model(qhbm: inference.QHBM,
             "circuit_grad_size", tf.reduce_max(tf.abs(grads[-1:])), step=step)
 
       elif config.training.ansatz == "qaia":
-        tf.summary.histogram(
-            "thetas_classical", modular_hamiltonian.energy.post_process[0].kernel, step=step)
-        tf.summary.histogram(
-            "etas", modular_hamiltonian.circuit.value_layers_inputs[0][0], step=step)
-        if not config.hparams.tied:
+        if config.logging.energy_variables:
           tf.summary.histogram(
-              "thetas_quantum",
-              modular_hamiltonian.circuit.value_layers_inputs[0][1],
-              step=step)
-        tf.summary.histogram(
-            "gammas", modular_hamiltonian.circuit.value_layers_inputs[0][2], step=step)
+              "energy_variables", modular_hamiltonian.energy.post_process[0].kernel, step=step)
+          tf.summary.histogram(
+              "etas", modular_hamiltonian.circuit.value_layers_inputs[0][0], step=step)
+        if config.logging.circuit_variables:
+          if not config.hparams.tied:
+            tf.summary.histogram(
+                "quantum_variables",
+                modular_hamiltonian.circuit.value_layers_inputs[0][1],
+                step=step)
+          tf.summary.histogram(
+              "gammas", modular_hamiltonian.circuit.value_layers_inputs[0][2], step=step)
+        if config.logging.energy_grads:
+          tf.summary.histogram("energy_grads", grads[:-1], step=step)
+          tf.summary.scalar(
+            "energy_grad_size", tf.reduce_max(tf.abs(grads[:-1])), step=step)
+        if config.logging.circuit_grads:
+          tf.summary.histogram("circuit_grads", grads[-1:], step=step)
+          tf.summary.scalar(
+            "circuit_grad_size", tf.reduce_max(tf.abs(grads[-1:])), step=step)
 
       if step % config.logging.expensive_downsample == 0 or step == num_steps - 1:
         if config.logging.fidelity:
@@ -408,7 +418,7 @@ def main(argv):
         model_dir = os.path.join(results_dir, "metrics", data_point_label,
                                  model_label)
         model_metrics_writer = tf.summary.create_file_writer(model_dir)
-        initial_t = time.time()
+        initial_time = time.time()
 
         num_steps = config.training.init_steps if sequence_step == 0 else config.training.num_steps
         if vqt:
@@ -443,7 +453,7 @@ def main(argv):
             target_loss = target_entropy
           tf.summary.scalar("target_loss", target_loss, step=num_steps-1)
 
-        total_wall_time = time.time() - initial_t
+        total_wall_time = time.time() - initial_time
         logging.info("Finished training. Total min: %.2f",
                      total_wall_time / 60.0)
 

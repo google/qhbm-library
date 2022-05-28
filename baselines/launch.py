@@ -51,7 +51,7 @@ flags.DEFINE_string(
     'config', None, 'Filepath to Python file with a function '
     'get_sweep(hyper) returning a hyperparameter sweep and/or '
     'a function get_config() returning a ConfigDict.')
-flags.DEFINE_bool('launch_on_gcp', False, 'Whether or not to launch on GCS.')
+flags.DEFINE_bool('launch_on_gcp', True, 'Whether or not to launch on GCS.')
 
 # Accelerator flags
 flags.DEFINE_string('platform', None, 'Platform (e.g., tpu-v2, tpu-v3, gpu).')
@@ -145,28 +145,6 @@ def _build_binary_metadata(config):
   args = dict(num_cores=num_cores, use_gpu=use_gpu)
   args.update(flag_args)
   return args, metadata
-
-
-def _map_experiment_names(wid, params):
-  """Generates name of experiment based on parameters.
-
-  Args:
-    wid: WorkerID of this parameter run.
-    params: Dictionary containing mapping from parameter name to value.
-
-  Returns:
-    Reformatted string encoding the different parameter names.
-  """
-  if not params:
-    return str(wid)
-
-  param_values = []
-  for k, v in params.items():
-    if isinstance(v, float):
-      param_values.append('{}:{:.8f}'.format(k, v))
-    else:
-      param_values.append('{}:{}'.format(k, v))
-  return '{}-{}'.format(wid, '-'.join(param_values))
 
 
 def _split_path_to_ub(filepath):

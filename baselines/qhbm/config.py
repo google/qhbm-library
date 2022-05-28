@@ -11,13 +11,8 @@ import ml_collections
 def get_config():
   """Returns the configuration for this experiment."""
   config = ml_collections.ConfigDict()
-  config.platform = 'cpu'
-  # config.gpu_type = 'v100'
-  config.num_gpus = 1
   config.experiment_name = ('qhbm_test' + '_' +
       datetime.datetime.today().strftime('%Y-%m-%d-%H-%M-%S'))
-  output_dir = '/tmp/qhbm_logs/{}'.format(
-      config.experiment_name)
 
   # dataset generation settings
   dataset = ml_collections.ConfigDict()
@@ -50,6 +45,17 @@ def get_config():
   training.initialization = 'optimal'
   config.training = training
 
+    # hyperparameters
+  hparams = ml_collections.ConfigDict()
+  hparams.energy_mean = 0.0
+  hparams.energy_stddev = 0.1
+  hparams.circuit_mean = 0.0
+  hparams.circuit_stddev = 0.1
+  hparams.num_iterations = 1
+  hparams.num_layers = 7
+  hparams.tied = False
+  config.hparams = hparams
+
   # logging settings
   logging = ml_collections.ConfigDict()
   logging.loss = True
@@ -63,29 +69,17 @@ def get_config():
   logging.expensive_downsample = 1
   config.logging = logging
 
-  # hyperparameters
-  hparams = ml_collections.ConfigDict()
-  hparams.energy_mean = 0.0
-  hparams.energy_stddev = 0.1
-  hparams.circuit_mean = 0.0
-  hparams.circuit_stddev = 0.1
-  hparams.num_iterations = 1
-  hparams.num_layers = 7
-  hparams.tied = False
-  config.hparams = hparams
-
   config.args = {
       'experiment_name': config.experiment_name,
-      'output_dir': output_dir,
+      'output_dir': '/tmp/qhbm_logs/{}'.format(config.experiment_name),
       'config': os.path.basename(__file__),
+      'seed': 42,
   }
   return config
 
 
 def get_sweep():
-  optimizer = ['Adam']
-  initialization = ['random']
-  num_layers = [7]
-  bias = [1.0]
-  seed = [1]
-  return list(dict([('config.training.optimizer', o), ('config.training.param_init', pi), ('config.hparams.p', pj), ('config.dataset.bias', b), ('seed', s)]) for (o, m, pi, pj, b, s) in itertools.product(optimizer, method, initialization, num_layers, bias, seed))
+  loss = ['vqt', 'qvartz']
+  optimizer = ['SGD', 'Adam']
+  initialization = ['random', 'optimal']
+  return list(dict([('config.training.loss', l), ('config.training.optimizer', o), ('config.training.initialization', i)]) for (l, o, i) in itertools.product(loss, optimizer, initialization))
