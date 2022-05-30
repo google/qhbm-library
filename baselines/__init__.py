@@ -1,2 +1,2 @@
-from baselines import architectures
+from baselines import pqc
 from baselines import utils

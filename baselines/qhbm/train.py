@@ -12,7 +12,7 @@ from qhbmlib import data
 from qhbmlib import models
 from qhbmlib import inference
 from qhbmlib import utils
-from baselines import architectures
+from baselines import pqc
 from baselines import utils as baselines_utils
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -162,14 +162,14 @@ def get_initial_qhbm(hamiltonian_shards, config, name):
     raw_qubits = cirq.GridQubit.rect(config.dataset.num_rows,
                                      config.dataset.num_cols)
   if num_layers == 0:
-    pqc = cirq.Circuit(cirq.I(q) for q in raw_qubits)
+    u = cirq.Circuit(cirq.I(q) for q in raw_qubits)
   else:
-    pqc = architectures.get_hardware_efficient_ansatz(
+    u = pqc.get_hardware_efficient_model_unitary(
         raw_qubits, num_layers, name)
   circuit_initializer = tf.keras.initializers.RandomNormal(
       mean=config.hparams.circuit_mean, stddev=config.hparams.circuit_stddev)
   if config.training.ansatz == "qhea":
-    circuit = models.DirectQuantumCircuit(pqc, circuit_initializer)
+    circuit = models.DirectQuantumCircuit(u, circuit_initializer)
   elif config.training.ansatz == "qaia":
     circuit = models.QAIA(hamiltonian_shards,
                           energy.operator_shards(raw_qubits),

@@ -51,7 +51,7 @@ def get_cz_exp_layer(qubits, layer_num, name):
   return circuit
 
 
-def get_hardware_efficient_ansatz(qubits, num_layers, name):
+def get_hardware_efficient_model_unitary(qubits, num_layers, name):
   """Build our full parameterized model unitary."""
   circuit = cirq.Circuit()
   for layer_num in range(num_layers):
