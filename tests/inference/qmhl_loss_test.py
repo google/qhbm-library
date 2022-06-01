@@ -135,10 +135,13 @@ class QMHLTest(tf.test.TestCase):
 
   def test_loss_value_x_rot(self):
     """Confirms correct values for a single qubit X rotation QHBM.
+
     We use a data state which is a Y rotation of an initially diagonal density
     operator.  The QHBM is a Bernoulli latent state with X rotation QNN.
+
     See the colab notebook at the following link for derivations:
     https://colab.research.google.com/drive/14987JCMju_8AVvvVoojwe6hA7Nlw-Dhe?usp=sharing
+
     Since each qubit is independent, the loss is the sum over the individual
     qubit losses, and the gradients are the the per-qubit gradients.
     """

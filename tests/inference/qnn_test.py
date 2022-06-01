@@ -33,7 +33,6 @@ from qhbmlib import models
 from qhbmlib import utils
 from tests import test_util
 
-
 class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
   """Tests the Analytic and Sampled QuantumInference classes."""
 
@@ -617,7 +616,6 @@ class QuantumInferenceTest(parameterized.TestCase, tf.test.TestCase):
     # QNN samples should be half 0 and half 1.
     self.assertAllClose(
         samples_counts[0], samples_counts[1], atol=max_counts // 1000)
-
 
 if __name__ == "__main__":
   logging.info("Running qnn_test.py ...")

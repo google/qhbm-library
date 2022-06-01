@@ -414,7 +414,7 @@ def main(argv):
           optimizer = get_optimizer(config.training.optimizer,
                                     config.training.learning_rate)
 
-        model_label = f"train_model_iteration_{iteration}"
+        model_label = f"model_iteration_{iteration}"
         model_dir = os.path.join(results_dir, "metrics", data_point_label,
                                  model_label)
         model_metrics_writer = tf.summary.create_file_writer(model_dir)
