@@ -28,3 +28,5 @@ __pycache__/
 *.swp
 *.swo
 
+# ignore generated docs files
+/docs/build/
