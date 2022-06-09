@@ -89,58 +89,21 @@ def get_tfim_unitary(x_hamiltonian, z_hamiltonian, config):
                              coefficients * config.dataset.trotter_steps)
 
 
-def get_average_correlation_op(config):
-  num_rows = config.dataset.num_rows
-  num_cols = config.dataset.num_cols
-
-  if config.dataset.lattice_dimension == 1:
-    num_sites = num_rows * num_cols
-    qubits = cirq.GridQubit.rect(1, num_sites)
-    op = cirq.PauliSum()
-    for q0, q1 in zip(qubits, qubits[1:]):
-      op += (1.0 / (num_sites - 1)) * cirq.Z(q0) * cirq.Z(q1)
-    return op
-    
-  elif config.dataset.lattice_dimension == 2:
-    hamiltonian = cirq.PauliSum()
-    qubits = get_qubit_grid(num_rows, num_cols)
-    extended_qubits = get_qubit_grid(num_rows, num_cols)
-    for r, row in enumerate(qubits):
-      extended_qubits[r].append(row[0])
-    extended_qubits.append(qubits[0])
-    count = 0
-    # Horizontal interactions.
-    for row in extended_qubits[:-1]:
-      for q0, q1 in zip(row, row[1:]):
-        hamiltonian += cirq.Z(q0) * cirq.Z(q1)
-        count += 1
-    # Vertical interactions.
-    for row_0, row_1 in zip(extended_qubits, extended_qubits[1:]):
-      for q0, q1 in zip(row_0[:-1], row_1):
-        hamiltonian += cirq.Z(q0) * cirq.Z(q1)
-        count += 1
-    hamiltonian = hamiltonian / float(count)
-    return hamiltonian
-
-
-def compute_data_point_metrics(average_correlation_op_matrix,
-                               beta=None,
+def compute_data_point_metrics(beta=None,
                                target_hamiltonian_matrix=None,
                                prev_target_density_matrix=None,
                                channel_matrix=None):
   if beta is not None and target_hamiltonian_matrix is not None:
-    target_density_matrix = baselines_utils.np_get_thermal_state(beta, target_hamiltonian_matrix)
+    target_density_matrix = baselines_utils.get_thermal_state(beta, target_hamiltonian_matrix)
     target_log_partition_function = baselines_utils.log_partition_function(
         beta, target_hamiltonian_matrix)
   elif prev_target_density_matrix is not None and channel_matrix is not None:
     target_density_matrix = channel_matrix @ prev_target_density_matrix @ tf.linalg.adjoint(channel_matrix)
-  target_correlation = tf.linalg.trace(
-      tf.matmul(average_correlation_op_matrix, target_density_matrix))
   target_state_eigvals = tf.linalg.eigvalsh(target_density_matrix)
   target_entropy = -tf.math.reduce_sum(tf.math.multiply_no_nan(tf.math.log(target_state_eigvals), target_state_eigvals))
   if beta is not None and target_hamiltonian_matrix is not None:
-    return target_density_matrix, target_correlation, target_entropy, target_log_partition_function
-  return target_density_matrix, target_correlation, target_entropy
+    return target_density_matrix, target_entropy, target_log_partition_function
+  return target_density_matrix, target_entropy
 
 
 def get_initial_qhbm(hamiltonian_shards, config, name):
@@ -319,11 +282,6 @@ def main(argv):
   with tf.io.gfile.GFile(os.path.join(results_dir, "config.json"), "w") as outfile:
     json.dump(config.to_dict(), outfile)
 
-  average_correlation_op = get_average_correlation_op(config)
-  average_correlation_op_matrix = tf.constant(
-      average_correlation_op.matrix(), dtype=tf.complex128)
-  average_correlation_op = tfq.convert_to_tensor([average_correlation_op])
-
   bias = round(config.dataset.bias, config.dataset.digits)
   x_hamiltonian, z_hamiltonian = get_tfim_hamiltonian(bias, config)
   target_hamiltonian_shards = [x_hamiltonian, z_hamiltonian]
@@ -357,8 +315,7 @@ def main(argv):
         if config.training.loss == "qvartz":
           evolution_time = 0.0
           evolution_time = round(evolution_time, config.dataset.digits)
-        target_density_matrix, target_correlation, target_entropy, target_log_partition_function = compute_data_point_metrics(
-            average_correlation_op_matrix,
+        target_density_matrix, target_entropy, target_log_partition_function = compute_data_point_metrics(
             beta=beta_tensor,
             target_hamiltonian_matrix=target_hamiltonian_matrix)
       else:
@@ -366,8 +323,7 @@ def main(argv):
         evolution_time = round(evolution_time, config.dataset.digits)
         unitary = iterates[sequence_step]
         unitary_matrix = tf.constant(unitary.unitary(), dtype=tf.complex128)
-        target_density_matrix, target_correlation, target_entropy = compute_data_point_metrics(
-            average_correlation_op_matrix,
+        target_density_matrix, target_entropy = compute_data_point_metrics(
             prev_target_density_matrix=target_density_matrix,
             channel_matrix=unitary_matrix)
 
@@ -388,8 +344,6 @@ def main(argv):
             data_point_dir)
         with data_point_metrics_writer.as_default():
           step_0 = tf.constant(0, dtype=tf.int64)
-          tf.summary.scalar(
-              "target_correlation", target_correlation, step=step_0)
           tf.summary.scalar("target_entropy", target_entropy, step=step_0)
           if vqt:
             tf.summary.scalar(

@@ -20,124 +20,6 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_quantum as tfq
 
-# ============================================================================ #
-# Density matrix utilities.
-# ============================================================================ #
-
-
-def pure_state_tensor_to_density_matrix(pure_states, counts):
-  """Returns the uniform mixture of the given tensor of pure states.
-    This function first treats every state as a column vector, then takes the
-    outer product of each state with its adjoint.  Then the sum over all the
-    outer
-    products is taken, and the resulting matrix normalized.
-    Args:
-      pure_states: 2-D `tf.Tensor` of dtype `complex64` and shape [num_states,
-        2**num_qubits] containing a pure state decomposition of a density
-        operator.
-  """
-  expanded_s = tf.expand_dims(pure_states, 1)
-  col_s = tf.transpose(expanded_s, [0, 2, 1])
-  adj_s = tf.linalg.adjoint(col_s)
-  prod = tf.linalg.matmul(col_s, adj_s)
-  thermal_state = tf.reduce_sum(
-      prod *
-      tf.cast(tf.expand_dims(tf.expand_dims(counts, 1), 2), tf.complex64), 0)
-  return tf.math.divide(thermal_state,
-                        tf.cast(tf.reduce_sum(counts), tf.complex64))
-
-
-def circuits_and_counts_to_density_matrix(circuits, counts):
-  pure_states = tfq.layers.State()(circuits).to_tensor()
-  return pure_state_tensor_to_density_matrix(pure_states, counts)
-
-
-def fidelity(rho, sigma):
-  """Calculate the fidelity between the two given density matrices.
-    Args:
-      rho: 2-D `tf.Tensor` of dtype `complex64` representing the left density
-        matrix in the fidelity calculation.
-      sigma: 2-D `tf.Tensor` of dtype `complex64` representing the right density
-        matrix in the fidelity calculation.
-    Returns:
-      A tf.Tensor float64 fidelity scalar between the two given density
-      matrices.
-    """
-  e_rho, v_rho = tf.linalg.eigh(tf.cast(rho, tf.complex128))
-  rho_sqrt = tf.linalg.matmul(
-      tf.linalg.matmul(v_rho, tf.linalg.diag(tf.math.sqrt(e_rho))),
-      tf.linalg.adjoint(v_rho),
-  )
-  omega = tf.linalg.matmul(
-      tf.linalg.matmul(rho_sqrt, tf.cast(sigma, tf.complex128)), rho_sqrt)
-  e_omega = tf.linalg.eigvals(omega)
-  return tf.math.abs(tf.math.reduce_sum(tf.math.sqrt(e_omega)))**2
-
-
-def fast_fidelity(rho, sigma):
-  """Calculate the 10x faster fidelity between the two given density matrices.
-    Args:
-      rho: 2-D `tf.Tensor` of dtype `complex64` representing the left density
-        matrix in the fidelity calculation.
-      sigma: 2-D `tf.Tensor` of dtype `complex64` representing the right density
-        matrix in the fidelity calculation.
-    Returns:
-      A tf.Tensor float64 fidelity scalar between the two given density
-      matrices.
-    """
-  e_rho, v_rho = tf.linalg.eigh(tf.cast(rho, tf.complex128))
-  # Optimization
-  # 1) tf.matmul(a, tf.linalg.diag(b))
-  # -> tf.multiply(a, tf.tile(tf.expand_dims(b, axis=0), [tf.shape(a)[0], 1]))
-  # minor portion, but 10x
-  sqrt_e_rho = tf.sqrt(e_rho)
-  v_rho_sqrt_e_rho = tf.multiply(
-      v_rho,
-      tf.tile(tf.expand_dims(sqrt_e_rho, axis=0), (tf.shape(v_rho)[0], 1)))
-  rho_sqrt = tf.linalg.matmul(v_rho_sqrt_e_rho, tf.linalg.adjoint(v_rho))
-  omega = tf.linalg.matmul(
-      tf.linalg.matmul(rho_sqrt, tf.cast(sigma, tf.complex128)), rho_sqrt)
-  # 2) Optimization eigvals -> eigh (10x), with numerical errors in 1e-4.
-  e_omega, _ = tf.linalg.eigh(omega)
-  return tf.math.abs(tf.math.reduce_sum(tf.math.sqrt(e_omega)))**2
-
-
-def _np_fidelity_internal(e_rho, v_rho, sigma):
-  """Internal np fidelity logic for preventing retracing graphs."""
-  sqrt_e_rho = tf.cast(tf.sqrt(e_rho), dtype=tf.complex128)
-  v_rho_sqrt_e_rho = tf.cast(
-      tf.multiply(
-          v_rho,
-          tf.tile(tf.expand_dims(sqrt_e_rho, axis=0), (tf.shape(v_rho)[0], 1))),
-      tf.complex128,
-  )
-  rho_sqrt = tf.linalg.matmul(v_rho_sqrt_e_rho, tf.linalg.adjoint(v_rho))
-  omega = tf.linalg.matmul(
-      tf.linalg.matmul(rho_sqrt, tf.cast(sigma, tf.complex128)), rho_sqrt)
-  return omega
-
-
-def np_fidelity(rho, sigma):
-  """Calculate the numpy-based fidelity between the two given density matrices.
-    tf.linalg.eigh() currently shows memory usage growth,
-    so it's slower & requires larger memory than np.linalg.eigh().
-    To enable the experiments, we need this function.
-    For example, 4x3 HEA VQT or 3x3 QAIA VQT can't run fidelity calculation on
-    64 GiB due to memory exceeds.
-    Args:
-      rho: 2-D `tf.Tensor` of dtype `complex64` representing the left density
-        matrix in the fidelity calculation.
-      sigma: 2-D `tf.Tensor` of dtype `complex64` representing the right density
-        matrix in the fidelity calculation.
-    Returns:
-      A tf.Tensor float64 fidelity scalar between the two given density
-      matrices.
-    """
-  e_rho, v_rho = np.linalg.eigh(tf.cast(rho, dtype=tf.complex128))
-  omega = _np_fidelity_internal(e_rho, v_rho, sigma)
-  e_omega, _ = np.linalg.eigh(omega)
-  return tf.math.abs(tf.math.reduce_sum(tf.math.sqrt(e_omega)))**2
-
 
 def optimized_trace_matmul(rho, sigma):
   """Returns optimized version of tf.linalg.trace(tf.matmul(rho, sigma)).
@@ -174,6 +56,17 @@ def relative_entropy(rho, sigma):
   log_rho = tf.linalg.logm(tf.cast(rho, tf.complex128))
   log_sigma = tf.linalg.logm(tf.cast(sigma, tf.complex128))
   return optimized_trace_matmul(rho, tf.subtract(log_rho, log_sigma))
+
+
+def _get_thermal_state_internal(beta, e, h_shape):
+  x = -1.0 * beta * e
+  with tf.GradientTape() as g:
+    g.watch(x)
+    lse = tf.reduce_logsumexp(x)
+  lse_grad = g.gradient(lse, x)
+  tiled_lse_grad = tf.cast(
+      tf.tile(tf.expand_dims(lse_grad, 0), [h_shape[0], 1]), tf.complex128)
+  return tiled_lse_grad
 
 
 def get_thermal_state(beta, h_num):
@@ -214,49 +107,9 @@ def get_thermal_state(beta, h_num):
       thermal
           state of `h_num` at inverse temperature `beta`.
     """
-  e_raw, v_raw = tf.linalg.eigh(h_num)
-  e = tf.cast(e_raw, tf.float64)
-  x = -1.0 * beta * e
-  with tf.GradientTape() as g:
-    g.watch(x)
-    lse = tf.reduce_logsumexp(x)
-  lse_grad = g.gradient(lse, x)
-  tiled_lse_grad = tf.cast(
-      tf.tile(tf.expand_dims(lse_grad, 0), [tf.shape(h_num)[0], 1]),
-      tf.complex128)
-  return tf.linalg.matmul(
-      tf.math.multiply(v_raw, tiled_lse_grad), tf.linalg.adjoint(v_raw))
-
-
-def _np_get_thermal_state_internal(beta, e, h_shape):
-  x = -1.0 * beta * e
-  with tf.GradientTape() as g:
-    g.watch(x)
-    lse = tf.reduce_logsumexp(x)
-  lse_grad = g.gradient(lse, x)
-  tiled_lse_grad = tf.cast(
-      tf.tile(tf.expand_dims(lse_grad, 0), [h_shape[0], 1]), tf.complex128)
-  return tiled_lse_grad
-
-
-def np_get_thermal_state(beta, h_num):
-  """Computes the thermal state with numpy eigh().
-    For details, please refer to get_thermal_state().
-    Since tf.linalg.eigh() shows huge memory usage growth, we can't use it
-    for larger grid size.
-    Args:
-      beta: Scalar `tf.Tensor` of dtype `float64` which is the inverse
-        temperature at which to calculate the thermal state.
-      h_num: Square, Hermitian `tf.Tensor` of dtype `complex128` which is the
-        Hamiltonian whose thermal state is to be calculated.
-    Returns:
-      `tf.Tensor` of dtype `complex128` which is the density matrix of the
-      thermal
-          state of `h_num` at inverse temperature `beta`.
-    """
   h_num = tf.cast(h_num, tf.complex128)
   e_raw, v_raw = np.linalg.eigh(h_num)
-  tiled_lse_grad = _np_get_thermal_state_internal(
+  tiled_lse_grad = _get_thermal_state_internal(
       tf.cast(beta, tf.float64), tf.cast(e_raw, tf.float64), tf.shape(h_num))
   return tf.linalg.matmul(
       tf.math.multiply(v_raw, tiled_lse_grad), tf.linalg.adjoint(v_raw))
@@ -279,31 +132,6 @@ def log_partition_function(beta, h_num):
       h_num, tf.complex128))  # h_eigs are real since h_num is Hermitian
   return tf.reduce_logsumexp(-tf.cast(beta, tf.float64) *
                              tf.cast(h_eigs, tf.float64))
-
-
-def entropy(rho):
-  """Computes the von Neumann entropy of the given density matrix.
-    The von Neumann entropy is -Tr[rho ln[rho]].  Note that the entropy is then
-    in
-    units of nats here instead of bits since we use natural logarithm.
-    Simplify:
-    -Tr[rho ln[rho]]
-        = -Tr[U D U_dag ln[U D U_dag]]
-        = -Tr[U D U_dag U ln[D] U_dag]
-        = -Tr[D ln[D]]
-        = -sum_i D_ii ln D_ii
-    Args:
-      rho: Square, Hermitian `tf.Tensor` of dtype `complex128` which is the
-        density matrix.
-    Returns:
-      Scalar `tf.Tensor` of dtype `float64` which is the von Neumann entropy (in
-        units of nats) of `rho`.
-    """
-  # Use eigh instead of eigvalsh to ease backpropagation, see docs on eigvalsh.
-  rho_eigs, _ = tf.linalg.eigh(rho)
-  # limit as x->0 of x ln x is 0, so replace nans from any 0 ln 0 with 0
-  rho_prod = tf.math.multiply_no_nan(tf.math.log(rho_eigs), rho_eigs)
-  return -tf.math.reduce_sum(rho_prod)
 
 
 def density_matrix_to_image(dm):
@@ -330,44 +158,3 @@ def density_matrix_to_image(dm):
   return tf.reshape(
       tf.concat([dm_real, my_zeros, dm_imag], 2),
       (1, total_edge, total_edge, 3))
-
-
-# ============================================================================ #
-# Bitstring utilities.
-# ============================================================================ #
-
-
-def qubits_to_indices(qubits):
-  """Maps list of cirq.GridQubit to a tensor of the column and row coordinates.
-  Args:
-    qubits: Python `list` of `cirq.GridQubit`s.
-  Returns:
-    indices: `tf.Tensor` of shape [len(qubits), 2] where `indices[i][0]` and
-      `indices[i][1]` give the row of and column of `qubits[i]`, respectively.
-  """
-  indices = tf.constant([[q.row, q.col] for q in qubits], dtype=tf.int32)
-  return indices
-
-
-def qubit_sub_indices(qubits_total, qubits_sublist):
-  """Returns the indices of the qubit sublist in the qubit total.
-  Args:
-    qubits_total: `tf.Tensor` of shape [n, 2], the output of `qubits_to_indices`
-      on some list of `cirq.GridQubit`s.
-    qubits_sublist: `tf.Tensor` of shape [m, 2], the output of
-      `qubits_to_indices` on some list of `cirq.GridQubit`s.
-  Returns:
-    sub_indices: `tf.Tensor` of shape [j], whose entries are the indices of the
-      sublist of qubits in total list of qubits.  When `qubits_sublist` is a
-      subset of `qubits_total`, then j == m.  More generally, j is the number of
-      qubits in `qubits_sublist` that also appear in `qubits_total`.
-  """
-  qubits_total_tiled = tf.tile(
-      tf.expand_dims(qubits_total, 0), [tf.shape(qubits_sublist)[0], 1, 1])
-  qubits_sublist_tiled = tf.tile(
-      tf.expand_dims(qubits_sublist, 1), [1, tf.shape(qubits_total)[0], 1])
-  qubit_overlaps = tf.equal(qubits_total_tiled, qubits_sublist_tiled)
-  reduced_qubit_overlaps = tf.reduce_all(qubit_overlaps, 2)
-  doubled_indices = tf.where(reduced_qubit_overlaps)
-  sub_indices = tf.transpose(doubled_indices)[1]
-  return sub_indices

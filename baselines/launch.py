@@ -10,11 +10,6 @@ The launcher works with any Python binary with the following flags:
 
 For binaries that support only certain accelerator settings, we recommend still
 using these flags. Raise errors outside its support or rely on runtime errors.
-
-To learn about experiment workflows, see
-`third_party/py/qhbmlib/baselines/README.md`.
-
-Forked from //uncertainty_baselines/baselines/xm_launcher.py
 """
 
 import collections
