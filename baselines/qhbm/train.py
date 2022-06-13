@@ -25,7 +25,7 @@ tfd = tfp.distributions
 
 # Output logging
 flags.DEFINE_string("experiment_name", "qhbm_experiment", "")
-flags.DEFINE_string("output_dir", "/tmp/qhbm_logs/", "")
+flags.DEFINE_string("output_dir", "/tmp/qhbm_logs/qhbm_experiment", "")
 config_flags.DEFINE_config_file("config", "path/to/config",
                                 "File containing the training configuration.")
 
