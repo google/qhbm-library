@@ -11,7 +11,7 @@ import ml_collections
 def get_config():
   """Returns the configuration for this experiment."""
   config = ml_collections.ConfigDict()
-  config.experiment_name = ('geometry_test' + '_' +
+  config.experiment_name = ('qhbm_experiment' + '_' +
       datetime.datetime.today().strftime('%Y-%m-%d-%H-%M-%S'))
 
   # dataset generation settings

@@ -24,8 +24,8 @@ tfb = tfp.bijectors
 tfd = tfp.distributions
 
 # Output logging
-flags.DEFINE_string("experiment_name", "geometry_experiment", "")
-flags.DEFINE_string("output_dir", "/tmp/geometry_logs/", "")
+flags.DEFINE_string("experiment_name", "qhbm_experiment", "")
+flags.DEFINE_string("output_dir", "/tmp/qhbm_logs/", "")
 config_flags.DEFINE_config_file("config", "path/to/config",
                                 "File containing the training configuration.")
 
