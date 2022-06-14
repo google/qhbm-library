@@ -85,5 +85,5 @@ to access Vertex AI to run jobs.
 
 ## Run XManager
 ```bash
-xmanager launch ./baselines/launch.py -- --binary ./baselines/project/train.py --config ./baselines/project/config.py --launch_on_gcp --num_cpus 1 --memory 8
+xmanager launch ./baselines/launch.py -- --binary ./baselines/train.py --config ./baselines/config.py --launch_on_gcp --num_cpus 1 --memory 8
 ```
