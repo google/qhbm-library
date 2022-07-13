@@ -60,13 +60,13 @@ class EnergyInferenceTest(tf.test.TestCase):
     self.close_rtol = 2e-2
     self.close_atol = 2e-3
     self.not_zero_atol = 4e-3
-    self.num_samples = int(1e6)
+    self.num_samples = int(5e5)
 
     self.num_bits = 5
     self.all_bitstrings = tf.constant(
         list(itertools.product([0, 1], repeat=self.num_bits)), dtype=tf.int8)
     self.tfp_seed = tf.constant([3, 4], tf.int32)
-    self.tf_random_seed = 4
+    self.tf_random_seed = 5
     energy_init = tf.keras.initializers.RandomUniform(seed=self.tf_random_seed)
     self.energy = models.BernoulliEnergy(
         list(range(self.num_bits)), initializer=energy_init)
@@ -77,7 +77,7 @@ class EnergyInferenceTest(tf.test.TestCase):
                                                     self.tfp_seed)
 
     spins_from_bitstrings = models.SpinsFromBitstrings()
-    parity = models.Parity(list(range(self.num_bits)), 2)
+    parity = models.Parity(list(range(self.num_bits)), 1)
 
     def test_function(bitstrings):
       """Simple test function to send to expectation."""
@@ -89,18 +89,21 @@ class EnergyInferenceTest(tf.test.TestCase):
   def test_entropy(self):
     """Compares estimated entropy to exact value."""
 
+    analytic_inference = inference.AnalyticEnergyInference(
+        self.energy, self.num_samples)
+
     def manual_entropy():
       """Returns the exact entropy of the distribution."""
-      return tf.reduce_sum(
-          tfp.distributions.Bernoulli(logits=self.energy.logits).entropy())
+      return analytic_inference.entropy()
 
+    print(manual_entropy())
     expected_entropy = manual_entropy()
     entropy_wrapper = tf.function(self.ebm.entropy)
     actual_entropy = entropy_wrapper()
     self.assertAllClose(actual_entropy, expected_entropy, rtol=self.close_rtol)
 
     expected_gradient = test_util.approximate_gradient(
-        manual_entropy, self.energy.trainable_variables)
+        manual_entropy, self.energy.trainable_variables, delta=1e-2)
     with tf.GradientTape() as tape:
       value = entropy_wrapper()
     actual_gradient = tape.gradient(value, self.energy.trainable_variables)
@@ -115,9 +118,8 @@ class EnergyInferenceTest(tf.test.TestCase):
       """A manual function for taking expectation values."""
       samples = tfp.distributions.Bernoulli(logits=self.energy.logits).sample(
           self.num_samples, seed=self.tfp_seed)
-      unique_samples, _, counts = utils.unique_bitstrings_with_counts(samples)
-      values = f(unique_samples)
-      return utils.weighted_average(counts, values)
+      values = f(samples)
+      return tf.math.reduce_mean(values, 0)
 
     expected_expectation = manual_expectation(self.test_function)
     expectation_wrapper = tf.function(self.ebm.expectation)

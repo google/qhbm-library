@@ -184,9 +184,8 @@ class EnergyInferenceBase(tf.keras.layers.Layer, abc.ABC):
     """Returns an estimate of the expectation value of the given function.
 
     Args:
-      function: Mapping from a 2D tensor of bitstrings to a possibly nested
-        structure.  The structure must have atomic elements all of which are
-        float tensors with the same batch size as the input bitstrings.
+      function: Mapping from a 2D tensor of bitstrings to a float tensor
+        with the same batch size as the input bitstrings.
     """
     return self._expectation(function)
 
@@ -269,59 +268,93 @@ class EnergyInference(EnergyInferenceBase):
     def _inner_expectation():
       """Enables derivatives."""
       samples = tf.stop_gradient(self.sample(self.num_expectation_samples))
-      bitstrings, _, counts = utils.unique_bitstrings_with_counts(samples)
+      unique_samples, idx, counts = utils.unique_bitstrings_with_counts(samples)
 
       # TODO(#157): try to parameterize the persistence.
       with tf.GradientTape() as values_tape:
         # Adds variables in `self.energy` to `variables` argument of `grad_fn`.
         values_tape.watch(self.energy.trainable_variables)
-        values = function(bitstrings)
-        average_of_values = tf.nest.map_structure(
-            lambda x: utils.weighted_average(counts, x), values)
+        values = function(samples)
+        average_of_values = tf.math.reduce_mean(values, 0)
 
-      def grad_fn(*upstream, variables):
+      def grad_fn(upstream, variables):
         """See equation A5 in the QHBM paper appendix for details.
 
         # TODO(#119): confirm equation number.
+
+        Args:
+          upstream: The derivative of the final node in the computational graph
+            backpropagated to `average_of_values`, since that is the output of
+            `_inner_expectation`.  Is d g / d <f_i> from the notes.
+          variables: List of variables encountered while computing the forward
+            pass of the function (everything in `_inner_expectation` outside of
+            this `grad_fn`.  For example, see the _eager_mode_decorator function
+            inside tensorflow/python/ops/custom_gradient.py
         """
-        function_grads = values_tape.gradient(
+
+        ####
+        # Compute first summand in equation A5.
+
+        with tf.GradientTape() as tape:
+          unique_energies = self.energy(unique_samples)
+
+        # d E_theta(x) / d theta_j
+        # Returned value is a list, one entry for each variable.
+        # Each entry is a tensor; first index indexes unique energies, remaining
+        # indices are the same as the corresponding entry of `variables`
+        unique_energies_grads = tape.jacobian(
+            unique_energies,
+            variables,
+            unconnected_gradients=tf.UnconnectedGradients.ZERO)
+        energies_grads = tf.nest.map_structure(
+            lambda g: utils.expand_unique_results(g, idx),
+            unique_energies_grads)
+
+        # <d E_theta(x) / d theta_j>
+        average_energies_grads = tf.nest.map_structure(
+            lambda g: utils.weighted_average(counts, g), unique_energies_grads)
+
+        # Multiply d g / d <f_i> times <f_i>, then do the sum.
+        # This is now a scalar.
+        summed_upstream_times_average_of_values = tf.math.reduce_sum(
+            upstream * average_of_values)
+
+        first_summand = tf.nest.map_structure(
+            lambda x: x * summed_upstream_times_average_of_values,
+            average_energies_grads)
+
+        ####
+        # Compute middle summand in equation A5.
+
+        # Multiply d g / d <f_i> times f_i(x), summing over
+        # non-bitstring indices.  This is now a 1D tensor.
+        expanded_upstream = tf.expand_dims(upstream, 0)
+        summed_upstream_times_values = tf.vectorized_map(
+            tf.math.reduce_sum,
+            values * expanded_upstream,
+            fallback_to_while_loop=False)
+
+        # d E_theta(x) / d theta_j times sum_i d g / d <f_i> times f_i(x)
+        energies_grads_times_sums = tf.nest.map_structure(
+            lambda g: tf.einsum("i,i...->i...", summed_upstream_times_values, g
+                               ), energies_grads)
+
+        middle_summand = tf.nest.map_structure(tf.math.reduce_mean,
+                                               energies_grads_times_sums)
+
+        ####
+        # Last summand in equation A5.
+        # `output_gradients` is  d g / d <f_i>
+        last_summand = values_tape.gradient(
             average_of_values,
             variables,
             output_gradients=upstream,
             unconnected_gradients=tf.UnconnectedGradients.ZERO)
 
-        flat_upstream = tf.nest.flatten(upstream)
-        flat_values = tf.nest.flatten(values)
-        combined_flat = tf.nest.map_structure(lambda x, y: x * y, flat_upstream,
-                                              flat_values)
-        combined_flat_sum = tf.nest.map_structure(
-            lambda x: tf.map_fn(tf.reduce_sum, x), combined_flat)
-        combined_sum = tf.reduce_sum(tf.stack(combined_flat_sum), 0)
-        average_of_combined_sum = utils.weighted_average(counts, combined_sum)
-
-        # Compute grad E terms.
-        with tf.GradientTape() as tape:
-          energies = self.energy(bitstrings)
-        energies_grads = tape.jacobian(
-            energies,
-            variables,
-            unconnected_gradients=tf.UnconnectedGradients.ZERO)
-        average_of_energies_grads = tf.nest.map_structure(
-            lambda x: utils.weighted_average(counts, x), energies_grads)
-
-        product_of_averages = tf.nest.map_structure(
-            lambda x: x * average_of_combined_sum, average_of_energies_grads)
-
-        products = tf.nest.map_structure(
-            lambda x: tf.einsum("i...,i->i...", x, combined_sum),
-            energies_grads)
-        average_of_products = tf.nest.map_structure(
-            lambda x: utils.weighted_average(counts, x), products)
-
-        # Note: upstream gradient is already a coefficient in poa, aop, and fg.
+        # Note: upstream gradient is already a coefficient in fs, ms, and ls.
         return tuple(), [
-            poa - aop + fg for poa, aop, fg in zip(
-                product_of_averages, average_of_products, function_grads)
+            fs - ms + ls
+            for fs, ms, ls in zip(first_summand, middle_summand, last_summand)
         ]
 
       return average_of_values, grad_fn
